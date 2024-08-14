@@ -1,15 +1,16 @@
-def create_daily_vhi_list(date_generated, fs):
+def create_daily_vhi_list(date_generated, fs, warning=False):
     """
     Creates a list of daily vhi (Vegetative Health Index) files and calculates the total size of the files.
 
     Parameters:
-    - date_generated (list): A list of dates for which to check the existence of AOD files.
-    - fs (FileSystem): The file system object used to check file existence and size.
+        date_generated (list): A list of dates for which to check the existence of AOD files.
+        fs (FileSystem): The file system object used to check file existence and size.
 
     Returns:
-    - nodd_file_list (list): A list of paths to the existing AOD files.
-    - nodd_total_size (int): The total size of the existing AOD files in bytes.
+        tuple: A tuple containing the list of file paths and the total size of the files.
     """
+    import warnings
+
     # Loop through observation dates & check for files
     nodd_file_list = []
     nodd_total_size = 0
@@ -17,33 +18,35 @@ def create_daily_vhi_list(date_generated, fs):
         file_date = date.strftime("%Y%m%d")
         year = file_date[:4]
         prod_path = "noaa-cdr-ndvi-pds/data/" + year + "/"
-        file_name = fs.glob(prod_path + "VIIRS-Land_*_" + file_date + "_*.nc")
+        file_names = fs.glob(prod_path + "VIIRS-Land_*_" + file_date + "_*.nc")
         # If file exists, add path to list and add file size to total
-        try:
-            if fs.exists(prod_path + file_name) is True:
-                nodd_file_list.extend(fs.ls(prod_path + file_name))
-                nodd_total_size = nodd_total_size + fs.size(prod_path + file_name)
+        if file_names:
+            nodd_file_list.extend(file_names)
+            nodd_total_size = nodd_total_size + sum(fs.size(f) for f in file_names)
+        else:
+            msg = "File does not exist on AWS: " + prod_path + "VIIRS-Land_*_" + file_date + "_*.nc"
+            if warning:
+                warnings.warn(msg)
+                nodd_file_list.append(None)
             else:
-                raise ValueError
-        except ValueError:
-            print("File does not exist on AWS: " + prod_path + file_name)
-            return [], 0
+                raise ValueError(msg)
+
     return nodd_file_list, nodd_total_size
 
 
 def open_dataset(date):
     """
-    Opens a dataset for the given date, satellite, data resolution, and averaging time.
+    Opens a dataset for the given date.
 
     Parameters:
-        date (str or datetime.datetime): The date for which to open the dataset.
-        averaging_time (str, optional): The averaging time. Valid values are 'daily', 'weekly', or 'monthly'. Defaults to 'daily'.
+        date (str or datetime-like): The date for which to open the dataset.
+            1981--present are available.
 
     Returns:
         xarray.Dataset: The opened dataset.
 
     Raises:
-        ValueError: If the input values are invalid.
+        ValueError: If the input parameters are invalid.
     """
     import pandas as pd
     import s3fs
@@ -59,70 +62,51 @@ def open_dataset(date):
 
     file_list, _ = create_daily_vhi_list(date_generated, fs)
 
-    try:
-        if len(file_list) == 0:
-            raise ValueError
-        else:
-            aws_file = fs.open(file_list[0])
-    except ValueError:
-        print("Files not available for product and date:", date_generated[0])
-        return
+    if len(file_list) == 0 or all(f is None for f in file_list):
+        raise ValueError(f"Files not available for product and date: {date_generated[0]}")
+
+    aws_file = fs.open(file_list[0])
 
     dset = xr.open_dataset(aws_file)
-
-    # add datetime
-    # dset = dset.expand_dims(time=date_generated)
 
     return dset
 
 
-def open_mfdataset(dates, download=False, save_path="./"):
+def open_mfdataset(dates, error_missing=False):
     """
     Opens and combines multiple NetCDF files into a single xarray dataset.
 
     Parameters:
         dates (pandas.DatetimeIndex): The dates for which to retrieve the data.
-        satellite (str): The satellite name. Valid values are 'SNPP', 'NOAA20', or 'both'.
-        data_resolution (str, optional): The data resolution. Valid values are '0.050', '0.100', or '0.250'. Defaults to '0.1'.
-        averaging_time (str, optional): The averaging time. Valid values are 'daily', 'weekly', or 'monthly'. Defaults to 'daily'.
-        download (bool, optional): Whether to download the data from AWS. Defaults to False.
-        save_path (str, optional): The path to save the downloaded data. Defaults to './'.
-
+        error_missing (bool, optional): If False (default), skip missing files with warning
+            and continue processing. Otherwise, raise an error.
     Returns:
         xarray.Dataset: The combined dataset containing the data for the specified dates.
 
     Raises:
         ValueError: If the input parameters are invalid.
-
     """
+    from collections.abc import Iterable
+
     import pandas as pd
     import s3fs
     import xarray as xr
 
-    try:
-        if not isinstance(dates, pd.DatetimeIndex):
-            raise ValueError("Expecting pandas.DatetimeIndex for 'dates' parameter.")
-    except ValueError:
-        print("Invalid input for 'dates': Expecting pandas.DatetimeIndex")
-        return
+    if isinstance(dates, Iterable) and not isinstance(dates, str):
+        dates = pd.DatetimeIndex(dates)
+    else:
+        dates = pd.DatetimeIndex([dates])
 
     # Access AWS using anonymous credentials
     fs = s3fs.S3FileSystem(anon=True)
 
-    file_list, total_size = create_daily_vhi_list(dates, fs)
+    file_list, _ = create_daily_vhi_list(dates, fs, warning=not error_missing)
 
-    try:
-        if not file_list:
-            raise ValueError
-        aws_files = []
-        for f in file_list:
-            aws_files.append(fs.open(f))
-    except ValueError:
-        print("File not available for product and date")
-        return
+    if len(file_list) == 0 or all(f is None for f in file_list):
+        raise ValueError(f"Files not available for product and dates: {dates}")
 
-    dset = xr.open_mfdataset(aws_files, concat_dim={"time": dates}, combine="nested")
+    aws_files = [fs.open(f) for f in file_list if f is not None]
 
-    dset["time"] = dates
+    dset = xr.open_mfdataset(aws_files, concat_dim="time", combine="nested")
 
     return dset

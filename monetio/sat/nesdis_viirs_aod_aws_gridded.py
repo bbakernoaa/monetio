@@ -3,14 +3,13 @@ def create_daily_aod_list(data_resolution, satellite, date_generated, fs, warnin
     Creates a list of daily AOD (Aerosol Optical Depth) files and calculates the total size of the files.
 
     Parameters:
-    - data_resolution (str): The resolution of the AOD data.
-    - satellite (str): The satellite name. Can be 'SNPP' or 'NOAA20'.
-    - date_generated (list): A list of dates for which to check the existence of AOD files.
-    - fs (FileSystem): The file system object used to check file existence and size.
+        data_resolution (str): The resolution of the AOD data.
+        satellite (str): The satellite name. Can be 'SNPP' or 'NOAA20'.
+        date_generated (list): A list of dates for which to check the existence of AOD files.
+        fs (FileSystem): The file system object used to check file existence and size.
 
     Returns:
-    - nodd_file_list (list): A list of paths to the existing AOD files.
-    - nodd_total_size (int): The total size of the existing AOD files in bytes.
+        tuple: A tuple containing the list of file paths and the total size of the files.
     """
     import warnings
 
@@ -66,7 +65,6 @@ def create_monthly_aod_list(satellite, date_generated, fs, warning=False):
 
     Returns:
         tuple: A tuple containing the list of file paths and the total size of the files.
-
     """
     import warnings
 
@@ -113,12 +111,12 @@ def create_weekly_aod_list(satellite, date_generated, fs, warning=False):
     Creates a list of files and calculates the total size of files for a given satellite, observation dates, and file system.
 
     Parameters:
-    satellite (str): The satellite name. Can be 'SNPP' or 'NOAA20'.
-    date_generated (list): A list of observation dates.
-    fs (FileSystem): The file system object.
+        satellite (str): The satellite name. Can be 'SNPP' or 'NOAA20'.
+        date_generated (list): A list of observation dates.
+        fs (FileSystem): The file system object.
 
     Returns:
-    tuple: A tuple containing the list of files and the total size of files.
+        tuple: A tuple containing the list of files and the total size of files.
     """
     # Loop through observation dates & check for files
     nodd_file_list = []
@@ -244,7 +242,7 @@ def open_mfdataset(
             For 'weekly' and 'monthly' data, the resolution is always 0.25.
         averaging_time (str, optional): The averaging time.
             Valid values are 'daily', 'weekly', or 'monthly'. Defaults to 'daily'.
-        error_missing (bool, optional): If False, skip missing files with warning
+        error_missing (bool, optional): If False (default), skip missing files with warning
             and continue processing. Otherwise, raise an error.
 
     Returns:
@@ -272,7 +270,7 @@ def open_mfdataset(
             "Valid values are '0.050', '0.100', or '0.250'"
         )
 
-    if isinstance(dates, Iterable):
+    if isinstance(dates, Iterable) and not isinstance(dates, str):
         dates = pd.DatetimeIndex(dates)
     else:
         dates = pd.DatetimeIndex([dates])
