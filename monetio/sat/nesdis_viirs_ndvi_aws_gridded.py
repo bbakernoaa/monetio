@@ -68,7 +68,7 @@ def open_dataset(date):
 
     aws_file = fs.open(file_list[0])
 
-    dset = xr.open_dataset(aws_file)
+    dset = xr.open_dataset(aws_file, drop_variables=["TIMEOFDAY"])
 
     return dset
 
@@ -108,6 +108,11 @@ def open_mfdataset(dates, error_missing=False):
 
     aws_files = [fs.open(f) for f in file_list if f is not None]
 
-    dset = xr.open_mfdataset(aws_files, concat_dim="time", combine="nested")
+    dset = xr.open_mfdataset(
+        aws_files,
+        concat_dim="time",
+        combine="nested",
+        drop_variables=["TIMEOFDAY"],
+    )
 
     return dset
