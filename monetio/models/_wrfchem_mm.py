@@ -189,7 +189,12 @@ def open_mfdataset(
     if "pm25_om" in list_calc_sum:
         dset = add_lazy_om_pm25(dset, dict_sum)
 
-    dset = dset.reset_coords(["XTIME", "datetime"], drop=True)
+    # fix to work with Jerrold's wrfchem files
+    if "XTIME" in list(dset.coords):
+        dset = dset.reset_coords(["XTIME", "datetime"], drop=True)
+    else:
+        dset = dset.reset_coords("datetime", drop=True)
+
     if not surf_only_nc:
         # Reset more variables
         dset = dset.rename(
