@@ -55,5 +55,5 @@ or you can manually download it from GitHub and install it using the setup.py::
    always be available to python 2.7 users. For more information see the
    following references:
 
-      - `Python 3 Statement <https://python3statement.org/>`__
+      - `Python 3 Statement <https://python3statement.github.io/>`__
       - `Tips on porting to Python 3 <https://docs.python.org/3/howto/pyporting.html>`__
