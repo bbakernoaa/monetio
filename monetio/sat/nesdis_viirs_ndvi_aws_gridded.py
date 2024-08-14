@@ -18,13 +18,14 @@ def create_daily_vhi_list(date_generated, fs, warning=False):
         file_date = date.strftime("%Y%m%d")
         year = file_date[:4]
         prod_path = "noaa-cdr-ndvi-pds/data/" + year + "/"
-        file_names = fs.glob(prod_path + "VIIRS-Land_*_" + file_date + "_*.nc")
+        patt = "VIIRS-Land_*_"
+        file_names = fs.glob(prod_path + patt + file_date + "_*.nc")
         # If file exists, add path to list and add file size to total
         if file_names:
             nodd_file_list.extend(file_names)
             nodd_total_size = nodd_total_size + sum(fs.size(f) for f in file_names)
         else:
-            msg = "File does not exist on AWS: " + prod_path + "VIIRS-Land_*_" + file_date + "_*.nc"
+            msg = "File does not exist on AWS: " + prod_path + patt + file_date + "_*.nc"
             if warning:
                 warnings.warn(msg)
                 nodd_file_list.append(None)
