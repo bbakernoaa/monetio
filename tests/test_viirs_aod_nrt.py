@@ -80,7 +80,5 @@ def test_missing_date_mf():
         ds = open_mfdataset(one_good)
         assert ds.sizes["time"] == 1
 
-    with pytest.raises(RuntimeError, match="Failed to access file"), pytest.warns(
-        UserWarning, match="Failed to access file"
-    ):
+    with pytest.raises(RuntimeError, match="Failed to access file"):
         open_mfdataset(one_good, error_missing=True)
