@@ -219,7 +219,7 @@ def open_dataset(date, satellite="SNPP", data_resolution=0.1, averaging_time="da
     dset = xr.open_dataset(aws_file)
 
     # Add datetime
-    dset = dset.expand_dims(time=date_generated)
+    dset = dset.expand_dims(time=date_generated).set_coords(["time"])
 
     return dset
 

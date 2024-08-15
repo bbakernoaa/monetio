@@ -1,10 +1,7 @@
 import pandas as pd
 
-server = "ftp.star.nesdis.noaa.gov"
-base_dir = "/pub/smcd/VIIRS_Aerosol/npp.viirs.aerosol.data/epsaot550/"
 
-
-def build_urls(dates, *, daily=True, res=0.1, sat="noaa20"):
+def build_urls(dates, *, daily=True, data_resolution=0.1, satellite="NOAA20"):
     """Construct URLs for downloading NEPS data.
 
     Parameters
@@ -12,11 +9,11 @@ def build_urls(dates, *, daily=True, res=0.1, sat="noaa20"):
     dates : pd.DatetimeIndex or iterable of datetime
         Dates to download data for.
     daily : bool, optional
-        Whether to download daily (default) or sub-daily data.
-    res : float, optional
-        Resolution of data in km, only used for sub-daily data.
-    sat : str, optional
-        Satellite platform, only used for sub-daily data.
+        Whether to download daily (default) or monthly data.
+    data_resolution : float, optional
+        Resolution of data in degrees (0.1 or 0.25).
+    satellite : str, optional
+        Satellite platform, 'SNPP' or 'NOAA20'.
 
     Returns
     -------
@@ -27,92 +24,78 @@ def build_urls(dates, *, daily=True, res=0.1, sat="noaa20"):
     -----
     The `res` and `sat` parameters are only used for sub-daily data.
     """
-
+    import warnings
     from collections.abc import Iterable
 
-    if isinstance(dates, Iterable):
+    if isinstance(dates, Iterable) and not isinstance(dates, str):
         dates = pd.DatetimeIndex(dates)
     else:
         dates = pd.DatetimeIndex([dates])
+
     if daily:
         dates = dates.floor("D").unique()
     else:  # monthly
-        dates = dates.floor("m").unique()
-    sat = sat.lower()
+        dates = dates.to_period("M").to_timestamp().unique()
+
+    if data_resolution != 0.25 and not daily:
+        warnings.warn(
+            "Monthly data is only available at 0.25 deg resolution, "
+            f"got 'data_resolution' {data_resolution!r}"
+        )
+
+    sat_dirname = satellite.lower()
+    if satellite.upper() == "SNPP":
+        sat = "npp" if daily else "snpp"
+    elif satellite.upper() == "NOAA20":
+        sat = "noaa20"
+    res = str(data_resolution).ljust(5, "0")
+    aod_dirname = "aod/eps" if daily else "aod_monthly"
+
     urls = []
     fnames = []
+
     print("Building VIIRS URLs...")
-    base_url = f"https://www.star.nesdis.noaa.gov/pub/smcd/VIIRS_Aerosol/viirs_aerosol_gridded_data/{sat}/aod/eps/"
-    if sat == "snpp":
-        sat = "npp"
-    for dt in dates:
+    base_url = (
+        "https://www.star.nesdis.noaa.gov/pub/smcd/VIIRS_Aerosol/viirs_aerosol_gridded_data/"
+        f"{sat_dirname}/{aod_dirname}/"
+    )
+
+    for date in dates:
         if daily:
-            fname = "viirs_eps_{}_aod_{}_deg_{}_nrt.nc".format(
-                sat, str(res).ljust(5, "0"), dt.strftime("%Y%m%d")
+            fname = "{}/viirs_eps_{}_aod_{}_deg_{}_nrt.nc".format(
+                date.strftime("%Y"),
+                sat,
+                res,
+                date.strftime("%Y%m%d"),
             )
-        url = base_url + dt.strftime(r"%Y/") + fname
+        else:
+            fname = "viirs_aod_monthly_{}_{}_deg_{}_nrt.nc".format(
+                sat,
+                res,
+                date.strftime("%Y%m"),
+            )
+        url = base_url + fname
         urls.append(url)
         fnames.append(fname)
 
     # Note: files needed for comparison
     urls = pd.Series(urls, index=None)
     fnames = pd.Series(fnames, index=None)
+
     return urls, fnames
 
 
-def check_remote_file_exists(file_url):
-    import requests
-
-    r = requests.head(file_url, stream=True, verify=False)
-
-    if r.status_code == 200:
-        _ = next(r.iter_content(10))
-        return True
-    else:
-        print(f"HTTP Error {r.status_code} - {r.reason}")
-        return False
-
-
-def retrieve(url, fname):
-    """Download files from the airnowtech S3 server.
-
-    Parameters
-    ----------
-    url : string
-        Description of parameter `url`.
-    fname : string
-        Description of parameter `fname`.
-
-    Returns
-    -------
-    None
-
-    """
-    import os
-
-    import requests
-
-    if not os.path.isfile(fname):
-        print("\n Retrieving: " + fname)
-        print(url)
-        print("\n")
-        r = requests.get(url)
-        r.raise_for_status()
-        with open(fname, "wb") as f:
-            f.write(r.content)
-    else:
-        print("\n File Exists: " + fname)
-
-
-def open_dataset(date, satellite="noaa20", res=0.1, daily=True, add_timestamp=True):
+def open_dataset(date, *, satellite="NOAA20", data_resolution=0.1, daily=True):
     """
     Parameters
     ----------
-    datestr : str or datetime-like
+    date : str or datetime-like
         The date for which to open the dataset.
-        2022-10-29 to current is available.
     """
+    from io import BytesIO
+
     import pandas as pd
+    import requests
     import xarray as xr
 
     if not isinstance(date, pd.Timestamp):
@@ -120,75 +103,71 @@ def open_dataset(date, satellite="noaa20", res=0.1, daily=True, add_timestamp=Tr
     else:
         d = date
 
-    try:
-        if satellite.lower() not in ("noaa20", "snpp"):
-            raise ValueError
-        elif satellite.lower() == "noaa20":
-            sat = "noaa20"
-        else:
-            sat = "snpp"
-    except ValueError:
-        print("Invalid input for 'sat': Valid values are 'noaa20' or 'snpp'")
+    if satellite.lower() not in ("noaa20", "snpp"):
+        raise ValueError(
+            f"Invalid input for 'satellite' {satellite!r}: " "Valid values are 'NOAA20' or 'SNPP'"
+        )
 
-    # if (res != 0.1) or (res != 0.25):
-    #    res = 0.1 # assume resolution is 0.1 if wrong value supplied
+    if data_resolution not in {0.1, 0.25}:
+        raise ValueError(
+            f"Invalid input for 'data_resolution' {data_resolution!r}: "
+            "Valid values are 0.1 or 0.25"
+        )
 
-    urls, fnames = build_urls(d, sat=sat, res=res, daily=daily)
-    url = urls.values[0]
-    fname = fnames.values[0]
+    urls, _ = build_urls(d, satellite=satellite, data_resolution=data_resolution, daily=daily)
 
-    try:
-        if check_remote_file_exists(url) is False:
-            raise ValueError
-    except ValueError:
-        print("File does not exist on NOAA HTTPS server.", url)
-        return ValueError
-    retrieve(url, fname)
+    r = requests.get(urls[0], stream=True)
+    r.raise_for_status()
+    dset = xr.open_dataset(BytesIO(r.content))
 
-    dset = xr.open_dataset(fname)
+    dset = dset.expand_dims(time=[d]).set_coords(["time"])
 
-    if add_timestamp:
-        dset["time"] = d
-        dset = dset.expand_dims("time")
-        dset = dset.set_coords(["time"])
     return dset
 
 
-def open_mfdataset(dates, satellite="noaa20", res=0.1, daily=True):
+def open_mfdataset(dates, satellite="NOAA20", data_resolution=0.1, daily=True, error_missing=False):
+    import warnings
+    from collections.abc import Iterable
+    from io import BytesIO
+
     import pandas as pd
+    import requests
     import xarray as xr
 
-    try:
-        if isinstance(dates, pd.DatetimeIndex):
-            d = dates
+    if isinstance(dates, Iterable) and not isinstance(dates, str):
+        dates = pd.DatetimeIndex(dates)
+    else:
+        dates = pd.DatetimeIndex([dates])
+
+    if satellite.lower() not in ("noaa20", "snpp"):
+        raise ValueError(
+            f"Invalid input for 'satellite' {satellite!r}: " "Valid values are 'NOAA20' or 'SNPP'"
+        )
+
+    if data_resolution not in {0.1, 0.25}:
+        raise ValueError(
+            f"Invalid input for 'data_resolution' {data_resolution!r}: "
+            "Valid values are 0.1 or 0.25"
+        )
+
+    urls, _ = build_urls(dates, satellite=satellite, data_resolution=data_resolution, daily=daily)
+
+    dsets = []
+    for url, date in zip(urls, dates):
+        r = requests.get(url, stream=True)
+        if r.status_code != 200:
+            msg = f"Failed to access file on NESDIS FTP server: {url}"
+            if error_missing:
+                raise RuntimeError(msg)
+            else:
+                warnings.warn(msg)
         else:
-            raise TypeError
-    except TypeError:
-        print("Please provide a pandas.DatetimeIndex")
-        return
+            ds = xr.open_dataset(BytesIO(r.content)).expand_dims(time=[date]).set_coords(["time"])
+            dsets.append(ds)
 
-    try:
-        if satellite.lower() not in ("noaa20", "snpp"):
-            raise ValueError
-        elif satellite.lower() == "noaa20":
-            sat = "noaa20"
-        else:
-            sat = "snpp"
-    except ValueError:
-        print("Invalid input for 'sat': Valid values are 'noaa20' or 'snpp'")
+    if len(dsets) == 0:
+        raise ValueError(f"Files not available for product and dates: {dates}")
 
-    urls, fnames = build_urls(d, sat=sat, res=res, daily=daily)
-
-    for url, fname in zip(urls, fnames):
-        try:
-            if check_remote_file_exists(url) is False:
-                raise ValueError
-        except ValueError:
-            print("File does not exist on NOAA HTTPS server.", url)
-            return
-        retrieve(url, fname)
-
-    dset = xr.open_mfdataset(fnames, combine="nested", concat_dim={"time": d})
-    dset["time"] = d
+    dset = xr.concat(dsets, dim="time")
 
     return dset
