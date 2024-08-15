@@ -1,5 +1,6 @@
 import sys
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -17,13 +18,24 @@ def test_open_dataset_no_data():
 def test_open_dataset():
     date = "2023-01-01"
     ds = open_dataset(date)
+
     assert set(ds.dims) >= {"time", "latitude", "longitude"}
     assert ds.sizes["time"] == 1
     assert ds.sizes["latitude"] == 3600
     assert ds.sizes["longitude"] == 7200
     assert ds["time"] == pd.to_datetime(date)
+
     assert "NDVI" in ds.data_vars
     assert ds["NDVI"].dims == ("time", "latitude", "longitude")
+
+    assert np.abs(ds["NDVI"]).max().item() < 5
+    q = 0.02
+    a, b = ds["NDVI"].quantile((q, 1 - q)).values
+    assert -1 < a < b < 1
+
+    assert ds["TIMEOFDAY"].isnull().sum() > 0
+    assert ds["TIMEOFDAY"].to_series().min() >= pd.Timedelta("0h")
+    assert ds["TIMEOFDAY"].to_series().max() < pd.Timedelta("24h")
 
 
 def test_open_mfdataset():

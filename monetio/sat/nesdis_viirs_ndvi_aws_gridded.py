@@ -68,7 +68,18 @@ def open_dataset(date):
 
     aws_file = fs.open(file_list[0])
 
-    dset = xr.open_dataset(aws_file, drop_variables=["TIMEOFDAY"])
+    dset = xr.open_dataset(aws_file, decode_cf=False)
+
+    # Deal with TIMEOFDAY variable manually to avoid warnings
+    m = dset["TIMEOFDAY"].attrs.pop("scale_factor")  # 0.01
+    b = dset["TIMEOFDAY"].attrs.pop("add_offset")  # 0
+    fv = dset["TIMEOFDAY"].attrs.pop("_FillValue")  # -9999
+    dset["TIMEOFDAY"] = dset["TIMEOFDAY"] * m + b
+    dset["TIMEOFDAY"].attrs.update(units="hours")  # -> auto timedelta conversion
+    dset = xr.decode_cf(dset)
+    dset["TIMEOFDAY"] = dset["TIMEOFDAY"].where(
+        dset["TIMEOFDAY"] != pd.Timedelta(fv * m + b, unit="hours")
+    )
 
     return dset
 
@@ -112,7 +123,18 @@ def open_mfdataset(dates, error_missing=False):
         aws_files,
         concat_dim="time",
         combine="nested",
-        drop_variables=["TIMEOFDAY"],
+        decode_cf=False,
+    )
+
+    # Deal with TIMEOFDAY variable manually to avoid warnings
+    m = dset["TIMEOFDAY"].attrs.pop("scale_factor")  # 0.01
+    b = dset["TIMEOFDAY"].attrs.pop("add_offset")  # 0
+    fv = dset["TIMEOFDAY"].attrs.pop("_FillValue")  # -9999
+    dset["TIMEOFDAY"] = dset["TIMEOFDAY"] * m + b
+    dset["TIMEOFDAY"].attrs.update(units="hours")  # -> auto timedelta conversion
+    dset = xr.decode_cf(dset)
+    dset["TIMEOFDAY"] = dset["TIMEOFDAY"].where(
+        dset["TIMEOFDAY"] != pd.Timedelta(fv * m + b, unit="hours")
     )
 
     return dset
