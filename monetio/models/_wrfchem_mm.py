@@ -1,4 +1,5 @@
 """ WRF-Chem File reader """
+
 import xarray as xr
 from pandas import Series
 
@@ -88,17 +89,16 @@ def open_mfdataset(
         var_list.append("PSFC")
         # need to calculate surface pressure and dp and optionally dz here.
 
+        # Additional defaults for satellite analysis
+        var_list.append("zstag")
+
     var_wrf_list = []
     for var in var_list:
         if var == "pres":  # Insert special versions.
             var_wrf = getvar(
                 wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False, units="Pa"
             )
-        elif var == "height":
-            var_wrf = getvar(
-                wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False, units="m"
-            )
-        elif var == "height_agl":
+        elif var in {"height", "height_agl", "zstag"}:
             var_wrf = getvar(
                 wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False, units="m"
             )
@@ -107,6 +107,13 @@ def open_mfdataset(
         var_wrf_list.append(var_wrf)
 
     dset = xr.merge(var_wrf_list)
+
+    if not surf_only_nc:
+        # Compute layer thickness
+        dset["dz"] = (
+            dset["zstag"].diff("bottom_top_stag").swap_dims({"bottom_top_stag": "bottom_top"})
+        )
+        dset["dz"] = dset["dz"].assign_attrs({"units": "m", "long_name": "layer thickness"})
 
     # Add global attributes needed
     a_truelat1 = extract_global_attrs(wrflist[0], "TRUELAT1")
@@ -203,6 +210,7 @@ def open_mfdataset(
                 "temp": "temperature_k",
                 "height": "alt_msl_m_mid",
                 "height_agl": "alt_agl_m_mid",
+                "dz": "dz_m",
                 "PSFC": "surfpres_pa",
                 "pressure": "pres_pa_mid",
             }
