@@ -82,6 +82,7 @@ def _open_one_dataset(fname, variable_dict):
 
             itrop_ = get_extra("tm5_tropopause_layer_index", dct_=dct)
             itrop_[itrop_ == 0] = 1  # Avoid trop in surface layer
+
             itrop = xr.DataArray(itrop_, dims=("y", "x"))
             a = xr.DataArray(data=get_extra("tm5_constant_a", dct_=dct), dims=("z", "v"))
             b = xr.DataArray(data=get_extra("tm5_constant_b", dct_=dct), dims=("z", "v"))
@@ -102,10 +103,10 @@ def _open_one_dataset(fname, variable_dict):
 
             # Tropopause pressure
             ptrop = xr.full_like(itrop, np.nan, dtype=ds["preslev"].dtype)
+            print(np.unique(itrop))
             for i in np.unique(itrop):
-                if np.isnan(i):
-                    continue
-                ptrop = xr.where(itrop == i, p.isel(z=int(i)), ptrop)
+                if i >= 0 and i < p.sizes['z']:
+                    ptrop = xr.where(itrop == i, p.isel(z=int(i)), ptrop)
             ds["troppres"] = ptrop
             ds["troppres"].attrs.update({"long_name": "tropopause pressure", "units": "Pa"})
 
