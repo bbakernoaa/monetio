@@ -6,6 +6,13 @@ import pytest
 
 from monetio import ish
 
+try:
+    import requests
+
+    requests.head("https://www1.ncdc.noaa.gov/pub/data/noaa/")
+except Exception:
+    pytest.skip("NCEI server issues", allow_module_level=True)
+
 
 def test_ish_read_history():
     dates = pd.date_range("2020-09-01", "2020-09-02")

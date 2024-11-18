@@ -68,8 +68,8 @@ def open_mfdataset(
                 dset = add_met_data_3D(dset, dset_met)
             if "alt_agl_m_mid" in dset.variables:
                 var_list = var_list + ["alt_agl_m_mid"]
-            if "layer_height_agl" in dset.variables:
-                var_list = var_list + ["layer_height_agl"]
+            if "dz_m" in dset.variables:
+                var_list = var_list + ["dz_m"]
             if "pres_pa_mid" in dset.variables:
                 var_list = var_list + ["pres_pa_mid"]
             if "temperature_k" in dset.variables:
@@ -206,7 +206,7 @@ def add_met_data_3D(d_chem, d_met):
             "var_desc": "pressure",
         }
     if ("z" in d_met.variables) or ("ZGRID_M" in d_met.variables):
-        d_chem["alt_agl_m_mid"], d_chem["layer_height_agl"] = _calc_midlayer_height_agl(d_met)
+        d_chem["alt_agl_m_mid"], d_chem["dz_m"] = _calc_midlayer_height_agl(d_met)
     else:
         warnings.warn("No altitude AGL was found.")
 
@@ -458,6 +458,12 @@ def _calc_midlayer_height_agl(dset):
     alt_agl_m_mid[:, :, :, :] = mid_layer_height
     alt_agl_m_mid.attrs["var_desc"] = "Layer height above ground level at midpoint"
     alt_agl_m_mid.attrs["long_name"] = "Height AGL at midpoint"
+
+    dz_m = xr.zeros_like(layer_height_agl)
+    dz_m[:, 0, :, :] = layer_height_agl[:, 0, :, :].values
+    dz_m[:, 1:, :, :] = layer_height_agl[:, 1:, :, :].values - layer_height_agl[:, :-1, :, :].values
+    dz_m.attrs["long_name"] = "dz in meters"
+    dz_m.attrs["var_desc"] = "Layer thickness in meters"
     return alt_agl_m_mid, layer_height_agl
 
 

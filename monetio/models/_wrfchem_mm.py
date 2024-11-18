@@ -102,6 +102,8 @@ def open_mfdataset(
             var_wrf = getvar(
                 wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False, units="m"
             )
+            if var == "zstag":
+                var_wrf = var_wrf.rename("zstag")
         else:
             var_wrf = getvar(wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False)
         var_wrf_list.append(var_wrf)
