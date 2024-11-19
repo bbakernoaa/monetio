@@ -64,23 +64,27 @@ DATA_CONFIGS = {
     "vhi": {
         "viirs": {
             "path": "noaa-cdr-ndvi-pds/data/",
-            "pattern": "VIIRS-Land_*_"
+            "pattern": "VIIRS-Land_*"
         },
         "avhrr": {
             "path": "noaa-cdr-vegetation-health-pds/data/",
-            "pattern": "AVHRR-Land_*_"
+            "pattern": "AVHRR-Land_*"
         }
     },
     "lai_fpar": {
         "viirs": {
-            "path": "noaa-viirs-lai-fpar/data/",
-            "pattern": "VIIRS-Land-LAI-FPAR_*_"
+            "path": "noaa-cdr-leaf-area-index-fapar-pds/data/",
+            "pattern": "VIIRS-Land_*"
+        },
+        'avhrr': {
+            "path": "noaa-cdr-leaf-area-index-fapar-pds/data/",
+            "pattern": "AVHRR-Land_*"
         }
     },
     "snow": {
         "ims": {
             "path": "noaa-cdr-snow-cover-extent-ims-nrt/",
-            "pattern": "snow_cover_extent_*_"
+            "pattern": "snow_cover_extent_*"
         }
     }
 }
