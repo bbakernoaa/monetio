@@ -1,306 +1,388 @@
-def create_daily_aod_list(data_resolution, satellite, date_generated, fs, warning=False):
-    """
-    Creates a list of daily AOD (Aerosol Optical Depth) files and calculates the total size of the files.
+"""
+NOAA VIIRS Aerosol Optical Depth (AOD) Dataset Access Module
 
-    Parameters:
-        data_resolution (str): The resolution of the AOD data.
-        satellite (str): The satellite name. Can be 'SNPP' or 'NOAA20'.
-        date_generated (list): A list of dates for which to check the existence of AOD files.
-        fs (FileSystem): The file system object used to check file existence and size.
+This module provides access to NOAA's VIIRS-derived Aerosol Optical Depth data:
+
+Data Products:
+    1. Daily AOD:
+        - Resolution options: 0.05°, 0.10°, 0.25°
+        - Coverage: Global over ocean
+        - Variables: AOD at 550nm, quality flags
+        - Path: noaa-jpss/{satellite}/VIIRS/{resolution}_Degrees_Daily/
+
+    2. Weekly AOD:
+        - Fixed resolution: 0.25°
+        - Coverage: Global over ocean
+        - Variables: Weekly averaged AOD
+        - Path: noaa-jpss/{satellite}/VIIRS/0.25_Degrees_Weekly/
+
+    3. Monthly AOD:
+        - Fixed resolution: 0.25°
+        - Coverage: Global over ocean
+        - Variables: Monthly averaged AOD
+        - Path: noaa-jpss/{satellite}/VIIRS/0.25_Degrees_Monthly/
+
+Satellites:
+    - SNPP: Data available from 2012-01-19 to present
+    - NOAA20: Data available from 2018-01-01 to present
+
+References:
+    - VIIRS AOD Algorithm: https://www.star.nesdis.noaa.gov/jpss/documents/ATBD/ATBD_EPS_Aerosol_AOD_v3.0.1.pdf
+    - Data Access: https://www.avl.class.noaa.gov/saa/products/welcome
+"""
+
+from typing import List, Tuple, Union
+from datetime import datetime
+import warnings
+import pandas as pd
+import s3fs
+import xarray as xr
+from enum import Enum
+from functools import lru_cache
+from pathlib import Path
+
+class AveragingTime(str, Enum):
+    """Enumeration of valid averaging time periods."""
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+
+class Satellite(str, Enum):
+    """Enumeration of valid satellites."""
+    SNPP = "SNPP"
+    NOAA20 = "NOAA20"
+
+# Configuration dictionary for data products
+PRODUCT_CONFIG = {
+    AveragingTime.DAILY: {
+        "path_template": "noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/{resolution}_Degrees_Daily/{year}/",
+        "file_template": "viirs_eps_{sat_name}_aod_{resolution}_deg_{date}.nc",
+        "resolutions": {"0.050", "0.100", "0.250"},
+    },
+    AveragingTime.WEEKLY: {
+        "path_template": "noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Weekly/{year}/",
+        "resolutions": {"0.250"},
+    },
+    AveragingTime.MONTHLY: {
+        "path_template": "noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Monthly/",
+        "file_template": "viirs_aod_monthly_{sat_name}_0.250_deg_{date}.nc",
+        "resolutions": {"0.250"},
+    }
+}
+
+@lru_cache(maxsize=128)
+def _get_satellite_name(satellite: str) -> str:
+    """Get the lowercase satellite name used in file paths."""
+    return "npp" if satellite == "SNPP" else "noaa20"
+
+def validate_inputs(satellite: str, data_resolution: str, averaging_time: str) -> None:
+    """
+    Validate input parameters.
+
+    Args:
+        satellite: Satellite name
+        data_resolution: Data resolution
+        averaging_time: Averaging period
+
+    Raises:
+        ValueError: If inputs are invalid
+    """
+    if satellite not in {s.value for s in Satellite}:
+        raise ValueError(f"Invalid satellite: {satellite}. Must be one of {list(Satellite)}")
+
+    if averaging_time not in {t.value for t in AveragingTime}:
+        raise ValueError(f"Invalid averaging_time: {averaging_time}. Must be one of {list(AveragingTime)}")
+
+    if data_resolution not in PRODUCT_CONFIG[averaging_time]["resolutions"]:
+        raise ValueError(
+            f"Invalid resolution {data_resolution} for {averaging_time} data. "
+            f"Valid resolutions: {PRODUCT_CONFIG[averaging_time]['resolutions']}"
+        )
+
+def create_daily_aod_list(
+    data_resolution: str,
+    satellite: str,
+    date_generated: List[datetime],
+    fs: s3fs.S3FileSystem,
+    warning: bool = False
+) -> Tuple[List[str], int]:
+    """
+    Creates a list of daily AOD files and calculates their total size.
+
+    Args:
+        data_resolution: Data resolution
+        satellite: Satellite name
+        date_generated: List of dates to process
+        fs: S3 filesystem object
+        warning: Whether to warn instead of raise errors
 
     Returns:
-        tuple: A tuple containing the list of file paths and the total size of the files.
+        Tuple of (file_list, total_size)
     """
-    import warnings
+    validate_inputs(satellite, data_resolution, AveragingTime.DAILY)
 
-    # Loop through observation dates & check for files
-    nodd_file_list = []
-    nodd_total_size = 0
+    file_list = []
+    total_size = 0
+    sat_name = _get_satellite_name(satellite)
+    config = PRODUCT_CONFIG[AveragingTime.DAILY]
+
     for date in date_generated:
         file_date = date.strftime("%Y%m%d")
         year = file_date[:4]
 
-        if satellite == "SNPP":
-            sat_name = "npp"
-        elif satellite == "NOAA20":
-            sat_name = "noaa20"
-        file_name = (
-            "viirs_eps_" + sat_name + "_aod_" + data_resolution + "_deg_" + file_date + ".nc"
+        file_name = config["file_template"].format(
+            sat_name=sat_name,
+            resolution=data_resolution,
+            date=file_date
         )
-        prod_path = (
-            "noaa-jpss/"
-            + satellite
-            + "/VIIRS/"
-            + satellite
-            + "_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/"
-            + data_resolution[:4]
-            + "_Degrees_Daily/"
-            + year
-            + "/"
+
+        prod_path = config["path_template"].format(
+            satellite=satellite,
+            resolution=data_resolution[:4],
+            year=year
         )
-        # If file exists, add path to list and add file size to total
-        if fs.exists(prod_path + file_name) is True:
-            nodd_file_list.extend(fs.ls(prod_path + file_name))
-            nodd_total_size = nodd_total_size + fs.size(prod_path + file_name)
+
+        full_path = prod_path + file_name
+
+        if fs.exists(full_path):
+            file_list.extend(fs.ls(full_path))
+            total_size += fs.size(full_path)
         else:
-            msg = "File does not exist on AWS: " + prod_path + file_name
+            msg = f"File does not exist: {full_path}"
             if warning:
                 warnings.warn(msg, stacklevel=2)
-                nodd_file_list.append(None)
+                file_list.append(None)
             else:
                 raise ValueError(msg)
 
-    return nodd_file_list, nodd_total_size
+    return file_list, total_size
 
-
-# Create list of available monthly data file paths & total size of files
-def create_monthly_aod_list(satellite, date_generated, fs, warning=False):
+def create_monthly_aod_list(
+    satellite: str,
+    date_generated: List[datetime],
+    fs: s3fs.S3FileSystem,
+    warning: bool = False
+) -> Tuple[List[str], int]:
     """
-    Creates a list of monthly AOD (Aerosol Optical Depth) files for a given satellite and date range.
+    Creates a list of monthly AOD files and calculates their total size.
 
     Args:
-        satellite (str): The satellite name. Can be 'SNPP' or 'NOAA20'.
-        date_generated (list): A list of datetime objects representing the observation dates.
-        fs: The file system object used to check for file existence and retrieve file information.
+        satellite: Satellite name
+        date_generated: List of dates to process
+        fs: S3 filesystem object
+        warning: Whether to warn instead of raise errors
 
     Returns:
-        tuple: A tuple containing the list of file paths and the total size of the files.
+        Tuple of (file_list, total_size)
     """
-    import warnings
+    validate_inputs(satellite, "0.250", AveragingTime.MONTHLY)
 
-    # Loop through observation dates & check for files
-    nodd_file_list = []
-    nodd_total_size = 0
-    year_month_list = []
+    file_list = []
+    total_size = 0
+    processed_months = set()
+    sat_name = _get_satellite_name(satellite)
+    config = PRODUCT_CONFIG[AveragingTime.MONTHLY]
+
     for date in date_generated:
-        file_date = date.strftime("%Y%m%d")
-        year_month = file_date[:6]
-        if year_month not in year_month_list:
-            year_month_list.append(year_month)
+        year_month = date.strftime("%Y%m")
+        if year_month in processed_months:
+            continue
 
-            if satellite == "SNPP":
-                sat_name = "snpp"
-            elif satellite == "NOAA20":
-                sat_name = "noaa20"
-            file_name = "viirs_aod_monthly_" + sat_name + "_0.250_deg_" + year_month + ".nc"
-            prod_path = (
-                "noaa-jpss/"
-                + satellite
-                + "/VIIRS/"
-                + satellite
-                + "_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Monthly/"
-            )
-            # If file exists, add path to list and add file size to total
-            if fs.exists(prod_path + file_name) is True:
-                nodd_file_list.extend(fs.ls(prod_path + file_name))
-                nodd_total_size = nodd_total_size + fs.size(prod_path + file_name)
+        processed_months.add(year_month)
+        file_name = config["file_template"].format(
+            sat_name=sat_name,
+            date=year_month
+        )
+
+        prod_path = config["path_template"].format(satellite=satellite)
+        full_path = prod_path + file_name
+
+        if fs.exists(full_path):
+            file_list.extend(fs.ls(full_path))
+            total_size += fs.size(full_path)
+        else:
+            msg = f"File does not exist: {full_path}"
+            if warning:
+                warnings.warn(msg, stacklevel=2)
+                file_list.append(None)
             else:
-                msg = "File does not exist on AWS: " + prod_path + file_name
-                if warning:
-                    warnings.warn(msg, stacklevel=2)
-                    nodd_file_list.append(None)
-                else:
-                    raise ValueError(msg)
+                raise ValueError(msg)
 
-    return nodd_file_list, nodd_total_size
+    return file_list, total_size
 
-
-# Create list of available weekly data file paths & total size of files
-def create_weekly_aod_list(satellite, date_generated, fs, warning=False):
+def create_weekly_aod_list(
+    satellite: str,
+    date_generated: List[datetime],
+    fs: s3fs.S3FileSystem,
+    warning: bool = False
+) -> Tuple[List[str], int]:
     """
-    Creates a list of files and calculates the total size of files for a given satellite, observation dates, and file system.
+    Creates a list of weekly AOD files and calculates their total size.
 
-    Parameters:
-        satellite (str): The satellite name. Can be 'SNPP' or 'NOAA20'.
-        date_generated (list): A list of observation dates.
-        fs (FileSystem): The file system object.
+    Args:
+        satellite: Satellite name
+        date_generated: List of dates to process
+        fs: S3 filesystem object
+        warning: Whether to warn instead of raise errors
 
     Returns:
-        tuple: A tuple containing the list of files and the total size of files.
+        Tuple of (file_list, total_size)
     """
-    # Loop through observation dates & check for files
-    nodd_file_list = []
-    nodd_total_size = 0
+    validate_inputs(satellite, "0.250", AveragingTime.WEEKLY)
+
+    file_list = []
+    total_size = 0
+    config = PRODUCT_CONFIG[AveragingTime.WEEKLY]
+
     for date in date_generated:
         file_date = date.strftime("%Y%m%d")
         year = file_date[:4]
 
-        prod_path = (
-            "noaa-jpss/"
-            + satellite
-            + "/VIIRS/"
-            + satellite
-            + "_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Weekly/"
-            + year
-            + "/"
+        prod_path = config["path_template"].format(
+            satellite=satellite,
+            year=year
         )
-        # Get list of all files in given year on NODD
-        all_files = fs.ls(prod_path)
-        # Loop through files, check if file date falls within observation date range
-        for file in all_files:
-            file_start = file.split("/")[-1].split("_")[7].split(".")[0].split("-")[0]
-            file_end = file.split("/")[-1].split("_")[7].split(".")[0].split("-")[1]
-            # If file within observation range, add path to list and add file size to total
-            if file_date >= file_start and file_date <= file_end:
-                if file not in nodd_file_list:
-                    nodd_file_list.append(file)
-                    nodd_total_size = nodd_total_size + fs.size(file)
 
-    return nodd_file_list, nodd_total_size
+        try:
+            all_files = fs.ls(prod_path)
+            for file in all_files:
+                file_name = Path(file).name
+                date_range = file_name.split("_")[7].split(".")[0]
+                file_start, file_end = date_range.split("-")
 
+                if file_start <= file_date <= file_end and file not in file_list:
+                    file_list.append(file)
+                    total_size += fs.size(file)
+        except Exception as e:
+            if warning:
+                warnings.warn(str(e), stacklevel=2)
+            else:
+                raise ValueError(str(e))
 
-def open_dataset(date, satellite="SNPP", data_resolution=0.1, averaging_time="daily"):
-    """Load VIIRS AOD data from AWS
-    for the given date, satellite, data resolution, and averaging time.
+    return file_list, total_size
 
-    Parameters:
-        date (str or datetime-like): The date for which to open the dataset.
-            SNPP has data from 2012-01-19 to 2020-12-31.
-            NOAA20 has data from 2018-01-01 to 2020-12-31.
-        satellite (str): The satellite to retrieve data from.
+def open_dataset(
+    date: Union[str, datetime],
+    satellite: str = "SNPP",
+    data_resolution: Union[float, str] = 0.1,
+    averaging_time: str = "daily"
+) -> xr.Dataset:
+    """
+    Load VIIRS AOD data from AWS for the given parameters.
+
+    Args:
+        date: The date for which to open the dataset.
+            SNPP has data from 2012-01-19 to present.
+            NOAA20 has data from 2018-01-01 to present.
+        satellite: The satellite to retrieve data from.
             Valid values are 'SNPP' or 'NOAA20'.
-        data_resolution (float or str, optional): The data resolution.
+        data_resolution: The data resolution.
             Valid values are '0.050', '0.100', or '0.250'. Defaults to 0.1°.
-            Only has an effect when `averaging_time` is 'daily'.
-            For 'weekly' and 'monthly' data, the resolution is always 0.25.
-        averaging_time (str, optional): The averaging time.
-            Valid values are 'daily', 'weekly', or 'monthly'. Defaults to 'daily'.
+            Only has effect when averaging_time is 'daily'.
+            For 'weekly' and 'monthly' data, resolution is always 0.25.
+        averaging_time: The averaging time period.
+            Valid values are 'daily', 'weekly', or 'monthly'.
 
     Returns:
         xarray.Dataset: The opened dataset.
 
     Raises:
-        ValueError: If the input parameters are invalid.
+        ValueError: If input parameters are invalid.
     """
-    import pandas as pd
-    import s3fs
-    import xarray as xr
-
-    if satellite not in {"SNPP", "NOAA20"}:
-        raise ValueError(
-            f"Invalid input for 'satellite' {satellite!r}: Valid values are 'SNPP' or 'NOAA20'"
-        )
-
-    data_resolution_in = data_resolution
-    data_resolution = str(data_resolution).ljust(5, "0")
-    if data_resolution not in {"0.050", "0.100", "0.250"}:
-        raise ValueError(
-            f"Invalid input for 'data_resolution' {data_resolution_in!r}: "
-            "Valid values are '0.050', '0.100', or '0.250'"
-        )
+    validate_inputs(satellite, str(data_resolution).ljust(5, "0"), averaging_time)
 
     if isinstance(date, str):
         date_generated = [pd.Timestamp(date)]
     else:
         date_generated = [date]
 
-    # Access AWS using anonymous credentials
     fs = s3fs.S3FileSystem(anon=True)
 
-    if averaging_time.lower() == "monthly":
-        file_list, _ = create_monthly_aod_list(satellite, date_generated, fs, warning=False)
-    elif averaging_time.lower() == "weekly":
-        file_list, _ = create_weekly_aod_list(satellite, date_generated, fs, warning=False)
-    elif averaging_time.lower() == "daily":
-        file_list, _ = create_daily_aod_list(
-            data_resolution, satellite, date_generated, fs, warning=False
-        )
-    else:
-        raise ValueError(
-            f"Invalid input for 'averaging_time' {averaging_time!r}: "
-            "Valid values are 'daily', 'weekly', or 'monthly'"
-        )
+    # Get file list based on averaging time
+    if averaging_time == AveragingTime.MONTHLY:
+        file_list, _ = create_monthly_aod_list(satellite, date_generated, fs)
+    elif averaging_time == AveragingTime.WEEKLY:
+        file_list, _ = create_weekly_aod_list(satellite, date_generated, fs)
+    else:  # daily
+        data_resolution = str(data_resolution).ljust(5, "0")
+        file_list, _ = create_daily_aod_list(data_resolution, satellite, date_generated, fs)
 
     if len(file_list) == 0 or all(f is None for f in file_list):
-        raise ValueError(f"Files not available for product and date: {date_generated[0]}")
+        raise ValueError(f"Files not available for {averaging_time} data and date: {date_generated[0]}")
 
-    aws_file = fs.open(file_list[0])
-
-    dset = xr.open_dataset(aws_file)
-
-    # Add datetime
+    # Open and process dataset
+    dset = xr.open_dataset(fs.open(file_list[0]))
     dset = dset.expand_dims(time=date_generated).set_coords(["time"])
 
     return dset
 
-
 def open_mfdataset(
-    dates, satellite="SNPP", data_resolution=0.1, averaging_time="daily", error_missing=False
-):
+    dates: Union[pd.DatetimeIndex, datetime, str],
+    satellite: str = "SNPP",
+    data_resolution: Union[float, str] = 0.1,
+    averaging_time: str = "daily",
+    error_missing: bool = False
+) -> xr.Dataset:
     """
-    Opens and combines multiple NetCDF files into a single xarray dataset.
+    Opens and combines multiple NetCDF files into a single dataset.
 
-    Parameters:
-        dates (pandas.DatetimeIndex): The dates for which to retrieve the data.
-            SNPP has data from 2012-01-19 to 2020-12-31.
-            NOAA20 has data from 2018-01-01 to 2020-12-31.
-        satellite (str): The satellite name.
+    Args:
+        dates: The dates for which to retrieve the data.
+            SNPP has data from 2012-01-19 to present.
+            NOAA20 has data from 2018-01-01 to present.
+        satellite: The satellite name.
             Valid values are 'SNPP' or 'NOAA20'.
-        data_resolution (float or str, optional): The data resolution.
+        data_resolution: The data resolution.
             Valid values are '0.050', '0.100', or '0.250'. Defaults to 0.1°.
-            Only has an effect when `averaging_time` is 'daily'.
-            For 'weekly' and 'monthly' data, the resolution is always 0.25.
-        averaging_time (str, optional): The averaging time.
-            Valid values are 'daily', 'weekly', or 'monthly'. Defaults to 'daily'.
-        error_missing (bool, optional): If False (default), skip missing files with warning
+            Only has effect when averaging_time is 'daily'.
+            For 'weekly' and 'monthly' data, resolution is always 0.25.
+        averaging_time: The averaging time period.
+            Valid values are 'daily', 'weekly', or 'monthly'.
+        error_missing: If False (default), skip missing files with warning
             and continue processing. Otherwise, raise an error.
 
     Returns:
-        xarray.Dataset: The combined dataset containing the data for the specified dates.
+        xarray.Dataset: The combined dataset for specified dates.
 
     Raises:
-        ValueError: If the input parameters are invalid.
+        ValueError: If input parameters are invalid.
     """
-    from collections.abc import Iterable
+    # Validate inputs
+    validate_inputs(satellite, str(data_resolution).ljust(5, "0"), averaging_time)
 
-    import pandas as pd
-    import s3fs
-    import xarray as xr
-
-    if satellite not in {"SNPP", "NOAA20"}:
-        raise ValueError(
-            f"Invalid input for 'satellite' {satellite!r}: Valid values are 'SNPP' or 'NOAA20'"
-        )
-
-    data_resolution_in = data_resolution
-    data_resolution = str(data_resolution).ljust(5, "0")
-    if data_resolution not in {"0.050", "0.100", "0.250"}:
-        raise ValueError(
-            f"Invalid input for 'data_resolution' {data_resolution_in!r}: "
-            "Valid values are '0.050', '0.100', or '0.250'"
-        )
-
-    if isinstance(dates, Iterable) and not isinstance(dates, str):
-        dates = pd.DatetimeIndex(dates)
-    else:
+    # Convert dates to DatetimeIndex
+    if isinstance(dates, (str, datetime)):
         dates = pd.DatetimeIndex([dates])
+    elif not isinstance(dates, pd.DatetimeIndex):
+        dates = pd.DatetimeIndex(dates)
 
-    # Access AWS using anonymous credentials
     fs = s3fs.S3FileSystem(anon=True)
 
-    if averaging_time.lower() == "monthly":
-        file_list, _ = create_monthly_aod_list(satellite, dates, fs, warning=not error_missing)
-    elif averaging_time.lower() == "weekly":
-        file_list, _ = create_weekly_aod_list(satellite, dates, fs, warning=not error_missing)
-    elif averaging_time.lower() == "daily":
+    # Get file list based on averaging time
+    if averaging_time == AveragingTime.MONTHLY:
+        file_list, _ = create_monthly_aod_list(
+            satellite, dates, fs, warning=not error_missing
+        )
+    elif averaging_time == AveragingTime.WEEKLY:
+        file_list, _ = create_weekly_aod_list(
+            satellite, dates, fs, warning=not error_missing
+        )
+    else:  # daily
+        data_resolution = str(data_resolution).ljust(5, "0")
         file_list, _ = create_daily_aod_list(
             data_resolution, satellite, dates, fs, warning=not error_missing
         )
-    else:
-        raise ValueError(
-            f"Invalid input for 'averaging_time' {averaging_time!r}: "
-            "Valid values are 'daily', 'weekly', or 'monthly'"
-        )
 
     if len(file_list) == 0 or all(f is None for f in file_list):
-        raise ValueError(f"Files not available for product and dates: {dates}")
+        raise ValueError(f"Files not available for {averaging_time} data and dates: {dates}")
 
     if not len(file_list) == len(dates):
         raise ValueError(
             "'dates' and discovered file list are not the same length. "
-            "Consider the time frequency ('averaging_time') when constructing your dates input."
+            f"Check your dates input for {averaging_time} frequency."
         )
 
+    # Process valid files and dates
     dates_good = []
     aws_files = []
     for d, f in zip(dates, file_list):
@@ -308,8 +390,8 @@ def open_mfdataset(
             aws_files.append(fs.open(f))
             dates_good.append(d)
 
+    # Combine datasets
     dset = xr.open_mfdataset(aws_files, concat_dim="time", combine="nested")
-
     dset["time"] = dates_good
 
     return dset
