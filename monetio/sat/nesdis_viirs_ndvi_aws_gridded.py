@@ -51,13 +51,18 @@ Note:
     This module requires active internet connection and access to AWS S3 buckets.
     Some datasets might have temporal gaps or missing data.
 """
-from typing import List, Tuple, Union
+# Standard library imports
 from datetime import datetime
+from enum import Enum
+from functools import lru_cache
+from pathlib import Path
+from typing import List, Tuple, Union
 import warnings
+
+# Third-party imports
 import pandas as pd
 import s3fs
 import xarray as xr
-from functools import lru_cache
 
 # Configuration dictionary for different data products
 DATA_CONFIGS = {

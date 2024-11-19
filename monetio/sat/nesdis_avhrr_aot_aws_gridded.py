@@ -56,6 +56,7 @@ from s3fs import S3FileSystem
 from enum import Enum
 from datetime import datetime
 from pathlib import Path
+from typing import List, Tuple, Union
 import warnings
 import pandas as pd
 import s3fs

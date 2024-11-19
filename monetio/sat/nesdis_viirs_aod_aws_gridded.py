@@ -30,16 +30,18 @@ References:
     - VIIRS AOD Algorithm: https://www.star.nesdis.noaa.gov/jpss/documents/ATBD/ATBD_EPS_Aerosol_AOD_v3.0.1.pdf
     - Data Access: https://www.avl.class.noaa.gov/saa/products/welcome
 """
-
-from typing import List, Tuple, Union
+# Standard library imports
 from datetime import datetime
-import warnings
-import pandas as pd
-import s3fs
-import xarray as xr
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
+from typing import List, Tuple, Union
+import warnings
+
+# Third-party imports
+import pandas as pd
+import s3fs
+import xarray as xr
 
 class AveragingTime(str, Enum):
     """Enumeration of valid averaging time periods."""
