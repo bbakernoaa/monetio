@@ -236,7 +236,8 @@ def open_mfdataset(
     dates: Union[pd.DatetimeIndex, datetime, str],
     data_type: str = "vhi",
     sensor: str = "viirs",
-    error_missing: bool = False
+    error_missing: bool = False,
+    **kwargs
 ) -> xr.Dataset:
     """
     Opens and combines multiple NetCDF files into a single dataset.
@@ -273,6 +274,7 @@ def open_mfdataset(
         concat_dim="time",
         combine="nested",
         decode_cf=False,
+        **kwargs
     )
 
     return process_timeofday(dset)
