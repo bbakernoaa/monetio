@@ -31,7 +31,7 @@ def retry(func):
                 requests.exceptions.ReadTimeout,
                 requests.exceptions.ConnectionError,
             ):
-                time.sleep(0.5 * i + rand() * 0.1)
+                time.sleep(0.5 * i**1.5 + rand() * 0.1)
             else:
                 break
         else:
