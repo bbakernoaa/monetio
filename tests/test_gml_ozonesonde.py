@@ -102,6 +102,7 @@ def test_add_data_invalid_location(location):
         _ = gml_ozonesonde.add_data(dates, location=location)
 
 
+@discover
 def test_same_location_and_launch_time():
     # Two files with same file time and launch time:
     # - https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/Boulder,%20Colorado/100%20Meter%20Average%20Files/bl774_2003_03_10_20.l100
