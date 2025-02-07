@@ -9,7 +9,7 @@ uses_get_files = pytest.mark.xdist_group(name="get-files")
 @pytest.mark.order(1)
 @uses_get_files
 def test_discover_files():
-    files = gml_ozonesonde.discover_files()
+    files = gml_ozonesonde.discover_files(n_threads=2)
     assert len(files) > 0
     assert set(files["location"].unique()) == set(gml_ozonesonde.LOCATIONS)
 
