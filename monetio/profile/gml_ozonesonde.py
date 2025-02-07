@@ -41,6 +41,8 @@ def retry(func):
     return wrapper
 
 
+TIMEOUT = 20  # seconds
+
 LOCATIONS = [
     "Boulder, Colorado",
     "Hilo, Hawaii",
@@ -88,7 +90,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
         url = f"{base}/{url_location}/100 Meter Average Files/".replace(" ", "%20")
         print(url)
 
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=TIMEOUT)
         r.raise_for_status()
 
         data = []
@@ -330,7 +332,7 @@ def read_100m(fp_or_url):
 
         @retry
         def get_text():
-            r = requests.get(fp_or_url, timeout=10)
+            r = requests.get(fp_or_url, timeout=TIMEOUT)
             r.raise_for_status()
             return r.text
 
