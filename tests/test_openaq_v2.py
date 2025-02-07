@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 import pytest
+import requests
 
 import monetio.obs.openaq_v2 as openaq
 
@@ -29,7 +30,14 @@ SITES_NEAR_NCWCP = [
     843,
 ]
 
+fails_with_410 = pytest.mark.xfail(
+    raises=requests.HTTPError,
+    reason="API v2 is gone",
+    strict=True,
+)
 
+
+@fails_with_410
 def test_get_parameters():
     params = openaq.get_parameters()
     assert 50 <= len(params) <= 500
@@ -39,6 +47,7 @@ def test_get_parameters():
     assert "o3" in params.name.values
 
 
+@fails_with_410
 def test_get_locations():
     sites = openaq.get_locations(npages=2, limit=100)
     assert len(sites) <= 200
@@ -51,6 +60,7 @@ def test_get_locations():
     assert sites["longitude"].isnull().sum() == 0
 
 
+@fails_with_410
 def test_get_data_near_ncwcp_sites():
     sites = SITES_NEAR_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 01:00", freq="1H")
@@ -64,6 +74,7 @@ def test_get_data_near_ncwcp_sites():
     assert not df.value.isna().all() and not df.value.lt(0).any()
 
 
+@fails_with_410
 def test_get_data_near_ncwcp_sites_wide():
     sites = SITES_NEAR_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 01:00", freq="1H")
@@ -75,6 +86,7 @@ def test_get_data_near_ncwcp_sites_wide():
     assert not {"parameter", "value", "unit"} <= set(df.columns)
 
 
+@fails_with_410
 def test_get_data_near_ncwcp_search_radius():
     latlon = LATLON_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 01:00", freq="1H")
@@ -88,6 +100,7 @@ def test_get_data_near_ncwcp_search_radius():
     assert df.entity.eq("Governmental Organization").all()
 
 
+@fails_with_410
 def test_get_data_near_ncwcp_sensor_type():
     latlon = LATLON_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 03:00", freq="1H")
@@ -96,6 +109,7 @@ def test_get_data_near_ncwcp_sensor_type():
     assert df.sensor_type.eq("low-cost sensor").all()
 
 
+@fails_with_410
 def test_get_data_single_dt_single_site():
     site = 843
     dates = "2023-08-01"
@@ -103,6 +117,7 @@ def test_get_data_single_dt_single_site():
     assert len(df) == 1
 
 
+@fails_with_410
 @pytest.mark.parametrize(
     "entity",
     [
