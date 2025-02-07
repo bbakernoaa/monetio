@@ -3,10 +3,11 @@ import pytest
 
 from monetio import gml_ozonesonde
 
-discover = pytest.mark.xdist_group(name="discover")
+uses_get_files = pytest.mark.xdist_group(name="get-files")
 
 
-@discover
+@pytest.mark.order(1)
+@uses_get_files
 def test_discover_files():
     files = gml_ozonesonde.discover_files()
     assert len(files) > 0
@@ -63,7 +64,7 @@ def test_read_100m_bad_header_line():
         _ = gml_ozonesonde.read_100m(url)
 
 
-@discover
+@uses_get_files
 def test_add_data():
     dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="H")
     df = gml_ozonesonde.add_data(dates, n_procs=2)
@@ -78,7 +79,7 @@ def test_add_data():
     assert df["siteid"].nunique() == latlon.nunique()
 
 
-@discover
+@uses_get_files
 def test_add_data_location_sel():
     dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="H")
     df = gml_ozonesonde.add_data(
@@ -102,7 +103,7 @@ def test_add_data_invalid_location(location):
         _ = gml_ozonesonde.add_data(dates, location=location)
 
 
-@discover
+@uses_get_files
 def test_same_location_and_launch_time():
     # Two files with same file time and launch time:
     # - https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/Boulder,%20Colorado/100%20Meter%20Average%20Files/bl774_2003_03_10_20.l100
