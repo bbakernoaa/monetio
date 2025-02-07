@@ -53,7 +53,7 @@ jobs:
       - name: Test with pytspack installed
         run: |
           pip install https://github.com/noaa-oar-arl/pytspack/archive/master.zip
-          pytest -n auto -v -rsx -k with_pytspack
+          pytest -n auto --dist loadgroup -v -rsx -k with_pytspack
 
   docs:
     name: Check docs build
