@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-TIMEOUT = 20  # seconds
+TIMEOUT = 15  # seconds
 RETRIES = 5
 
 
