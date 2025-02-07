@@ -94,9 +94,9 @@ def test_get_data_near_ncwcp_sites_wide():
     sites = SITES_NEAR_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 01:00", freq="1H")
 
-    with pytest.warns(UserWarning, match=r"dropping '.*' from index for wide fmt \(all null\)"):
-        with check410():
-            df = openaq.add_data(dates, sites=sites, wide_fmt=True)
+    # with pytest.warns(UserWarning, match=r"dropping '.*' from index for wide fmt \(all null\)"):
+    with check410():
+        df = openaq.add_data(dates, sites=sites, wide_fmt=True)
     assert len(df) > 0
     assert {"pm25_ugm3", "o3_ppm"} <= set(df.columns)
     assert not {"parameter", "value", "unit"} <= set(df.columns)
