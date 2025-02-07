@@ -13,17 +13,18 @@ import numpy as np
 import pandas as pd
 import requests
 
+TIMEOUT = 20  # seconds
+RETRIES = 5
+
 
 def retry(func):
     import time
     from functools import wraps
     from random import random as rand
 
-    n = 3
-
     @wraps(func)
     def wrapper(*args, **kwargs):
-        for i in range(n):
+        for i in range(RETRIES):
             try:
                 res = func(*args, **kwargs)
             except (
@@ -34,14 +35,12 @@ def retry(func):
             else:
                 break
         else:
-            raise RuntimeError(f"{func.__name__} failed after {n} tries.")
+            raise RuntimeError(f"{func.__name__} failed after {RETRIES} tries.")
 
         return res
 
     return wrapper
 
-
-TIMEOUT = 20  # seconds
 
 LOCATIONS = [
     "Boulder, Colorado",
