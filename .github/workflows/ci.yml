@@ -48,12 +48,12 @@ jobs:
             aioitertools=0.11.0
 
       - name: Test with pytest
-        run: pytest -n auto -v -ra -W "ignore:Downloading test file:UserWarning::"
+        run: pytest -n auto --dist loadgroup -v -ra -W "ignore:Downloading test file:UserWarning::"
 
       - name: Test with pytspack installed
         run: |
           pip install https://github.com/noaa-oar-arl/pytspack/archive/master.zip
-          pytest -n auto --dist loadgroup -v -rsx -k with_pytspack
+          pytest -k with_pytspack -n auto -v -ra -W "ignore:API key length is 0:UserWarning::"
 
   docs:
     name: Check docs build
