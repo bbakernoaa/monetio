@@ -1,4 +1,5 @@
 import os
+from contextlib import contextmanager
 
 import pandas as pd
 import pytest
@@ -30,16 +31,28 @@ SITES_NEAR_NCWCP = [
     843,
 ]
 
-fails_with_410 = pytest.mark.xfail(
+xfail_httperror = pytest.mark.xfail(
     raises=requests.HTTPError,
     reason="API v2 is gone",
     strict=True,
 )
 
 
-@fails_with_410
+@contextmanager
+def check410():
+    try:
+        yield
+    except requests.HTTPError as e:
+        assert e.response.status_code == 410
+        raise
+    except Exception as e:
+        raise AssertionError("expected HTTP Error 410") from e
+
+
+@xfail_httperror
 def test_get_parameters():
-    params = openaq.get_parameters()
+    with check410():
+        params = openaq.get_parameters()
     assert 50 <= len(params) <= 500
     assert params.id.nunique() == len(params)
     assert params.name.nunique() < len(params), "dupes for different units etc."
@@ -47,9 +60,10 @@ def test_get_parameters():
     assert "o3" in params.name.values
 
 
-@fails_with_410
+@xfail_httperror
 def test_get_locations():
-    sites = openaq.get_locations(npages=2, limit=100)
+    with check410():
+        sites = openaq.get_locations(npages=2, limit=100)
     assert len(sites) <= 200
     assert sites.siteid.nunique() == len(sites)
     assert sites.dtypes["firstUpdated"] == "datetime64[ns]"
@@ -60,11 +74,12 @@ def test_get_locations():
     assert sites["longitude"].isnull().sum() == 0
 
 
-@fails_with_410
+@xfail_httperror
 def test_get_data_near_ncwcp_sites():
     sites = SITES_NEAR_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 01:00", freq="1H")
-    df = openaq.add_data(dates, sites=sites)
+    with check410():
+        df = openaq.add_data(dates, sites=sites)
     assert len(df) > 0
     assert "pm25" in df.parameter.values
     assert df.latitude.round().eq(39).all()
@@ -74,23 +89,25 @@ def test_get_data_near_ncwcp_sites():
     assert not df.value.isna().all() and not df.value.lt(0).any()
 
 
-@fails_with_410
+@xfail_httperror
 def test_get_data_near_ncwcp_sites_wide():
     sites = SITES_NEAR_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 01:00", freq="1H")
 
     with pytest.warns(UserWarning, match=r"dropping '.*' from index for wide fmt \(all null\)"):
-        df = openaq.add_data(dates, sites=sites, wide_fmt=True)
+        with check410():
+            df = openaq.add_data(dates, sites=sites, wide_fmt=True)
     assert len(df) > 0
     assert {"pm25_ugm3", "o3_ppm"} <= set(df.columns)
     assert not {"parameter", "value", "unit"} <= set(df.columns)
 
 
-@fails_with_410
+@xfail_httperror
 def test_get_data_near_ncwcp_search_radius():
     latlon = LATLON_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 01:00", freq="1H")
-    df = openaq.add_data(dates, search_radius={latlon: 10_000}, threads=2)
+    with check410():
+        df = openaq.add_data(dates, search_radius={latlon: 10_000}, threads=2)
     assert len(df) > 0
     assert "pm25" in df.parameter.values
     assert df.latitude.round().eq(39).all()
@@ -100,24 +117,26 @@ def test_get_data_near_ncwcp_search_radius():
     assert df.entity.eq("Governmental Organization").all()
 
 
-@fails_with_410
+@xfail_httperror
 def test_get_data_near_ncwcp_sensor_type():
     latlon = LATLON_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 03:00", freq="1H")
-    df = openaq.add_data(dates, sensor_type="low-cost sensor", search_radius={latlon: 25_000})
+    with check410():
+        df = openaq.add_data(dates, sensor_type="low-cost sensor", search_radius={latlon: 25_000})
     assert len(df) > 0
     assert df.sensor_type.eq("low-cost sensor").all()
 
 
-@fails_with_410
+@xfail_httperror
 def test_get_data_single_dt_single_site():
     site = 843
     dates = "2023-08-01"
-    df = openaq.add_data(dates, parameters="o3", sites=site)
+    with check410():
+        df = openaq.add_data(dates, parameters="o3", sites=site)
     assert len(df) == 1
 
 
-@fails_with_410
+@xfail_httperror
 @pytest.mark.parametrize(
     "entity",
     [
@@ -129,7 +148,8 @@ def test_get_data_single_dt_single_site():
 def test_get_data_near_ncwcp_entity(entity):
     latlon = LATLON_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 01:00", freq="1H")
-    df = openaq.add_data(dates, entity=entity, search_radius={latlon: 25_000})
+    with check410():
+        df = openaq.add_data(dates, entity=entity, search_radius={latlon: 25_000})
     assert df.empty
 
 
