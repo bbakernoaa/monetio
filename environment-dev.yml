@@ -27,7 +27,6 @@ dependencies:
   # test
   - filelock
   - pytest
-  - pytest-order
   - pytest-xdist
   #
   - pip>=21.1
