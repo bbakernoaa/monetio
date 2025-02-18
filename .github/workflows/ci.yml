@@ -19,7 +19,7 @@ jobs:
     if: github.repository == 'noaa-oar-arl/monetio'
     strategy:
       matrix:
-        python-version: ["3.6", "3.8", "3.10"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
     defaults:
       run:
         shell: bash -l {0}
@@ -27,25 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python (micromamba) [>3.6]
-        if: matrix.python-version != '3.6'
+      - name: Set up Python (micromamba)
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment-dev.yml
           cache-environment: true
           create-args: >-
             python=${{ matrix.python-version }}
-
-      - name: Set up Python (micromamba) [3.6]
-        if: matrix.python-version == '3.6'
-        uses: mamba-org/setup-micromamba@v2
-        with:
-          environment-file: environment-dev.yml
-          cache-environment: true
-          create-args: >-
-            python=${{ matrix.python-version }}
-            attrs=22.2.0
-            aioitertools=0.11.0
 
       - name: Test with pytest
         run: pytest -n auto --dist loadgroup -v -ra -W "ignore:Downloading test file:UserWarning::"
