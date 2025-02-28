@@ -234,7 +234,11 @@ def get_locations(**kwargs):
             last_time = last_time.get("utc", None)
         lat = d["coordinates"]["latitude"]
         lon = d["coordinates"]["longitude"]
-        parameters = [s["parameter"]["name"] for s in d["sensors"]]
+        parameters = []
+        sensor_ids = []
+        for s in d["sensors"]:
+            parameters.append(s["parameter"]["name"])
+            sensor_ids.append(s["id"])
 
         # Start by taking selected scalars
         d2 = {k: d[k] for k in some_scalars}
@@ -250,6 +254,7 @@ def get_locations(**kwargs):
             latitude=lat,
             longitude=lon,
             parameters=parameters,
+            sensor_ids=sensor_ids,
         )
 
         data2.append(d2)
