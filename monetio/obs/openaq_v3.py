@@ -444,15 +444,17 @@ def add_data(
         meta = meta.query("sensor_type == @sensor_type")
 
     # Pick sensors that have the desired parameters
-    sensors = meta.explode(["sensor_ids", "parameters"])
-    sensors = sensors.query("parameters == @parameters")
+    sensors = meta.explode(["sensor_ids", "parameters"], ignore_index=True).rename(
+        columns={"sensor_ids": "sensor_id", "parameters": "parameter"}
+    )
+    sensors = sensors.query("parameter == @parameters")
     print(f"using {len(sensors)} sensors from {len(meta)} locations")
 
     # TODO: it should be possible to remove sensors not active during the time period
     # TODO: or with sensors input (from a stored list, e.g.) we could bypass location discover/filtering
 
     def iter_queries():
-        for sensor_id in sensors["sensor_ids"]:
+        for sensor_id in sensors["sensor_id"]:
             for t_from, t_to in iter_time_slices():
                 yield f"/v3/sensors/{sensor_id}/measurements", {
                     "datetime_from": t_from,
