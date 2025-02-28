@@ -324,7 +324,6 @@ def add_data(
     *,
     parameters=None,
     country=None,
-    search_radius=None,
     sites=None,
     entity=None,
     sensor_type=None,
@@ -345,10 +344,6 @@ def add_data(
     country : str or list of str, optional
         For example, ``'US'`` or ``['US', 'CA']`` (two-letter country codes).
         Default: full dataset (no limitation by country).
-    search_radius : dict, optional
-        Mapping of coords tuple (lat, lon) [deg] to search radius [m] (max of 25 km).
-        For example: ``search_radius={(39.0, -77.0): 10_000}``.
-        Note that this dict can contain multiple entries.
     sites : list of str, optional
         Site ID(s) to include, e.g. a specific known site
         or group of sites from :func:`get_latlonbox_sites`.
@@ -363,7 +358,7 @@ def add_data(
         Frequency to use when splitting the web API queries in time,
         in a format that ``pandas.to_timedelta`` will understand.
         This is necessary since there is a 100k limit on the number of results.
-        However, if you are using search radii, e.g., you may want to set this
+        However, in some cases you may want to set this
         to something higher in order to increase the query return speed.
         Set to ``None`` for no time splitting.
         Default: 1 hour
@@ -411,14 +406,6 @@ def add_data(
                 "Set query_time_split=None to disable time splitting."
             )
 
-    if search_radius is not None:
-        for coords, radius in search_radius.items():
-            if not 0 < radius <= 25_000:
-                raise ValueError(
-                    f"invalid radius {radius!r} for location {coords!r}. "
-                    "Must be positive and <= 25000 (25 km)."
-                )
-
     def iter_time_slices():
         # seems that (from < time <= to) == (from , to] is used
         # i.e. `from` is exclusive, `to` is inclusive
@@ -445,24 +432,12 @@ def add_data(
     def iter_queries():
         for parameter in parameters:
             for t_from, t_to in iter_time_slices():
-                if search_radius is not None:
-                    for coords, radius in search_radius.items():
-                        lat, lon = coords
-                        yield {
-                            **base_params,
-                            "parameter": parameter,
-                            "date_from": t_from,
-                            "date_to": t_to,
-                            "coordinates": f"{lat:.8f},{lon:.8f}",
-                            "radius": radius,
-                        }
-                else:
-                    yield {
-                        **base_params,
-                        "parameter": parameter,
-                        "date_from": t_from,
-                        "date_to": t_to,
-                    }
+                yield {
+                    **base_params,
+                    "parameter": parameter,
+                    "date_from": t_from,
+                    "date_to": t_to,
+                }
 
     threads = kwargs.pop("threads", None)
     if threads is not None:
