@@ -1,4 +1,4 @@
-"""Get AQ data from the OpenAQ v2 REST API.
+"""Get AQ data from the OpenAQ v3 REST API.
 
 Visit https://docs.openaq.org/docs/getting-started to get an API key
 and set environment variable ``OPENAQ_API_KEY`` to use it.
@@ -11,7 +11,7 @@ For example, in Bash:
 
 https://openaq.org/
 
-https://api.openaq.org/docs#/v2
+https://api.openaq.org/docs#/v3
 """
 
 import functools
@@ -69,7 +69,7 @@ def _api_key_warning(func):
     def wrapper(*args, **kwargs):
         if API_KEY is None:
             warnings.warn(
-                "Non-cached requests to the OpenAQ v2 web API will be slow without an API key "
+                "Non-cached requests to the OpenAQ v3 web API will be slow without an API key "
                 "or requests will fail (HTTP error 401). "
                 "Obtain one (https://docs.openaq.org/docs/getting-started#api-key) "
                 "and set your OPENAQ_API_KEY environment variable.",
@@ -82,9 +82,9 @@ def _api_key_warning(func):
 
 _BASE_URL = "https://api.openaq.org"
 _ENDPOINTS = {
-    "locations": "/v2/locations",
-    "parameters": "/v2/parameters",
-    "measurements": "/v2/measurements",
+    "locations": "/v3/locations",
+    "parameters": "/v3/parameters",
+    "sensors": "/v3/sensors",
 }
 
 
@@ -94,7 +94,8 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
     Parameters
     ----------
     endpoint : str
-        API endpoint, e.g. ``'/v2/locations'``, ``'/v2/parameters'``, ``'/v2/measurements'``.
+        API endpoint, e.g. ``'/v3/locations'``, ``'/v3/parameters'``, ``'/v3/sensors'``,
+        ``'/v3/sensors/<sensor id>/measurements'``.
     params : dict, optional
         Parameters for the GET request to the API.
         Don't pass ``limit``, ``page``, or ``offset`` here, since they are covered
@@ -114,8 +115,8 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
 
     if not endpoint.startswith("/"):
         endpoint = "/" + endpoint
-    if not endpoint.startswith("/v2"):
-        endpoint = "/v2" + endpoint
+    if not endpoint.startswith("/v3"):
+        endpoint = "/v3" + endpoint
     url = _BASE_URL + endpoint
 
     if params is None:
@@ -177,11 +178,11 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
 
 @_api_key_warning
 def get_locations(**kwargs):
-    """Get available site info (including site IDs) from OpenAQ v2 API.
+    """Get available site info (including site IDs) from OpenAQ v3 API.
 
     kwargs are passed to :func:`_consume`.
 
-    https://api.openaq.org/docs#/v2/locations_get_v2_locations_get
+    https://api.openaq.org/docs#/v3/locations_get_v3_locations_get
     """
 
     data = _consume(_ENDPOINTS["locations"], **kwargs)
@@ -242,8 +243,9 @@ def get_locations(**kwargs):
     return df
 
 
+@_api_key_warning
 def get_parameters(**kwargs):
-    """Get supported parameter info from OpenAQ v2 API.
+    """Get supported parameter info from OpenAQ v3 API.
 
     kwargs are passed to :func:`_consume`.
     """
@@ -293,7 +295,7 @@ def add_data(
     wide_fmt=False,  # FIXME: probably want to default to True
     **kwargs,
 ):
-    """Get OpenAQ API v2 data, including low-cost sensors.
+    """Get OpenAQ API v3 data, including low-cost sensors.
 
     Parameters
     ----------
