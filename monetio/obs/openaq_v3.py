@@ -191,44 +191,76 @@ def get_locations(**kwargs):
     some_scalars = [
         "id",
         "name",
-        "city",
-        "country",
-        # "entity",  # all null (from /measurements we do get values)
+        "locality",
+        "timezone",
         "isMobile",
-        # "isAnalysis",  # all null
-        # "sensorType",  # all null (from /measurements we do get values)
-        "firstUpdated",
-        "lastUpdated",
+        "isMonitor",
+        "distance",
     ]
+
+    # We will convert the keys of these dicts to columns
+    some_dicts = ["country", "owner", "provider"]
 
     data2 = []
     for d in data:
+        # Example (k v):
+        # - id 3
+        # - name NMA - Nima
+        # - locality None
+        # - timezone Africa/Accra
+        # - country {'id': 152, 'code': 'GH', 'name': 'Ghana'}
+        # - owner {'id': 4, 'name': 'Unknown Governmental Organization'}
+        # - provider {'id': 209, 'name': 'Dr. Raphael E. Arku and Colleagues'}
+        # - isMobile False
+        # - isMonitor True
+        # - instruments [{'id': 2, 'name': 'Government Monitor'}]
+        # - sensors [
+        #     {'id': 6, 'name': 'pm10 µg/m³', 'parameter': {'id': 1, 'name': 'pm10', 'units': 'µg/m³', 'displayName': 'PM10'}},
+        #     {'id': 5, 'name': 'pm25 µg/m³', 'parameter': {'id': 2, 'name': 'pm25', 'units': 'µg/m³', 'displayName': 'PM2.5'}}
+        #   ]
+        # - coordinates {'latitude': 5.58389, 'longitude': -0.19968}
+        # - licenses None
+        # - bounds [-0.19968, 5.58389, -0.19968, 5.58389]
+        # - distance None
+        # - datetimeFirst {'utc': '2016-03-23T20:00:00Z', 'local': '2016-03-23T15:00:00-05:00'}}
+        # - datetimeLast None
+
+        # Pull out some data
+        first_time = d["datetimeFirst"]
+        if first_time is not None:
+            first_time = first_time.get("utc", None)
+        last_time = d["datetimeLast"]
+        if last_time is not None:
+            last_time = last_time.get("utc", None)
         lat = d["coordinates"]["latitude"]
         lon = d["coordinates"]["longitude"]
-        parameters = [p["parameter"] for p in d["parameters"]]
-        mfs = d["manufacturers"]
-        if mfs:
-            manufacturer = mfs[0]["manufacturerName"]
-            if len(mfs) > 1:
-                logger.info(f"site {d['id']} has multiple manufacturers: {mfs}")
-        else:
-            manufacturer = None
+        parameters = [s["parameter"]["name"] for s in d["sensors"]]
+
+        # Start by taking selected scalars
         d2 = {k: d[k] for k in some_scalars}
+
+        # Convert some dict values to multiple columns
+        for k in some_dicts:
+            for kk, vv in d[k].items():
+                d2[f"{k}_{kk}"] = vv
+
         d2.update(
+            first_time=first_time,
+            last_time=last_time,
             latitude=lat,
             longitude=lon,
             parameters=parameters,
-            manufacturer=manufacturer,
         )
+
         data2.append(d2)
 
     df = pd.DataFrame(data2)
 
-    # Compute datetimes (the timestamps are already in UTC, but with tz specified)
-    assert df.firstUpdated.str.slice(-6, None).eq("+00:00").all()
-    df["firstUpdated"] = pd.to_datetime(df.firstUpdated.str.slice(0, -6))
-    assert df.lastUpdated.str.slice(-6, None).eq("+00:00").all()
-    df["lastUpdated"] = pd.to_datetime(df.lastUpdated.str.slice(0, -6))
+    # Compute datetimes
+    for col in ["first_time", "last_time"]:
+        i = df[col].notnull()
+        assert df.loc[i, col].str.slice(-1, None).eq("Z").all()
+        df[col] = pd.to_datetime(df[col].str.slice(0, -1))
 
     # Site ID
     df = df.rename(columns={"id": "siteid"})
@@ -238,7 +270,7 @@ def get_locations(**kwargs):
         logger.info(
             f"note: found {len(maybe_dupe_rows)} rows with duplicate site IDs:\n{maybe_dupe_rows}"
         )
-    df = df.drop_duplicates("siteid", keep="first").reset_index(drop=True)  # seem to be some dupes
+    df = df.drop_duplicates("siteid", keep="first").reset_index(drop=True)
 
     return df
 
