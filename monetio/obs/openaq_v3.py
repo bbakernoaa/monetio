@@ -185,6 +185,8 @@ def get_locations(**kwargs):
     https://api.openaq.org/docs#/v3/locations_get_v3_locations_get
     """
 
+    # TODO: multi-thread and/or cache to disk
+
     data = _consume(_ENDPOINTS["locations"], **kwargs)
 
     # Some fields with scalar values to take
@@ -238,7 +240,7 @@ def get_locations(**kwargs):
         sensor_ids = []
         for s in d["sensors"]:
             parameters.append(s["parameter"]["name"])
-            sensor_ids.append([str(x) for x in s["id"]])
+            sensor_ids.append(str(s["id"]))
 
         # Start by taking selected scalars
         d2 = {k: d[k] for k in some_scalars}
@@ -327,7 +329,7 @@ def add_data(
     sites=None,
     entity=None,
     sensor_type=None,
-    query_time_split="1H",
+    query_time_split="1H",  # TODO: raise or remove this, given the single sensor queries
     wide_fmt=False,  # FIXME: probably want to default to True
     **kwargs,
 ):
@@ -419,46 +421,60 @@ def add_data(
         else:
             yield date_min - one_sec, date_max
 
-    base_params = {}
+    # Discover locations
+    print("getting locations...")
+    meta = get_locations(npages=5)  # FIXME: arbitrary limit for testing
+    print(f"found {len(meta)} locations")
+
+    # Narrow locations based on user input
     if country is not None:
-        base_params.update(country=country)
+        meta = meta.query("country_code == @country")
     if sites is not None:
-        base_params.update(location_id=sites)
+        meta = meta.query("siteid == @sites")
     if entity is not None:
-        base_params.update(entity=entity)
+        raise NotImplementedError  # TODO: not sure what to use for this
     if sensor_type is not None:
-        base_params.update(sensor_type=sensor_type)
+        # FIXME: may not be the best approach
+        meta["sensor_type"] = meta["isMonitor"].map(
+            {
+                True: "reference grade",
+                False: "low-cost sensor",
+            }
+        )
+        meta = meta.query("sensor_type == @sensor_type")
+
+    # Pick sensors that have the desired parameters
+    sensors = meta.explode(["sensor_ids", "parameters"])
+    sensors = sensors.query("parameters == @parameters")
+    print(f"using {len(sensors)} sensors from {len(meta)} locations")
+
+    # TODO: it should be possible to remove sensors not active during the time period
+    # TODO: or with sensors input (from a stored list, e.g.) we could bypass location discover/filtering
 
     def iter_queries():
-        for parameter in parameters:
+        for sensor_id in sensors["sensor_ids"]:
             for t_from, t_to in iter_time_slices():
-                yield {
-                    **base_params,
-                    "parameter": parameter,
-                    "date_from": t_from,
-                    "date_to": t_to,
+                yield f"/v3/sensors/{sensor_id}/measurements", {
+                    "datetime_from": t_from,
+                    "datetime_to": t_to,
                 }
 
     threads = kwargs.pop("threads", None)
+
+    def tfunc(tup):
+        endpt, params = tup
+        return _consume(endpt, params=params, **kwargs)
+
     if threads is not None:
         import concurrent.futures
         from itertools import chain
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-            data = chain.from_iterable(
-                executor.map(
-                    lambda params: _consume(_ENDPOINTS["measurements"], params=params, **kwargs),
-                    iter_queries(),
-                )
-            )
+            data = chain.from_iterable(executor.map(tfunc, iter_queries()))
     else:
         data = []
-        for params in iter_queries():
-            this_data = _consume(
-                _ENDPOINTS["measurements"],
-                params=params,
-                **kwargs,
-            )
+        for tup in iter_queries():
+            this_data = tfunc(tup)
             data.extend(this_data)
 
     df = pd.DataFrame(data)
