@@ -238,7 +238,7 @@ def get_locations(**kwargs):
         sensor_ids = []
         for s in d["sensors"]:
             parameters.append(s["parameter"]["name"])
-            sensor_ids.append(s["id"])
+            sensor_ids.append([str(x) for x in s["id"]])
 
         # Start by taking selected scalars
         d2 = {k: d[k] for k in some_scalars}
