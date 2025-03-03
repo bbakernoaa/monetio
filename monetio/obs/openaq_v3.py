@@ -15,12 +15,10 @@ https://api.openaq.org/docs#/v3
 """
 
 import functools
-import json
 import logging
 import os
 import warnings
 
-import numpy as np
 import pandas as pd
 import requests
 
@@ -282,6 +280,9 @@ def get_locations(**kwargs):
     return df
 
 
+# TODO: get_sensors(location)
+
+
 @_api_key_warning
 def get_parameters(**kwargs):
     """Get supported parameter info from OpenAQ v3 API.
@@ -423,7 +424,7 @@ def add_data(
 
     # Discover locations
     print("getting locations...")
-    meta = get_locations(npages=5)  # FIXME: arbitrary limit for testing
+    meta = get_locations(npages=1)  # FIXME: arbitrary limit for testing
     print(f"found {len(meta)} locations")
 
     # Narrow locations based on user input
@@ -448,6 +449,7 @@ def add_data(
         columns={"sensor_ids": "sensor_id", "parameters": "parameter"}
     )
     sensors = sensors.query("parameter == @parameters")
+    sensors = sensors.iloc[:10]  # FIXME: arbitrary limit for testing
     print(f"using {len(sensors)} sensors from {len(meta)} locations")
 
     # TODO: it should be possible to remove sensors not active during the time period
@@ -456,7 +458,7 @@ def add_data(
     def iter_queries():
         for sensor_id in sensors["sensor_id"]:
             for t_from, t_to in iter_time_slices():
-                yield f"/v3/sensors/{sensor_id}/measurements", {
+                yield sensor_id, {
                     "datetime_from": t_from,
                     "datetime_to": t_to,
                 }
@@ -464,8 +466,21 @@ def add_data(
     threads = kwargs.pop("threads", None)
 
     def tfunc(tup):
-        endpt, params = tup
-        return _consume(endpt, params=params, **kwargs)
+        sensor_id, params = tup
+        endpt = f"/v3/sensors/{sensor_id}/measurements"
+        return [
+            {
+                "value": d["value"],
+                "parameter_id": d["parameter"]["id"],
+                "period_label": d["period"]["label"],
+                "time_from_utc": d["period"]["datetimeFrom"]["utc"],
+                "time_from_local": d["period"]["datetimeFrom"]["local"],
+                "time_to_utc": d["period"]["datetimeTo"]["utc"],
+                "time_to_local": d["period"]["datetimeTo"]["local"],
+                "sensor_id": sensor_id,
+            }
+            for d in _consume(endpt, params=params, **kwargs)
+        ]
 
     if threads is not None:
         import concurrent.futures
@@ -484,54 +499,34 @@ def add_data(
         print("warning: no data found")
         return df
 
-    #  #   Column       Non-Null Count  Dtype
-    # ---  ------       --------------  -----
-    #  0   locationId   2000 non-null   int64
-    #  1   location     2000 non-null   object
-    #  2   parameter    2000 non-null   object
-    #  3   value        2000 non-null   float64
-    #  4   date         2000 non-null   object
-    #  5   unit         2000 non-null   object
-    #  6   coordinates  2000 non-null   object
-    #  7   country      2000 non-null   object
-    #  8   city         0 non-null      object  # None
-    #  9   isMobile     2000 non-null   bool
-    #  10  isAnalysis   0 non-null      object  # None
-    #  11  entity       2000 non-null   object
-    #  12  sensorType   2000 non-null   object
+    # Convert times to naive datetime, e.g.
+    # {'utc': '2019-08-01T04:00:00Z', 'local': '2019-08-01T00:00:00-04:00'}}
+    for col in ["time_from", "time_to"]:
+        for tz in ["utc", "local"]:
+            df[f"{col}_{tz}"] = pd.to_datetime(df[f"{col}_{tz}"]).dt.tz_localize(None)
 
-    to_expand = ["date", "coordinates"]
-    new = pd.json_normalize(json.loads(df[to_expand].to_json(orient="records")))
+    utcoffset = df["time_from_local"] - df["time_from_utc"]
 
-    time = pd.to_datetime(new["date.utc"]).dt.tz_localize(None)
-    # utcoffset = pd.to_timedelta(new["date.local"].str.slice(-6, None) + ":00")
-    # time_local = time + utcoffset
-    # ^ Seems some have negative minutes in the tz, so this method complains
-    time_local = pd.to_datetime(new["date.local"].str.slice(0, 19))
-    utcoffset = time_local - time
+    # TODO: get lat/lon from sensors df
 
-    # TODO: null case??
-    lat = new["coordinates.latitude"]
-    lon = new["coordinates.longitude"]
-
-    df = df.drop(columns=to_expand).assign(
-        time=time,
-        time_local=time_local,
+    df = df.assign(
+        time=df["time_from_utc"],  # left-labelled
+        time_local=df["time_from_local"],
         utcoffset=utcoffset,
-        latitude=lat,
-        longitude=lon,
+        # latitude=lat,
+        # longitude=lon,
+    ).drop(
+        columns=[
+            "time_from_utc",
+            "time_from_local",
+            "time_to_utc",
+            "time_to_local",
+        ]
     )
 
-    # Rename columns and ensure site ID is string
-    df = df.rename(
-        columns={
-            "locationId": "siteid",
-            "isMobile": "is_mobile",
-            "isAnalysis": "is_analysis",
-            "sensorType": "sensor_type",
-        },
-    )
-    df["siteid"] = df.siteid.astype(str)
+    # TODO: get site info in from meta df
+
+    # TODO: get units and name in from parameters df
 
     # Most variables invalid if < 0
     # > preferredUnit.value_counts()
@@ -551,24 +546,24 @@ def add_data(
     # f                 1
     # mb                1
     # iaq               1
-    non_neg_units = [
-        "particles/cm³",
-        "ppm",
-        "ppb",
-        "umol/mol",
-        "µg/m³",
-        "ugm3",
-        "ng/m3",
-        "iaq",
-        #
-        "%",
-        #
-        "m/s",
-        #
-        "hpa",
-        "mb",
-    ]
-    df.loc[df.unit.isin(non_neg_units) & (df.value < 0), "value"] = np.nan
+    # non_neg_units = [
+    #     "particles/cm³",
+    #     "ppm",
+    #     "ppb",
+    #     "umol/mol",
+    #     "µg/m³",
+    #     "ugm3",
+    #     "ng/m3",
+    #     "iaq",
+    #     #
+    #     "%",
+    #     #
+    #     "m/s",
+    #     #
+    #     "hpa",
+    #     "mb",
+    # ]
+    # df.loc[df.unit.isin(non_neg_units) & (df.value < 0), "value"] = np.nan
 
     if wide_fmt:
         # Normalize units
