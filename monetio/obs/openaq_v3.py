@@ -415,7 +415,8 @@ def _to_wide_fmt(df):
 
     # Certain metadata should be unique for a given site but sometimes aren't
     # (e.g. location names of different specificity, slight differences in lat/lon coords)
-    for col in ["latitude", "longitude"]:  # TODO: location name too
+    # TODO: would be nice to have location name too
+    for col in ["latitude", "longitude"]:
         site_col = df.groupby("siteid")[col].unique()
         unique = site_col.apply(len).eq(1)
         if not unique.all():
@@ -629,9 +630,6 @@ def add_data(
         f"requesting data from {len(sensors)} sensors "
         f"at {sensors.siteid.nunique()} unique locations"
     )
-
-    # TODO: it should be possible to remove sensors not active during the time period
-    # TODO: or with sensors input (from a stored list, e.g.) we could bypass location discover/filtering
 
     def iter_queries():
         for sensor_id in sensors["sensor_id"]:

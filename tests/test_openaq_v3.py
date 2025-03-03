@@ -5,9 +5,6 @@ import pytest
 
 import monetio.obs.openaq_v3 as openaq
 
-# TODO: check no camel case cols
-
-
 if (
     os.environ.get("CI", "false").lower() not in {"false", "0"}
     and os.environ.get("OPENAQ_API_KEY", "") == ""
