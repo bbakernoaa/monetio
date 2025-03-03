@@ -19,6 +19,7 @@ import logging
 import os
 import warnings
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
@@ -154,6 +155,7 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
                 time.sleep(tries + 0.1 * rand())
             elif r.status_code == 429:
                 # Note: response headers don't seem to include Retry-After
+                # Just `{'detail': 'To many requests'}` in `.json()`
                 logger.info(f"rate limited (try {tries}/{retry})")
                 time.sleep(tries * 5 + 0.2 * rand())
             else:
@@ -166,9 +168,10 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
         logger.info(f"page={page} found={found!r} n={n}")
         if n == 0:
             break
+        data.extend(this_data["results"])
         if n < limit:
             logger.info(f"note: results returned ({n}) < limit ({limit})")
-        data.extend(this_data["results"])
+            break
 
     if isinstance(found, str) and found.startswith(">"):
         print(f"warning: some query results not fetched ('found' is {found!r})")
@@ -532,8 +535,11 @@ def add_data(
         columns={"sensor_ids": "sensor_id", "parameters": "parameter"}
     )
     sensors = sensors.query("parameter == @parameters")
-    sensors = sensors.iloc[:100]  # FIXME: arbitrary limit for testing
-    print(f"using {len(sensors)} sensors from {len(meta)} locations")
+    sensors = sensors.iloc[:1000]  # FIXME: arbitrary limit for testing
+    print(
+        f"requesting data from {len(sensors)} sensors "
+        f"at {sensors.siteid.nunique()} unique locations"
+    )
 
     # TODO: it should be possible to remove sensors not active during the time period
     # TODO: or with sensors input (from a stored list, e.g.) we could bypass location discover/filtering
@@ -566,6 +572,7 @@ def add_data(
             for d in _consume(endpt, params=params, **kwargs)
         ]
 
+    tic = perf_counter()
     if threads is not None:
         import concurrent.futures
         from itertools import chain
@@ -577,6 +584,7 @@ def add_data(
         for tup in iter_queries():
             this_data = tfunc(tup)
             data.extend(this_data)
+    logger.info(f"took {pd.Timedelta(seconds=(perf_counter() - tic))} s to fetch data")
 
     df = pd.DataFrame(data)
     if df.empty:
