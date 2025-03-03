@@ -48,9 +48,9 @@ def test_get_parameters():
 
 
 def test_get_locations():
-    sites = openaq.get_locations(npages=2, limit=100)
+    sites = openaq.get_locations()
     assert_columns_all_snake_case(sites)
-    assert len(sites) <= 200
+    assert 10_000 <= len(sites) < 50_000
     assert sites.siteid.nunique() == len(sites)
     assert sites.dtypes["first_time"] == "datetime64[ns]"
     assert sites.dtypes["last_time"] == "datetime64[ns]"
@@ -70,5 +70,32 @@ def test_get_locations():
 
 
 def test_get_sensors():
-    df = openaq.get_sensors(3832)
+    df = openaq.get_sensors("3832")
+    assert_columns_all_snake_case(df)
     assert df.parameter.tolist() == ["so2", "o3"]
+
+
+def test_add_data_sensor_ids():
+    df = openaq.get_sensors("2978434")
+    sensor_ids = df["id"].tolist()
+    assert len(sensor_ids) == 1
+    df = openaq.add_data(
+        ["2024-08-01", "2024-08-08"],
+        query_time_split="1D",
+        sensor_ids=sensor_ids,
+        threads=2,
+    )
+    assert_columns_all_snake_case(df)
+    assert len(df) > 0
+
+
+def test_add_data_sensor_limit():
+    df = openaq.add_data(
+        ["2019-08-01", "2019-08-02"],
+        query_time_split=None,
+        sensor_limit=10,
+        threads=2,
+    )
+    assert_columns_all_snake_case(df)
+    assert len(df) > 0
+    assert df.sensor_id.nunique() <= 10

@@ -340,7 +340,7 @@ def get_sensors(location_id, **kwargs):
             last_time = last_time.get("utc", None)
 
         d2 = {
-            "id": d["id"],
+            "id": str(d["id"]),
             "name": d["name"],
             "parameter": d["parameter"]["name"],
             "parameter_id": d["parameter"]["id"],
@@ -408,6 +408,7 @@ def add_data(
     sites=None,
     entity=None,
     sensor_type=None,
+    sensor_ids=None,
     query_time_split="1H",  # TODO: raise or remove this, given the single sensor queries
     wide_fmt=False,  # FIXME: probably want to default to True
     **kwargs,
@@ -428,6 +429,9 @@ def add_data(
     sites : list of str, optional
         Site ID(s) to include, e.g. a specific known site
         or group of sites from :func:`get_latlonbox_sites`.
+        Note that in the OpenAQ API, these are called 'location IDs'
+        and are integers, not strings.
+        We use strings here for consistency with other MONETIO obs readers.
         Default: full dataset (no limitation by site).
     entity : str or list of str, optional
         Options: ``'government'``, ``'research'``, ``'community'``.
@@ -435,6 +439,9 @@ def add_data(
     sensor_type : str or list of str, optional
         Options: ``'low-cost sensor'``, ``'reference grade'``.
         Default: full dataset (no limitation by sensor type).
+    sensor_ids : str or list of str, optional
+        Sensor ID(s) to include.
+        Default: full dataset (no limitation by sensor).
     query_time_split
         Frequency to use when splitting the web API queries in time,
         in a format that ``pandas.to_timedelta`` will understand.
@@ -535,7 +542,11 @@ def add_data(
         columns={"sensor_ids": "sensor_id", "parameters": "parameter"}
     )
     sensors = sensors.query("parameter == @parameters")
-    sensors = sensors.iloc[:1000]  # FIXME: arbitrary limit for testing
+    sensor_limit = kwargs.pop("sensor_limit", None)  # for testing
+    if sensor_limit is not None:
+        sensors = sensors.iloc[:sensor_limit]
+    if sensor_ids is not None:
+        sensors = sensors.query("sensor_id == @sensor_ids")
     print(
         f"requesting data from {len(sensors)} sensors "
         f"at {sensors.siteid.nunique()} unique locations"
