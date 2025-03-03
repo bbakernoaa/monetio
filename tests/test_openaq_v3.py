@@ -72,21 +72,47 @@ def test_get_sensors():
     assert df.parameter.tolist() == ["so2", "o3"]
 
 
-def test_add_data_sensor_ids():
+@pytest.mark.parametrize(
+    "product",
+    [
+        "raw",
+        "hourly",
+        # "daily",
+        # FIXME: ^ weird results
+        # - time not floored to day (04:00:00)
+        #   - but it is for _local_ time
+        # -  2024-07-31 the first day
+        # - two different-valued pm25 records for each day even though just one sensor
+        #   - probably related to the time, multiple periods overlapping the request
+        #     and 1D time split -> doubled records
+    ],
+)
+def test_add_data_sensor_ids(product):
     df = openaq.get_sensors("2978434")
     sensor_ids = df["id"].tolist()
     assert len(sensor_ids) == 1
     df = openaq.add_data(
         ["2024-08-01", "2024-08-08"],
         query_time_split="1D",
+        raw=product == "raw",
+        hourly=product == "hourly",
+        daily=product == "daily",
         sensor_ids=sensor_ids,
         threads=2,
     )
     assert columns_all_snake_case(df)
     assert len(df) > 0
     assert df.sensor_id.nunique() == 1
-    assert df.time.min() > pd.Timestamp("2024-08-01") - pd.Timedelta("1h")
-    assert df.time.max() < pd.Timestamp("2024-08-08") + pd.Timedelta("1h")
+
+    tmin, tmax = df.time.min(), df.time.max()
+    if product == "raw":
+        assert tmin > pd.Timestamp("2024-08-01") - pd.Timedelta("1h")
+        assert tmax < pd.Timestamp("2024-08-08") + pd.Timedelta("1h")
+    elif product in {"hourly", "daily"}:
+        assert tmin == pd.Timestamp("2024-08-01")
+        assert tmax == pd.Timestamp("2024-08-08")
+    else:
+        raise AssertionError
 
 
 def test_add_data_sensor_limit():

@@ -478,6 +478,9 @@ def add_data(
     dates,
     *,
     parameters=None,
+    raw=None,
+    hourly=None,
+    daily=None,
     country=None,
     sites=None,
     entity=None,
@@ -497,6 +500,9 @@ def add_data(
         as inclusive time bounds of the desired data.
     parameters : str or list of str, optional
         For example, ``'o3'`` or ``['pm25', 'o3']`` (default).
+    raw, hourly, daily : bool, optional
+        Select product (use only one of these).
+        By default, raw data is returned.
     country : str or list of str, optional
         For example, ``'US'`` or ``['US', 'CA']`` (two-letter country codes).
         Default: full dataset (no limitation by country).
@@ -562,6 +568,28 @@ def add_data(
     elif isinstance(parameters, str):
         parameters = [parameters]
 
+    if all([raw is None, hourly is None, daily is None]):
+        # Default to raw
+        # FIXME: probably want hourly to be the default
+        raw = True
+        hourly = False
+        daily = False
+    else:
+        # User specified one (or more)
+        if raw is None:
+            raw = False
+        if hourly is None:
+            hourly = False
+        if daily is None:
+            daily = False
+    if sum([raw, hourly, daily]) != 1:
+        raise ValueError("exactly one of raw, hourly, daily can be True")
+    endpt_tpl = "/v3/sensors/{sensor_id}/measurements"
+    if hourly:
+        endpt_tpl += "/hourly"
+    elif daily:
+        endpt_tpl += "/daily"
+
     query_dt = pd.to_timedelta(query_time_split) if len(dates) > 1 else None
     date_min, date_max = dates.min(), dates.max()
     if query_dt is not None:
@@ -574,10 +602,15 @@ def add_data(
                 "must provide at least two unique datetimes to use query_time_split. "
                 "Set query_time_split=None to disable time splitting."
             )
+        if hourly:
+            date_max = date_max + pd.Timedelta(hours=1)
+        elif daily:
+            date_max = date_max + pd.Timedelta(days=1)
 
     def iter_time_slices():
-        # seems that (from < time <= to) == (from , to] is used
-        # i.e. `from` is exclusive, `to` is inclusive
+        # Seems that (from <= time < to) == [from , to) is used
+        # TODO: For consistency with other MONETIO readers,
+        # we want the upper bound in dates to be included in the result.
         # one_sec = pd.Timedelta(seconds=1)
         if query_dt is not None:
             t = date_min
@@ -586,9 +619,7 @@ def add_data(
                 yield t, t_next
                 t = t_next
         else:
-            # yield date_min - one_sec, date_max
             yield date_min, date_max
-            # TODO: minus one sec seems no longer necessary
 
     # Discover locations
     print("getting locations...")
@@ -627,8 +658,8 @@ def add_data(
     if sensor_ids is not None:
         sensors = sensors.query("sensor_id == @sensor_ids")
     print(
-        f"requesting data from {len(sensors)} sensors "
-        f"at {sensors.siteid.nunique()} unique locations"
+        f"requesting data from {len(sensors)} sensor(s) "
+        f"at {sensors.siteid.nunique()} unique location(s)"
     )
 
     def iter_queries():
@@ -644,7 +675,7 @@ def add_data(
 
     def tfunc(tup):
         sensor_id, params = tup
-        endpt = f"/v3/sensors/{sensor_id}/measurements"
+        endpt = endpt_tpl.format(sensor_id=sensor_id)
         return [
             {
                 "value": d["value"],
