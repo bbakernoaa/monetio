@@ -647,11 +647,13 @@ def add_data(
         raise NotImplementedError  # TODO: not sure what to use for this
     if sensor_type is not None:
         # FIXME: may not be the best approach
-        meta["sensor_type"] = meta["is_monitor"].map(
-            {
-                True: "reference grade",
-                False: "low-cost sensor",
-            }
+        meta = meta.assign(
+            sensor_type=meta["is_monitor"].map(
+                {
+                    True: "reference grade",
+                    False: "low-cost sensor",
+                }
+            )
         )
         meta = meta.query("sensor_type == @sensor_type")
     meta = meta[
