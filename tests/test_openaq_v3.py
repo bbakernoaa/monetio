@@ -86,10 +86,10 @@ def test_add_data_sensor_ids(product):
     assert len(sensor_ids) == 1
     df = openaq.add_data(
         ["2024-08-01", "2024-08-08"],
-        query_time_split="1D",
         raw=product == "raw",
         hourly=product == "hourly",
         daily=product == "daily",
+        query_time_split="1D",
         sensor_ids=sensor_ids,
         threads=2,
     )
@@ -108,9 +108,21 @@ def test_add_data_sensor_ids(product):
         raise AssertionError
 
 
-def test_add_data_sensor_limit():
+@pytest.mark.parametrize(
+    "product",
+    [
+        "raw",
+        "hourly",
+        "daily",
+    ],
+)
+def test_add_data_sensor_limit(product):
     df = openaq.add_data(
         ["2019-08-01", "2019-08-02"],
+        parameters="pm25",
+        raw=product == "raw",
+        hourly=product == "hourly",
+        daily=product == "daily",
         query_time_split=None,
         sensor_limit=10,
         threads=2,
@@ -120,4 +132,8 @@ def test_add_data_sensor_limit():
     assert df.sensor_id.nunique() <= 10
 
     df_wide = openaq._to_wide_fmt(df)
-    assert df.query("parameter == 'pm25'").value.mean() == df_wide.pm25_ugm3.mean()
+    assert df_wide.pm25_ugm3.mean() == pytest.approx(
+        df.query("parameter == 'pm25'").value.mean(),
+        rel=1e-15,
+        abs=0,
+    )
