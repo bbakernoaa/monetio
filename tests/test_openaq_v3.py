@@ -30,13 +30,13 @@ SITES_NEAR_NCWCP = [
 ]
 
 
-def assert_columns_all_snake_case(df):
-    assert all(df.columns.str.fullmatch(r"[a-z_]+"))
+def columns_all_snake_case(df):
+    return all(df.columns.str.fullmatch(r"[a-z_]+"))
 
 
 def test_get_parameters():
     params = openaq.get_parameters()
-    assert_columns_all_snake_case(params)
+    assert columns_all_snake_case(params)
     assert 20 <= len(params) <= 100
     assert params.id.nunique() == len(params)
     assert params.name.nunique() < len(params), "dupes for different units etc."
@@ -46,7 +46,7 @@ def test_get_parameters():
 
 def test_get_locations():
     sites = openaq.get_locations()
-    assert_columns_all_snake_case(sites)
+    assert columns_all_snake_case(sites)
     assert 10_000 <= len(sites) < 50_000
     assert sites.siteid.nunique() == len(sites)
     assert sites.dtypes["first_time"] == "datetime64[ns]"
@@ -68,7 +68,7 @@ def test_get_locations():
 
 def test_get_sensors():
     df = openaq.get_sensors("3832")
-    assert_columns_all_snake_case(df)
+    assert columns_all_snake_case(df)
     assert df.parameter.tolist() == ["so2", "o3"]
 
 
@@ -82,7 +82,7 @@ def test_add_data_sensor_ids():
         sensor_ids=sensor_ids,
         threads=2,
     )
-    assert_columns_all_snake_case(df)
+    assert columns_all_snake_case(df)
     assert len(df) > 0
 
 
@@ -93,7 +93,7 @@ def test_add_data_sensor_limit():
         sensor_limit=10,
         threads=2,
     )
-    assert_columns_all_snake_case(df)
+    assert columns_all_snake_case(df)
     assert len(df) > 0
     assert df.sensor_id.nunique() <= 10
 
