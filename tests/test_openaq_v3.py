@@ -62,8 +62,13 @@ def test_get_locations():
     # Check that we didn't end up with unexpected non-scalar columns
     for col in sites.columns:
         is_scalar = sites[col].apply(lambda x: pd.api.types.is_scalar(x)).all()
-        assert is_scalar or col in {"parameters", "sensor_ids"}
+        assert is_scalar or col in {"parameters", "parameter_ids", "sensor_ids"}
 
     # Check that pm25 and o3 are in the unique parameters
     unique_params = set(sites["parameters"].sum())
     assert {"pm25", "o3"} <= unique_params
+
+
+def test_get_sensors():
+    df = openaq.get_sensors(3832)
+    assert df.parameter.tolist() == ["so2", "o3"]

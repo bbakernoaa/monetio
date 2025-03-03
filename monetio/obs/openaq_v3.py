@@ -236,9 +236,11 @@ def get_locations(**kwargs):
         lat = d["coordinates"]["latitude"]
         lon = d["coordinates"]["longitude"]
         parameters = []
+        parameter_ids = []
         sensor_ids = []
         for s in d["sensors"]:
             parameters.append(s["parameter"]["name"])
+            parameter_ids.append(s["parameter"]["id"])
             sensor_ids.append(str(s["id"]))
 
         # Start by taking selected scalars
@@ -255,6 +257,7 @@ def get_locations(**kwargs):
             latitude=lat,
             longitude=lon,
             parameters=parameters,
+            parameter_ids=parameters,
             sensor_ids=sensor_ids,
         )
 
@@ -286,7 +289,45 @@ def get_locations(**kwargs):
     return df
 
 
-# TODO: get_sensors(location)
+@_api_key_warning
+def get_sensors(location_id, **kwargs):
+    """Get sensors for a location (ID; aka 'siteid')."""
+
+    # Doesn't seem to be paging properly?
+    # (Next page always has the same n)
+    # So set to one page for now
+    kwargs["limit"] = kwargs.get("limit", 1000)
+    kwargs["npages"] = kwargs.get("npages", 1)
+
+    data2 = []
+    for d in _consume(f"/v3/locations/{location_id}/sensors", **kwargs):
+        first_time = d["datetimeFirst"]
+        if first_time is not None:
+            first_time = first_time.get("utc", None)
+        last_time = d["datetimeLast"]
+        if last_time is not None:
+            last_time = last_time.get("utc", None)
+
+        d2 = {
+            "id": d["id"],
+            "name": d["name"],
+            "parameter": d["parameter"]["name"],
+            "parameter_id": d["parameter"]["id"],
+            "first_time": first_time,
+            "last_time": last_time,
+        }
+
+        data2.append(d2)
+
+    df = pd.DataFrame(data2)
+
+    # Compute datetimes
+    for col in ["first_time", "last_time"]:
+        i = df[col].notnull()
+        assert df.loc[i, col].str.slice(-1, None).eq("Z").all()
+        df[col] = pd.to_datetime(df[col].str.slice(0, -1))
+
+    return df
 
 
 @_api_key_warning
