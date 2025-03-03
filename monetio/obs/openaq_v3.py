@@ -19,6 +19,7 @@ import logging
 import os
 import warnings
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -193,7 +194,7 @@ def get_locations(**kwargs):
         "name",
         "locality",
         "timezone",
-        "isMobile",
+        "isMobile",  # TODO: rename these two to snake_case
         "isMonitor",
         "distance",
     ]
@@ -507,14 +508,11 @@ def add_data(
 
     utcoffset = df["time_from_local"] - df["time_from_utc"]
 
-    # TODO: get lat/lon from sensors df
-
+    # Choose time
     df = df.assign(
         time=df["time_from_utc"],  # left-labelled
         time_local=df["time_from_local"],
         utcoffset=utcoffset,
-        # latitude=lat,
-        # longitude=lon,
     ).drop(
         columns=[
             "time_from_utc",
@@ -524,9 +522,39 @@ def add_data(
         ]
     )
 
-    # TODO: get site info in from meta df
+    # Get site info in from meta df
+    df = df.merge(
+        sensors[
+            [
+                "country_code",
+                "siteid",
+                "latitude",
+                "longitude",
+                "sensor_id",
+                "isMobile",
+                "isMonitor",
+            ]
+        ],
+        on="sensor_id",
+        how="left",
+    ).rename(
+        columns={
+            "country_code": "country",
+        }
+    )
 
-    # TODO: get units and name in from parameters df
+    # Add parameter info
+    parameters = get_parameters().rename(
+        columns={
+            "id": "parameter_id",
+            "name": "parameter",
+        }
+    )
+    df = df.merge(
+        parameters[["parameter_id", "parameter", "units"]],
+        on="parameter_id",
+        how="left",
+    ).drop(columns="parameter_id")
 
     # Most variables invalid if < 0
     # > preferredUnit.value_counts()
@@ -546,34 +574,53 @@ def add_data(
     # f                 1
     # mb                1
     # iaq               1
-    # non_neg_units = [
-    #     "particles/cm³",
-    #     "ppm",
-    #     "ppb",
-    #     "umol/mol",
-    #     "µg/m³",
-    #     "ugm3",
-    #     "ng/m3",
-    #     "iaq",
-    #     #
-    #     "%",
-    #     #
-    #     "m/s",
-    #     #
-    #     "hpa",
-    #     "mb",
-    # ]
-    # df.loc[df.unit.isin(non_neg_units) & (df.value < 0), "value"] = np.nan
+    non_neg_units = [
+        "particles/cm³",
+        "ppm",
+        "ppb",
+        "umol/mol",
+        "µg/m³",
+        "ugm3",
+        "ng/m3",
+        "iaq",
+        #
+        "%",
+        #
+        "m/s",
+        #
+        "hpa",
+        "mb",
+    ]
+    df.loc[df.units.isin(non_neg_units) & (df.value < 0), "value"] = np.nan
+
+    col_order = [
+        "parameter",
+        "value",
+        "units",
+        "time",
+        "siteid",
+        "latitude",
+        "longitude",
+        "time_local",
+        "utcoffset",
+        "country",
+        "sensor_id",
+        "isMobile",
+        "isMonitor",
+        "period_label",
+    ]
+    assert sorted(df.columns) == sorted(col_order)
+    df = df[col_order]
 
     if wide_fmt:
         # Normalize units
         for vn, f in _PPM_TO_UGM3.items():
-            is_ug = (df.parameter == vn) & (df.unit == "µg/m³")
+            is_ug = (df.parameter == vn) & (df.units == "µg/m³")
             df.loc[is_ug, "value"] /= f
             df.loc[is_ug, "unit"] = "ppm"
 
         # Warn if inconsistent units
-        p_units = df.groupby("parameter").unit.unique()
+        p_units = df.groupby("parameter").units.unique()
         unique = p_units.apply(len).eq(1)
         if not unique.all():
             p_units_non_unique = p_units[~unique]
