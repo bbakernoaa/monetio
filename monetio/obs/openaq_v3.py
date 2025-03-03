@@ -198,24 +198,28 @@ def get_locations(**kwargs):
     kwargs["limit"] = kwargs.get("limit", 1000)
 
     p = HERE / "openaq_locations_data.json.gz"
-    have_cache = False
-    if p.is_file():
-        now = pd.Timestamp.now(tz="UTC")
-        mtime = pd.Timestamp.fromtimestamp(p.stat().st_mtime, tz="UTC")
-        logger.info(f"locations cache file exists, mtime {mtime:%Y-%m-%d %H:%M:%SZ}")
-        if now - mtime < pd.Timedelta(days=7):
-            have_cache = True
-        else:
-            logger.info("locations cache file is old, will refresh")
-    else:
-        logger.info("locations cache file not found, will create")
 
-    if not have_cache:
-        with FileLock(p.as_posix() + ".lock"):
+    def have_cache():
+        if p.is_file():
+            now = pd.Timestamp.now(tz="UTC")
+            mtime = pd.Timestamp.fromtimestamp(p.stat().st_mtime, tz="UTC")
+            logger.info(f"locations cache file exists, mtime {mtime:%Y-%m-%d %H:%M:%SZ}")
+            if now - mtime < pd.Timedelta(days=7):
+                return True
+            else:
+                logger.info("locations cache file is old, will refresh")
+        else:
+            logger.info("locations cache file not found, will create")
+        return False
+
+    data = None
+    with FileLock(p.as_posix() + ".lock"):
+        if not have_cache():
             data = _consume(_ENDPOINTS["locations"], **kwargs)
             with gzip.open(p, "wt") as f:
                 json.dump(data, f)
-    else:
+
+    if data is None:
         logger.info("using cached locations data")
         with gzip.open(p, "rt") as f:
             data = json.load(f)
