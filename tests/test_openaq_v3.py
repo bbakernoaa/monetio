@@ -99,8 +99,8 @@ def test_add_data_sensor_ids(product):
 
     tmin, tmax = df.time.min(), df.time.max()
     if product == "raw":
-        assert tmin > pd.Timestamp("2024-08-01") - pd.Timedelta("1h")
-        assert tmax < pd.Timestamp("2024-08-08") + pd.Timedelta("1h")
+        assert tmin >= pd.Timestamp("2024-08-01")
+        assert tmax <= pd.Timestamp("2024-08-08")
     elif product in {"hourly", "daily"}:
         assert tmin == pd.Timestamp("2024-08-01")
         assert tmax == pd.Timestamp("2024-08-08")

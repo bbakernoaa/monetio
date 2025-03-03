@@ -612,7 +612,7 @@ def add_data(
                 "must provide at least two unique datetimes to use query_time_split. "
                 "Set query_time_split=None to disable time splitting."
             )
-        if hourly:
+        if hourly or raw:
             date_max = date_max + pd.Timedelta(hours=1)
         elif daily:
             date_max = date_max + pd.Timedelta(days=1)
@@ -737,7 +737,15 @@ def add_data(
         ]
     )
 
-    if daily:
+    if raw:
+        df = df[
+            df.time.between(
+                date_min.tz_localize(None),
+                date_max.tz_localize(None) - pd.Timedelta(hours=1),
+                inclusive="both",
+            )
+        ]
+    elif daily:
         # We only need the date
         assert df["time_local"].eq(df["time_local"].dt.floor("D")).all()
         df = df.assign(time=df["time_local"]).drop(columns=["time_local"])
