@@ -482,7 +482,7 @@ def add_data(
     entity=None,
     sensor_type=None,
     sensor_ids=None,
-    query_time_split="1H",  # TODO: raise or remove this, given the single sensor queries
+    query_time_split=None,
     wide_fmt=False,  # FIXME: probably want to default to True
     **kwargs,
 ):
@@ -518,12 +518,17 @@ def add_data(
     query_time_split
         Frequency to use when splitting the web API queries in time,
         in a format that ``pandas.to_timedelta`` will understand.
-        This is necessary since there is a 100k limit on the number of results.
-        However, in some cases you may want to set this
-        to something higher in order to increase the query return speed.
-        Set to ``None`` for no time splitting.
-        Default: 1 hour
-        (OpenAQ data are hourly, so setting to something smaller won't help).
+        There is a 100k limit on the number of results you can get from a single query.
+        In this version of the OpenAQ web API, each sensor has its own endpoint
+        and so is a separate query,
+        but 100k equates to more than 10 years of hourly data.
+        For many use cases, data from a single sensor fits in one page
+        (the default page size, controlled by `limit`, is 500).
+        Time splitting might still be useful if you are requesting
+        a long record from a single sensor, for example,
+        to allow for multi-threaded requesting.
+        Set to ``None`` for no time splitting (default).
+        Default: no time splitting
         Ignored if only one date/time is provided.
     wide_fmt : bool
         Convert dataframe to wide format (one column per parameter).
