@@ -399,6 +399,79 @@ def get_latlonbox_sites(latlonbox, **kwargs):
     return sites[in_box].reset_index(drop=True)
 
 
+def _to_wide_fmt(df):
+    # Normalize units
+    for vn, f in _PPM_TO_UGM3.items():
+        is_ug = (df.parameter == vn) & (df.units == "µg/m³")
+        df.loc[is_ug, "value"] /= f
+        df.loc[is_ug, "units"] = "ppm"
+
+    # Warn if inconsistent units
+    p_units = df.groupby("parameter").units.unique()
+    unique = p_units.apply(len).eq(1)
+    if not unique.all():
+        p_units_non_unique = p_units[~unique]
+        warnings.warn(f"inconsistent units among parameters:\n{p_units_non_unique}")
+
+    # Certain metadata should be unique for a given site but sometimes aren't
+    # (e.g. location names of different specificity, slight differences in lat/lon coords)
+    for col in ["latitude", "longitude"]:  # TODO: location name too
+        site_col = df.groupby("siteid")[col].unique()
+        unique = site_col.apply(len).eq(1)
+        if not unique.all():
+            site_col_non_unique = site_col[~unique]
+            warnings.warn(
+                f"non-unique {col!r} among site IDs:\n{site_col_non_unique}" "\nUsing first."
+            )
+            df = df.drop(columns=[col]).merge(
+                site_col.str.get(0),
+                left_on="siteid",
+                right_index=True,
+                how="left",
+            )
+
+    # Pivot
+    index = [
+        "siteid",
+        "time",
+        "latitude",
+        "longitude",
+        "time_local",
+        "utcoffset",
+        #
+        "country",
+        #
+        "sensor_id",
+        "is_mobile",
+        "is_monitor",
+        "period_label",
+    ]
+    assert sorted(index + ["parameter", "value", "units"]) == sorted(df.columns)
+
+    dupes = df[df.duplicated(keep=False)]
+    if not dupes.empty:
+        logging.info(f"found {len(dupes)} duplicated rows")
+    for col in index:
+        if df[col].isnull().all():
+            index.remove(col)
+            warnings.warn(f"dropping {col!r} from index for wide fmt (all null)")
+    df = (
+        df.drop_duplicates(keep="first")
+        .pivot_table(
+            values="value",
+            index=index,
+            columns="parameter",
+        )
+        .reset_index()
+    )
+
+    # Rename so that units are clear
+    df = df.rename(columns={p: f"{p}_ugm3" for p in _NON_MOLEC_PARAMS}, errors="ignore")
+    df = df.rename(columns={p: f"{p}_ppm" for p in _PPM_TO_UGM3}, errors="ignore")
+
+    return df
+
+
 @_api_key_warning
 def add_data(
     dates,
@@ -715,73 +788,6 @@ def add_data(
     df = df[col_order]
 
     if wide_fmt:
-        # Normalize units
-        for vn, f in _PPM_TO_UGM3.items():
-            is_ug = (df.parameter == vn) & (df.units == "µg/m³")
-            df.loc[is_ug, "value"] /= f
-            df.loc[is_ug, "unit"] = "ppm"
-
-        # Warn if inconsistent units
-        p_units = df.groupby("parameter").units.unique()
-        unique = p_units.apply(len).eq(1)
-        if not unique.all():
-            p_units_non_unique = p_units[~unique]
-            warnings.warn(f"inconsistent units among parameters:\n{p_units_non_unique}")
-
-        # Certain metadata should be unique for a given site but sometimes aren't
-        # (e.g. location names of different specificity, slight differences in lat/lon coords)
-        for col in ["location", "latitude", "longitude"]:
-            site_col = df.groupby("siteid")[col].unique()
-            unique = site_col.apply(len).eq(1)
-            if not unique.all():
-                site_col_non_unique = site_col[~unique]
-                warnings.warn(
-                    f"non-unique {col!r} among site IDs:\n{site_col_non_unique}" "\nUsing first."
-                )
-                df = df.drop(columns=[col]).merge(
-                    site_col.str.get(0),
-                    left_on="siteid",
-                    right_index=True,
-                    how="left",
-                )
-
-        # Pivot
-        index = [
-            "siteid",
-            "time",
-            "latitude",
-            "longitude",
-            "time_local",
-            "utcoffset",
-            #
-            "location",
-            "city",
-            "country",
-            #
-            "entity",
-            "sensor_type",
-            "is_mobile",
-            "is_analysis",
-        ]
-        dupes = df[df.duplicated(keep=False)]
-        if not dupes.empty:
-            logging.info(f"found {len(dupes)} duplicated rows")
-        for col in index:
-            if df[col].isnull().all():
-                index.remove(col)
-                warnings.warn(f"dropping {col!r} from index for wide fmt (all null)")
-        df = (
-            df.drop_duplicates(keep="first")
-            .pivot_table(
-                values="value",
-                index=index,
-                columns="parameter",
-            )
-            .reset_index()
-        )
-
-        # Rename so that units are clear
-        df = df.rename(columns={p: f"{p}_ugm3" for p in _NON_MOLEC_PARAMS}, errors="ignore")
-        df = df.rename(columns={p: f"{p}_ppm" for p in _PPM_TO_UGM3}, errors="ignore")
+        df = _to_wide_fmt(df)
 
     return df

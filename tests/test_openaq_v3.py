@@ -99,3 +99,6 @@ def test_add_data_sensor_limit():
     assert_columns_all_snake_case(df)
     assert len(df) > 0
     assert df.sensor_id.nunique() <= 10
+
+    df_wide = openaq._to_wide_fmt(df)
+    assert df.query("parameter == 'pm25'").value.mean() == df_wide.pm25_ugm3.mean()
