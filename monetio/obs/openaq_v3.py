@@ -634,9 +634,9 @@ def add_data(
             yield date_min, date_max
 
     # Discover locations
-    print("getting locations...")
+    print("loading locations...")
     meta = get_locations()
-    print(f"found {len(meta)} locations")
+    print(f"{len(meta)} locations detected")
 
     # Narrow locations based on user input
     if country is not None:
