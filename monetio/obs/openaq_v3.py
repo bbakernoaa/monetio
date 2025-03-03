@@ -437,6 +437,8 @@ def add_data(
     dates = dates.dropna()
     if dates.empty:
         raise ValueError("must provide at least one datetime-like")
+    if dates.tz is None:
+        dates = dates.tz_localize("UTC")
 
     if parameters is None:
         parameters = ["pm25", "o3"]
@@ -467,11 +469,13 @@ def add_data(
                 yield t - one_sec, t_next
                 t = t_next
         else:
-            yield date_min - one_sec, date_max
+            # yield date_min - one_sec, date_max
+            yield date_min, date_max
+            # TODO: minus one sec seems no longer necessary
 
     # Discover locations
     print("getting locations...")
-    meta = get_locations(npages=1)  # FIXME: arbitrary limit for testing
+    meta = get_locations(npages=10)  # FIXME: arbitrary limit for testing
     print(f"found {len(meta)} locations")
 
     # Narrow locations based on user input
@@ -490,13 +494,17 @@ def add_data(
             }
         )
         meta = meta.query("sensor_type == @sensor_type")
+    meta = meta[
+        (meta.first_time <= date_max.tz_localize(None))
+        & (meta.last_time >= date_min.tz_localize(None))
+    ]
 
     # Pick sensors that have the desired parameters
     sensors = meta.explode(["sensor_ids", "parameters"], ignore_index=True).rename(
         columns={"sensor_ids": "sensor_id", "parameters": "parameter"}
     )
     sensors = sensors.query("parameter == @parameters")
-    sensors = sensors.iloc[:10]  # FIXME: arbitrary limit for testing
+    sensors = sensors.iloc[:100]  # FIXME: arbitrary limit for testing
     print(f"using {len(sensors)} sensors from {len(meta)} locations")
 
     # TODO: it should be possible to remove sensors not active during the time period
@@ -505,6 +513,7 @@ def add_data(
     def iter_queries():
         for sensor_id in sensors["sensor_id"]:
             for t_from, t_to in iter_time_slices():
+                # TODO: should these be UTC or local here? and does naive vs non-naive make a difference?
                 yield sensor_id, {
                     "datetime_from": t_from,
                     "datetime_to": t_to,
@@ -549,8 +558,8 @@ def add_data(
     # Convert times to naive datetime, e.g.
     # {'utc': '2019-08-01T04:00:00Z', 'local': '2019-08-01T00:00:00-04:00'}}
     for col in ["time_from", "time_to"]:
-        for tz in ["utc", "local"]:
-            df[f"{col}_{tz}"] = pd.to_datetime(df[f"{col}_{tz}"]).dt.tz_localize(None)
+        df[f"{col}_utc"] = pd.to_datetime(df[f"{col}_utc"]).dt.tz_localize(None)
+        df[f"{col}_local"] = pd.to_datetime(df[f"{col}_local"].str.slice(0, 19))
 
     utcoffset = df["time_from_local"] - df["time_from_utc"]
 
