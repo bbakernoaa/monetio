@@ -33,8 +33,13 @@ SITES_NEAR_NCWCP = [
 ]
 
 
+def assert_columns_all_snake_case(df):
+    assert all(df.columns.str.fullmatch(r"[a-z_]+"))
+
+
 def test_get_parameters():
     params = openaq.get_parameters()
+    assert_columns_all_snake_case(params)
     assert 20 <= len(params) <= 100
     assert params.id.nunique() == len(params)
     assert params.name.nunique() < len(params), "dupes for different units etc."
@@ -44,6 +49,7 @@ def test_get_parameters():
 
 def test_get_locations():
     sites = openaq.get_locations(npages=2, limit=100)
+    assert_columns_all_snake_case(sites)
     assert len(sites) <= 200
     assert sites.siteid.nunique() == len(sites)
     assert sites.dtypes["first_time"] == "datetime64[ns]"

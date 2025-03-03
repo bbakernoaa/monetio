@@ -194,7 +194,7 @@ def get_locations(**kwargs):
         "name",
         "locality",
         "timezone",
-        "isMobile",  # TODO: rename these two to snake_case
+        "isMobile",
         "isMonitor",
         "distance",
     ]
@@ -260,7 +260,12 @@ def get_locations(**kwargs):
 
         data2.append(d2)
 
-    df = pd.DataFrame(data2)
+    df = pd.DataFrame(data2).rename(
+        columns={
+            "isMobile": "is_mobile",
+            "isMonitor": "is_monitor",
+        }
+    )
 
     # Compute datetimes
     for col in ["first_time", "last_time"]:
@@ -293,7 +298,7 @@ def get_parameters(**kwargs):
 
     data = _consume(_ENDPOINTS["parameters"], **kwargs)
 
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(data).rename(columns={"displayName": "display_name"})
 
     return df
 
@@ -437,7 +442,7 @@ def add_data(
         raise NotImplementedError  # TODO: not sure what to use for this
     if sensor_type is not None:
         # FIXME: may not be the best approach
-        meta["sensor_type"] = meta["isMonitor"].map(
+        meta["sensor_type"] = meta["is_monitor"].map(
             {
                 True: "reference grade",
                 False: "low-cost sensor",
@@ -531,8 +536,8 @@ def add_data(
                 "latitude",
                 "longitude",
                 "sensor_id",
-                "isMobile",
-                "isMonitor",
+                "is_mobile",
+                "is_monitor",
             ]
         ],
         on="sensor_id",
@@ -605,8 +610,8 @@ def add_data(
         "utcoffset",
         "country",
         "sensor_id",
-        "isMobile",
-        "isMonitor",
+        "is_mobile",
+        "is_monitor",
         "period_label",
     ]
     assert sorted(df.columns) == sorted(col_order)
