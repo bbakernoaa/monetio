@@ -190,33 +190,34 @@ def get_locations(**kwargs):
     https://api.openaq.org/docs#/v3/locations_get_v3_locations_get
     """
 
+    import gzip
     import json
 
     from filelock import FileLock
 
     kwargs["limit"] = kwargs.get("limit", 1000)
 
-    # TODO: gzip? or place in user cache dir instead?
-    p = HERE / "openaq_locations_data.json"
+    p = HERE / "openaq_locations_data.json.gz"
     have_cache = False
     if p.is_file():
         now = pd.Timestamp.now(tz="UTC")
         mtime = pd.Timestamp.fromtimestamp(p.stat().st_mtime, tz="UTC")
+        logger.info(f"locations cache file exists, mtime {mtime:%Y-%m-%d %H:%M:%SZ}")
         if now - mtime < pd.Timedelta(days=7):
             have_cache = True
         else:
-            logger.info(f"locations cache file is old ({mtime:%Y-%m-%d %H:%M:%SZ}), will refresh")
+            logger.info("locations cache file is old, will refresh")
     else:
-        logger.info("no locations cache file")
+        logger.info("locations cache file not found, will create")
 
     if not have_cache:
         with FileLock(p.as_posix() + ".lock"):
             data = _consume(_ENDPOINTS["locations"], **kwargs)
-            with open(p, "w") as f:
+            with gzip.open(p, "wt") as f:
                 json.dump(data, f)
     else:
         logger.info("using cached locations data")
-        with open(p) as f:
+        with gzip.open(p, "rt") as f:
             data = json.load(f)
 
     # Some fields with scalar values to take
