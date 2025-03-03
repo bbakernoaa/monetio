@@ -619,9 +619,6 @@ def add_data(
 
     def iter_time_slices():
         # Seems that (from <= time < to) == [from , to) is used
-        # TODO: For consistency with other MONETIO readers,
-        # we want the upper bound in dates to be included in the result.
-        # one_sec = pd.Timedelta(seconds=1)
         if query_dt is not None:
             t = date_min
             while t < date_max:
