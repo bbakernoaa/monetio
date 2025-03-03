@@ -18,10 +18,13 @@ import functools
 import logging
 import os
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import requests
+
+HERE = Path(__file__).parent
 
 logger = logging.getLogger(__name__)
 
@@ -184,9 +187,34 @@ def get_locations(**kwargs):
     https://api.openaq.org/docs#/v3/locations_get_v3_locations_get
     """
 
-    # TODO: multi-thread and/or cache to disk
+    import json
 
-    data = _consume(_ENDPOINTS["locations"], **kwargs)
+    from filelock import FileLock
+
+    kwargs["limit"] = kwargs.get("limit", 1000)
+
+    # TODO: gzip? or place in user cache dir instead?
+    p = HERE / "openaq_locations_data.json"
+    have_cache = False
+    if p.is_file():
+        now = pd.Timestamp.now(tz="UTC")
+        mtime = pd.Timestamp.fromtimestamp(p.stat().st_mtime, tz="UTC")
+        if now - mtime < pd.Timedelta(days=7):
+            have_cache = True
+        else:
+            logger.info(f"locations cache file is old ({mtime:%Y-%m-%d %H:%M:%SZ}), will refresh")
+    else:
+        logger.info("no locations cache file")
+
+    if not have_cache:
+        with FileLock(p.as_posix() + ".lock"):
+            data = _consume(_ENDPOINTS["locations"], **kwargs)
+            with open(p, "w") as f:
+                json.dump(data, f)
+    else:
+        logger.info("using cached locations data")
+        with open(p) as f:
+            data = json.load(f)
 
     # Some fields with scalar values to take
     some_scalars = [
@@ -475,7 +503,7 @@ def add_data(
 
     # Discover locations
     print("getting locations...")
-    meta = get_locations(npages=10)  # FIXME: arbitrary limit for testing
+    meta = get_locations()
     print(f"found {len(meta)} locations")
 
     # Narrow locations based on user input
