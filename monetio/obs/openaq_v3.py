@@ -447,6 +447,8 @@ def _to_wide_fmt(df):
         "is_monitor",
         "period_label",
     ]
+    if "time_local" not in df.columns:  # daily data
+        index.remove("time_local")
     assert sorted(index + ["parameter", "value", "units"]) == sorted(df.columns)
 
     dupes = df[df.duplicated(keep=False)]
@@ -560,8 +562,6 @@ def add_data(
     dates = dates.dropna()
     if dates.empty:
         raise ValueError("must provide at least one datetime-like")
-    if dates.tz is None:
-        dates = dates.tz_localize("UTC")
 
     if parameters is None:
         parameters = ["pm25", "o3"]
@@ -589,6 +589,16 @@ def add_data(
         endpt_tpl += "/hourly"
     elif daily:
         endpt_tpl += "/daily"
+
+    # The API seems to assume local time if tz is not set.
+    # Usually we _do_ want/mean UTC, but for daily, we want to select dates,
+    # which are local time, and we don't want worry about tz differences
+    # for different sites.
+    if dates.tz is None and not daily:
+        dates = dates.tz_localize("UTC")
+    if daily and dates.tz is not None:
+        warnings.warn("ignoring tz for daily data")
+        dates = dates.tz_localize(None)
 
     query_dt = pd.to_timedelta(query_time_split) if len(dates) > 1 else None
     date_min, date_max = dates.min(), dates.max()
@@ -665,7 +675,6 @@ def add_data(
     def iter_queries():
         for sensor_id in sensors["sensor_id"]:
             for t_from, t_to in iter_time_slices():
-                # TODO: should these be UTC or local here? and does naive vs non-naive make a difference?
                 yield sensor_id, {
                     "datetime_from": t_from,
                     "datetime_to": t_to,
@@ -730,6 +739,11 @@ def add_data(
             "time_to_local",
         ]
     )
+
+    if daily:
+        # We only need the date
+        assert df["time_local"].eq(df["time_local"].dt.floor("D")).all()
+        df = df.assign(time=df["time_local"]).drop(columns=["time_local"])
 
     # Get site info in from meta df
     df = df.merge(
@@ -818,6 +832,8 @@ def add_data(
         "is_monitor",
         "period_label",
     ]
+    if daily:
+        col_order.remove("time_local")
     assert sorted(df.columns) == sorted(col_order)
     df = df[col_order]
 

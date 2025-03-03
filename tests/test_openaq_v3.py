@@ -77,14 +77,7 @@ def test_get_sensors():
     [
         "raw",
         "hourly",
-        # "daily",
-        # FIXME: ^ weird results
-        # - time not floored to day (04:00:00)
-        #   - but it is for _local_ time
-        # -  2024-07-31 the first day
-        # - two different-valued pm25 records for each day even though just one sensor
-        #   - probably related to the time, multiple periods overlapping the request
-        #     and 1D time split -> doubled records
+        "daily",
     ],
 )
 def test_add_data_sensor_ids(product):
