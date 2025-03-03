@@ -578,12 +578,12 @@ def add_data(
     def iter_time_slices():
         # seems that (from < time <= to) == (from , to] is used
         # i.e. `from` is exclusive, `to` is inclusive
-        one_sec = pd.Timedelta(seconds=1)
+        # one_sec = pd.Timedelta(seconds=1)
         if query_dt is not None:
             t = date_min
             while t < date_max:
                 t_next = min(t + query_dt, date_max)
-                yield t - one_sec, t_next
+                yield t, t_next
                 t = t_next
         else:
             # yield date_min - one_sec, date_max

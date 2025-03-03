@@ -84,6 +84,9 @@ def test_add_data_sensor_ids():
     )
     assert columns_all_snake_case(df)
     assert len(df) > 0
+    assert df.sensor_id.nunique() == 1
+    assert df.time.min() > pd.Timestamp("2024-08-01") - pd.Timedelta("1h")
+    assert df.time.max() < pd.Timestamp("2024-08-08") + pd.Timedelta("1h")
 
 
 def test_add_data_sensor_limit():
