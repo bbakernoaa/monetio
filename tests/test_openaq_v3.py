@@ -131,9 +131,27 @@ def test_add_data_sensor_limit(product):
     assert len(df) > 0
     assert df.sensor_id.nunique() <= 10
 
+    tmin, tmax = df.time.min(), df.time.max()
+    if product == "raw":
+        assert tmin >= pd.Timestamp("2019-08-01")
+        assert tmax <= pd.Timestamp("2019-08-02")
+    elif product in {"hourly", "daily"}:
+        assert tmin == pd.Timestamp("2019-08-01")
+        assert tmax == pd.Timestamp("2019-08-02")
+    else:
+        raise AssertionError
+
     df_wide = openaq._to_wide_fmt(df)
     assert df_wide.pm25_ugm3.mean() == pytest.approx(
         df.query("parameter == 'pm25'").value.mean(),
         rel=1e-15,
         abs=0,
     )
+
+
+def test_get_data_single_dt_single_site():
+    site = "843"
+    dates = "2023-08-01"
+    df = openaq.add_data(dates, parameters="o3", sites=site)
+    assert len(df) == 1
+    assert df.time.iloc[0] == pd.Timestamp("2023-08-01")

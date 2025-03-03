@@ -612,10 +612,10 @@ def add_data(
                 "must provide at least two unique datetimes to use query_time_split. "
                 "Set query_time_split=None to disable time splitting."
             )
-        if hourly or raw:
-            date_max = date_max + pd.Timedelta(hours=1)
-        elif daily:
-            date_max = date_max + pd.Timedelta(days=1)
+    if hourly or raw:
+        date_max = date_max + pd.Timedelta(hours=1)
+    elif daily:
+        date_max = date_max + pd.Timedelta(days=1)
 
     def iter_time_slices():
         # Seems that (from <= time < to) == [from , to) is used
