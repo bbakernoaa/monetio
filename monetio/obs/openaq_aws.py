@@ -177,6 +177,7 @@ def get_locs(*, country=None, provider=None):
         paths = []
         for cntry in countries:
             cntry_paths = fs.find(
+                # TODO: these paths (csv.gz/country=) are no longer there
                 f"openaq-data-archive/records/csv.gz/country={cntry.lower()}/",
                 withdirs=True,
                 maxdepth=1,
@@ -230,6 +231,72 @@ def get_locs(*, country=None, provider=None):
         warnings.warn(f"no locations found for country={country!r} provider={provider!r}")
 
     return sorted(locs)
+
+
+def _build_urls(dates, sites, *, protocol="s3"):
+    """Naively build URLs for OpenAQ archive data on AWS
+    for the given `sites` (location IDs) and dates.
+
+    "Naively" meaning not checking if the files actually exist.
+
+    Parameters
+    ----------
+    dates : datetime-like or array-like of datetime-like
+        Desired dates.
+    sites : str or list of str
+        Sites (OpenAQ location IDs).
+    protocol : {'s3', 'http', 'https'}
+        URL protocol to use.
+
+    Returns
+    -------
+    list of str
+    """
+    dates = pd.to_datetime(dates)
+    if pd.api.types.is_scalar(dates):
+        dates = pd.DatetimeIndex([dates])
+
+    if pd.api.types.is_scalar(sites):
+        sites = [sites]
+
+    if protocol.lower() == "s3":
+        pref = "s3://openaq-data-archive"
+    elif protocol.lower() in {"http", "https"}:
+        pref = f"{protocol.lower()}://openaq-data-archive.s3.amazonaws.com"
+    else:
+        raise ValueError(f"protocol: {protocol!r}")
+
+    _urls = []
+    for site in sites:
+        for date in dates:
+            _urls.append(
+                f"{pref}/records/csv.gz/"
+                f"locationid={site}/year={date:%Y}/month={date:%m}/"
+                f"location-{site}-{date:%Y%m%d}.csv.gz"
+            )
+
+    return _urls
+
+
+def _maybe_read(fp):
+    """Try to read a file, returning an empty DataFrame if it doesn't exist."""
+    try:
+        return read(fp)
+    except FileNotFoundError:
+        logger.info(f"file not found: {fp}")
+        return pd.DataFrame(
+            columns=[
+                "siteid",
+                "sensor_id",
+                "location",
+                "time",
+                "latitude",
+                "longitude",
+                "parameter",
+                "unit",
+                "value",
+            ]
+        )
 
 
 def add_data(
