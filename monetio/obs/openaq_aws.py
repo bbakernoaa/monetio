@@ -9,8 +9,12 @@ https://docs.openaq.org/docs/accessing-openaq-archive-data
 
 import logging
 import warnings
+from pathlib import Path
+from time import perf_counter
 
 import pandas as pd
+
+HERE = Path(__file__).parent
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +74,38 @@ def _maybe_to_list(x):
         return [x]
     else:
         return x
+
+
+def _cache_site_days():
+    """Discover all available site-days and save to CSV.
+
+    Returns
+    -------
+    None
+    """
+    import s3fs
+
+    fs = s3fs.S3FileSystem(anon=True)
+
+    # TODO: could try multi-thread by month (12 threads)
+    glb = "openaq-data-archive/records/csv.gz/" "locationid=*/year=*/month=*/" "location-*-*.csv.gz"
+    tic = perf_counter()
+    paths = fs.glob(glb)
+    print(f"found {len(paths)} site-days " f"in {pd.Timedelta(seconds=perf_counter() - tic)}")
+
+    df = pd.DataFrame({"path": paths})
+    df["filename"] = df["path"].str.rsplit("/", n=1, expand=True)[1]
+
+    ext = ".csv.gz"
+    assert df["filename"].str.endswith(ext).all()
+    df[["siteid", "date"]] = (
+        df["filename"].str.slice(None, -len(ext)).str.rsplit("-", expand=True)[[1, 2]]
+    )
+
+    df[["siteid", "date"]].to_csv(
+        HERE / "openaq-site-days.csv.gz",
+        index=False,
+    )
 
 
 def get_paths(dates, *, location_id=None, country=None, provider=None):
