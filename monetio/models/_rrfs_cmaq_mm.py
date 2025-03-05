@@ -111,6 +111,19 @@ def open_mfdataset(
         var_list.append("hgtsfc")
         var_list.append("delz")
 
+        # Remove standardized variable names that user may have requested to pair on in MM
+        # as they will be added anyway and here would cause `[var_list]` to fail.
+        for vn in [
+            "temperature_k",
+            "surfpres_pa",
+            "dp_pa",
+            "surfalt_m",
+            "dz_m",
+            "pres_pa_mid",
+        ]:
+            if vn in var_list:
+                var_list.remove(vn)
+
         # Remove duplicates just in case:
         var_list = list(dict.fromkeys(var_list))
         list_remove_extra = list(dict.fromkeys(list_remove_extra))
