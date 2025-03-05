@@ -103,7 +103,7 @@ def _cache_site_days():
     )
 
     df[["siteid", "date"]].to_csv(
-        HERE / "openaq-site-days.csv.gz",
+        HERE / "openaq-data-archive_site-days.csv.gz",
         index=False,
     )
 
