@@ -1,5 +1,8 @@
+import pandas as pd
+
 from monetio.obs.openaq_aws import (
     _build_urls,
+    add_data,
     get_locations,
     get_paths,
     get_provider_countries,
@@ -16,6 +19,14 @@ def test_read():
     )
     df = read(url)
     assert len(df) > 0
+
+    assert df.siteid.eq("2178").all()
+
+    dt = pd.Timedelta(hours=7)
+    assert df.time.min() == pd.Timestamp("2022-05-03 00:00") + dt
+    assert df.time.max() == pd.Timestamp("2022-05-03 23:00") + dt
+
+    assert df.value.min() >= 0
 
 
 def test_get_providers():
@@ -46,3 +57,19 @@ def test_get_paths_vs_build():
     naive_urls = _build_urls(date, siteid)
     assert len(paths) == len(naive_urls) == 1
     assert all(u.endswith(p) for p, u in zip(paths, naive_urls))
+
+
+def test_add_data():
+    df = add_data(
+        "2022-05-03",
+        siteid="2178",
+    )
+    assert len(df) > 0
+
+    assert df.siteid.eq("2178").all()
+
+    dt = pd.Timedelta(hours=7)
+    assert df.time.min() == pd.Timestamp("2022-05-03 00:00") + dt
+    assert df.time.max() == pd.Timestamp("2022-05-03 23:00") + dt
+
+    assert df.value.min() >= 0
