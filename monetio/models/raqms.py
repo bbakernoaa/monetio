@@ -9,7 +9,7 @@ More information: http://raqms-ops.ssec.wisc.edu/
 import xarray as xr
 
 
-def open_dataset(fname, convert_to_ppb=True, surf_only=False):
+def open_dataset(fname, *, convert_to_ppb=True, surf_only=False):
     """Open a single dataset from RAQMS output. Currently expects netCDF file format.
 
     Parameters
