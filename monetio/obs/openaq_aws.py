@@ -80,6 +80,14 @@ def _maybe_to_list(x, *, not_none=False):
 
 
 def _to_datetime_index(dates, **kwargs):
+    """Convert `dates` to a pandas DatetimeIndex
+    by calling ``pd.to_datetime(dates, **kwargs)`` and then
+    converting to a singleton DatetimeIndex if necessary.
+
+    Notes
+    -----
+    If `dates` is already a DatetimeIndex, the same object is returned.
+    """
     dates = pd.to_datetime(dates, **kwargs)
     if pd.api.types.is_scalar(dates):
         dates = pd.DatetimeIndex([dates])
@@ -102,7 +110,7 @@ def _cache_site_days():
     glb = "openaq-data-archive/records/csv.gz/locationid=*/year=*/month=*/location-*-*.csv.gz"
     tic = perf_counter()
     paths = fs.glob(glb)
-    print(f"found {len(paths)} site-days " f"in {pd.Timedelta(seconds=perf_counter() - tic)}")
+    print(f"found {len(paths)} site-day(s) in {pd.Timedelta(seconds=perf_counter() - tic)}")
 
     df = pd.DataFrame({"path": paths})
     df["filename"] = df["path"].str.rsplit("/", n=1, expand=True)[1]
@@ -120,7 +128,8 @@ def _cache_site_days():
 
 
 def get_paths(dates, *, siteid=None, country=None, provider=None):
-    """
+    """Get site-day paths, searching independently by location ID, country, and provider.
+
     Parameters
     ----------
     dates : datetime-like or array-like of datetime-like
@@ -212,14 +221,14 @@ def get_providers():
     fs = s3fs.S3FileSystem(anon=True)
 
     paths = fs.glob("openaq-data-archive/records/csv.gz/provider=*", maxdepth=1)
-    logger.debug(f"found {len(paths)} paths")
+    logger.debug(f"found {len(paths)} path(s)")
 
     providers = []
     for p in paths:
         _, provider = p.split("=")
         providers.append(provider)
 
-    logger.debug(f"found {len(providers)} providers")
+    logger.debug(f"found {len(providers)} provider(s)")
     if not providers:
         warnings.warn("no providers found", stacklevel=2)
 
@@ -244,14 +253,14 @@ def get_provider_countries(provider):
 
     glb = f"openaq-data-archive/records/csv.gz/provider={provider.lower()}/country=*"
     paths = fs.glob(glb, maxdepth=1)
-    logger.debug(f"found {len(paths)} paths for provider={provider!r}")
+    logger.debug(f"found {len(paths)} path(s) for provider={provider!r}")
 
     countries = []
     for p in paths:
         _, _, country = p.split("=")
         countries.append(country)
 
-    logger.debug(f"found {len(countries)} countries for provider={provider!r}")
+    logger.debug(f"found {len(countries)} country(ies) for provider={provider!r}")
     if not countries:
         warnings.warn(f"no countries found for provider={provider!r}", stacklevel=2)
 
@@ -274,12 +283,11 @@ def get_all_locations():
 
     import s3fs
 
-    print("discovering locations...")
     fs = s3fs.S3FileSystem(anon=True)
 
     # Note: ~ 2x faster than using fs.glob
     paths = fs.find("openaq-data-archive/records/csv.gz/", withdirs=True, maxdepth=1)
-    logger.debug(f"found {len(paths)} paths")
+    logger.debug(f"found {len(paths)} path(s)")
 
     locs = []
     for p in paths:
@@ -287,7 +295,7 @@ def get_all_locations():
         if m is not None:
             locs.append(m.group(1))
 
-    logger.debug(f"found {len(locs)} locations")
+    logger.debug(f"found {len(locs)} location(s)")
     if not locs:
         warnings.warn("no locations found", stacklevel=2)
 
@@ -343,7 +351,7 @@ def get_locations(*, provider=None, country=None):
             )
             paths.extend(prvdr_cntry_paths)
 
-    logger.debug(f"found {len(paths)} paths")
+    logger.debug(f"found {len(paths)} path(s)")
 
     locs = []
     for p in paths:
@@ -356,7 +364,7 @@ def get_locations(*, provider=None, country=None):
         if m is not None:
             locs.append(m.group(3))
 
-    logger.debug(f"found {len(locs)} locations")
+    logger.debug(f"found {len(locs)} location(s)")
     if not locs:
         warnings.warn(
             f"no locations found for country={country!r} provider={provider!r}",
@@ -386,9 +394,7 @@ def _build_urls(dates, sites, *, protocol="s3"):
     list of str
     """
     dates = _to_datetime_index(dates)
-
-    if pd.api.types.is_scalar(sites):
-        sites = [sites]
+    sites = _maybe_to_list(sites, not_none=True)
 
     if protocol.lower() == "s3":
         pref = "s3://openaq-data-archive"
@@ -397,16 +403,16 @@ def _build_urls(dates, sites, *, protocol="s3"):
     else:
         raise ValueError(f"protocol: {protocol!r}")
 
-    _urls = []
+    urls = []
     for site in sites:
-        for date in dates:
-            _urls.append(
+        for date in dates.floor("D").unique():
+            urls.append(
                 f"{pref}/records/csv.gz/"
                 f"locationid={site}/year={date:%Y}/month={date:%m}/"
                 f"location-{site}-{date:%Y%m%d}.csv.gz"
             )
 
-    return _urls
+    return urls
 
 
 def _maybe_read(fp):
@@ -436,6 +442,7 @@ def add_data(
     siteid=None,
     country=None,
     provider=None,
+    find_paths=True,
     n_procs=1,
 ):
     """Add OpenAQ data AWS Open Data.
@@ -453,6 +460,13 @@ def add_data(
         Other special values are '99' and '--'.
     provider : str or list of str, optional
         Data provider(s) to include.
+    find_paths : bool
+        Search for paths in the bucket using :func:`get_paths` (default).
+        If false, you must provide `siteid` and paths will be constructed naively.
+        Use ``find_paths=False`` if you know in advance the sites you want
+        and are confident they have data for most of the given dates.
+    n_procs : int
+        Number of Dask workers to use.
 
     Returns
     -------
@@ -461,16 +475,21 @@ def add_data(
     """
     import dask.dataframe as dd
 
-    dates = pd.to_datetime(dates)
-    if pd.api.types.is_scalar(dates):
-        dates = pd.DatetimeIndex([dates])
-    dates = dates.dropna()
+    dates = _to_datetime_index(dates).dropna()
     if dates.empty:
         raise ValueError("must provide at least one datetime-like")
 
-    paths = get_paths(dates, siteid=siteid, country=country, provider=provider)
-    print(f"found {len(paths)}")
-    uris = [f"s3://{p}" for p in paths]
+    if find_paths:
+        paths = get_paths(dates, siteid=siteid, country=country, provider=provider)
+        print(f"found {len(paths)} path(s)")
+        urls = [f"s3://{p}" for p in paths]
+        func = read
+    else:
+        if siteid is None:
+            raise ValueError("must provide `siteid` when `find_paths` is false")
+        urls = _build_urls(dates, siteid)
+        print(f"built {len(urls)} path(s)")
+        func = _maybe_read
 
     meta = [
         ("siteid", str),
@@ -484,6 +503,6 @@ def add_data(
         ("value", float),
     ]
     print("reading...")
-    df = dd.from_map(read, uris, meta=meta).compute(num_workers=n_procs)
+    df = dd.from_map(func, urls, meta=meta).compute(num_workers=n_procs)
 
     return df.reset_index(drop=True)
