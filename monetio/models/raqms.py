@@ -81,7 +81,8 @@ def _fix(ds, *, surf_only, convert_to_ppb):
         for i in ds.variables:
             if "units" in ds[i].attrs:
                 if ds[i].attrs["units"] == "ppv":
-                    ds[i] *= 1e9
+                    with xr.set_options(keep_attrs=True):
+                        ds[i] = ds[i] * 1e9
                     ds[i].attrs["units"] = "ppbv"
 
     if "ttheta" in ds.keys():
