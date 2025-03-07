@@ -39,7 +39,7 @@ def read(fp):
             0: str,  # location_id
             1: str,  # sensor_id or sensors_id ??
             2: str,  # location
-            # 3: datetime
+            3: str,  # datetime
             4: float,  # lat
             5: float,  # lon
             6: str,  # parameter
@@ -70,6 +70,7 @@ def read(fp):
 
 
 def _maybe_to_list(x):
+    """Convert non-None scalar to singleton list, or return original."""
     if x is not None and pd.api.types.is_scalar(x):
         return [x]
     else:
@@ -87,8 +88,8 @@ def _cache_site_days():
 
     fs = s3fs.S3FileSystem(anon=True)
 
-    # TODO: could try multi-thread by month (12 threads)
-    glb = "openaq-data-archive/records/csv.gz/" "locationid=*/year=*/month=*/" "location-*-*.csv.gz"
+    # TODO: could try multi-thread by month (12 threads) and start/ending digit of location ID
+    glb = "openaq-data-archive/records/csv.gz/locationid=*/year=*/month=*/location-*-*.csv.gz"
     tic = perf_counter()
     paths = fs.glob(glb)
     print(f"found {len(paths)} site-days " f"in {pd.Timedelta(seconds=perf_counter() - tic)}")
@@ -108,7 +109,7 @@ def _cache_site_days():
     )
 
 
-def get_paths(dates, *, location_id=None, country=None, provider=None):
+def get_paths(dates, *, siteid=None, country=None, provider=None):
     """
     Parameters
     ----------
@@ -118,7 +119,7 @@ def get_paths(dates, *, location_id=None, country=None, provider=None):
 
     fs = s3fs.S3FileSystem(anon=True)
 
-    location_ids = _maybe_to_list(location_id)
+    location_ids = _maybe_to_list(siteid)
     providers = _maybe_to_list(provider)
     countries = _maybe_to_list(country)
 
@@ -186,7 +187,7 @@ def get_paths(dates, *, location_id=None, country=None, provider=None):
     return sorted(set(paths))
 
 
-def get_locs(*, country=None, provider=None):
+def get_locations(*, country=None, provider=None):
     """Get location IDs corresponding to country/countries OR provider(s).
 
     Default: all locations.
@@ -315,7 +316,7 @@ def _build_urls(dates, sites, *, protocol="s3"):
 
 
 def _maybe_read(fp):
-    """Try to read a file, returning an empty DataFrame if it doesn't exist."""
+    """Try to :func:`read` a file, returning an empty DataFrame if it doesn't exist."""
     try:
         return read(fp)
     except FileNotFoundError:
@@ -338,7 +339,7 @@ def _maybe_read(fp):
 def add_data(
     dates,
     *,
-    location_id=None,
+    siteid=None,
     country=None,
     provider=None,
     n_procs=1,
@@ -349,8 +350,9 @@ def add_data(
     ----------
     dates : datetime-like or array-like of datetime-like
         Desired dates (the archive data is stored in daily files, per location).
-    location_id : str or int or list, optional
-        Location ID(s) to include.
+    siteid : str or int or list, optional
+        OpenAQ location ID(s) to include.
+        For example, from :func:`get_locations`.
     country : str or list of str, optional
         Country or countries to include. 2-character ISO country codes.
     provider : str or list of str, optional
@@ -359,7 +361,7 @@ def add_data(
     Returns
     -------
     pd.DataFrame
-        OpenAQ data.
+        OpenAQ archive data.
     """
     import dask.dataframe as dd
 
@@ -370,7 +372,7 @@ def add_data(
     if dates.empty:
         raise ValueError("must provide at least one datetime-like")
 
-    paths = get_paths(dates, location_id=location_id, country=country, provider=provider)
+    paths = get_paths(dates, siteid=siteid, country=country, provider=provider)
     print(f"found {len(paths)}")
     uris = [f"s3://{p}" for p in paths]
 
