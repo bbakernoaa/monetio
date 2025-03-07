@@ -32,6 +32,14 @@ def open_dataset(fname, convert_to_ppb=True, surf_only=False, **kwargs):
     ds = xr.open_dataset(names[0], drop_variables=["theta"])
     ds = _fix(ds, surf_only=surf_only)
 
+    # convert all gas species to ppbv
+    if convert_to_ppb:
+        for i in ds.variables:
+            if "units" in ds[i].attrs:
+                if "ppv" in ds[i].attrs["units"]:
+                    ds[i] *= 1e9
+                    ds[i].attrs["units"] = "ppbv"
+    
     return ds
 
 
@@ -67,7 +75,7 @@ def open_mfdataset(
             "Do not mix and match file types."
         )
     if var_list is not None:
-        var_list.extend(['lat','lon',"IDATE", "Times","psfc","delp",'pdash'])
+        var_list.extend(['lat','lon',"IDATE", "Times","psfc","delp",'pdash','ttheta'])
         ds = xr.open_mfdataset(names, concat_dim="time", drop_variables=["theta"], combine="nested")[var_list]
     else:
         ds = xr.open_mfdataset(names, concat_dim="time", drop_variables=["theta"], combine="nested")
@@ -80,7 +88,13 @@ def open_mfdataset(
                 if "ppv" in ds[i].attrs["units"]:
                     ds[i] *= 1e9
                     ds[i].attrs["units"] = "ppbv"
-
+    
+    if 'ttheta' in ds.keys():
+        # Calculate temperature from potential temperature
+        k = 0.28571428571428564 # metpy.constants kappa
+        ds['temperature_k'] = ds['ttheta']*(ds['pres_pa_mid']/100000)**k
+        ds['temperature_k'].attrs['units'] = 'K'
+    
     return ds
 
 
