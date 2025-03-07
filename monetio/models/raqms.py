@@ -35,7 +35,7 @@ def open_dataset(fname, *, convert_to_ppb=True, surf_only=False):
     return ds
 
 
-def open_mfdataset(fname, convert_to_ppb=True, var_list=None, surf_only=False):
+def open_mfdataset(fname, *, convert_to_ppb=True, var_list=None, surf_only=False):
     """Open a multiple file dataset from RAQMS output.
 
     Parameters
