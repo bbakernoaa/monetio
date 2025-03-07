@@ -311,7 +311,7 @@ def get_locations(*, provider=None, country=None):
 
     Returns
     -------
-    list of str
+    pd.DataFrame
     """
     import re
 
@@ -319,7 +319,8 @@ def get_locations(*, provider=None, country=None):
 
     if country is None and provider is None:
         warnings.warn(
-            "get_all_locations() is a faster way to get all locations",
+            "get_all_locations() is a faster way to get all locations, "
+            "though the result is different",
             stacklevel=2,
         )
 
@@ -353,7 +354,7 @@ def get_locations(*, provider=None, country=None):
 
     logger.debug(f"found {len(paths)} path(s)")
 
-    locs = []
+    rows = []
     for p in paths:
         m = re.fullmatch(
             r"openaq-data-archive/records/csv\.gz/"
@@ -362,16 +363,18 @@ def get_locations(*, provider=None, country=None):
             p,
         )
         if m is not None:
-            locs.append(m.group(3))
+            rows.append(m.groups())
 
-    logger.debug(f"found {len(locs)} location(s)")
-    if not locs:
+    df = pd.DataFrame(rows, columns=["provider", "country", "siteid"])
+
+    logger.debug(f"found {len(df)} location(s)")
+    if df.empty:
         warnings.warn(
             f"no locations found for country={country!r} provider={provider!r}",
             stacklevel=2,
         )
 
-    return sorted(locs)
+    return df
 
 
 def _build_urls(dates, sites, *, protocol="s3"):
