@@ -52,8 +52,8 @@ def read(fp):
     # Normalize to web API column names
     if "sensors_id" in df.columns:
         df = df.rename(columns={"sensors_id": "sensor_id"})
-    if "units" in df.columns:
-        df = df.rename(columns={"units": "unit"})
+    if "unit" in df.columns:
+        df = df.rename(columns={"unit": "units"})
     df = df.rename(
         columns={
             "location_id": "siteid",
@@ -330,7 +330,7 @@ def _maybe_read(fp):
                 "latitude",
                 "longitude",
                 "parameter",
-                "unit",
+                "units",
                 "value",
             ]
         )
@@ -384,7 +384,7 @@ def add_data(
         ("latitude", float),
         ("longitude", float),
         ("parameter", str),
-        ("unit", str),
+        ("units", str),
         ("value", float),
     ]
     print("reading...")
