@@ -46,7 +46,7 @@ def open_mfdataset(fname, *, convert_to_ppb=True, var_list=None, surf_only=False
         If true the units of the gas species will be converted to ppbv
     var_list : list of str, optional
         List of variables to include in output. MELODIES MONET should only read in
-        variables need to plot in order to save on memory and simulation cost
+        variables needed to plot in order to save on memory and simulation cost
         especially for vertical data. If ``None`` (default), will read in all model data.
 
     Returns
