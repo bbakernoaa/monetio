@@ -641,7 +641,6 @@ fine = np.array(
         "PSO4",
         "PNO3",
         "PNH4",
-        "PH2O",
         "PCL",
         "PEC",
         "FPRM",
