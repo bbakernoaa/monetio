@@ -155,7 +155,7 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
                 time.sleep(tries + 0.1 * rand())
             elif r.status_code == 429:
                 logger.info(f"rate limited (try {tries}/{retry})")
-                ratelimit_reset = int(r.headers.get("X-Ratelimit-Reset", 60))
+                ratelimit_reset = int(r.headers.get("X-Ratelimit-Reset", 30))
                 logger.info(f"sleeping for {ratelimit_reset} s (rate limit reset)")
                 time.sleep(ratelimit_reset + 0.1 * rand())
             else:
