@@ -653,7 +653,6 @@ def add_data(
     if entity is not None:
         raise NotImplementedError  # TODO: not sure what to use for this
     if sensor_type is not None:
-        # FIXME: may not be the best approach
         meta = meta.assign(
             sensor_type=meta["is_monitor"].map(
                 {
