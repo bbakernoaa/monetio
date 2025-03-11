@@ -713,10 +713,23 @@ def add_data(
     tic = perf_counter()
     if threads is not None:
         import concurrent.futures
-        from itertools import chain
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-            data = chain.from_iterable(executor.map(tfunc, iter_queries()))
+            futures = [executor.submit(tfunc, tup) for tup in iter_queries()]
+            data = []
+            done, not_done = concurrent.futures.wait(
+                futures,
+                return_when="FIRST_EXCEPTION",
+            )
+            logger.info(f"{len(done)} tasks done, {len(not_done)} not done")
+            for future in done:
+                e = future.exception()
+                if e is not None:
+                    logger.error(f"thread raised {e!r}")
+                    for future in not_done:
+                        future.cancel()
+                    raise RuntimeError("exception raised in thread") from e
+                data.extend(future.result())
     else:
         data = []
         for tup in iter_queries():
