@@ -154,13 +154,20 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
                 logger.info(f"request timed out (try {tries}/{retry})")
                 time.sleep(tries + 0.1 * rand())
             elif r.status_code == 429:
-                # Note: response headers don't seem to include Retry-After
-                # Just `{'detail': 'To many requests'}` in `.json()`
                 logger.info(f"rate limited (try {tries}/{retry})")
-                time.sleep(tries * 5 + 0.2 * rand())
+                ratelimit_reset = int(r.headers.get("X-Ratelimit-Reset", 60))
+                logger.info(f"sleeping for {ratelimit_reset} s (rate limit reset)")
+                time.sleep(ratelimit_reset + 0.1 * rand())
             else:
                 break
         r.raise_for_status()
+
+        ratelimit_remaining = int(r.headers["X-Ratelimit-Remaining"])
+        logger.info(f"rate limit count remaining: {ratelimit_remaining}")
+        if ratelimit_remaining < 1:
+            ratelimit_reset = int(r.headers["X-Ratelimit-Reset"])
+            logger.info(f"sleeping for {ratelimit_reset} s (rate limit reset)")
+            time.sleep(ratelimit_reset + 0.1 * rand())
 
         this_data = r.json()
         found = this_data["meta"]["found"]
