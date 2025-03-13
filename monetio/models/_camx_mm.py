@@ -193,7 +193,7 @@ def add_met_data_3D(d_chem, d_met):
     # d_met has a final TSTEP not present in d_chem
     d_met = d_met.isel(TSTEP=slice(0, len(d_met.TSTEP) - 1))
     if "pressure" in d_met.variables:
-        d_chem["pres_pa_mid"] = d_met["PRESS_MB"] * 100
+        d_chem["pres_pa_mid"] = d_met["pressure"] * 100
     elif "PRESS_MB" in d_met.variables:
         d_chem["pres_pa_mid"] = d_met["PRESS_MB"] * 100
     else:
