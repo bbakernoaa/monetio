@@ -464,7 +464,7 @@ def _calc_midlayer_height_agl(dset):
     dz_m[:, 1:, :, :] = layer_height_agl[:, 1:, :, :].values - layer_height_agl[:, :-1, :, :].values
     dz_m.attrs["long_name"] = "dz in meters"
     dz_m.attrs["var_desc"] = "Layer thickness in meters"
-    return alt_agl_m_mid, layer_height_agl
+    return alt_agl_m_mid, dz_m
 
 
 def _calc_midlayer_height_msl(dset, dset_lu):
