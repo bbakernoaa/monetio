@@ -75,7 +75,7 @@ def open_mfdataset(
         var_list = var_list + ["alt_msl_m_mid"]
 
         # calc layer thickness if hyai and hybi exist
-        if "hyai" and "hybi" in dset_load.keys():
+        if {"hyai", "hybi"} <= dset_load.keys():
             dset_load["pres_pa_int"] = _calc_pressure_i(dset_load)
             dset_load["dz_m"] = _calc_layer_thickness_i(dset_load)
             var_list.append("dz_m")
