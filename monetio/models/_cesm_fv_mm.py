@@ -68,17 +68,20 @@ def open_mfdataset(
     if not surf_only:
         if "PMID" not in dset_load.keys():
             dset_load["PMID"] = _calc_pressure(dset_load)
-        var_list = var_list + ["pres_pa_mid"]
         if "Z3" not in dset_load.keys():
             warnings.warn("Geopotential height Z3 is not in model keys. Assuming hydrostatic runs")
             dset_load["Z3"] = _calc_hydrostatic_height(dset_load)
-        var_list = var_list + ["alt_msl_m_mid"]
 
         # calc layer thickness if hyai and hybi exist
         if {"hyai", "hybi"} <= dset_load.keys():
             dset_load["pres_pa_int"] = _calc_pressure_i(dset_load)
             dset_load["dz_m"] = _calc_layer_thickness_i(dset_load)
             var_list.append("dz_m")
+        else:
+            print(
+                "The model dataset does not contain 'hyai' or 'hybi'."
+                "Skipping layer thickness calculations (dz_m)."
+            )
 
         dset_load = dset_load.rename(
             {
@@ -192,9 +195,9 @@ def _calc_pressure(dset):
     if not all(pvar in list(dset.keys()) for pvar in presvars):
         raise KeyError(
             "The model does not have the variables to calculate"
-            + "the pressure. This can be done either with PMID or with"
-            + "P0, PS, hyam and hybm.\n"
-            + "If the vertical coordinate is not needed, set surface_only=True"
+            "the pressure. This can be done either with PMID or with"
+            "P0, PS, hyam and hybm."
+            "If the vertical coordinate is not needed, set surface_only=True"
         )
     time = dset["PS"].time.values
     vert = dset["hyam"].lev.values
@@ -380,8 +383,7 @@ def _calc_layer_thickness_i(dset):
     Note: This calculates based on pressure being in increasing order,
     and altitude in decreasing order. The code flips all the variables
     along the 'z' dimensions at the end. 'pres_pa_int' does not
-    because it has a dimension of 'ilev' instead of 'z'. Add a correction
-    for this last part.
+    because it has a dimension of 'ilev' instead of 'z'.
 
     Parameters
     ----------
