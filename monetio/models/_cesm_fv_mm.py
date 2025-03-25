@@ -348,9 +348,9 @@ def _calc_hydrostatic_height_i(dset):
     # pressure levels should be increasing.
     _height_decreasing = np.all(ilev[:-1] < ilev[1:])
     if not _height_decreasing:
-        raise Exception(
-            "Expected default CESM behaviour:"
-            + "pressure levels should be in increasing order, height in decreasing order"
+        raise ValueError(
+            "Expected default CESM behaviour "
+            "(pressure levels should be in increasing order, height in decreasing order)"
         )
     # surface geopotential height (PHIS / g)
     height = np.zeros((len(time), len(ilev), len(lat), len(lon)))
