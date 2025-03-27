@@ -195,8 +195,8 @@ def _calc_pressure(dset):
     if not all(pvar in list(dset.keys()) for pvar in presvars):
         raise KeyError(
             "The model does not have the variables to calculate"
-            "the pressure. This can be done either with PMID or with"
-            "P0, PS, hyam and hybm."
+            "the pressure. This can be done either with PMID or with "
+            "P0, PS, hyam and hybm. "
             "If the vertical coordinate is not needed, set surface_only=True"
         )
     time = dset["PS"].time.values
