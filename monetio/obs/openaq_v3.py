@@ -112,6 +112,10 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
     npages : int, optional
         Number of pages to fetch.
         By default, try to fetch as many as needed to get all results.
+
+    Notes
+    -----
+    Rate limit info: https://docs.openaq.org/using-the-api/rate-limits
     """
     import time
     from random import random as rand
