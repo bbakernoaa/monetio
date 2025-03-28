@@ -4,7 +4,7 @@ https://openaq.org/
 
 https://registry.opendata.aws/openaq/
 
-https://docs.openaq.org/docs/accessing-openaq-archive-data
+https://docs.openaq.org/aws/about
 """
 
 import logging
