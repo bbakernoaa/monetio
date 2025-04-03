@@ -216,9 +216,15 @@ def _calc_pressure(dset):
     else:
         p0 = dset["P0"].values
 
+    # need to specify the time dimension because it is created
+    # when there are more that one model output files being read.
+    if "time" in dset["hyam"].dims:
+        dset["hyam"] = dset["hyam"].isel(time=0)
+        dset["hybm"] = dset["hybm"].isel(time=0)
+
     for nlev in range(n_vert):
         pressure[:, nlev, :, :] = (
-            dset["hyam"][nlev].values * p0 + dset["hybm"][nlev].values * dset["PS"].values
+            dset["hyam"][nlev].values * p0 + dset["hybm"][nlev].values * dset["PS"][:, :, :].values
         )
     P = xr.DataArray(
         data=pressure,
@@ -264,9 +270,15 @@ def _calc_pressure_i(dset):
     else:
         p0 = dset["P0"].values
 
+    # need to specify the time dimension because it is created
+    # when there are more that one model output files being read.
+    if "time" in dset["hyai"].dims:
+        dset["hyai"] = dset["hyai"].isel(time=0)
+        dset["hybi"] = dset["hybi"].isel(time=0)
+
     for nlev in range(n_vert):
         pressure_i[:, nlev, :, :] = (
-            dset["hyai"][0, nlev].values * p0 + dset["hybi"][0, nlev].values * dset["PS"].values
+            dset["hyai"][nlev].values * p0 + dset["hybi"][nlev].values * dset["PS"][:, :, :].values
         )
     P_int = xr.DataArray(
         data=pressure_i,
