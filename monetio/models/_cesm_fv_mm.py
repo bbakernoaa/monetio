@@ -71,15 +71,32 @@ def open_mfdataset(
         if "Z3" not in dset_load.keys():
             warnings.warn("Geopotential height Z3 is not in model keys. Assuming hydrostatic runs")
             dset_load["Z3"] = _calc_hydrostatic_height(dset_load)
+        if "PS" in dset_load.keys():
+            dset_load["PS"].rename("pres_pa_mid")
+        else:
+            warnings.warn("Surface pressure (PS) is not in model keys. Continuing without it.")
+        if "PHIS" in dset_load.keys():
+            # calc height agl. PHIS in m2/s2, where Z3 already in m
+            dset_load["alt_agl_m_mid"] = dset_load["alt_msl_m_mid"] - dset_load["PHIS"] / 9.80665
+            dset_load["alt_agl_m_mid"].attrs = {
+                "description": "geopotential height above ground level",
+                "units": "m",
+            }
+        else:
+            warnings.warn("PHIS is not in model keys. Continuing without it.")
 
         # calc layer thickness if hyai and hybi exist
-        if {"hyai", "hybi"} <= dset_load.keys():
+        if {"hyai", "hybi", "PHIS"} <= dset_load.keys():
             dset_load["pres_pa_int"] = _calc_pressure_i(dset_load)
             dset_load["dz_m"] = _calc_layer_thickness_i(dset_load)
             var_list.append("dz_m")
+        elif {"PDELDRY"} <= dset_load.keys():
+            dset_load["dz_m"] = _calc_layer_thickness_mid(dset_load)
+            var_list.append("dz_m")
         else:
             print(
-                "The model dataset does not contain 'hyai' or 'hybi'."
+                "The model dataset does not contain 'hyai' or 'hybi' for layer_thickness "
+                "calculation at the interface, or 'PDELDDRY' for calculation using midlayer. "
                 "Skipping layer thickness calculations (dz_m)."
             )
 
@@ -87,22 +104,22 @@ def open_mfdataset(
             {
                 "T": "temperature_k",
                 "Z3": "alt_msl_m_mid",
-                "PS": "surfpres_pa",
+                # "PS": "surfpres_pa",
                 "PMID": "pres_pa_mid",
             }
         )
         # Calc height agl. PHIS is in m2/s2, whereas Z3 is in already in m
-        dset_load["alt_agl_m_mid"] = dset_load["alt_msl_m_mid"] - dset_load["PHIS"] / 9.80665
-        dset_load["alt_agl_m_mid"].attrs = {
-            "description": "geopotential height above ground level",
-            "units": "m",
-        }
+        # dset_load["alt_agl_m_mid"] = dset_load["alt_msl_m_mid"] - dset_load["PHIS"] / 9.80665
+        # dset_load["alt_agl_m_mid"].attrs = {
+        #    "description": "geopotential height above ground level",
+        #    "units": "m",
+        # }
 
         var_list = var_list + [
             "temperature_k",
             "alt_msl_m_mid",
-            "alt_agl_m_mid",
-            "surfpres_pa",
+            #   "alt_agl_m_mid",
+            #  "surfpres_pa",
             "pres_pa_mid",
         ]
 
@@ -412,6 +429,47 @@ def _calc_layer_thickness_i(dset):
     dz_m = np.zeros((len(dset.time), len(dset.lev), len(dset.lat), len(dset.lon)))
     for nlev in range(len(dset.lev)):
         dz_m[:, nlev, :, :] = z_int[:, nlev, :, :] - z_int[:, nlev + 1, :, :]
+
+    dz_m = xr.DataArray(
+        data=dz_m,
+        dims=["time", "lev", "lat", "lon"],
+        coords={"time": dset.time, "lev": dset.lev, "lat": dset.lat, "lon": dset.lon},
+        attrs={"description": "Layer Thickness (based on interface pressure)", "units": "m"},
+    )
+    return dz_m
+
+
+def _calc_layer_thickness_mid(dset):
+    """
+    Calculates layer thickness (dz_m) when hybrid variables
+    (hyai, hybi) are not provided.
+    Note: This calculates based on pressure being in increasing order,
+    and altitude in decreasing order. The code flips all the variables
+    along the 'z' dimensions at the end.
+    This uses PDELDRY, T, and pres_pa_mid.
+
+    Parameters
+    ----------
+    dset: xr.Dataset
+
+    Returns
+    ----------
+    xr.DataArray
+        Layer Thickness (m)
+    """
+
+    GRAVITY = 9.80665  # m / s2
+    RGAS = 287.04
+
+    # # compute layer thickness
+    dz_m = np.zeros((len(dset.time), len(dset.lev), len(dset.lat), len(dset.lon)))
+    for nlev in range(len(dset.lev)):
+        dp = dset["PDELDRY"].isel(lev=nlev).values  # Dry pressure difference between levels [Pa]
+        temp = dset["T"].isel(lev=nlev).values  # midlayer temp approx
+        pmid = dset["PMID"].isel(lev=nlev)
+        rho = pmid / RGAS / temp
+        # dz in m [Pa]/[m/s2]/[Pa/(K-m2/K/s2)]
+        dz_m[:, nlev, :, :] = dp / rho / GRAVITY
 
     dz_m = xr.DataArray(
         data=dz_m,
