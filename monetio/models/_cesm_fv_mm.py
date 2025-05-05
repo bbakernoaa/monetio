@@ -6,6 +6,10 @@ import numpy as np
 import xarray as xr
 from numpy import meshgrid
 
+# -- TO DO:
+# need to have the code be able to read additional variables when surf_only = false
+# currently does it when its true .. can base it off of if not surf_only section
+
 
 def open_mfdataset(
     fname,
@@ -72,7 +76,7 @@ def open_mfdataset(
             warnings.warn("Geopotential height Z3 is not in model keys. Assuming hydrostatic runs")
             dset_load["Z3"] = _calc_hydrostatic_height(dset_load)
         if "PS" in dset_load.keys():
-            dset_load["PS"].rename("pres_pa_mid")
+            dset_load["PS"].rename("surfpres_pa")
         else:
             warnings.warn("Surface pressure (PS) is not in model keys. Continuing without it.")
         if "PHIS" in dset_load.keys():
@@ -99,12 +103,10 @@ def open_mfdataset(
                 "calculation at the interface, or 'PDELDDRY' for calculation using midlayer. "
                 "Skipping layer thickness calculations (dz_m)."
             )
-
         dset_load = dset_load.rename(
             {
                 "T": "temperature_k",
                 "Z3": "alt_msl_m_mid",
-                # "PS": "surfpres_pa",
                 "PMID": "pres_pa_mid",
             }
         )
