@@ -1,34 +1,46 @@
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
+import dask.array as da
 import pytest
-import xarray
-
-from monetio.models._rrfs_cmaq_mm import open_mfdataset
-import monetio
 from pytest_mock import MockerFixture
 
+import monetio
+from monetio.models.ufs import open_mfdataset
 
-@pytest.mark.parametrize("surf_only", [True, False], ids=lambda x: f"surf_only={x}")
-def test_open_mfdataset(data_dir: Path, surf_only: bool, mocker: MockerFixture) -> None:
-    print(data_dir)
+
+@dataclass
+class SurfOnlyTestData:
+    surf_only: bool
+    expected_nz: int
+    expected_to_be_loaded: tuple[str, ...] = ("dz_m", "surfalt_m", "pres_pa_mid", "alt_msl_m_full")
+
+
+@pytest.mark.parametrize(
+    "test_data",
+    [
+        SurfOnlyTestData(surf_only=True, expected_nz=1),
+        SurfOnlyTestData(surf_only=False, expected_nz=64),
+    ],
+    ids=lambda x: f"surf_only={x.surf_only}",
+)
+def test_open_mfdataset_surf_only(
+    data_dir: Path, test_data: SurfOnlyTestData, mocker: MockerFixture
+) -> None:
     slug = "aqm.t12z.dyn.f*.nc"
+    spy = mocker.spy(monetio.models.ufs, "_isel_surface_level_")
+    actual = open_mfdataset(str(data_dir / "ufs" / slug), surf_only=test_data.surf_only)
 
-    spy = mocker.spy(monetio.models._rrfs_cmaq_mm, "_isel_surface_level_")
+    # Confirm the expeced function is called...perhaps overkill
+    assert spy.call_count == int(test_data.surf_only)
 
-    actual = open_mfdataset(str(data_dir / "ufs" / slug), surf_only=surf_only)
-    print(actual)
-
-    assert spy.call_count == int(surf_only)
-
-
-# def test_write():
-#     fns = ["/opt/project/local-data/aqm.t12z.dyn.f000.nc",
-#            "/opt/project/local-data/aqm.t12z.dyn.f001.nc"]
-#     outdir = Path("/opt/project/tests/data/ufs")
-#
-#     for fn in fns:
-#         dset = xarray.open_dataset(fn)
-#         dset = dset.isel(grid_yt=slice(110, 120), grid_xt=slice(350, 360))
-#         print(dset)
-#         dset.to_netcdf(outdir / Path(fn).name)
+    for var in actual.data_vars.values():
+        shape_dict = {dim: actual.dims[dim] for dim in var.dims}
+        # Assert there is only one level when extracting surface data
+        if "z" in shape_dict:
+            assert shape_dict["z"] == test_data.expected_nz
+        try:
+            assert isinstance(var.data, da.Array)
+        except AssertionError:
+            # Some variables are loaded from disk for pre-processing
+            assert var.name in test_data.expected_to_be_loaded

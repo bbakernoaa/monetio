@@ -1,10 +1,10 @@
 """ RRFS-CMAQ File Reader """
 
 import numpy as np
+import psutil
 import xarray as xr
 from numpy import concatenate
 from pandas import Series
-import psutil
 
 
 def can_do(index):
@@ -1067,9 +1067,7 @@ def dict_species_sums(mech):
         )
 
     else:
-        raise NotImplementedError(
-            "Mechanism not supported, update _rrfs_cmaq_mm.py file in MONETIO"
-        )
+        raise NotImplementedError("Mechanism not supported, update ufs.py file in MONETIO")
 
     return sum_dict
 
