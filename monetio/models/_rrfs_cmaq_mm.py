@@ -4,6 +4,7 @@ import numpy as np
 import xarray as xr
 from numpy import concatenate
 from pandas import Series
+import psutil
 
 
 def can_do(index):
@@ -149,7 +150,10 @@ def open_mfdataset(
         dset = xr.open_mfdataset(fname, concat_dim="time", combine="nested", **kwargs)[var_list]
     else:
         # Read in all variables and do all calculations.
+        print(f"tdk: {psutil.virtual_memory().used*1e-9=}")
         dset = xr.open_mfdataset(fname, concat_dim="time", combine="nested", **kwargs)
+        print(f"tdk: {psutil.virtual_memory().used*1e-9=}")
+        print(f"tdk: {type(dset['pm25_ave'].data)=}")
         list_calc_sum = [
             "PM25",
             "PM10",
@@ -199,14 +203,18 @@ def open_mfdataset(
 
     # Calculate pressure. This has to go before sorting because ak and bk
     # are not sorted as they are in attributes
+    print(f"tdk:206: {psutil.virtual_memory().used*1e-9=}")
     dset["pres_pa_mid"] = _calc_pressure(dset)
+    print(f"tdk:208: {psutil.virtual_memory().used*1e-9=}")
 
     # Adjust pressure levels for all models such that the surface is first.
+    print(f"tdk:211: {psutil.virtual_memory().used*1e-9=}")
     if np.all(np.diff(dset.z.values) > 0):  # increasing pressure
         dset = dset.isel(z=slice(None, None, -1))  # -> decreasing
     if np.all(np.diff(dset.z_i.values) > 0):  # increasing pressure
         dset = dset.isel(z_i=slice(None, None, -1))  # -> decreasing
     dset["dz_m"] = dset["dz_m"] * -1.0  # Change to positive values.
+    print(f"tdk:217: {psutil.virtual_memory().used*1e-9=}")
 
     # Note this altitude calcs needs to always go after resorting.
     # Altitude calculations are all optional, but for each model add values that are easy to calculate.
@@ -225,7 +233,7 @@ def open_mfdataset(
     # These sums and units are quite expensive and memory intensive,
     # so add option to shrink dataset to just surface when needed
     if surf_only:
-        dset = dset.isel(z=0).expand_dims("z", axis=1)
+        dset = _isel_surface_level_(dset)
 
     # Need to adjust units before summing for aerosols
     # convert all gas species to ppbv
@@ -283,7 +291,13 @@ def open_mfdataset(
         if bool(list_remove_extra_only):  # confirm list not empty
             dset = dset.drop_vars(list_remove_extra_only)
 
+    print(f"tdk: {type(dset['pm25_ave'].data)=}")
+    print(f"tdk:291: {psutil.virtual_memory().used*1e-9=}")
     return dset
+
+
+def _isel_surface_level_(dset: xr.Dataset) -> xr.Dataset:
+    return dset.isel(z=0).expand_dims("z", axis=1)
 
 
 def _get_keys(d):

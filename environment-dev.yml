@@ -28,8 +28,9 @@ dependencies:
   # test
   - pytest
   - pytest-xdist
+  - pytest-mock
   #
   - pip>=21.1
   - pip:
-      - "-e ."
+#      - "-e ."
       - pytest-print
