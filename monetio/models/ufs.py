@@ -225,7 +225,7 @@ def open_mfdataset(
     # These sums and units are quite expensive and memory intensive,
     # so add option to shrink dataset to just surface when needed
     if surf_only:
-        dset = _isel_surface_level_(dset)
+        dset = dset.isel(z=0).expand_dims("z", axis=1)
 
     # Need to adjust units before summing for aerosols
     # convert all gas species to ppbv
@@ -284,10 +284,6 @@ def open_mfdataset(
             dset = dset.drop_vars(list_remove_extra_only)
 
     return dset
-
-
-def _isel_surface_level_(dset: xr.Dataset) -> xr.Dataset:
-    return dset.isel(z=0).expand_dims("z", axis=1)
 
 
 def _get_keys(d):
@@ -1062,62 +1058,71 @@ def dict_species_sums(mech):
     return sum_dict
 
 
-def _calc_hgt(f):
-    """Calculates the geopotential height in m from the variables hgtsfc and
-    delz. Note: To use this function the delz value needs to go from surface
-    to top of atmosphere in vertical. Because we are adding the height of
-    each grid box these are really grid top values
-
-    Parameters
-    ----------
-    f : xarray.Dataset
-        RRFS-CMAQ model data
-
-    Returns
-    -------
-    xr.DataArray
-        Geoptential height with attributes.
-    """
-    sfc = f.surfalt_m.load()
-    dz = f.dz_m.load() * -1.0
-    # These are negative in RRFS-CMAQ, but you resorted and are adding from the surface,
-    # so make them positive.
-    dz[:, 0, :, :] = dz[:, 0, :, :] + sfc  # Add the surface altitude to the first model level only
-    z = dz.rolling(z=len(f.z), min_periods=1).sum()
-    z.name = "alt_msl_m_full"
-    z.attrs["long_name"] = "Altitude MSL Full Layer in Meters"
-    z.attrs["units"] = "m"
-    return z
-
-
-def _calc_pressure(dset):
-    """Calculate the mid-layer pressure in Pa from surface pressure
-    and ak and bk constants.
-
-    Interface pressures are calculated by:
-    phalf(k) = a(k) + surfpres * b(k)
-
-    Mid layer pressures are calculated by:
-    pfull(k) = (phalf(k+1)-phalf(k))/log(phalf(k+1)/phalf(k))
+def _calc_hgt(dset: xr.Dataset) -> xr.DataArray:
+    """Calculate the geopotential height in m.
 
     Parameters
     ----------
     dset : xarray.Dataset
-        RRFS-CMAQ model data
+        The UFS dataset
 
     Returns
     -------
     xarray.DataArray
-        Mid-layer pressure with attributes.
+        Geopotential height
     """
-    p = dset.dp_pa.copy().load()  # Have to load into memory here so can assign levels.
-    psfc = dset.surfpres_pa.copy().load()
-    for k in range(len(dset.z)):
-        pres_2 = dset.ak[k + 1] + psfc * dset.bk[k + 1]
-        pres_1 = dset.ak[k] + psfc * dset.bk[k]
-        p[:, k, :, :] = (pres_2 - pres_1) / np.log(pres_2 / pres_1)
+    # Get surface altitude
+    sfc = dset.surfalt_m
 
-    p.name = "pres_pa_mid"
-    p.attrs["units"] = "pa"
-    p.attrs["long_name"] = "Pressure Mid Layer in Pa"
-    return p
+    # Get the vertical displacement and flip sign as needed
+    dz = dset.dz_m * -1.0
+
+    # Add surface elevation
+    dz = dz.where(~(dz.z == dz.z[0]), dz + sfc)
+
+    # Calculate cumulative sum along z dimension to get heights
+    z = dz.cumsum(dim="z")
+
+    # Set attributes
+    z.name = "alt_msl_m_full"
+    z.attrs["long_name"] = "Altitude MSL Full Layer in Meters"
+    z.attrs["units"] = "m"
+
+    return z
+
+
+def _calc_pressure(dset: xr.Dataset) -> xr.DataArray:
+    """Calculate the mid-layer pressure in Pa.
+
+    Parameters
+    ----------
+    dset : xarray.Dataset
+        The UFS dataset
+
+    Returns
+    -------
+    xarray.DataArray
+        Mid-layer pressure
+    """
+    # Get surface pressure for calculation
+    psfc = dset.surfpres_pa.expand_dims(dim={"z": dset.z.size}, axis=1)
+
+    # Calculate pressure at each layer boundary using vectorized operations
+    # First, calculate pressure at layer interfaces using ak and bk coefficients
+    ak = xr.DataArray(dset.ak, dims="z")
+    bk = xr.DataArray(dset.bk, dims="z")
+    p_interfaces_1 = ak[:-1] + psfc * bk[:-1]  # Upper interface of each layer
+    p_interfaces_2 = ak[1:] + psfc * bk[1:]  # Lower interface of each layer
+
+    # Calculate mid-layer pressure using log-average
+    # log(p_mid) = (p_2 - p_1) / ln(p_2/p_1)
+    # This preserves all dimensions and allows lazy evaluation
+    p_mid = (p_interfaces_2 - p_interfaces_1) / np.log(p_interfaces_2 / p_interfaces_1)
+    p_mid = p_mid.transpose(*dset.pm25_ave.dims)
+
+    # Set attributes
+    p_mid.name = "pres_pa_mid"
+    p_mid.attrs["units"] = "pa"
+    p_mid.attrs["long_name"] = "Pressure Mid Layer in Pa"
+
+    return p_mid

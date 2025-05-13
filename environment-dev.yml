@@ -25,11 +25,9 @@ dependencies:
   - requests
   - timezonefinder
   #
-  # test/dev
+  # test
   - pytest
   - pytest-xdist
-  - pytest-mock
-  - pre-commit
   #
   - pip>=21.1
   - pip:
