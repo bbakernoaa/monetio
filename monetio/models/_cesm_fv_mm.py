@@ -6,10 +6,6 @@ import numpy as np
 import xarray as xr
 from numpy import meshgrid
 
-# -- TO DO:
-# need to have the code be able to read additional variables when surf_only = false
-# currently does it when its true .. can base it off of if not surf_only section
-
 
 def open_mfdataset(
     fname,
@@ -81,7 +77,7 @@ def open_mfdataset(
             warnings.warn("Surface pressure (PS) is not in model keys. Continuing without it.")
         if "PHIS" in dset_load.keys():
             # calc height agl. PHIS in m2/s2, where Z3 already in m
-            dset_load["alt_agl_m_mid"] = dset_load["alt_msl_m_mid"] - dset_load["PHIS"] / 9.80665
+            dset_load["alt_agl_m_mid"] = dset_load["Z3"] - dset_load["PHIS"] / 9.80665
             dset_load["alt_agl_m_mid"].attrs = {
                 "description": "geopotential height above ground level",
                 "units": "m",
@@ -110,21 +106,12 @@ def open_mfdataset(
                 "PMID": "pres_pa_mid",
             }
         )
-        # Calc height agl. PHIS is in m2/s2, whereas Z3 is in already in m
-        # dset_load["alt_agl_m_mid"] = dset_load["alt_msl_m_mid"] - dset_load["PHIS"] / 9.80665
-        # dset_load["alt_agl_m_mid"].attrs = {
-        #    "description": "geopotential height above ground level",
-        #    "units": "m",
-        # }
 
         var_list = var_list + [
             "temperature_k",
             "alt_msl_m_mid",
-            #   "alt_agl_m_mid",
-            #  "surfpres_pa",
             "pres_pa_mid",
         ]
-
     dset = dset_load.get(var_list)
     # rename altitude dimension to z for monet use
     # also rename lon to x and lat to y
@@ -477,6 +464,6 @@ def _calc_layer_thickness_mid(dset):
         data=dz_m,
         dims=["time", "lev", "lat", "lon"],
         coords={"time": dset.time, "lev": dset.lev, "lat": dset.lat, "lon": dset.lon},
-        attrs={"description": "Layer Thickness (based on interface pressure)", "units": "m"},
+        attrs={"description": "Layer Thickness (based on midlayer pressure)", "units": "m"},
     )
     return dz_m
