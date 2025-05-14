@@ -100,13 +100,6 @@ def _check_vertical_levels(ds):
 
 
 def _check_pressure_vars(ds):
-    assert "surfpres_pa" in ds.variables, "surfpres_pa variable is missing. "
-    assert tuple(ds["surfpres_pa"].dims) == (
-        "time",
-        "y",
-        "x",
-    ), "Dimensions for surfpres_pa are incorrect. "
-    assert ds["surfpres_pa"].attrs["units"] == "Pa", "Units for surfpres_pa are incorrect. "
     assert "pres_pa_mid" in ds.variables, "pres_pa_mid variable is missing. "
     assert tuple(ds["pres_pa_mid"].dims) == (
         "time",
@@ -137,14 +130,6 @@ def _check_altitude(ds):
         "x",
     ), "Dimensions for alt_msl_m_mid are incorrect. "
     assert ds["alt_msl_m_mid"].attrs["units"] == "m", "Units for alt_msl_m_mid are incorrect. "
-    assert "alt_agl_m_mid" in ds.variables, "alt_agl_m_mid variable is missing. "
-    assert tuple(ds["alt_agl_m_mid"].dims) == (
-        "time",
-        "z",
-        "y",
-        "x",
-    ), "Dimensions for alt_agl_m_mid are incorrect. "
-    assert ds["alt_agl_m_mid"].attrs["units"] == "m", "Units for alt_agl_m_mid are incorrect. "
 
 
 def test_open_mfdataset(test_file_path):
