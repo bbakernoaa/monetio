@@ -204,9 +204,9 @@ def open_mfdataset(
     # Adjust pressure levels for all models such that the surface is first.
     if np.all(np.diff(dset.z.values) > 0):  # increasing pressure
         dset = dset.isel(z=slice(None, None, -1))  # -> decreasing
+        dset["dz_m"] = dset["dz_m"] * -1.0  # Change to positive values.
     if np.all(np.diff(dset.z_i.values) > 0):  # increasing pressure
         dset = dset.isel(z_i=slice(None, None, -1))  # -> decreasing
-    dset["dz_m"] = dset["dz_m"] * -1.0  # Change to positive values.
 
     # Note this altitude calcs needs to always go after resorting.
     # Altitude calculations are all optional, but for each model add values that are easy to calculate.
@@ -1067,22 +1067,15 @@ def _calc_hgt(dset: xr.Dataset) -> xr.DataArray:
     Parameters
     ----------
     dset : xarray.Dataset
-        UFS-AQM model data
+        UFS model data
 
     Returns
     -------
     xr.DataArray
         Geopotential height with attributes.
     """
-    # These are negative in UFS-AQM, but we resorted and are adding from the surface,
-    # so make them positive.
-    dz = dset.dz_m * -1.0
-
-    # Add surface elevation to everything except surface
-    dz = dz.where(~(dz.z == dz.z[0]), dz + dset.surfalt_m)
-
-    # Calculate cumulative sum along z dimension to get heights
-    z = dz.cumsum(dim="z")
+    # Calculate cumulative sum along z dimension to get heights plus the surface elevation
+    z = dset.dz_m.cumsum(dim="z") + dset.surfalt_m
 
     z.name = "alt_msl_m_full"
     z.attrs["long_name"] = "altitude above MSL at full layer tops"

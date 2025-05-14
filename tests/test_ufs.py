@@ -1,3 +1,4 @@
+import itertools
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,12 +39,29 @@ def test_open_mfdataset(data_dir: Path, test_data: DataForTest) -> None:
             # Some variables are loaded from disk for pre-processing or calculated at runtime
             assert var.name in test_data.expected_to_be_loaded
 
-    # Baseline is for full level profile
-    if not test_data.surf_only:
-        with xr.open_dataset(ufs_data_dir / "baseline-20250514.nc") as baseline:
-            assert actual.equals(baseline)
+    if test_data.surf_only:
+        assert "alt_msl_m_full" not in actual.data_vars
+    else:
+        assert "alt_msl_m_full" in actual.data_vars
+        # Baseline is for full level profile
+        _compare_with_baseline_(actual, ufs_data_dir / "baseline-20250514-1622.nc")
 
 
 def test_deprecated_rrfs_cmaq_mm() -> None:
-    # Manual testing indicates the warning is surfaced. The deprecation is also caught by modern IDEs.
     from monetio.models._rrfs_cmaq_mm import open_mfdataset  # noqa: F401
+
+
+def _compare_with_baseline_(actual: xr.Dataset, baseline_path: Path) -> None:
+    with xr.open_dataset(baseline_path) as baseline:
+        try:
+            assert actual.equals(baseline)
+        except AssertionError:
+            # Let's dig into the variables a bit more
+            for var_name, var in itertools.chain(actual.data_vars.items(), actual.coords.items()):
+                try:
+                    assert var.equals(baseline[var_name])
+                except AssertionError:
+                    print(var.to_series().describe())
+                    raise
+            # If there are no assertion issues here, then it's related to global attributes (probably)
+            raise
