@@ -3,12 +3,13 @@ from pathlib import Path
 
 import dask.array as da
 import pytest
+import xarray as xr
 
 from monetio.models.ufs import open_mfdataset
 
 
 @dataclass
-class SurfOnlyTestData:
+class DataForTest:
     surf_only: bool
     expected_nz: int
     expected_to_be_loaded: tuple[str, ...] = ("dz_m", "surfalt_m", "pres_pa_mid", "alt_msl_m_full")
@@ -17,14 +18,14 @@ class SurfOnlyTestData:
 @pytest.mark.parametrize(
     "test_data",
     [
-        SurfOnlyTestData(surf_only=True, expected_nz=1),
-        SurfOnlyTestData(surf_only=False, expected_nz=64),
+        DataForTest(surf_only=True, expected_nz=1),
+        DataForTest(surf_only=False, expected_nz=64),
     ],
     ids=lambda x: f"surf_only={x.surf_only}",
 )
-def test_open_mfdataset_surf_only(data_dir: Path, test_data: SurfOnlyTestData) -> None:
-    slug = "aqm.t12z.dyn.f*.nc"
-    actual = open_mfdataset(str(data_dir / "ufs" / slug), surf_only=test_data.surf_only)
+def test_open_mfdataset(data_dir: Path, test_data: DataForTest) -> None:
+    ufs_data_dir = data_dir / "ufs"
+    actual = open_mfdataset(str(ufs_data_dir / "aqm.t12z.dyn.f*.nc"), surf_only=test_data.surf_only)
 
     for var in actual.data_vars.values():
         shape_dict = {dim: actual.sizes[dim] for dim in var.dims}
@@ -36,3 +37,13 @@ def test_open_mfdataset_surf_only(data_dir: Path, test_data: SurfOnlyTestData) -
         except AssertionError:
             # Some variables are loaded from disk for pre-processing or calculated at runtime
             assert var.name in test_data.expected_to_be_loaded
+
+    # Baseline is for full level profile
+    if not test_data.surf_only:
+        with xr.open_dataset(ufs_data_dir / "baseline-20250514.nc") as baseline:
+            assert actual.equals(baseline)
+
+
+def test_deprecated_rrfs_cmaq_mm() -> None:
+    # Manual testing indicates the warning is surfaced. The deprecation is also caught by modern IDEs.
+    from monetio.models._rrfs_cmaq_mm import open_mfdataset  # noqa: F401

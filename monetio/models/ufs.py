@@ -1,4 +1,4 @@
-""" RRFS-CMAQ File Reader """
+""" UFS-AQM File Reader """
 
 import numpy as np
 import xarray as xr
@@ -50,7 +50,7 @@ def open_mfdataset(
     Returns
     -------
     xarray.DataSet
-        RRFS-CMAQ model dataset in standard format for use in MELODIES-MONET
+        UFS-AQM model dataset in standard format for use in MELODIES-MONET
 
     """
 
@@ -1059,33 +1059,33 @@ def dict_species_sums(mech):
 
 
 def _calc_hgt(dset: xr.Dataset) -> xr.DataArray:
-    """Calculate the geopotential height in m.
+    """Calculates the geopotential height in m from the variables hgtsfc and
+    delz. Note: To use this function the delz value needs to go from surface
+    to top of atmosphere in vertical. Because we are adding the height of
+    each grid box these are really grid top values.
 
     Parameters
     ----------
     dset : xarray.Dataset
-        The UFS dataset
+        UFS-AQM model data
 
     Returns
     -------
-    xarray.DataArray
-        Geopotential height
+    xr.DataArray
+        Geopotential height with attributes.
     """
-    # Get surface altitude
-    sfc = dset.surfalt_m
-
-    # Get the vertical displacement and flip sign as needed
+    # These are negative in UFS-AQM, but we resorted and are adding from the surface,
+    # so make them positive.
     dz = dset.dz_m * -1.0
 
-    # Add surface elevation
-    dz = dz.where(~(dz.z == dz.z[0]), dz + sfc)
+    # Add surface elevation to everything except surface
+    dz = dz.where(~(dz.z == dz.z[0]), dz + dset.surfalt_m)
 
     # Calculate cumulative sum along z dimension to get heights
     z = dz.cumsum(dim="z")
 
-    # Set attributes
     z.name = "alt_msl_m_full"
-    z.attrs["long_name"] = "Altitude MSL Full Layer in Meters"
+    z.attrs["long_name"] = "altitude above MSL at full layer tops"
     z.attrs["units"] = "m"
 
     return z
@@ -1118,11 +1118,10 @@ def _calc_pressure(dset: xr.Dataset) -> xr.DataArray:
     # log(p_mid) = (p_2 - p_1) / ln(p_2/p_1)
     # This preserves all dimensions and allows lazy evaluation
     p_mid = (p_interfaces_2 - p_interfaces_1) / np.log(p_interfaces_2 / p_interfaces_1)
-    p_mid = p_mid.transpose(*dset.pm25_ave.dims)
+    p_mid = p_mid.transpose("time", "z", "y", "x")
 
-    # Set attributes
     p_mid.name = "pres_pa_mid"
-    p_mid.attrs["units"] = "pa"
-    p_mid.attrs["long_name"] = "Pressure Mid Layer in Pa"
+    p_mid.attrs["units"] = "Pa"
+    p_mid.attrs["long_name"] = "mid-layer pressure"
 
     return p_mid
