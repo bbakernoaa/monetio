@@ -149,7 +149,8 @@ def _check_altitude(ds):
 
 def test_open_mfdataset(test_file_path):
     file_path = str(test_file_path)
-    ds = open_mfdataset(file_path)
+    var_list = ["NO2"]
+    ds = open_mfdataset(file_path, var_list=var_list)
     _check_dimensions(ds)
     _check_latitude_and_longitude(ds)
     _check_time(ds)
