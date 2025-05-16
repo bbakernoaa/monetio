@@ -143,8 +143,9 @@ def test_open_mfdataset(test_file_path):
 
 
 def test_open_mfdataset_surf_only_false(test_file_path):
+    file_path = str(test_file_path)
     var_list = ["NO2"]
-    ds = open_mfdataset(test_file_path, var_list=var_list, surf_only=False)
+    ds = open_mfdataset(file_path, var_list=var_list, surf_only=False)
     _check_dimensions(ds)
     _check_latitude_and_longitude(ds)
     _check_time(ds)
@@ -156,7 +157,8 @@ def test_open_mfdataset_surf_only_false(test_file_path):
 
 
 def test_hybrid_vars(test_file_path):
-    ds = xr.open_mfdataset(test_file_path)
+    file_path = str(test_file_path)
+    ds = xr.open_mfdataset(file_path)
 
     assert "hyam" in ds.variables, "hyam variable is missing. "
     assert tuple(ds["hyam"].dims) == ("lev",), "Dimensions for hyam are incorrect. "
