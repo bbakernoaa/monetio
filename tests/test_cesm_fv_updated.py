@@ -13,8 +13,7 @@ HERE = Path(__file__).parent
 
 
 def retrieve_test_file():
-    # fn = "CAM_chem_merra2_FCSD_1deg_QFED_world_201909-01-09_small_sfc.nc"
-    fn = "CAM_chem_merra2_FCSD_1deg_QFED_world_201909-01-09_small.nc"
+    fn = "f.e22.FCnudged.f09_f09_mg17.cst_emis.cam.h1.2018-12-25-43200.nc"
 
     # Download to tests/data if not already present
     p = HERE / "data" / fn
