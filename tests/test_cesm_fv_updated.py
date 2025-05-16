@@ -159,7 +159,6 @@ def test_open_mfdataset_surf_only_false(test_file_path):
 def test_hybrid_vars(test_file_path):
     file_path = str(test_file_path)
     ds = xr.open_mfdataset(file_path)
-
     assert "hyam" in ds.variables, "hyam variable is missing. "
     assert tuple(ds["hyam"].dims) == ("lev",), "Dimensions for hyam are incorrect. "
     assert "hybm" in ds.variables, "hybm variable is missing. "
@@ -174,7 +173,6 @@ def test_calc_pressure(test_file_path):
     file_path = str(test_file_path)
     ds = xr.open_mfdataset(file_path)
     pressure = _calc_pressure(ds)
-
     assert tuple(pressure.dims) == (
         "time",
         "lev",
