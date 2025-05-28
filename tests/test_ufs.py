@@ -54,12 +54,12 @@ def test_deprecated_rrfs_cmaq_mm() -> None:
 def _compare_with_baseline_(actual: xr.Dataset, baseline_path: Path) -> None:
     with xr.open_dataset(baseline_path) as baseline:
         try:
-            assert actual.equals(baseline)
+            assert actual.identical(baseline)
         except AssertionError:
             # Let's dig into the variables a bit more
             for var_name, var in itertools.chain(actual.data_vars.items(), actual.coords.items()):
                 try:
-                    assert var.equals(baseline[var_name])
+                    assert var.identical(baseline[var_name])
                 except AssertionError:
                     print(var.to_series().describe())
                     raise
