@@ -448,7 +448,7 @@ def add_data(
     find_paths=True,
     n_procs=1,
 ):
-    """Add OpenAQ data AWS Open Data.
+    """Add OpenAQ data from AWS Open Data (https://registry.opendata.aws/openaq/).
 
     Parameters
     ----------
