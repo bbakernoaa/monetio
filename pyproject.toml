@@ -1,6 +1,59 @@
 [build-system]
-requires = ["setuptools>=39.2.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "monetio"
+version = "0.1.0"  # Update as needed or use dynamic versioning
+description = "The Model and Observation Evaluation Toolkit (MONET) I/O package"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Barry D. Baker", email = "barry.baker@noaa.gov"},
+]
+maintainers = [
+    {name = "Barry D. Baker", email = "barry.baker@noaa.gov"},
+]
+urls = {"Homepage" = "https://github.com/noaa-oar-arl/monetio"}
+dependencies = [
+    "dask",
+    "netCDF4",
+    "pandas",
+    "s3fs",
+    "scipy",
+    "xarray",
+    "requests"
+]
+
+[project.optional-dependencies]
+dev = [
+    "h5netcdf",
+    "h5py",
+    "joblib",
+    "lxml",
+    "pyhdf!=0.11.3",
+    "timezonefinder",
+    "pyarrow",
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+    "filelock",
+    "black",
+    "isort"
+]
+
+test = [
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist",
+    "filelock"
+]
+
+
+[tool.setuptools]
+packages = ["monetio", "monetio.models", "monetio.obs", "monetio.profile", "monetio.sat"]
+package-data = {"monetio" = ["data/*.csv", "data/*.tsv", "data/*.txt", "data/*.png"]}
 
 [tool.black]
 line-length = 100
