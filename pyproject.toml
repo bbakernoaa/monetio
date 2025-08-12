@@ -41,6 +41,9 @@ dependencies = [
     "pyarrow"
 ]
 
+[tool.setuptools.dynamic]
+version = {attr = "monetio.__version__"}
+
 [project.optional-dependencies]
 dev = [
     "pytest",
