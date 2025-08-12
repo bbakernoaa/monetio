@@ -1,4 +1,4 @@
-""" CMAQ File Reader """
+"""CMAQ File Reader"""
 
 import xarray as xr
 from numpy import array, concatenate
@@ -24,7 +24,7 @@ def open_mfdataset(
     fname_vert=None,
     fname_surf=None,
     concatenate_forecasts=False,
-    **kwargs
+    **kwargs,
 ):
     """Method to open CMAQ IOAPI netcdf files.
 
@@ -331,9 +331,7 @@ def add_lazy_pm25(d):
             newkeys = allvars.loc[index]
             newweights = weights.loc[index]
             d["PM25"] = add_multiple_lazy(d, newkeys, weights=newweights)
-            d["PM25"] = d["PM25"].assign_attrs(
-                {"units": r"$\mu g m^{-3}$", "name": "PM2.5", "long_name": "PM2.5"}
-            )
+            d["PM25"] = d["PM25"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "PM2.5", "long_name": "PM2.5"})
     return d
 
 
@@ -422,9 +420,7 @@ def add_lazy_clf(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["CLf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["CLf"] = d["CLf"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "CLf", "long_name": "Fine Mode particulate Cl"}
-        )
+        d["CLf"] = d["CLf"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "CLf", "long_name": "Fine Mode particulate Cl"})
     return d
 
 
@@ -450,9 +446,7 @@ def add_lazy_caf(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["CAf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["CAf"] = d["CAf"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "CAf", "long_name": "Fine Mode particulate CA"}
-        )
+        d["CAf"] = d["CAf"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "CAf", "long_name": "Fine Mode particulate CA"})
     return d
 
 
@@ -478,9 +472,7 @@ def add_lazy_naf(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["NAf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NAf"] = d["NAf"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NAf", "long_name": "NAf"}
-        )
+        d["NAf"] = d["NAf"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "NAf", "long_name": "NAf"})
     return d
 
 
@@ -506,9 +498,7 @@ def add_lazy_so4f(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["SO4f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["SO4f"] = d["SO4f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "SO4f", "long_name": "SO4f"}
-        )
+        d["SO4f"] = d["SO4f"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "SO4f", "long_name": "SO4f"})
     return d
 
 
@@ -534,9 +524,7 @@ def add_lazy_nh4f(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["NH4f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NH4f"] = d["NH4f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NH4f", "long_name": "NH4f"}
-        )
+        d["NH4f"] = d["NH4f"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "NH4f", "long_name": "NH4f"})
     return d
 
 
@@ -562,9 +550,7 @@ def add_lazy_no3f(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["NO3f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NO3f"] = d["NO3f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NO3f", "long_name": "NO3f"}
-        )
+        d["NO3f"] = d["NO3f"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "NO3f", "long_name": "NO3f"})
     return d
 
 

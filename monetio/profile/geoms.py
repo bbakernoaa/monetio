@@ -109,11 +109,7 @@ def open_dataset(fp, *, rename_all=True, squeeze=True):
             del rename_main_dims[ref]
             continue
         n = ds[ref].size
-        time_dims = [
-            dim_name
-            for dim_name, dim_size in ds.sizes.items()
-            if dim_name.startswith("fakeDim") and dim_size == n
-        ]
+        time_dims = [dim_name for dim_name, dim_size in ds.sizes.items() if dim_name.startswith("fakeDim") and dim_size == n]
         ds = ds.rename_dims({dim_name: new_dim for dim_name in time_dims})
 
     # Squeeze out some unnecessary fakeDims of float vars
@@ -128,9 +124,7 @@ def open_dataset(fp, *, rename_all=True, squeeze=True):
     # 'PRESSURE_INDEPENDENT_SOURCE'
     # 'TEMPERATURE_INDEPENDENT_SOURCE'
     # These are '|S1' char arrays that need to be joined to make strings along the last dim
-    remaining_vns = [
-        vn for vn, da in ds.variables.items() if any(dim.startswith("fakeDim") for dim in da.dims)
-    ]
+    remaining_vns = [vn for vn, da in ds.variables.items() if any(dim.startswith("fakeDim") for dim in da.dims)]
     for vn in remaining_vns:
         da = ds[vn]
         if not da.dtype.kind == "S":
@@ -165,9 +159,7 @@ def open_dataset(fp, *, rename_all=True, squeeze=True):
         for vn in ds.variables:
             for dim in ds[vn].dims:
                 dim_to_vn[dim].append(vn)
-        fake_dim_info = ", ".join(
-            f"{dim}({ds.sizes[dim]}) [{', '.join(dim_to_vn[dim])}]" for dim in sorted(fake_dims)
-        )
+        fake_dim_info = ", ".join(f"{dim}({ds.sizes[dim]}) [{', '.join(dim_to_vn[dim])}]" for dim in sorted(fake_dims))
         warnings.warn(f"There are still some fakeDim's around: {fake_dim_info}")
 
     # Normalize dtypes
@@ -196,16 +188,10 @@ def open_dataset(fp, *, rename_all=True, squeeze=True):
     tub = _dti_from_mjd2000(ds["DATETIME.STOP"])  # upper
     dt = tstart_from_attr.tz_localize(None) - tlb[0]
     if not abs(dt) < pd.Timedelta(milliseconds=500):
-        warnings.warn(
-            f"first DATETIME.START ({tlb[0]}) "
-            f"is more than 500 ms from the DATA_START_DATE ({tstart_from_attr})"
-        )
+        warnings.warn(f"first DATETIME.START ({tlb[0]}) " f"is more than 500 ms from the DATA_START_DATE ({tstart_from_attr})")
     dt = tstop_from_attr.tz_localize(None) - tub[-1]
     if not abs(dt) < pd.Timedelta(milliseconds=500):
-        warnings.warn(
-            f"last DATETIME.STOP ({tub[-1]}) "
-            f"is more than 500 ms from the DATA_STOP_DATE ({tstop_from_attr})"
-        )
+        warnings.warn(f"last DATETIME.STOP ({tub[-1]}) " f"is more than 500 ms from the DATA_STOP_DATE ({tstop_from_attr})")
     ds["DATETIME"].values = t
     ds["DATETIME.START"].values = tub
     ds["DATETIME.STOP"].values = tlb

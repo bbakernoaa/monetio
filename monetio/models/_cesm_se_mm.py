@@ -1,15 +1,10 @@
-""" CESM File Reader """
+"""CESM File Reader"""
 
 import xarray as xr
 
 
 def open_mfdataset(
-    fname,
-    earth_radius=6370000,
-    convert_to_ppb=True,
-    var_list=["O3", "NO", "NO2", "lat", "lon"],
-    scrip_file="",
-    **kwargs
+    fname, earth_radius=6370000, convert_to_ppb=True, var_list=["O3", "NO", "NO2", "lat", "lon"], scrip_file="", **kwargs
 ):
     """Method to open multiple (or single) CESM SE netcdf files.
        This method extends the xarray.open_mfdataset functionality

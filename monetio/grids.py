@@ -46,9 +46,7 @@ def _geos_16_grid(dset):
         "sweep": sweep,
     }
 
-    area = geometry.AreaDefinition(
-        "GEOS_ABI", "ABI", "GOES_ABI", proj_dict, len(x), len(y), asarray(area_extent)
-    )
+    area = geometry.AreaDefinition("GEOS_ABI", "ABI", "GOES_ABI", proj_dict, len(x), len(y), asarray(area_extent))
     return area
 
 
@@ -95,9 +93,7 @@ def _get_sinu_latlon(x, y):
     from pyproj import Proj
 
     xv, yv = meshgrid(x, y)
-    sinu = Proj(
-        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m, +R=6371007.181"
-    )
+    sinu = Proj("+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m, +R=6371007.181")
     return sinu(xv, yv, inverse=True)
 
 
@@ -119,9 +115,7 @@ def get_modis_latlon_from_swath_hv(h, v, dset):
     dset.coords["longitude"] = (("x", "y"), lon)
     dset.coords["latitude"] = (("x", "y"), lat)
     dset.attrs["area_extent"] = (x.min(), y.min(), x.max(), y.max())
-    dset.attrs["proj4_srs"] = (
-        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 " "+b=6371007.181 +units=m"
-    )
+    dset.attrs["proj4_srs"] = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 " "+b=6371007.181 +units=m"
     return dset
 
 
@@ -154,9 +148,7 @@ def get_ioapi_pyresample_area_def(ds, proj4_srs):
         ds.YORIG + (ds.YCELL * ds.NROWS) + 0.5 * ds.YCELL,
     )
     area_extent = (x_ll, y_ll, x_ur, y_ur)
-    area_def = geometry.AreaDefinition(
-        area_id, description, proj_id, projection, x_size, y_size, area_extent
-    )
+    area_def = geometry.AreaDefinition(area_id, description, proj_id, projection, x_size, y_size, area_extent)
     return area_def
 
 
@@ -251,9 +243,7 @@ def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
         p4 = p4.format(**pargs)
     elif proj_id == 3:
         # Mercator
-        p4 = (
-            "+proj=merc +lat_ts={lat_1} " "+lon_0={center_lon} " "+x_0={x0} +y_0={y0} +a={r} +b={r}"
-        )
+        p4 = "+proj=merc +lat_ts={lat_1} " "+lon_0={center_lon} " "+x_0={x0} +y_0={y0} +a={r} +b={r}"
         p4 = p4.format(**pargs)
     else:
         raise NotImplementedError("IOAPI proj not implemented yet: " "{}".format(proj_id))

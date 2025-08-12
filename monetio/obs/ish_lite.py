@@ -155,12 +155,8 @@ class ISH:
             for date in unique_years.strftime("%Y"):
                 if self.verbose:
                     print("Year:", date)
-                year_url = (
-                    pd.read_html(f"{url}/{date}/")[0]["Name"].iloc[2:-1].to_frame(name="name")
-                )
-                all_urls.append(
-                    f"{url}/{date}/" + year_url
-                )  # add the full url path to the file name only
+                year_url = pd.read_html(f"{url}/{date}/")[0]["Name"].iloc[2:-1].to_frame(name="name")
+                all_urls.append(f"{url}/{date}/" + year_url)  # add the full url path to the file name only
 
             all_urls = pd.concat(all_urls, ignore_index=True)
         else:
@@ -170,9 +166,7 @@ class ISH:
 
         # Construct expected URLs based on sites and year(s) requested
         for syear in unique_years.strftime("%Y"):
-            year_fnames = (
-                sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-            )
+            year_fnames = sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
             for fname in year_fnames:
                 furls.append(f"{url}/{syear}/{fname}")
 
@@ -321,9 +315,7 @@ class ISH:
             # TODO: mean(numeric_only=True)
 
         # Add site metadata
-        df = pd.merge(df, dfloc, how="left", left_on="siteid", right_on="station_id").rename(
-            columns={"ctry": "country"}
-        )
+        df = pd.merge(df, dfloc, how="left", left_on="siteid", right_on="station_id").rename(columns={"ctry": "country"})
         return df.drop(["station_id"], axis=1)
 
     def get_url_file_objs(self, fname):

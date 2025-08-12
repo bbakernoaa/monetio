@@ -216,13 +216,7 @@ def regulatory_resample(df, col="model", pollutant_standard=None):
         dfreturn = calc_daily_max(df, rolling_frequency=1)
     else:  # do daily average
         dfn = df.drop_duplicates(subset=["siteid"])
-        df = (
-            df.groupby("siteid")[col]
-            .resample("D")
-            .mean()
-            .reset_index()
-            .rename(columns={"level_1": "time_local"})
-        )
+        df = df.groupby("siteid")[col].resample("D").mean().reset_index().rename(columns={"level_1": "time_local"})
         dfreturn = df.merge(dfn, how="left", on="siteid")
     return dfreturn
 
@@ -236,39 +230,18 @@ def calc_daily_max(df, param=None, rolling_frequency=8):
         temp = df.groupby("variable").get_group(param)
     temp.index = temp.time_local
     if rolling_frequency > 1:
-        g = (
-            temp.groupby("siteid")["model", "gmt_offset"]
-            .rolling(rolling_frequency, center=True, win_type="boxcar")
-            .mean()
-        )
+        g = temp.groupby("siteid")["model", "gmt_offset"].rolling(rolling_frequency, center=True, win_type="boxcar").mean()
         q = g.reset_index(level=0)
-        k = (
-            q.groupby("siteid")
-            .resample("D")
-            .max()
-            .reset_index(level=1)
-            .reset_index(drop="siteid")
-            .dropna()
-        )
+        k = q.groupby("siteid").resample("D").max().reset_index(level=1).reset_index(drop="siteid").dropna()
     else:
-        k = (
-            temp.groupby("siteid")["model", "gmt_offset"]
-            .resample("D")
-            .max()
-            .reset_index()
-            .rename({"level_1": "time_local"})
-        )
-    columnstomerge = temp.columns[~temp.columns.isin(k.columns) * (temp.columns != "time")].append(
-        Index(["siteid"])
-    )
+        k = temp.groupby("siteid")["model", "gmt_offset"].resample("D").max().reset_index().rename({"level_1": "time_local"})
+    columnstomerge = temp.columns[~temp.columns.isin(k.columns) * (temp.columns != "time")].append(Index(["siteid"]))
     if param is None:
-        dff = k.merge(df[columnstomerge], on="siteid", how="left").drop_duplicates(
+        dff = k.merge(df[columnstomerge], on="siteid", how="left").drop_duplicates(subset=["siteid", "time_local"])
+    else:
+        dff = k.merge(df.groupby("variable").get_group(param)[columnstomerge], on="siteid", how="left").drop_duplicates(
             subset=["siteid", "time_local"]
         )
-    else:
-        dff = k.merge(
-            df.groupby("variable").get_group(param)[columnstomerge], on="siteid", how="left"
-        ).drop_duplicates(subset=["siteid", "time_local"])
     dff["time"] = dff.time_local - to_timedelta(dff.gmt_offset, unit="H")
     return dff
 
@@ -392,7 +365,9 @@ def read_monitor_file(network=None, airnow=False, drop_latlon=True):
             # has network info (CSN IMPROVE etc....)
             monitor_url = baseurl + "aqs_monitors.zip"
             # Airnow monitor file
-            monitor_airnow_url = "https://s3-us-west-1.amazonaws.com//files.airnowtech.org/airnow/today/monitoring_site_locations.dat"
+            monitor_airnow_url = (
+                "https://s3-us-west-1.amazonaws.com//files.airnowtech.org/airnow/today/monitoring_site_locations.dat"
+            )
             colsinuse = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
             airnow = pd.read_csv(
                 monitor_airnow_url,

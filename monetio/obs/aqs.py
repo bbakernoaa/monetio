@@ -127,9 +127,7 @@ class AQS:
             "variable",
         ]
         self.df = pd.DataFrame()  # hourly dataframe
-        self.monitor_file = (
-            inspect.getfile(self.__class__)[:-10] + "data/monitoring_site_locations.dat"
-        )
+        self.monitor_file = inspect.getfile(self.__class__)[:-10] + "data/monitoring_site_locations.dat"
         self.monitor_df = None
         self.daily = False
         self.d_df = None  # daily dataframe
@@ -442,9 +440,7 @@ class AQS:
         #     monitor_drop = [u'datum']
         #     self.monitor_df.drop(monitor_drop, axis=1, inplace=True)
         if network is not None:
-            monitors = self.monitor_df.loc[self.monitor_df.isin([network])].drop_duplicates(
-                subset=["siteid"]
-            )
+            monitors = self.monitor_df.loc[self.monitor_df.isin([network])].drop_duplicates(subset=["siteid"])
         else:
             monitors = self.monitor_df.drop_duplicates(subset=["siteid"])
         # AMC - merging only on siteid was causing latitude_x latitude_y to be
@@ -650,11 +646,7 @@ class AQS:
         # For any remaining, use parameter_name but warn
         con = df.variable == ""
         if con.sum() > 0:
-            _tbl = (
-                df[con][["parameter_name", "parameter_code"]]
-                .drop_duplicates("parameter_name")
-                .to_string(index=False)
-            )
+            _tbl = df[con][["parameter_name", "parameter_code"]].drop_duplicates("parameter_name").to_string(index=False)
             warnings.warn(f"Short names not available for these variables:\n{_tbl}")
         df.loc[con, "variable"] = df.parameter_name
 

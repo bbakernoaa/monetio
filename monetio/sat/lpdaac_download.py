@@ -62,9 +62,7 @@ try:
 except FileNotFoundError:
     homeDir = os.path.expanduser("~")
     Popen(
-        "touch {0}.netrc | chmod og-rw {0}.netrc | echo machine {1} >> {0}.netrc".format(
-            homeDir + os.sep, urs
-        ),
+        "touch {0}.netrc | chmod og-rw {0}.netrc | echo machine {1} >> {0}.netrc".format(homeDir + os.sep, urs),
         shell=True,
     )
     Popen(f"echo login {getpass(prompt=prompts[0])} >> {homeDir + os.sep}.netrc", shell=True)

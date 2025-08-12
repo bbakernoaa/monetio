@@ -21,8 +21,7 @@ def retrieve_test_file():
         import requests
 
         r = requests.get(
-            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
-            f"example_observation_data/satellite/{fn}",
+            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/" f"example_observation_data/satellite/{fn}",
             stream=True,
         )
         r.raise_for_status()
@@ -65,10 +64,7 @@ def test_open_dataset(test_file_path):
 
     with pytest.warns(
         UserWarning,
-        match=(
-            "Calculating pressure in TEMPO data requires surface_pressure. "
-            + "Adding surface_pressure to output variables"
-        ),
+        match=("Calculating pressure in TEMPO data requires surface_pressure. " + "Adding surface_pressure to output variables"),
     ):
         ds2 = open_dataset(
             test_file_path,

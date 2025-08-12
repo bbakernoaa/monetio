@@ -21,8 +21,7 @@ def retrieve_test_file():
         import requests
 
         r = requests.get(
-            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
-            + f"example_model_data/cesmfv_example/{fn}",
+            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/" + f"example_model_data/cesmfv_example/{fn}",
             stream=True,
         )
         r.raise_for_status()

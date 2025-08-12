@@ -172,10 +172,7 @@ class ISH:
         """Clean up the data frame"""
 
         # index by time
-        frame["time"] = [
-            pd.Timestamp(f"{date:08}{htime:04}")
-            for date, htime in zip(frame["date"], frame["htime"])
-        ]
+        frame["time"] = [pd.Timestamp(f"{date:08}{htime:04}") for date, htime in zip(frame["date"], frame["htime"])]
         # these fields were combined into 'time'
         frame.drop(["date", "htime"], axis=1, inplace=True)
         frame.set_index("time", drop=True, inplace=True)
@@ -404,13 +401,7 @@ class ISH:
             numeric_cols = self.df.select_dtypes(include=["number"]).columns
             # Keep groupby columns in the result
             group_cols = ["station_id"]
-            resampled = (
-                self.df[group_cols + list(numeric_cols)]
-                .groupby("station_id")
-                .resample(window)
-                .mean()
-                .reset_index()
-            )
+            resampled = self.df[group_cols + list(numeric_cols)].groupby("station_id").resample(window).mean().reset_index()
             # Merge back with non-numeric columns (e.g., time, station_id) if needed
             # For now, assign to self.df
             self.df = resampled
@@ -506,12 +497,8 @@ class ISH:
             for date in unique_years.strftime("%Y"):
                 if self.verbose:
                     print("Year:", date)
-                year_url = (
-                    pd.read_html(f"{url}/{date}/")[0]["Name"].iloc[2:-1].to_frame(name="name")
-                )
-                all_urls.append(
-                    f"{url}/{date}/" + year_url
-                )  # add the full url path to the file name only
+                year_url = pd.read_html(f"{url}/{date}/")[0]["Name"].iloc[2:-1].to_frame(name="name")
+                all_urls.append(f"{url}/{date}/" + year_url)  # add the full url path to the file name only
 
             all_urls = pd.concat(all_urls, ignore_index=True)
         else:
@@ -521,9 +508,7 @@ class ISH:
 
         # Construct expected URLs based on sites and year(s) requested
         for syear in unique_years.strftime("%Y"):
-            year_fnames = (
-                sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-            )
+            year_fnames = sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
             for fname in year_fnames:
                 furls.append(f"{url}/{syear}/{fname}")
 

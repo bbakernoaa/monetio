@@ -53,6 +53,7 @@ def test_deprecated_rrfs_cmaq_mm() -> None:
 
 def _compare_with_baseline_(actual: xr.Dataset, baseline_path: Path) -> None:
     import numpy as np
+
     with xr.open_dataset(baseline_path) as baseline:
         # Compare variables with tolerance for numerical arrays
         for var_name, var in itertools.chain(actual.data_vars.items(), actual.coords.items()):

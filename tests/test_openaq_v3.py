@@ -5,10 +5,7 @@ import pytest
 
 import monetio.obs.openaq_v3 as openaq
 
-if (
-    os.environ.get("CI", "false").lower() not in {"false", "0"}
-    and os.environ.get("OPENAQ_API_KEY", "") == ""
-):
+if os.environ.get("CI", "false").lower() not in {"false", "0"} and os.environ.get("OPENAQ_API_KEY", "") == "":
     # PRs from forks don't get the secret
     pytest.skip("no API key", allow_module_level=True)
 
@@ -80,7 +77,6 @@ def test_get_sensors():
         "daily",
     ],
 )
-
 def test_add_data_sensor_ids(product):
     df = openaq.get_sensors("2978434")
     sensor_ids = df["id"].tolist()

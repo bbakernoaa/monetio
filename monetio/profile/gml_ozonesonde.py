@@ -119,9 +119,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
 
     if cache:
         for location in locations:
-            _FILES_L100_CACHE[location] = list(
-                df[df["location"] == location].itertuples(index=False, name=None)
-            )
+            _FILES_L100_CACHE[location] = list(df[df["location"] == location].itertuples(index=False, name=None))
 
     return df
 
@@ -160,9 +158,7 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise"):
     urls = df_urls[df_urls["time"].between(dates_min, dates_max, inclusive="both")]["url"].tolist()
 
     if not urls:
-        raise RuntimeError(
-            f"No files found for dates {dates_min} to {dates_max}, location={location!r}."
-        )
+        raise RuntimeError(f"No files found for dates {dates_min} to {dates_max}, location={location!r}.")
 
     def func(fp_or_url):
         try:
@@ -422,8 +418,7 @@ def read_100m(fp_or_url):
     if not data_block_first_ncol == ncol_expected:
         head = "\n".join(data_block.splitlines()[:4] + ["..."])
         raise ValueError(
-            f"Expected {ncol_expected} columns in data block, "
-            f"got {data_block_first_ncol} in first data line:\n{head}"
+            f"Expected {ncol_expected} columns in data block, " f"got {data_block_first_ncol} in first data line:\n{head}"
         )
         # TODO: allow pandas to skip bad lines with `on_bad_lines='skip'`?
 

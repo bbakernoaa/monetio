@@ -145,9 +145,7 @@ def read_json2(fp_or_url, *, verbose=False):
         import requests
 
         if fp_or_url.startswith("s3"):
-            fp_or_url = fp_or_url.replace(
-                "s3://openaq-fetches/", "https://openaq-fetches.s3.amazonaws.com/"
-            )
+            fp_or_url = fp_or_url.replace("s3://openaq-fetches/", "https://openaq-fetches.s3.amazonaws.com/")
 
         r = requests.get(fp_or_url, stream=True, timeout=2)
         r.raise_for_status()
@@ -478,10 +476,7 @@ class OPENAQ:
             # NOTE: seems that some sites have dupe rows with city == "N/A"
             na_locations = ["Wampanoag Laboratory"]
             df = (
-                df[
-                    (df.averagingPeriod == pd.Timedelta("1H"))
-                    & ~(df.location.isin(na_locations) & (df.city == "N/A"))
-                ]
+                df[(df.averagingPeriod == pd.Timedelta("1H")) & ~(df.location.isin(na_locations) & (df.city == "N/A"))]
                 .pivot_table(
                     values="value",
                     index=index,
