@@ -13,6 +13,8 @@ from monetio.models._cesm_fv_mm import _calc_pressure, _calc_pressure_i, open_mf
 
 HERE = Path(__file__).parent
 
+uses_get_files = pytest.mark.xdist_group(name="retrieve-files")
+
 
 def retrieve_test_file():
     fn = "f.e22.FCnudged.f09_f09_mg17.cst_emis.cam.h1.2018-12-25-43200.nc"
@@ -136,6 +138,7 @@ def _check_altitude(ds):
     assert ds["alt_msl_m_mid"].attrs["units"] == "m", "Units for alt_msl_m_mid are incorrect. "
 
 
+@uses_get_files
 def test_open_mfdataset(test_file_path):
     file_path = str(test_file_path)
     var_list = ["NO2"]
@@ -147,6 +150,7 @@ def test_open_mfdataset(test_file_path):
     _check_vertical_levels(ds)
 
 
+@uses_get_files
 def test_open_mfdataset_surf_only_false(test_file_path):
     file_path = str(test_file_path)
     var_list = ["NO2"]
@@ -161,6 +165,7 @@ def test_open_mfdataset_surf_only_false(test_file_path):
     _check_altitude(ds)
 
 
+@uses_get_files
 def test_hybrid_vars(test_file_path):
     file_path = str(test_file_path)
     ds = xr.open_mfdataset(file_path, engine="netcdf4")
@@ -174,6 +179,7 @@ def test_hybrid_vars(test_file_path):
     assert tuple(ds["hybi"].dims) == ("ilev",), "Dimensions for hybi are incorrect. "
 
 
+@uses_get_files
 def test_calc_pressure(test_file_path):
     file_path = str(test_file_path)
     ds = xr.open_mfdataset(file_path, engine="netcdf4")
