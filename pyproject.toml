@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "monetio"
-version = "0.1.0"  # Update as needed or use dynamic versioning
+dynamic = ["version"]
 description = "The Model and Observation Evaluation Toolkit (MONET) I/O package"
 readme = "README.md"
 requires-python = ">=3.8"
