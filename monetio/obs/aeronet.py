@@ -10,11 +10,11 @@ import numpy as np
 import pandas as pd
 
 try:
-    from joblib import Parallel, delayed
+    import dask
 
-    has_joblib = True
+    has_dask = True
 except ImportError:
-    has_joblib = False
+    has_dask = False
 
 
 def add_local(
@@ -158,19 +158,20 @@ def add_data(
         if max_date not in time_bounds:
             time_bounds = time_bounds.append(pd.DatetimeIndex([max_date]))
 
-    if has_joblib and requested_parallel and dates is not None and len(time_bounds) > 2:
-        dfs = Parallel(n_jobs=n_procs, verbose=verbose)(
-            delayed(_parallel_aeronet_call)(pd.DatetimeIndex([t1, t2]), **kwargs, freq=None)
+    if has_dask and requested_parallel and dates is not None and len(time_bounds) > 2:
+        tasks = [
+            dask.delayed(_parallel_aeronet_call)(pd.DatetimeIndex([t1, t2]), **kwargs, freq=None)
             for t1, t2 in zip(time_bounds[:-1], time_bounds[1:])
-        )
+        ]
+        dfs = dask.compute(*tasks, scheduler="processes", num_workers=n_procs)
         df = pd.concat(dfs, ignore_index=True).drop_duplicates()
         if freq is not None:
             df.index = df.time
             df = df.groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
         return df.reset_index(drop=True)
     else:
-        if not has_joblib and requested_parallel:
-            print("Please install joblib to use the parallel feature of monetio.aeronet. " "Proceeding in serial mode...")
+        if not has_dask and requested_parallel:
+            print("Please install dask to use the parallel feature of monetio.aeronet. Proceeding in serial mode...")
         df = a.add_data(
             dates=dates,
             **kwargs,
