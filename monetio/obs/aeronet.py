@@ -81,8 +81,8 @@ def add_data(
     interp_to_aod_values=None,
     #
     # joblib
-    n_procs=1,
-    verbose=10,
+    n_procs=1,  # TODO: remove kwarg as we moved to dask instead of joblib
+    verbose=10,  # TODO: remove kwarg as we moved to dask instead of joblib
 ):
     """Load AERONET data from the AERONET Web Service.
 

@@ -31,5 +31,5 @@ dependencies:
   #
   - pip>=21.1
   - pip:
-      - "-e ."
+      - " .[dev]"
       - pytest-print
