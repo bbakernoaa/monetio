@@ -1,5 +1,7 @@
 import shutil
 import warnings
+
+# from math import e
 from pathlib import Path
 
 import numpy as np
@@ -129,7 +131,7 @@ def _check_altitude(ds):
 def test_open_mfdataset(test_file_path):
     file_path = str(test_file_path)
     var_list = ["NO2"]
-    ds = open_mfdataset(file_path, var_list=var_list)
+    ds = open_mfdataset(file_path, var_list=var_list, engine="netcdf4")
     _check_dimensions(ds)
     _check_latitude_and_longitude(ds)
     _check_time(ds)
@@ -140,7 +142,7 @@ def test_open_mfdataset(test_file_path):
 def test_open_mfdataset_surf_only_false(test_file_path):
     file_path = str(test_file_path)
     var_list = ["NO2"]
-    ds = open_mfdataset(file_path, var_list=var_list, surf_only=False)
+    ds = open_mfdataset(file_path, var_list=var_list, surf_only=False, engine="netcdf4")
     _check_dimensions(ds)
     _check_latitude_and_longitude(ds)
     _check_time(ds)
@@ -153,7 +155,7 @@ def test_open_mfdataset_surf_only_false(test_file_path):
 
 def test_hybrid_vars(test_file_path):
     file_path = str(test_file_path)
-    ds = xr.open_mfdataset(file_path)
+    ds = xr.open_mfdataset(file_path, engine="netcdf4")
     assert "hyam" in ds.variables, "hyam variable is missing. "
     assert tuple(ds["hyam"].dims) == ("lev",), "Dimensions for hyam are incorrect. "
     assert "hybm" in ds.variables, "hybm variable is missing. "
@@ -166,7 +168,7 @@ def test_hybrid_vars(test_file_path):
 
 def test_calc_pressure(test_file_path):
     file_path = str(test_file_path)
-    ds = xr.open_mfdataset(file_path)
+    ds = xr.open_mfdataset(file_path, engine="netcdf4")
     pressure = _calc_pressure(ds)
     assert tuple(pressure.dims) == (
         "time",
@@ -179,7 +181,7 @@ def test_calc_pressure(test_file_path):
 
 def test_calc_pressure_i(test_file_path):
     file_path = str(test_file_path)
-    ds = xr.open_mfdataset(file_path)
+    ds = xr.open_mfdataset(file_path, engine="netcdf4")
     pressure_i = _calc_pressure_i(ds)
     assert tuple(pressure_i.dims) == (
         "time",
