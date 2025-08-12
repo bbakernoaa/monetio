@@ -227,7 +227,7 @@ def test_interp_daily_with_pytspack():
     [
         pd.to_datetime(["2019-09-01", "2019-09-02"]),
         pd.to_datetime(["2019-09-01", "2019-09-03"]),
-        pd.to_datetime(["2019-09-01", "2019-09-01 12:00"]),
+        pd.to_datetime(["2019-09-01 00:00", "2019-09-01 12:00"]),
     ],
     ids=[
         "one day",

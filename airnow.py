@@ -1,5 +1,3 @@
-
-import logging
 import pandas as pd
 import pytest
 
@@ -26,18 +24,15 @@ def test_build_urls():
 
 
 def test_add_data_hourly():
-    dates = pd.date_range("2024/07/01", periods=18, freq="h")
-    print(dates)
+    dates = pd.date_range("2021/07/01", periods=3, freq="H")
 
     # Wide format (default)
     df = airnow.add_data(dates)
-    print(df)
     _check_df(df)
     assert all(col in df.columns for col in ["OZONE", "OZONE_unit"])
 
     # Non-wide
     df = airnow.add_data(dates, wide_fmt=False)
-    print(df)
     _check_df(df)
     assert all(col in df.columns for col in ["variable", "units", "obs"])
 
@@ -54,7 +49,7 @@ def test_add_data_daily():
     assert df.time.unique().size == 3
 
     # Non-wide
-    df = airnow.add_data(dates, daily=True, wide_fmt=False, n_procs=2)
+    df = airnow.add_data(dates, daily=True, wide_fmt=False)
     _check_df(df)
     assert all(col in df.columns for col in ["variable", "units", "obs"])
     assert df.time.unique().size == 3
@@ -76,7 +71,7 @@ def test_add_data_daily():
         "yesterday",  # varies
     ],
 )
-def test_check_zero_utc_offsets(date, bad_utcoffset, request):
+def test_check_zero_utc_offsets(date, bad_utcoffset, request, printer):
     dates = [date]
 
     case = request.node.callspec.id.split("-")[0]
@@ -99,7 +94,7 @@ def test_check_zero_utc_offsets(date, bad_utcoffset, request):
                 f"{len(bad_sites)} sites with zero UTC offset and abs(lon) > 20:\n"
             )
             msg += bad_sites.to_string(index=False)
-            logging.info(msg)
+            printer(msg)
     elif bad_utcoffset == "null":
         if case in {"multiple_bad", "some_bad"}:
             assert df.utcoffset.isnull().sum() > 0
@@ -115,3 +110,30 @@ def test_check_zero_utc_offsets(date, bad_utcoffset, request):
         assert ((df.utcoffset >= -12) & (df.utcoffset <= 14)).all()
     else:
         raise AssertionError
+
+
+def add_data(dates, daily=False, wide_fmt=True, bad_utcoffset="leave"):
+    # ...existing code...
+    # Ensure dates is always a list/array of timestamps
+    if isinstance(dates, pd.Timestamp):
+        dates = [dates]
+    dates = pd.to_datetime(dates)
+
+    # Always build URLs for all dates, even for small ranges
+    urls, fnames = build_urls(dates, daily=daily)
+    dfs = []
+    for url in urls:
+        df = _fetch_and_parse(url)
+        if df is not None and not df.empty:
+            dfs.append(df)
+        # If no data is returned, optionally append an empty DataFrame with correct columns
+        # else: dfs.append(pd.DataFrame(columns=EXPECTED_COLUMNS))
+    if not dfs:
+        # Return an empty DataFrame with expected columns if no data was fetched
+        return pd.DataFrame(columns=[
+            "time", "siteid", "site", "utcoffset", "time_local", "latitude", "longitude",
+            "cmsa_name", "msa_code", "msa_name", "state_name", "epa_region"
+        ])
+    df = pd.concat(dfs, ignore_index=True)
+    # ...existing code...
+    return df

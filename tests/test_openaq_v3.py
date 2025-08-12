@@ -80,6 +80,7 @@ def test_get_sensors():
         "daily",
     ],
 )
+
 def test_add_data_sensor_ids(product):
     df = openaq.get_sensors("2978434")
     sensor_ids = df["id"].tolist()
