@@ -37,5 +37,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: codespell-project/actions-codespell@v2
         with:
-          ignore_words: .codespell-exclude
+          ignore_words_file: .codespell-exclude
           skip: "./monetio/data/aqs_qualifiers.csv,./monetio/data/cemsinfo.csv,./monetio/data/stations.tsv"
