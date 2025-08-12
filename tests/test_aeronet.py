@@ -1,3 +1,13 @@
+import os
+
+import pytest
+
+# TODO: Skip on CI until we can fix this with NASA.  NASA seems to be blocking requests from CI IPs.
+# This is a temporary solution until we can resolve the issue with NASA.
+# If you are running this locally, you can remove the skip decorator.
+skip_on_ci = pytest.mark.skipif(os.environ.get("CI", "false").lower() == "true", reason="Skipped on CI")
+
+pytestmark = skip_on_ci
 from pathlib import Path
 
 import numpy as np
