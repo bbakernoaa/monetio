@@ -1,5 +1,5 @@
 [tool.flake8]
-max-line-length = 130
+max-line-length = 100
 ignore = [
     "E203",  # whitespace before ':' - doesn't work well with black
     "E402",  # module level import not at top of file
@@ -65,12 +65,12 @@ package-data = {"monetio" = ["data/*.csv", "data/*.tsv", "data/*.txt", "data/*.p
 
 
 [tool.black]
-line-length = 130
+line-length = 100
 
 [tool.isort]
 known_first_party = "monetio"
 profile = "black"
-line_length = 130
+line_length = 100
 
 [tool.pytest.ini_options]
 filterwarnings = [
