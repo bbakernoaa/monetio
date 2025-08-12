@@ -234,7 +234,9 @@ def get_locations(**kwargs):
     df["siteid"] = df.siteid.astype(str)
     maybe_dupe_rows = df[df.siteid.duplicated(keep=False)].sort_values("siteid")
     if not maybe_dupe_rows.empty:
-        logger.info(f"note: found {len(maybe_dupe_rows)} rows with duplicate site IDs:\n{maybe_dupe_rows}")
+        logger.info(
+            f"note: found {len(maybe_dupe_rows)} rows with duplicate site IDs:\n{maybe_dupe_rows}"
+        )
     df = df.drop_duplicates("siteid", keep="first").reset_index(drop=True)  # seem to be some dupes
 
     return df
@@ -266,7 +268,12 @@ def get_latlonbox_sites(latlonbox, **kwargs):
     lat1, lon1, lat2, lon2 = latlonbox
     sites = get_locations(**kwargs)
 
-    in_box = (sites.latitude >= lat1) & (sites.latitude <= lat2) & (sites.longitude >= lon1) & (sites.longitude <= lon2)
+    in_box = (
+        (sites.latitude >= lat1)
+        & (sites.latitude <= lat2)
+        & (sites.longitude >= lon1)
+        & (sites.longitude <= lon2)
+    )
     # TODO: need to account for case of box crossing antimeridian
 
     return sites[in_box].reset_index(drop=True)
@@ -356,7 +363,9 @@ def add_data(
     date_min, date_max = dates.min(), dates.max()
     if query_dt is not None:
         if query_dt <= pd.Timedelta(0):
-            raise ValueError(f"query_time_split must be positive, got {query_dt} from {query_time_split!r}")
+            raise ValueError(
+                f"query_time_split must be positive, got {query_dt} from {query_time_split!r}"
+            )
         if date_min == date_max:
             raise ValueError(
                 "must provide at least two unique datetimes to use query_time_split. "
@@ -366,7 +375,10 @@ def add_data(
     if search_radius is not None:
         for coords, radius in search_radius.items():
             if not 0 < radius <= 25_000:
-                raise ValueError(f"invalid radius {radius!r} for location {coords!r}. " "Must be positive and <= 25000 (25 km).")
+                raise ValueError(
+                    f"invalid radius {radius!r} for location {coords!r}. "
+                    "Must be positive and <= 25000 (25 km)."
+                )
 
     def iter_time_slices():
         # seems that (from < time <= to) == (from , to] is used
@@ -547,7 +559,9 @@ def add_data(
             unique = site_col.apply(len).eq(1)
             if not unique.all():
                 site_col_non_unique = site_col[~unique]
-                warnings.warn(f"non-unique {col!r} among site IDs:\n{site_col_non_unique}" "\nUsing first.")
+                warnings.warn(
+                    f"non-unique {col!r} among site IDs:\n{site_col_non_unique}" "\nUsing first."
+                )
                 df = df.drop(columns=[col]).merge(
                     site_col.str.get(0),
                     left_on="siteid",

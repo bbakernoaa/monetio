@@ -8,7 +8,9 @@ try:
 
     has_s3fs = True
 except ImportError:
-    print("Please install s3fs if retrieving from the Amazon S3 Servers.  Otherwise continue with local data")
+    print(
+        "Please install s3fs if retrieving from the Amazon S3 Servers.  Otherwise continue with local data"
+    )
     has_s3fs = False
 
 try:

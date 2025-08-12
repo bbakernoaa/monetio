@@ -229,7 +229,9 @@ def _calc_pressure(dset):
         dset["hybm"] = dset["hybm"].isel(time=0)
 
     for nlev in range(n_vert):
-        pressure[:, nlev, :, :] = dset["hyam"][nlev].values * p0 + dset["hybm"][nlev].values * dset["PS"][:, :, :].values
+        pressure[:, nlev, :, :] = (
+            dset["hyam"][nlev].values * p0 + dset["hybm"][nlev].values * dset["PS"][:, :, :].values
+        )
     P = xr.DataArray(
         data=pressure,
         dims=["time", "lev", "lat", "lon"],
@@ -281,7 +283,9 @@ def _calc_pressure_i(dset):
         dset["hybi"] = dset["hybi"].isel(time=0)
 
     for nlev in range(n_vert):
-        pressure_i[:, nlev, :, :] = dset["hyai"][nlev].values * p0 + dset["hybi"][nlev].values * dset["PS"][:, :, :].values
+        pressure_i[:, nlev, :, :] = (
+            dset["hyai"][nlev].values * p0 + dset["hybi"][nlev].values * dset["PS"][:, :, :].values
+        )
     P_int = xr.DataArray(
         data=pressure_i,
         dims=["time", "ilev", "lat", "lon"],
@@ -319,7 +323,9 @@ def _calc_hydrostatic_height(dset):
     # pressure levels should be increasing.
     _height_decreasing = np.all(vert[:-1] < vert[1:])
     if not _height_decreasing:
-        raise Exception("Expected default CESM behaviour:" + "pressure levels should be in decreasing order")
+        raise Exception(
+            "Expected default CESM behaviour:" + "pressure levels should be in decreasing order"
+        )
     height = np.zeros((n_time, n_vert, n_lat, n_lon))
     height[:, n_vert, :, :] = dset["PHIS"].values / GRAVITY
     for nlev in range(n_vert - 1, -1, -1):
@@ -364,7 +370,8 @@ def _calc_hydrostatic_height_i(dset):
     _height_decreasing = np.all(ilev[:-1] < ilev[1:])
     if not _height_decreasing:
         raise ValueError(
-            "Expected default CESM behaviour " "(pressure levels should be in increasing order, height in decreasing order)"
+            "Expected default CESM behaviour "
+            "(pressure levels should be in increasing order, height in decreasing order)"
         )
     # surface geopotential height (PHIS / g)
     height = np.zeros((len(time), len(ilev), len(lat), len(lon)))
@@ -375,7 +382,9 @@ def _calc_hydrostatic_height_i(dset):
         pressure_top = dset["pres_pa_int"].isel(ilev=nlev + 1)
         pressure = dset["pres_pa_int"].isel(ilev=nlev)
 
-        height[:, nlev, :, :] = height[:, nlev + 1, :, :] - (R * temp / (GRAVITY * M_AIR)) * np.log(pressure / pressure_top)
+        height[:, nlev, :, :] = height[:, nlev + 1, :, :] - (R * temp / (GRAVITY * M_AIR)) * np.log(
+            pressure / pressure_top
+        )
 
     z = xr.DataArray(
         data=height,

@@ -117,7 +117,9 @@ def _cache_site_days():
 
     ext = ".csv.gz"
     assert df["filename"].str.endswith(ext).all()
-    df[["siteid", "date"]] = df["filename"].str.slice(None, -len(ext)).str.rsplit("-", expand=True)[[1, 2]]
+    df[["siteid", "date"]] = (
+        df["filename"].str.slice(None, -len(ext)).str.rsplit("-", expand=True)[[1, 2]]
+    )
 
     df[["siteid", "date"]].to_csv(
         HERE / "openaq-data-archive_site-days.csv.gz",
@@ -317,7 +319,8 @@ def get_locations(*, provider=None, country=None):
 
     if country is None and provider is None:
         warnings.warn(
-            "get_all_locations() is a faster way to get all locations, " "though the result is different",
+            "get_all_locations() is a faster way to get all locations, "
+            "though the result is different",
             stacklevel=2,
         )
 
@@ -338,7 +341,10 @@ def get_locations(*, provider=None, country=None):
             countries = country
 
         for cntry in countries:
-            glb = "openaq-data-archive/records/csv.gz/" f"provider={prvdr.lower()}/country={cntry.lower()}/"
+            glb = (
+                "openaq-data-archive/records/csv.gz/"
+                f"provider={prvdr.lower()}/country={cntry.lower()}/"
+            )
             prvdr_cntry_paths = fs.find(
                 glb,
                 withdirs=True,

@@ -171,7 +171,9 @@ def open_mfdataset(
 
         # Add the processed pm2.5 species.
         dset_pm25 = xr.open_mfdataset(fname_pm25, concat_dim="time", combine="nested", **kwargs)
-        dset_pm25 = dset_pm25.drop(labels=["lat", "lon", "pfull"])  # Drop duplicate variables so can merge.
+        dset_pm25 = dset_pm25.drop(
+            labels=["lat", "lon", "pfull"]
+        )  # Drop duplicate variables so can merge.
         # Slight differences in pfull value between the files, but I assume that these still represent the
         # same pressure levels from the model dynf* files.
         # Attributes are formatted differently in pm25 file so remove attributes and use those from dynf* files.
@@ -212,7 +214,9 @@ def open_mfdataset(
         dset["alt_msl_m_full"] = _calc_hgt(dset)
 
     # Set coordinates
-    dset = dset.reset_index(["x", "y", "z", "z_i"], drop=True)  # For now drop z_i no variables use it.
+    dset = dset.reset_index(
+        ["x", "y", "z", "z_i"], drop=True
+    )  # For now drop z_i no variables use it.
     dset["latitude"] = dset["latitude"].isel(time=0)
     dset["longitude"] = dset["longitude"].isel(time=0)
     dset = dset.reset_coords()
@@ -315,7 +319,9 @@ def add_lazy_pm25(d, dict_sum):
 
     """
     keys = _get_keys(d)
-    allvars = Series(concatenate([dict_sum["aitken"], dict_sum["accumulation"], dict_sum["coarse"]]))
+    allvars = Series(
+        concatenate([dict_sum["aitken"], dict_sum["accumulation"], dict_sum["coarse"]])
+    )
     weights = Series(
         concatenate(
             [
@@ -355,7 +361,9 @@ def add_lazy_pm10(d, dict_sum):
 
     """
     keys = _get_keys(d)
-    allvars = Series(concatenate([dict_sum["aitken"], dict_sum["accumulation"], dict_sum["coarse"]]))
+    allvars = Series(
+        concatenate([dict_sum["aitken"], dict_sum["accumulation"], dict_sum["coarse"]])
+    )
     index = allvars.isin(keys)
     if can_do(index):
         newkeys = allvars.loc[index]
@@ -416,7 +424,9 @@ def add_lazy_noy_a(d, dict_sum):
     if can_do(index):
         newkeys = allvars.loc[index]
         d["noy_aer"] = add_multiple_lazy2(d, newkeys)
-        d["noy_aer"] = d["noy_aer"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "noy_aer", "long_name": "NOy aerosol"})
+        d["noy_aer"] = d["noy_aer"].assign_attrs(
+            {"units": r"$\mu g m^{-3}$", "name": "noy_aer", "long_name": "NOy aerosol"}
+        )
     return d
 
 
@@ -688,7 +698,9 @@ def add_lazy_om_pm25(d, dict_sum):
     if can_do(index):
         newkeys = allvars.loc[index]
         d["pm25_om"] = add_multiple_lazy2(d, newkeys)
-        d["pm25_om"] = d["pm25_om"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "pm25_om", "long_name": "PM2.5 OM"})
+        d["pm25_om"] = d["pm25_om"].assign_attrs(
+            {"units": r"$\mu g m^{-3}$", "name": "pm25_om", "long_name": "PM2.5 OM"}
+        )
     return d
 
 
@@ -949,7 +961,9 @@ def dict_species_sums(mech):
                 ]
             }
         )
-        sum_dict.update({"coarse": ["asoil", "acors", "aseacat", "aclk", "aso4k", "ano3k", "anh4k"]})
+        sum_dict.update(
+            {"coarse": ["asoil", "acors", "aseacat", "aclk", "aso4k", "ano3k", "anh4k"]}
+        )
         sum_dict.update(
             {
                 "noy_gas": [
@@ -972,7 +986,9 @@ def dict_species_sums(mech):
             }
         )
         sum_dict.update({"noy_gas_weight": [1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]})
-        sum_dict.update({"noy_aer": ["ano3i", "ano3j", "ano3k"]})  # Need to confirm here if there is a size cutoff for noy obs?
+        sum_dict.update(
+            {"noy_aer": ["ano3i", "ano3j", "ano3k"]}
+        )  # Need to confirm here if there is a size cutoff for noy obs?
         sum_dict.update({"nox": ["no", "no2"]})
         sum_dict.update({"pm25_cl": ["acli", "aclj", "aclk"]})
         sum_dict.update({"pm25_cl_weight": [1, 1, 0.2]})

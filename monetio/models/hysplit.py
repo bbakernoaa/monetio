@@ -542,7 +542,9 @@ class ModelBin:
             print("Grid specs", self.gridhash)
         # read record 4 which gives information about vertical levels.
         hdata4a = np.fromfile(fid, dtype=rec4a, count=1)
-        hdata4b = np.fromfile(fid, dtype=rec4b, count=hdata4a["nlev"][0])  # reads levels, count is number of levels.
+        hdata4b = np.fromfile(
+            fid, dtype=rec4b, count=hdata4a["nlev"][0]
+        )  # reads levels, count is number of levels.
         self.parse_hdata4(hdata4a, hdata4b)
 
         # read record 5 which gives information about pollutants / species.
@@ -592,7 +594,9 @@ class ModelBin:
                         # non zero conc
                         self.nonzeroconcdates.append(pdate1)
                     else:
-                        tempzeroconcdates.append(pdate1)  # or add sample start time to list of start times
+                        tempzeroconcdates.append(
+                            pdate1
+                        )  # or add sample start time to list of start times
                         # with zero conc.
                     # This is just padding.
                     np.fromfile(fid, dtype=rec8c, count=1)

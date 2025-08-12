@@ -48,7 +48,9 @@ def test_add_data_daily():
     # Wide format (default)
     df = airnow.add_data(dates, daily=True)
     _check_df(df)
-    assert all(col in df.columns for col in ["OZONE-1HR", "OZONE-8HR", "OZONE-1HR_unit", "OZONE-8HR_unit"])
+    assert all(
+        col in df.columns for col in ["OZONE-1HR", "OZONE-8HR", "OZONE-1HR_unit", "OZONE-8HR_unit"]
+    )
     assert df.time.unique().size == 3
 
     # Non-wide
@@ -92,7 +94,10 @@ def test_check_zero_utc_offsets(date, bad_utcoffset, request):
         elif case == "zero_bad":
             assert bad_sites.empty
         if case != "zero_bad":
-            msg = f"For {date.strftime(r'%Y-%m-%d')}, found " f"{len(bad_sites)} sites with zero UTC offset and abs(lon) > 20:\n"
+            msg = (
+                f"For {date.strftime(r'%Y-%m-%d')}, found "
+                f"{len(bad_sites)} sites with zero UTC offset and abs(lon) > 20:\n"
+            )
             msg += bad_sites.to_string(index=False)
             logging.info(msg)
     elif bad_utcoffset == "null":

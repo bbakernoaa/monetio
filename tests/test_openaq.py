@@ -114,4 +114,6 @@ def test_parameter_coverage():
         "co2",
     ]
     assert len(params) == 13
-    assert sorted(openaq.OPENAQ.NON_MOLEC_PARAMS + list(openaq.OPENAQ.PPM_TO_UGM3)) == sorted(params)
+    assert sorted(openaq.OPENAQ.NON_MOLEC_PARAMS + list(openaq.OPENAQ.PPM_TO_UGM3)) == sorted(
+        params
+    )

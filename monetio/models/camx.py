@@ -253,7 +253,9 @@ def add_lazy_pm10(d):
         if can_do(index):
             newkeys = allvars.loc[index]
             d["PM10"] = add_multiple_lazy(d, newkeys)
-            d["PM10"] = d["PM10"].assign_attrs({"name": "PM10", "long_name": "Particulate Matter < 10 microns"})
+            d["PM10"] = d["PM10"].assign_attrs(
+                {"name": "PM10", "long_name": "Particulate Matter < 10 microns"}
+            )
     return d
 
 
@@ -264,7 +266,9 @@ def add_lazy_pm_course(d):
     if can_do(index):
         newkeys = allvars.loc[index]
         d["PM_COURSE"] = add_multiple_lazy(d, newkeys)
-        d["PM_COURSE"] = d["PM_COURSE"].assign_attrs({"name": "PM_COURSE", "long_name": "Course Mode Particulate Matter"})
+        d["PM_COURSE"] = d["PM_COURSE"].assign_attrs(
+            {"name": "PM_COURSE", "long_name": "Course Mode Particulate Matter"}
+        )
     return d
 
 

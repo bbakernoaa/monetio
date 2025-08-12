@@ -12,7 +12,11 @@ from monetio.obs.openaq_aws import (
 
 
 def test_read():
-    url = "s3://openaq-data-archive/records/csv.gz/" "locationid=2178/year=2022/month=05/" "location-2178-20220503.csv.gz"
+    url = (
+        "s3://openaq-data-archive/records/csv.gz/"
+        "locationid=2178/year=2022/month=05/"
+        "location-2178-20220503.csv.gz"
+    )
     df = read(url)
     assert len(df) > 0
 

@@ -25,7 +25,9 @@ def open_dataset(fname, *, convert_to_ppb=True, surf_only=False):
     """
     names, netcdf = _ensure_mfdataset_filenames(fname)
     if not netcdf:
-        raise ValueError("File format not supported. Note that files should be preprocessed to netCDF.")
+        raise ValueError(
+            "File format not supported. Note that files should be preprocessed to netCDF."
+        )
 
     ds = xr.open_dataset(names[0], drop_variables=["theta"])
     ds = _fix(ds, surf_only=surf_only, convert_to_ppb=convert_to_ppb)
@@ -54,7 +56,9 @@ def open_mfdataset(fname, *, convert_to_ppb=True, var_list=None, surf_only=False
     names, netcdf = _ensure_mfdataset_filenames(fname)
     if not netcdf:
         raise ValueError(
-            "File format not supported. Note that files should be " "in netCDF format." "Do not mix and match file types."
+            "File format not supported. Note that files should be "
+            "in netCDF format."
+            "Do not mix and match file types."
         )
     ds = xr.open_mfdataset(names, concat_dim="time", drop_variables=["theta"], combine="nested")
     if var_list is not None:

@@ -7,7 +7,10 @@ import requests
 
 import monetio.obs.openaq_v2 as openaq
 
-if os.environ.get("CI", "false").lower() not in {"false", "0"} and os.environ.get("OPENAQ_API_KEY", "") == "":
+if (
+    os.environ.get("CI", "false").lower() not in {"false", "0"}
+    and os.environ.get("OPENAQ_API_KEY", "") == ""
+):
     # PRs from forks don't get the secret
     pytest.skip("no API key", allow_module_level=True)
 

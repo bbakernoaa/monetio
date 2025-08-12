@@ -54,7 +54,13 @@ def add_local(
 
     # TODO: DRY wrt. class?
     if freq is not None:
-        a.df = a.df.set_index("time").groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
+        a.df = (
+            a.df.set_index("time")
+            .groupby("siteid")
+            .resample(freq)
+            .mean(numeric_only=True)
+            .reset_index()
+        )
 
     if detect_dust:
         a.dust_detect()
@@ -171,7 +177,9 @@ def add_data(
         return df.reset_index(drop=True)
     else:
         if not has_dask and requested_parallel:
-            print("Please install dask to use the parallel feature of monetio.aeronet. Proceeding in serial mode...")
+            print(
+                "Please install dask to use the parallel feature of monetio.aeronet. Proceeding in serial mode..."
+            )
         df = a.add_data(
             dates=dates,
             **kwargs,
@@ -309,7 +317,10 @@ class AERONET:
         em = d2.strftime(r"%m")
         ed = d2.strftime(r"%d")
         eh = d2.strftime(r"%H")
-        dates_ = f"year={sy}&month={sm}&day={sd}&hour={sh}" f"&year2={ey}&month2={em}&day2={ed}&hour2={eh}"
+        dates_ = (
+            f"year={sy}&month={sm}&day={sd}&hour={sh}"
+            f"&year2={ey}&month2={em}&day2={ed}&hour2={eh}"
+        )
 
         assert self.prod is not None, "required parameter"
 
@@ -485,10 +496,19 @@ class AERONET:
         try:
             self.read_aeronet()
         except Exception as e:
-            raise Exception(f"loading from URL {self.url!r} failed. " "If using `siteid`, check that the site is valid.") from e
+            raise Exception(
+                f"loading from URL {self.url!r} failed. "
+                "If using `siteid`, check that the site is valid."
+            ) from e
 
         if freq is not None:
-            self.df = self.df.set_index("time").groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
+            self.df = (
+                self.df.set_index("time")
+                .groupby("siteid")
+                .resample(freq)
+                .mean(numeric_only=True)
+                .reset_index()
+            )
 
         if detect_dust:
             self.dust_detect()
@@ -504,7 +524,9 @@ class AERONET:
 
         aod550 = aod500 * (550/500) ^ -alpha
         """
-        self.df["aod_550nm"] = self.df.aod_500nm * (550.0 / 500.0) ** (-self.df["440-870_angstrom_exponent"])
+        self.df["aod_550nm"] = self.df.aod_500nm * (550.0 / 500.0) ** (
+            -self.df["440-870_angstrom_exponent"]
+        )
 
     def calc_new_aod_values(self):
         def _tspack_aod_interp(row, new_wv=[440.0, 470.0, 550.0, 670.0, 870.0, 1020.0, 1240.0]):
@@ -514,7 +536,8 @@ class AERONET:
                 import pytspack
             except ImportError as e:
                 raise RuntimeError(
-                    "You must install pytspack before using this function.\n" "See https://github.com/noaa-oar-arl/pytspack/"
+                    "You must install pytspack before using this function.\n"
+                    "See https://github.com/noaa-oar-arl/pytspack/"
                 ) from e
 
             new_wv = np.asarray(new_wv)
@@ -522,7 +545,10 @@ class AERONET:
             # df_aod_nu = self._aeronet_aod_and_nu(row)
             aod_columns = [aod_column for aod_column in row.index if aod_column.startswith("aod_")]
             aods = row[aod_columns]
-            wv = [float(aod_column.replace("aod_", "").replace("nm", "")) for aod_column in aod_columns]
+            wv = [
+                float(aod_column.replace("aod_", "").replace("nm", ""))
+                for aod_column in aod_columns
+            ]
             # TODO: the non-daily product has `exact_wavelengths_of_aod(um)_<wavelength>nm` that could be used
             a = pd.DataFrame({"aod": aods}).reset_index()
             a["wv"] = wv
@@ -531,11 +557,15 @@ class AERONET:
             if len(df_aod_nu_sorted) < 2:
                 return new_wv * np.nan
             else:
-                x, y, yp, sigma = pytspack.tspsi(df_aod_nu_sorted.wv.values, df_aod_nu_sorted.aod.values)
+                x, y, yp, sigma = pytspack.tspsi(
+                    df_aod_nu_sorted.wv.values, df_aod_nu_sorted.aod.values
+                )
                 yi = pytspack.hval(self.new_aod_values, x, y, yp, sigma)
                 return yi
 
-        out = self.df.apply(_tspack_aod_interp, axis=1, result_type="expand", new_wv=self.new_aod_values)
+        out = self.df.apply(
+            _tspack_aod_interp, axis=1, result_type="expand", new_wv=self.new_aod_values
+        )
         names = "aod_" + pd.Series(self.new_aod_values.astype(int).astype(str)) + "nm"
         out.columns = names.values
         dup_names = list(set(self.df) & set(out))
@@ -577,7 +607,9 @@ class AERONET:
 
         and adds a Boolean `'dust'` column to :attr:`df`.
         """
-        self.df["dust"] = (self.df["aod_1020nm"] > 0.3) & (self.df["440-870_angstrom_exponent"] < 0.6)
+        self.df["dust"] = (self.df["aod_1020nm"] > 0.3) & (
+            self.df["440-870_angstrom_exponent"] < 0.6
+        )
 
     def set_daterange(self, begin="", end=""):
         dates = pd.date_range(start=begin, end=end, freq="H").values.astype("M8[s]").astype("O")

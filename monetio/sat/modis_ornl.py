@@ -299,7 +299,9 @@ def modisClient(
 
         # print >> sys.stderr, requestStart, requestEnd
 
-        data = client.service.getsubset(lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight)
+        data = client.service.getsubset(
+            lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight
+        )
 
         # print(data)
         # now fill up the data structure with the returned data...
@@ -393,7 +395,9 @@ def _get_single_retrieval(
             kmLeftRight=kmLeftRight,
         )
     if quality_control is not None:
-        modisGetQA(m, quality_control, client=client, kmAboveBelow=kmAboveBelow, kmLeftRight=kmLeftRight)
+        modisGetQA(
+            m, quality_control, client=client, kmAboveBelow=kmAboveBelow, kmLeftRight=kmLeftRight
+        )
 
     m.applyScale()
     return m

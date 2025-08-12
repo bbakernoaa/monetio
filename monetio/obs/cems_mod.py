@@ -221,7 +221,9 @@ class CEMS:
                 print("NO UNIT ID")
             # returns data frame where rows are date and columns are the values
             # of cmatch for orispl
-            pivot = pd.pivot_table(temp, values=varname, index=["time"], columns=["orispl_code"], aggfunc=np.sum)
+            pivot = pd.pivot_table(
+                temp, values=varname, index=["time"], columns=["orispl_code"], aggfunc=np.sum
+            )
         return pivot
 
     def get_var(self, varname, orisp=None, daterange=None, unitid=-99, verbose=True):
@@ -360,9 +362,17 @@ class CEMS:
                 rcolumn = self.rename(ccc, "orispl_code", rcolumn, verbose)
             elif "facility" in ccc.lower() and "id" in ccc.lower():
                 rcolumn = self.rename(ccc, "fac_id", rcolumn, verbose)
-            elif "so2" in ccc.lower() and ("lbs" in ccc.lower() or "pounds" in ccc.lower()) and ("rate" not in ccc.lower()):
+            elif (
+                "so2" in ccc.lower()
+                and ("lbs" in ccc.lower() or "pounds" in ccc.lower())
+                and ("rate" not in ccc.lower())
+            ):
                 rcolumn = self.rename(ccc, "so2_lbs", rcolumn, verbose)
-            elif "nox" in ccc.lower() and ("lbs" in ccc.lower() or "pounds" in ccc.lower()) and ("rate" not in ccc.lower()):
+            elif (
+                "nox" in ccc.lower()
+                and ("lbs" in ccc.lower() or "pounds" in ccc.lower())
+                and ("rate" not in ccc.lower())
+            ):
                 rcolumn = self.rename(ccc, "nox_lbs", rcolumn, verbose)
             elif "co2" in ccc.lower() and ("short" in ccc.lower() and "tons" in ccc.lower()):
                 rcolumn = self.rename(ccc, "co2_short_tons", rcolumn, verbose)
@@ -432,7 +442,9 @@ class CEMS:
                 dftemp.drop(["latitude", "longitude"], axis=1, inplace=True)
             except Exception:
                 pass
-            dfnew = pd.merge(dftemp, sinfo, how="left", left_on=["orispl_code"], right_on=["orispl_code"])
+            dfnew = pd.merge(
+                dftemp, sinfo, how="left", left_on=["orispl_code"], right_on=["orispl_code"]
+            )
             # print('---------z-----------')
             # print(dfnew.columns.values)
             # remove stations which do not have a time offset.
@@ -447,7 +459,9 @@ class CEMS:
             elif method == 2:
                 # this runs ok but fails pytest
                 def utc(x):
-                    return pd.Timestamp(x["time local"]) + datetime.timedelta(hours=x["time_offset"])
+                    return pd.Timestamp(x["time local"]) + datetime.timedelta(
+                        hours=x["time_offset"]
+                    )
 
                 dfnew["time"] = dfnew.apply(utc, axis=1)
             elif method == 3:
@@ -455,7 +469,9 @@ class CEMS:
                 def utc(x, y):
                     return x + datetime.timedelta(hours=y)
 
-                dfnew["time"] = dfnew.apply(lambda row: utc(row["time local"], row["time_offset"]), axis=1)
+                dfnew["time"] = dfnew.apply(
+                    lambda row: utc(row["time local"], row["time_offset"]), axis=1
+                )
             # remove the time_offset column.
             dfnew.drop(["time_offset"], axis=1, inplace=True)
             mlist = dftemp.columns.values.tolist()
@@ -487,7 +503,9 @@ class CEMS:
 
         # create column with datetime information
         # from column with month-day-year and column with hour.
-        dftime = dftemp.apply(lambda x: pd.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt), axis=1)
+        dftime = dftemp.apply(
+            lambda x: pd.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt), axis=1
+        )
         dftemp = pd.concat([dftime, dftemp], axis=1)
         dftemp.rename(columns={0: "time local"}, inplace=True)
         dftemp.drop(["date", "hour"], axis=1, inplace=True)

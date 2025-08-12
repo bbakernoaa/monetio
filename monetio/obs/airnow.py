@@ -267,7 +267,11 @@ def add_data(dates, *, download=False, wide_fmt=True, n_procs=1, daily=False, ba
     )
     print(df)
     if wide_fmt:
-        df = long_to_wide(df).drop_duplicates(subset=["time", "latitude", "longitude", "siteid"]).reset_index(drop=True)
+        df = (
+            long_to_wide(df)
+            .drop_duplicates(subset=["time", "latitude", "longitude", "siteid"])
+            .reset_index(drop=True)
+        )
         # TODO: shouldn't be any such dups (test)
 
     return df
@@ -333,7 +337,9 @@ def get_utcoffset(lat, lon):
         import pytz
         import timezonefinder
     except ImportError:
-        warnings.warn("timezonefinder and/or pytz not installed, guessing UTC offset based on longitude")
+        warnings.warn(
+            "timezonefinder and/or pytz not installed, guessing UTC offset based on longitude"
+        )
         do_guess = True
     else:
         do_guess = False

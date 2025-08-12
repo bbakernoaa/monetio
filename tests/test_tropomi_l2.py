@@ -22,7 +22,8 @@ def retrieve_test_file():
         import requests
 
         r = requests.get(
-            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/" f"example_observation_data/satellite/{fn}",
+            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
+            f"example_observation_data/satellite/{fn}",
             stream=True,
         )
         r.raise_for_status()

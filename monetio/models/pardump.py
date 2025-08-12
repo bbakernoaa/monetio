@@ -220,7 +220,9 @@ class Pardump:
                     par_frame = pd.DataFrame.from_records(ndata)  # create data frame
                     # drop the fields which were padding
                     par_frame.drop(["p1", "p2", "p3", "p4"], inplace=True, axis=1)
-                    par_frame.drop(["su", "sv", "sx", "mgrid"], inplace=True, axis=1)  # drop other fields
+                    par_frame.drop(
+                        ["su", "sv", "sx", "mgrid"], inplace=True, axis=1
+                    )  # drop other fields
                     # drop where the lat field is 0. because
                     par_frame = par_frame.loc[par_frame["lat"] != 0]
                     # in pardump file particles which have not been

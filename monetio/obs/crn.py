@@ -120,7 +120,9 @@ from numpy import array
 
 def add_data(dates, param=None, daily=False, sub_hourly=False, download=False, latlonbox=None):
     a = CRN()
-    df = a.add_data(dates, daily=daily, sub_hourly=sub_hourly, download=download, latlonbox=latlonbox)
+    df = a.add_data(
+        dates, daily=daily, sub_hourly=sub_hourly, download=download, latlonbox=latlonbox
+    )
     return df
 
 
@@ -131,10 +133,14 @@ class CRN:
         self.ftp = None
         self.df = pd.DataFrame()
         self.se_states = array(["AL", "FL", "GA", "MS", "NC", "SC", "TN", "VA", "WV"], dtype="|S14")
-        self.ne_states = array(["CT", "DE", "DC", "ME", "MD", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"], dtype="|S20")
+        self.ne_states = array(
+            ["CT", "DE", "DC", "ME", "MD", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"], dtype="|S20"
+        )
         self.nc_states = array(["IL", "IN", "IA", "KY", "MI", "MN", "MO", "OH", "WI"], dtype="|S9")
         self.sc_states = array(["AR", "LA", "OK", "TX"], dtype="|S9")
-        self.r_states = array(["AZ", "CO", "ID", "KS", "MT", "NE", "NV", "NM", "ND", "SD", "UT", "WY"], dtype="|S12")
+        self.r_states = array(
+            ["AZ", "CO", "ID", "KS", "MT", "NE", "NV", "NM", "ND", "SD", "UT", "WY"], dtype="|S12"
+        )
         self.p_states = array(["CA", "OR", "WA"], dtype="|S10")
         self.objtype = "CRN"
         self.monitor_file = inspect.getfile(self.__class__)[:-18] + "data/stations.tsv"
@@ -236,9 +242,7 @@ class CRN:
             "WIND",
             "WIND_FLAG",
         ]
-        self.citiation = (
-            "Diamond, H. J., T. R. Karl, M. A. Palecki, C. B. Baker, J. E. Bell, R. D. Leeper, D. R. Easterling, J. H. "
-        )
+        self.citiation = "Diamond, H. J., T. R. Karl, M. A. Palecki, C. B. Baker, J. E. Bell, R. D. Leeper, D. R. Easterling, J. H. "
         " Lawrimore, T. P. Meyers, M. R. Helfert, G. Goodge, and P. W. Thorne,"
         " 2013: U.S. Climate Reference Network after one decade of operations:"
         " status and assessment. Bull. Amer. Meteor. Soc., 94, 489-498. "
@@ -356,7 +360,9 @@ class CRN:
                 state = monitors.iloc[i].STATE
                 site = monitors.iloc[i].LOCATION.replace(" ", "_")
                 vector = monitors.iloc[i].VECTOR.replace(" ", "_")
-                url, fname = self.build_url(y, state, site, vector, daily=daily, sub_hourly=sub_hourly)
+                url, fname = self.build_url(
+                    y, state, site, vector, daily=daily, sub_hourly=sub_hourly
+                )
                 if self.check_url(url):
                     urls.append(url)
                     fnames.append(fname)
