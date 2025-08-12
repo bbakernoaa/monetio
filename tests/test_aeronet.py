@@ -8,6 +8,7 @@ import pytest
 skip_on_ci = pytest.mark.skipif(os.environ.get("CI", "false").lower() == "true", reason="Skipped on CI")
 
 pytestmark = skip_on_ci
+
 from pathlib import Path
 
 import numpy as np
