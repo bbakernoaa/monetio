@@ -95,7 +95,7 @@ def test_check_zero_utc_offsets(date, bad_utcoffset, request, printer):
                 f"{len(bad_sites)} sites with zero UTC offset and abs(lon) > 20:\n"
             )
             msg += bad_sites.to_string(index=False)
-            logging.info(msg)
+            printer(msg)
     elif bad_utcoffset == "null":
         if case in {"multiple_bad", "some_bad"}:
             assert df.utcoffset.isnull().sum() > 0
