@@ -1,5 +1,3 @@
-import logging
-
 import pandas as pd
 import pytest
 
@@ -31,13 +29,11 @@ def test_add_data_hourly():
 
     # Wide format (default)
     df = airnow.add_data(dates)
-    print(df)
     _check_df(df)
     assert all(col in df.columns for col in ["OZONE", "OZONE_unit"])
 
     # Non-wide
     df = airnow.add_data(dates, wide_fmt=False)
-    print(df)
     _check_df(df)
     assert all(col in df.columns for col in ["variable", "units", "obs"])
 
@@ -76,7 +72,7 @@ def test_add_data_daily():
         "yesterday",  # varies
     ],
 )
-def test_check_zero_utc_offsets(date, bad_utcoffset, request):
+def test_check_zero_utc_offsets(date, bad_utcoffset, request, printer):
     dates = [date]
 
     case = request.node.callspec.id.split("-")[0]
@@ -99,7 +95,7 @@ def test_check_zero_utc_offsets(date, bad_utcoffset, request):
                 f"{len(bad_sites)} sites with zero UTC offset and abs(lon) > 20:\n"
             )
             msg += bad_sites.to_string(index=False)
-            logging.info(msg)
+            printer(msg)
     elif bad_utcoffset == "null":
         if case in {"multiple_bad", "some_bad"}:
             assert df.utcoffset.isnull().sum() > 0
