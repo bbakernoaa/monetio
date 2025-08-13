@@ -29,7 +29,6 @@ def test_add_data_hourly():
 
     # Wide format (default)
     df = airnow.add_data(dates)
-    print(df)
     _check_df(df)
     assert all(col in df.columns for col in ["OZONE", "OZONE_unit"])
 
