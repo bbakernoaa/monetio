@@ -39,7 +39,7 @@ def retrieve_test_file():
 
 
 @pytest.fixture(scope="module")
-def test_file_path(tmp_path_factory, worker_id=None):
+def test_file_path(tmp_path_factory, worker_id):
     if worker_id == "master":
         # Not executing with multiple workers;
         # let pytest's fixture caching do its job
