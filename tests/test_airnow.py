@@ -72,7 +72,7 @@ def test_add_data_daily():
         "yesterday",  # varies
     ],
 )
-def test_check_zero_utc_offsets(date, bad_utcoffset, request):
+def test_check_zero_utc_offsets(date, bad_utcoffset, request, printer):
     dates = [date]
 
     case = request.node.callspec.id.split("-")[0]
