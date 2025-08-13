@@ -34,7 +34,6 @@ def test_add_data_hourly():
 
     # Non-wide
     df = airnow.add_data(dates, wide_fmt=False)
-    print(df)
     _check_df(df)
     assert all(col in df.columns for col in ["variable", "units", "obs"])
 
