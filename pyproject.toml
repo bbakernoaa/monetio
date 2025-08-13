@@ -48,6 +48,7 @@ version = {attr = "monetio.__version__"}
 dev = [
     "pytest",
     "pytest-cov",
+    "pytest-print",
     "pytest-xdist",
     "filelock",
     "black",
