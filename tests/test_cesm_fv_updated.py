@@ -46,7 +46,7 @@ def test_file_path(tmp_path_factory, worker_id):
     root_tmp_dir = tmp_path_factory.getbasetemp().parent
 
     # Copy to the shared test location
-    p_test = root_tmp_dir / "cesm_fv_test.nc"
+    p_test = root_tmp_dir / "cesm_fv_test2.nc"
     with FileLock(p_test.as_posix() + ".lock"):
         if p_test.is_file():
             return p_test
