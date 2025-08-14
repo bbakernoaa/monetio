@@ -10,8 +10,6 @@ from monetio.models._cesm_fv_mm import open_mfdataset
 
 HERE = Path(__file__).parent
 
-cesm_orig_xdist = pytest.mark.xdist_group(name="cesm_orig_xdist")
-
 
 def retrieve_test_file():
     fn = "CAM_chem_merra2_FCSD_1deg_QFED_world_201909-01-09_small_sfc.nc"
@@ -69,7 +67,6 @@ def _test_ds(ds):
     assert ds["O3"].attrs["units"] == "ppbv"
 
 
-@cesm_orig_xdist
 def test_open_mfdataset(test_file_path):
     file_path = str(test_file_path)
     ds = open_mfdataset(file_path, engine="netcdf4")
