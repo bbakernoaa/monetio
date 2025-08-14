@@ -16,25 +16,22 @@ cesm_xdist = pytest.mark.xdist_group(name="retrieve-files")
 
 def retrieve_test_file():
     fn = "f.e22.FCnudged.f09_f09_mg17.cst_emis.cam.h1.2018-12-25-43200.nc"
+
+    # Download to tests/data if not already present
     p = HERE / "data" / fn
     if not p.is_file():
-        try:
-            warnings.warn(f"Downloading test file {fn} for CESM-FV test")
-            import requests
+        warnings.warn(f"Downloading test file {fn} for CESM-FV test")
+        import requests
 
-            r = requests.get(
-                "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
-                + f"example_model_data/cesmfv_example/{fn}",
-                stream=True,
-            )
-            r.raise_for_status()
-            with open(p, "wb") as f:
-                f.write(r.content)
-        except Exception as e:
-            pytest.skip(f"Could not download test file {fn}: {e}")
-    # Check file exists and is not empty
-    if not p.is_file() or p.stat().st_size == 0:
-        pytest.skip(f"Test file {fn} is missing or empty.")
+        r = requests.get(
+            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
+            + f"example_model_data/cesmfv_example/{fn}",
+            stream=True,
+        )
+        r.raise_for_status()
+        with open(p, "wb") as f:
+            f.write(r.content)
+
     return p
 
 
