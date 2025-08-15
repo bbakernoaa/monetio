@@ -9,7 +9,6 @@ import logging
 import os
 import sys
 import warnings
-from collections import OrderedDict
 from glob import glob
 from pathlib import Path
 
@@ -76,6 +75,8 @@ def _open_one_dataset(fname, variable_dict):
             "vertical_column_troposphere",
             "vertical_column_stratosphere",
             "vertical_column_troposphere_uncertainty",
+            "vertical_column",
+            "vertical_column_uncertainty",
         ]:
             values_var = dso.groups["product"][varname]
         elif varname in [
@@ -102,13 +103,15 @@ def _open_one_dataset(fname, variable_dict):
             "gas_profile",
             "albedo",
             "temperature_profile",
+            "amf",
             "amf_total",
-            "amf_diagnositc_flag",
+            "amf_diagnostic_flag",
             "eff_cloud_fraction",
             "amf_cloud_fraction",
             "amf_cloud_pressure",
             "amf_troposphere",
             "amf_stratosphere",
+            "background_correction",
         ]:
             values_var = dso.groups["support_data"][varname]
         elif varname in ["fit_rms_residual", "fit_convergence_flag"]:
@@ -237,7 +240,7 @@ def open_dataset(fnames, variable_dict, debug=False):
     print(fnames)
     files = sorted(glob(fnames))
 
-    granules = OrderedDict()
+    granules = {}
 
     for file in files:
         granule = _open_one_dataset(file, variable_dict)
