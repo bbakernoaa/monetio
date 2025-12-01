@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from .base import GriddedReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("hysplit")
 class HYSPLITReader(GriddedReader):
@@ -19,16 +20,6 @@ class HYSPLITReader(GriddedReader):
         """
         Reads HYSPLIT binary concentration (cdump) files.
         """
-        # HYSPLIT reader handles single file logic inside ModelBin.
-        # If multiple files are passed, we might need to iterate.
-        # But 'combine_dataset' existed for that.
-
-        # We can assume 'files' is a list of files or a glob pattern.
-        # If it's a single file (str or list of length 1), use open_dataset logic.
-        # If multiple, use combine_dataset logic.
-
-        # Expand paths
-        from .drivers import FileUtility
         file_list = FileUtility.expand_paths(files)
 
         if len(file_list) == 1:
@@ -41,13 +32,7 @@ class HYSPLITReader(GriddedReader):
                 check_grid=check_grid
             )
         else:
-            # Combine dataset logic requires a list of (filename, sourcetag, metdatatag) tuples
-            # or just filenames. The original 'combine_dataset' took a list of tuples.
-            # Here we just have filenames. We need to adapt.
-            # If we pass just filenames, we might need default tags.
-
-            # Adapting combine_dataset to accept list of strings
-            blist = [(f, f, 'met') for f in file_list] # Dummy tags
+            blist = [(f, f, 'met') for f in file_list]
             return combine_dataset(
                 blist,
                 drange=drange,
@@ -294,7 +279,10 @@ class ModelBin:
         return concframe
 
     def readfile(self, filename, drange, verbose, century):
-        fid = open(filename, "rb")
+        # Use FileUtility to open file (supports S3)
+        fs = FileUtility.get_fs(filename)
+        fid = fs.open(filename, "rb")
+
         recs = self.define_struct()
         rec1, rec2, rec3, rec4a = recs[0], recs[1], recs[2], recs[3]
         rec4b, rec5a, rec5b, rec5c = recs[4], recs[5], recs[6], recs[7]
@@ -367,6 +355,8 @@ class ModelBin:
                 testf = False
             if inc_iii:
                 iii += 1
+
+        fid.close()
 
         self.atthash.update(self.gridhash)
         self.atthash["Species ID"] = list(set(self.atthash["Species ID"]))
@@ -487,8 +477,6 @@ def combine_dataset(
     splist = []
     sourcelist = []
 
-    # Re-construct dictionary from blist (list of tuples: filename, sourcetag, metdatatag)
-    # But here we assume blist is already [(fname, sourcetag, metdatatag)]
     aaa = sorted(blist, key=lambda x: x[1])
     blist_dict = {}
     for val in aaa:

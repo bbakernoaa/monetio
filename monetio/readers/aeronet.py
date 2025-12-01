@@ -6,6 +6,7 @@ from functools import lru_cache, partial
 import numpy as np
 import pandas as pd
 from .base import PointReader, register_reader
+from io import BytesIO
 
 try:
     import dask
@@ -28,25 +29,18 @@ class AERONETReader(PointReader):
                      interp_to_aod_values=None,
                      n_procs=1,
                      verbose=10,
-                     files=None, # For local file support
+                     files=None,
                      **kwargs):
         """
         Reads AERONET data.
-        If 'files' is provided, reads local files.
-        Otherwise, downloads from web service based on dates/siteid.
         """
         if files:
-            # Local file mode
-            # If multiple files, loop?
-            # Original 'add_local' took one file.
-            # Let's support list via pandas driver loop, but specialized logic needed.
             if isinstance(files, str):
                 files = [files]
 
             dfs = []
             for f in files:
                 a = AERONET()
-                # Check inv type
                 try:
                     with open(f) as fid:
                         if "Inversion" in fid.readline():
@@ -58,7 +52,6 @@ class AERONETReader(PointReader):
                 a.url = f
                 a.read_aeronet()
 
-                # post proc per file
                 if freq is not None and not a.df.empty:
                     a.df = (
                         a.df.set_index("time")
@@ -79,7 +72,6 @@ class AERONETReader(PointReader):
             return pd.concat(dfs)
 
         else:
-            # Web service mode
             a = AERONET()
             if interp_to_aod_values is not None:
                 interp_to_aod_values = np.asarray(interp_to_aod_values)
@@ -122,7 +114,7 @@ class AERONETReader(PointReader):
                 return a.add_data(dates=dates, freq=freq, **kwargs_inner)
 
 # -----------------------------------------------------------------------------
-# Helper functions ported from monetio/obs/aeronet.py
+# Helper functions
 # -----------------------------------------------------------------------------
 
 @lru_cache(1)
@@ -147,32 +139,9 @@ def get_valid_sites():
         raise
     return df
 
-def _parallel_aeronet_call(
-    dates=None,
-    product="AOD15",
-    latlonbox=None,
-    daily=False,
-    lunar=False,
-    interp_to_aod_values=None,
-    inv_type=None,
-    freq=None,
-    siteid=None,
-    detect_dust=False,
-):
+def _parallel_aeronet_call(**kwargs):
     a = AERONET()
-    df = a.add_data(
-        dates,
-        product=product,
-        latlonbox=latlonbox,
-        daily=daily,
-        lunar=lunar,
-        interp_to_aod_values=interp_to_aod_values,
-        inv_type=inv_type,
-        siteid=siteid,
-        freq=freq,
-        detect_dust=detect_dust,
-    )
-    return df
+    return a.add_data(**kwargs)
 
 class AERONET:
     _valid_prod_noninv = (
@@ -194,6 +163,9 @@ class AERONET:
         self.latlonbox = None
         self.siteid = None
         self.new_aod_values = None
+
+        # Buffer to store downloaded content
+        self._content_buffer = None
 
     def build_url(self):
         assert self.dates is not None, "required parameter"
@@ -249,13 +221,49 @@ class AERONET:
 
         self.url = f"{base_url}{dates_}{product_}{avg_}{lunar_}{inv_type_}{loc_}&if_no_html=1"
 
+    def _get_content(self, timeout=60, retries=3):
+        """Robustly fetch content from URL."""
+        if not (isinstance(self.url, str) and self.url.startswith("http")):
+            return None # Local file handled elsewhere
+
+        if self._content_buffer:
+            self._content_buffer.seek(0)
+            return self._content_buffer
+
+        import requests
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+
+        session = requests.Session()
+        retry = Retry(total=retries, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+
+        response = session.get(self.url, timeout=timeout)
+        response.raise_for_status()
+
+        self._content_buffer = BytesIO(response.content)
+        return self._content_buffer
+
     def _lines_from_url(self, *, n=10):
         from itertools import islice
+
         if isinstance(self.url, str) and self.url.startswith("http"):
-            import requests
-            r = requests.get(self.url, stream=True)
-            r.raise_for_status()
-            s = "\n".join(islice(r.iter_lines(decode_unicode=True), n))
+            # Use the robust fetcher
+            content = self._get_content()
+            # Read first n lines from bytes buffer
+            # Need to decode carefully
+            content.seek(0)
+            # Read a chunk that should contain enough lines?
+            # Or just wrap in TextIOWrapper for iteration?
+            import io
+            wrapper = io.TextIOWrapper(content, encoding='utf-8', errors='replace')
+            # iter_lines in requests yields lines without newlines? No, this is TextIOWrapper.
+            # We strip to match behavior of 'iter_lines' join logic often used or just to look nice.
+            s = "\n".join(line.rstrip('\n') for line in islice(wrapper, n))
+            wrapper.detach() # Don't close the BytesIO
+            content.seek(0) # Reset
         else:
             with open(self.url) as f:
                 s = "\n".join(islice(f, n))
@@ -265,14 +273,24 @@ class AERONET:
         print("Reading Aeronet Data...")
         inv = self.inv_type is not None
         skiprows = 5 if not inv else 6
+
+        # This will trigger download if needed
         info = self._lines_from_url(n=skiprows)
+
         if len(info.splitlines()) == 1:
             raise Exception("valid query but no data found")
         elif info.startswith("<html>"):
             raise Exception("invalid query, open the URL to check the error")
 
+        # Determine source for read_csv
+        if self._content_buffer:
+            self._content_buffer.seek(0)
+            source = self._content_buffer
+        else:
+            source = self.url
+
         df = pd.read_csv(
-            self.url,
+            source,
             engine="python",
             header="infer",
             skiprows=skiprows,

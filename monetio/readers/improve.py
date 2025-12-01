@@ -3,6 +3,7 @@
 import pandas as pd
 from numpy import nan
 from .base import PointReader, register_reader
+from .drivers import FileUtility
 from monetio.obs.epa_util import read_monitor_file
 
 @register_reader("improve")
@@ -15,8 +16,6 @@ class IMPROVEReader(PointReader):
         """
         Reads IMPROVE data files.
         """
-        # Expand paths
-        from .drivers import FileUtility
         file_list = FileUtility.expand_paths(files)
 
         dfs = []
@@ -40,16 +39,23 @@ class IMPROVE:
         self.daily = True
 
     def add_data(self, fname, add_meta=False, delimiter="\t"):
-        f = open(fname)
-        lines = f.readlines()
-        f.close()
+        fs = FileUtility.get_fs(fname)
+
+        with fs.open(fname, "r") as f:
+            lines = f.readlines()
+
         skiprows = 0
         skip = False
         for i, line in enumerate(lines):
-            if line == "Data\n":
+            if line.strip() == "Data": # Use strip to handle potential whitespace/newlines
                 skip = True
                 skiprows = i + 1
                 break
+
+        # Determine storage options for pandas if S3
+        storage_options = None
+        if fname.startswith("s3://"):
+            storage_options = {'anon': True}
 
         if skip:
             df = pd.read_csv(
@@ -59,6 +65,7 @@ class IMPROVE:
                 infer_datetime_format=True,
                 dtype={"EPACode": str},
                 skiprows=skiprows,
+                storage_options=storage_options
             )
         else:
             df = pd.read_csv(
@@ -67,6 +74,7 @@ class IMPROVE:
                 parse_dates=[2],
                 infer_datetime_format=True,
                 dtype={"EPACode": str},
+                storage_options=storage_options
             )
 
         df.rename(columns={"EPACode": "epaid", "Val": "Obs", "State": "state_name",
@@ -75,7 +83,6 @@ class IMPROVE:
         if "Dataset" in df.columns:
             df.drop("Dataset", axis=1, inplace=True)
 
-        # df["time"] = pd.to_datetime(df.time, format="%Y%m%d") # Already parsed by read_csv usually
         df.columns = [i.lower() for i in df.columns]
 
         if "epaid" in df.columns:
@@ -88,7 +95,6 @@ class IMPROVE:
             df.rename(columns={"siteid_x": "siteid", "state_name_x": "state_name"}, inplace=True)
 
         try:
-            # df.obs.loc[df.obs < df.mdl] = nan # mdl might not exist
             pass
         except:
             pass

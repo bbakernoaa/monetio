@@ -4,6 +4,7 @@ import datetime
 import numpy as np
 import pandas as pd
 from .base import PointReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("pardump")
 class PardumpReader(PointReader):
@@ -16,8 +17,6 @@ class PardumpReader(PointReader):
         """
         Reads HYSPLIT PARDUMP binary files.
         """
-        # Expand paths
-        from .drivers import FileUtility
         file_list = FileUtility.expand_paths(files)
 
         dfs = []
@@ -82,14 +81,16 @@ class Pardump:
     def read(self, drange=None, verbose=False, century=2000, sorti=None):
         imax = 100000
         parframe_all = pd.DataFrame()
-        with open(self.fname, "rb") as fpoint:
+
+        fs = FileUtility.get_fs(self.fname)
+        with fs.open(self.fname, "rb") as fpoint:
             iii = 0
             testf = True
             while testf:
                 hdata = np.fromfile(fpoint, dtype=self.hdr_dt, count=1)
                 if verbose:
                     print("Record Header ", hdata)
-                if not hdata.size: # Check size instead of truthiness for numpy array
+                if not hdata.size:
                     if verbose:
                         print("Done reading ", self.fname)
                     break
@@ -130,15 +131,6 @@ class Pardump:
                         parframe_all = par_frame.copy()
                     else:
                         parframe_all = pd.concat([parframe_all, par_frame], axis=0)
-                    # par_frame = pd.concat([par_frame], keys=[self.fname]) # This line in original code seems odd inside the loop if parframe_all accumulates?
-                    # The original code did:
-                    # par_frame = pd.concat([par_frame], keys=[self.fname])
-                    # But parframe_all is what's returned.
-                    # Wait, original code:
-                    # parframe_all = pd.concat([parframe_all, par_frame], axis=0)
-                    # par_frame = pd.concat([par_frame], keys=[self.fname])
-                    # The second line modifies par_frame but doesn't store it?
-                    # It likely meant to add keys to parframe_all or just return.
 
                 iii += 1
 
@@ -151,7 +143,6 @@ class Pardump:
                     print("Read pardump. Limited to" + str(imax) + "  iterations. Stopping")
                     testf = False
 
-        # Original code added keys at the end
         if not parframe_all.empty:
              parframe_all = pd.concat([parframe_all], keys=[self.fname])
 

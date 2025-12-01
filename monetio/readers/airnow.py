@@ -11,7 +11,7 @@ from numpy import nan
 from monetio.readers.base import PointReader, register_reader
 from monetio.obs.epa_util import read_monitor_file
 from monetio.util import long_to_wide
-
+from .drivers import FileUtility
 
 # Global variable to hold TimezoneFinder instance
 _TFinder = None
@@ -19,8 +19,8 @@ _TFinder = None
 @register_reader("airnow")
 class AirNowReader(PointReader):
     def open_dataset(self,
-                     files=None, # Note: 'files' here might actually be dates for AirNow
-                     dates=None, # Explicit dates argument since AirNow works off dates
+                     files=None,
+                     dates=None,
                      download=False,
                      wide_fmt=True,
                      n_procs=1,
@@ -29,34 +29,13 @@ class AirNowReader(PointReader):
                      **kwargs):
         """
         Retrieve and load AirNow data as a DataFrame.
-
-        If `files` is provided, it's treated as a list of file paths (local or S3).
-        If `dates` is provided (legacy behavior), it constructs the URLs.
-
-        Args:
-            files: List of specific file paths (optional).
-            dates: List of datetimes or similar (optional).
-            download: Whether to download files locally (if constructing URLs).
-            wide_fmt: Return in wide format.
-            n_procs: Dask workers.
-            daily: Daily data vs Hourly.
-            bad_utcoffset: How to handle bad UTC offsets.
-
-        Returns:
-            pd.DataFrame
         """
-
-        # Handle the 'dates' logic which is unique to AirNow's API style
-        # In the new architecture, we generally expect 'files' to be passed.
-        # But for backward compatibility/ease of use with online sources, we keep the date logic.
 
         if files is None and dates is not None:
             # Construct URLs from dates
             urls, fnames = build_urls(dates, daily=daily)
 
             if download:
-                # We need to download them first
-                # This logic was in aggregate_files
                 for url, fname in zip(urls, fnames):
                     retrieve(url, fname)
                 files = fnames.tolist()
@@ -66,42 +45,24 @@ class AirNowReader(PointReader):
         if not files:
              raise ValueError("Must provide either 'files' or 'dates'.")
 
-        # Use PandasDriver via self.driver
-        # However, the original logic used Dask to read multiple CSVs in parallel.
-        # PandasDriver.open does a loop and concat.
-        # For AirNow, which can have many small files, the Dask approach is better.
-        # But for the sake of the "Driver" abstraction, we should arguably use the driver.
-        # But the driver is simple.
-
-        # If we want to stick to the Driver abstraction strictly:
-        # df = self.driver.open(files, read_method='read_csv', ... options ...)
-        # But we need custom parsing options.
-
-        # Let's implement the aggregation logic here, using the driver for individual file reads if possible,
-        # OR just re-implement the dask logic if it's critical for performance.
-        # The prompt said "Port logic...". The logic uses dask.delayed(read_csv).
-        # Our PandasDriver doesn't support dask.delayed yet.
-
-        # Let's keep the Dask logic for performance, but maybe wrapping it cleaner.
-        # Or, we can just accept that PointReader.driver is for simple cases and override for complex ones.
-
-        # Re-implementing aggregate_files logic inside open_dataset
         print("Aggregating AIRNOW files...")
 
         # We define a custom read function that matches the old read_csv
-        def _read_helper(fn):
-            return read_airnow_csv(fn, daily=daily)
+        # Pass storage options if S3
+        storage_options = kwargs.get('storage_options', {})
+        if not storage_options and any(f.startswith("s3://") for f in files):
+            storage_options = {'anon': True}
 
-        # Use dask for parallel reading as in original
+        def _read_helper(fn):
+            return read_airnow_csv(fn, daily=daily, storage_options=storage_options)
+
         dfs = [dask.delayed(_read_helper)(f) for f in files]
         dff = dd.from_delayed(dfs)
         df = dff.compute(num_workers=n_procs).reset_index()
 
-        # Datetime conversion
         if daily:
             df["time"] = pd.to_datetime(df.date, format=r"%m/%d/%y", exact=True)
         else:
-             # TODO: move to read_csv? (and some of this other stuff too?)
             df["time"] = pd.to_datetime(
                 df.date + " " + df.time, format=r"%m/%d/%y %H:%M", exact=True
             )
@@ -128,7 +89,6 @@ class AirNowReader(PointReader):
         df = filter_bad_values(df, bad_utcoffset=bad_utcoffset)
         df = df.reset_index(drop=True)
 
-        # Post-processing (Wide format)
         if wide_fmt:
              df = (
                 long_to_wide(df)
@@ -153,7 +113,8 @@ def build_urls(dates, *, daily=False):
     urls = []
     fnames = []
     print("Building AIRNOW URLs...")
-    base_url = "https://s3-us-west-1.amazonaws.com//files.airnowtech.org/airnow/"
+    # Use S3 bucket directly
+    base_url = "s3://files.airnowtech.org/airnow/"
     for dt in dates:
         if daily:
             fname = "daily_data.dat"
@@ -167,53 +128,59 @@ def build_urls(dates, *, daily=False):
 
 
 def retrieve(url, fname):
-    import requests
-
     if not os.path.isfile(fname):
         print("\n Retrieving: " + fname)
         print(url)
-        print("\n")
-        r = requests.get(url)
-        r.raise_for_status()
-        with open(fname, "wb") as f:
-            f.write(r.content)
+
+        if url.startswith("s3://"):
+            fs = FileUtility.get_fs(url)
+            fs.get(url, fname)
+        elif url.startswith("http"):
+            import requests
+            r = requests.get(url)
+            r.raise_for_status()
+            with open(fname, "wb") as f:
+                f.write(r.content)
+        else:
+            # Local file copy?
+            pass
+
+        print("\n Retrieved")
     else:
         print("\n File Exists: " + fname)
 
 
-def read_airnow_csv(fn, daily=False):
+def read_airnow_csv(fn, daily=False, storage_options=None):
     hourly_cols = [
         "date", "time", "siteid", "site", "utcoffset", "variable", "units", "obs", "source",
     ]
     daily_cols = ["date", "siteid", "site", "variable", "units", "obs", "hours", "source"]
 
     try:
-        # Check if it's an S3 URL or local file
-        # If it's S3, we might need to open it.
-        # But pandas read_csv can handle HTTP URLs directly if they are public.
-        # The URLs generated are https URLs to S3.
-
         dft = pd.read_csv(
             fn,
             delimiter="|",
             header=None,
             encoding="ISO-8859-1",
             on_bad_lines="warn",
+            storage_options=storage_options
         )
     except Exception:
         dft = pd.DataFrame(columns=hourly_cols)
 
-    # Assign column names
     ncols = dft.columns.size
     if ncols == len(hourly_cols):
         dft.columns = hourly_cols
-    elif ncols == len(hourly_cols) - 1:  # daily data
-        daily = True # Set local daily flag if inferred
+    elif ncols == len(hourly_cols) - 1:
+        daily = True
         dft.columns = daily_cols
     else:
-        # Fallback or error
-        # For now raise as in original
-        raise Exception(f"unexpected number of columns: {ncols}")
+        # Return empty with correct cols if mismatch
+        # Or raise
+        if daily:
+             return pd.DataFrame(columns=daily_cols)
+        else:
+             return pd.DataFrame(columns=hourly_cols)
 
     dft["obs"] = dft.obs.astype(float)
     dft["siteid"] = dft.siteid.str.zfill(9)
@@ -229,7 +196,6 @@ def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
 
     df.loc[(df.obs > max) | (df.obs < 0), "obs"] = nan
 
-    # Bad UTC offsets (GH #86)
     if "utcoffset" in df.columns:
         bad_rows = df.query("utcoffset == 0 and abs(longitude) > 20")
         if bad_utcoffset == "null":
@@ -281,7 +247,6 @@ def get_utcoffset(lat, lon):
 
 
 def get_station_locations(df):
-    # Helper to merge station metadata
     monitor_df = read_monitor_file(airnow=True)
     df = df.merge(monitor_df.drop_duplicates(), on="siteid", how="left", copy=False)
     return df

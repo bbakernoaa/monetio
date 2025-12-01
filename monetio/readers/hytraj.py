@@ -4,6 +4,7 @@ import re
 import numpy as np
 import pandas as pd
 from .base import PointReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("hytraj")
 class HYTRAJReader(PointReader):
@@ -16,11 +17,7 @@ class HYTRAJReader(PointReader):
         """
         Reads HYTRAJ tdump files.
         """
-        # Expand paths
-        from .drivers import FileUtility
         file_list = FileUtility.expand_paths(files)
-
-        # Use combine_dataset logic
         return combine_dataset(file_list, taglist=taglist, renumber=renumber, verbose=verbose)
 
 # -----------------------------------------------------------------------------
@@ -59,7 +56,18 @@ def combine_dataset(flist, taglist=None, renumber=False, verbose=False):
     return rval
 
 def open_dataset_hytraj(filename):
-    tdump = open(filename, 'r')
+    # Use FileUtility to get filesystem and open
+    fs = FileUtility.get_fs(filename)
+    # pd.read_csv can usually take a file-like object if opened in text mode?
+    # Original used open(filename). Default is text 'r'.
+    # fsspec open returns bytes by default unless mode='r' which might be bytes or text depending on implementation.
+    # Safe to use 'r' for text if supported, or 'rb' and decode.
+    # TextIOWrapper is safer.
+
+    # fsspec open(..., "r") often returns text mode.
+    tdump = fs.open(filename, "r")
+
+    # However, get_metinfo uses seek(0) and readline().
     traj = get_traj(tdump)
     tdump.close()
     return traj
@@ -150,6 +158,7 @@ def get_traj(tdump):
         10: float,
         11: float,
     }
+    # pd.read_csv accepts file-like object
     traj = pd.read_csv(tdump, header=None, sep=r"\s+", dtype=dhash)
     traj["time"] = traj.apply(lambda row: dateparse(row), axis=1)
     traj = traj.drop([2, 3, 4, 5, 6], axis=1)

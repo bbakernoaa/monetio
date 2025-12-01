@@ -3,6 +3,7 @@
 import json
 import pandas as pd
 from .base import PointReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("pams")
 class PAMSReader(PointReader):
@@ -12,8 +13,6 @@ class PAMSReader(PointReader):
         """
         Reads PAMS JSON files.
         """
-        # Expand paths
-        from .drivers import FileUtility
         file_list = FileUtility.expand_paths(files)
 
         dfs = []
@@ -30,7 +29,8 @@ class PAMSReader(PointReader):
 # -----------------------------------------------------------------------------
 
 def open_json(filename):
-    with open(filename) as f:
+    fs = FileUtility.get_fs(filename)
+    with fs.open(filename, "r") as f:
         jsonf = json.load(f)
     return jsonf
 
@@ -65,10 +65,6 @@ def add_data_pams(filename):
         "date_gmt", "time_gmt", "poc", "unit_code", "sample_duration_code", "method_code",
     ]
     data = data.drop(columns=[c for c in cols_to_drop if c in data.columns])
-
-    # Reorder if columns exist
-    # cols = data.columns.tolist()
-    # Logic to insert siteid etc at start is cosmetic, skipping strict reorder to avoid key errors
 
     units = data.units.unique()
     for i in units:
