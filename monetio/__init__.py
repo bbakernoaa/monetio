@@ -113,6 +113,7 @@ _READER_MODULES = {
     "nesdis_eps_viirs": ".readers.nesdis_eps_viirs",
     "modis_ornl": ".readers.modis_ornl",
     "nasa_modis": ".readers.nasa_modis",
+    "nesdis_frp": ".readers.nesdis_frp",
 }
 
 def load(source: str, files=None, **kwargs):
@@ -127,7 +128,7 @@ def load(source: str, files=None, **kwargs):
         Models: cmaq, camx, fv3chem, hysplit, hytraj, icap_mme, ncep_grib, pardump, prepchem, raqms, ufs
         Obs: airnow, aeronet, aqs, cems, crn, improve, ish, ish_lite, nadp, openaq, pams
         Profile: icartt, tolnet, geoms, gml_ozonesonde
-        Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis
+        Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp
     """
     if source not in READER_REGISTRY:
         if source in _READER_MODULES:
