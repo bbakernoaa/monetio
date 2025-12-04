@@ -22,7 +22,7 @@ jobs:
   cff:
     name: Validate CITATION.cff
     runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
+    # if: github.repository == 'noaa-oar-arl/monetio'
     steps:
       - uses: actions/checkout@v4
       - uses: citation-file-format/cffconvert-github-action@2.0.0
@@ -32,7 +32,7 @@ jobs:
   spell:
     name: codespell
     runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
+    # if: github.repository == 'noaa-oar-arl/monetio'
     steps:
       - uses: actions/checkout@v4
       - uses: codespell-project/actions-codespell@v2
