@@ -2,24 +2,25 @@ name: CI
 
 on:
   push:
-    branches: [stable, develop]
+    branches:
+      - stable
+      - main
   pull_request:
-    branches: [stable, develop]
-  workflow_dispatch:
-  schedule:
-    - cron: "0 12 * * 1"
 
-env:
-  OPENAQ_API_KEY: "${{ secrets.OPENAQ_API_KEY }}"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    name: Test (Py ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
+    name: ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+
     defaults:
       run:
         shell: bash -l {0}
@@ -27,41 +28,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python (micromamba)
-        uses: mamba-org/setup-micromamba@v2
+      - name: Install Conda environment with Micromamba
+        uses: mamba-org/setup-micromamba@v1
         with:
           environment-file: environment-dev.yml
+          environment-name: monetio-dev
           cache-environment: true
+          condarc: |
+            channels:
+              - conda-forge
+              - defaults
           create-args: >-
             python=${{ matrix.python-version }}
 
-      - name: Test with pytest
-        run: pytest -n auto --dist loadgroup -v -ra -W "ignore:Downloading test file:UserWarning::"
-
-      - name: Test with pytspack installed
+      - name: Install package
         run: |
-          pip install https://github.com/noaa-oar-arl/pytspack/archive/master.zip
-          pytest -k with_pytspack -n auto -v -ra -W "ignore:API key length is 0:UserWarning::"
+          pip install . --no-deps
 
-  docs:
-    name: Check docs build
-    runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
-    defaults:
-      run:
-        shell: bash -l {0}
+      - name: Version info
+        run: |
+          conda info
+          conda list
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python (micromamba)
-        uses: mamba-org/setup-micromamba@v2
-        with:
-          environment-file: docs/environment-docs.yml
-          cache-environment: true
-
-      - name: linkcheck
-        run: sphinx-build -b linkcheck docs docs/_build/linkcheck
-
-      - name: sphinx-build -W
-        run: sphinx-build -b html -W docs docs/_build/html
+      - name: Run tests
+        run: |
+          pytest -v

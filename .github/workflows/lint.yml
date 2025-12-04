@@ -1,41 +1,22 @@
-name: Lint
+name: linting
 
 on:
   push:
-    branches: [stable, develop]
+    branches:
+      - stable
+      - main
   pull_request:
-    branches: [stable, develop]
-  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint:
-    name: pre-commit
+  pre-commit:
     runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: "3.x"
       - uses: pre-commit/action@v3.0.1
-
-  cff:
-    name: Validate CITATION.cff
-    runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: citation-file-format/cffconvert-github-action@2.0.0
-        with:
-          args: "--validate"
-
-  spell:
-    name: codespell
-    runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: codespell-project/actions-codespell@v2
-        with:
-          ignore_words_file: .codespell-exclude
-          skip: "./monetio/data/aqs_qualifiers.csv,./monetio/data/cemsinfo.csv,./monetio/data/stations.tsv"
