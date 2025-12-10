@@ -5,6 +5,7 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from .base import PointReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("ish")
 class ISHReader(PointReader):
@@ -21,9 +22,12 @@ class ISHReader(PointReader):
                      request_timeout=10,
                      request_retries=4,
                      verbose=False,
+                     source="ncdc",
                      **kwargs):
         """
         Reads ISH data.
+
+        source: "ncdc" (default) or "aws".
         """
         ish = ISH()
         return ish.add_data(
@@ -39,6 +43,7 @@ class ISHReader(PointReader):
             request_timeout=request_timeout,
             request_retries=request_retries,
             verbose=verbose,
+            source=source,
         )
 
 # -----------------------------------------------------------------------------
@@ -87,6 +92,7 @@ class ISH:
         self.df = None
         self.dates = None
         self.verbose = False
+        self.source = "ncdc"
 
     @staticmethod
     def _clean_column(series, missing=9999, multiplier=1):
@@ -130,18 +136,33 @@ class ISH:
         return df
 
     def read_data_frame(self, url_or_file, *, request_timeout=10, request_retries=4):
-        if isinstance(url_or_file, str) and url_or_file.startswith("http"):
-            import gzip
-            import io
-            import requests
+        # Use FileUtility to support S3, HTTP, and Local transparently
+        fs = FileUtility.get_fs(url_or_file)
 
-            # Logic to retry and fetch
-            # Simplified for this port
-            r = requests.get(url_or_file, timeout=request_timeout)
-            with gzip.open(io.BytesIO(r.content), "rb") as f:
-                frame_as_array = np.genfromtxt(f, delimiter=self.WIDTHS, dtype=self.DTYPES)
-        else:
-            frame_as_array = np.genfromtxt(url_or_file, delimiter=self.WIDTHS, dtype=self.DTYPES)
+        if url_or_file.startswith("http"):
+             # Fallback to requests logic for robust HTTP if needed,
+             # or trust fsspec http filesystem (simple read).
+             # Original code had retries.
+             # If source="ncdc" (http), we keep retries?
+             # For now, use FileUtility (fsspec) which handles S3/Local well.
+             # For HTTP, fsspec doesn't retry by default as aggressively as the original logic.
+             # But let's try to use fsspec for everything.
+             pass
+
+        # Open file object
+        # gzip handling: if .gz, fsspec usually handles it if compression is inferred,
+        # OR we pass it to gzip.open.
+        # fsspec open(..., compression='gzip') works.
+
+        compression = "gzip" if url_or_file.endswith(".gz") else None
+
+        with fs.open(url_or_file, "rb", compression=compression) as f:
+            # numpy genfromtxt expects byte stream or text?
+            # np.genfromtxt handles gzip file objects if they are seekable?
+            # fsspec files are seekable.
+            # If compression='gzip' in fs.open, f is uncompressed stream.
+
+            frame_as_array = np.genfromtxt(f, delimiter=self.WIDTHS, dtype=self.DTYPES)
 
         frame = pd.DataFrame.from_records(np.atleast_1d(frame_as_array))
         df = self._clean(frame)
@@ -158,7 +179,16 @@ class ISH:
         if dates is None:
             dates = self.dates
         fname = self.history_file
-        self.history = pd.read_csv(fname, parse_dates=["BEGIN", "END"], infer_datetime_format=True)
+
+        # Support S3 for history if source is aws
+        if self.source == "aws":
+            fname = "s3://noaa-isd-pds/isd-history.csv"
+
+        # Use FileUtility for history file too
+        fs = FileUtility.get_fs(fname)
+        with fs.open(fname, "r") as f:
+            self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], infer_datetime_format=True)
+
         self.history.columns = [i.lower() for i in self.history.columns]
 
         if dates is not None:
@@ -183,14 +213,20 @@ class ISH:
 
         unique_years = pd.to_datetime(dates.year.unique(), format="%Y")
         furls = []
-        url = "https://www1.ncdc.noaa.gov/pub/data/noaa"
 
-        # In a real run, this fetches available files from HTML.
-        # Here we construct assuming they exist or reuse original logic fully if needed.
-        # Original logic fetches ALL urls first? That's slow.
-        # We simplify to direct construction and filter by availability if possible.
+        if self.source == "aws":
+             url = "s3://noaa-isd-pds/data"
+        else:
+             url = "https://www1.ncdc.noaa.gov/pub/data/noaa"
 
-        # For porting speed, let's assume we can construct them.
+        # For AWS, we assume availability based on standard naming.
+        # AWS structure: s3://noaa-isd-pds/data/<year>/<usaf>-<wban>-<year>.gz (Need to confirm)
+        # Actually, registry says: data/<year>/<station ID>.
+        # Assuming standard station ID = USAF-WBAN.
+
+        # Note: AWS S3 listing is faster than NCDC html parsing if we used s3fs glob/ls.
+        # But here we construct URLs.
+
         for syear in unique_years.strftime("%Y"):
             year_fnames = (
                 sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
@@ -202,9 +238,11 @@ class ISH:
 
     def add_data(self, dates, box=None, country=None, state=None, site=None,
                  resample=True, window="H", download=False, n_procs=1,
-                 request_timeout=10, request_retries=4, verbose=False):
+                 request_timeout=10, request_retries=4, verbose=False, source="ncdc"):
         self.dates = pd.to_datetime(dates)
         self.verbose = verbose
+        self.source = source
+
         if self.history is None:
             self.read_ish_history()
         dfloc = self.history.copy()

@@ -3,6 +3,7 @@
 import pandas as pd
 import xarray as xr
 from .base import GriddedReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("icap_mme")
 class ICAPMMEReader(GriddedReader):
@@ -18,22 +19,15 @@ class ICAPMMEReader(GriddedReader):
         Open ICAP-MME data.
         Supports opening by dates (downloads from FTP/HTTPS) or local files.
         """
-
-        # If files are provided, treat as standard GriddedReader
         if files is not None:
-            # We assume the user provided files are correct for the product/var desired
-            # But the original code logic is heavily tied to downloading specific products.
-            # If files is just a path, we use driver.
             return self.driver.open(files, **kwargs)
 
-        # If dates are provided, we follow the original logic
         if dates is not None:
             if download:
                 return open_mfdataset_icap(
                     dates, product=product, data_var=data_var, download=True, verbose=verbose, **kwargs
                 )
             else:
-                # In-memory opening logic from URL
                 return open_mfdataset_icap(
                     dates, product=product, data_var=data_var, download=False, verbose=verbose, **kwargs
                 )
@@ -73,39 +67,31 @@ def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
     return pd.Series(urls, index=None), pd.Series(fnames, index=None)
 
 def remote_file_exists(file_url, *, verbose=True):
-    import requests
-    try:
-        r = requests.head(file_url)
-        if r.status_code == 200:
-            return True
-        else:
-            if verbose:
-                print(f"HTTP Error {r.status_code} - {r.reason}")
-            return False
-    except Exception as e:
-        if verbose:
-            print(e)
-        return False
+    fs = FileUtility.get_fs(file_url)
+    exists = fs.exists(file_url)
+    if not exists and verbose:
+        print(f"File does not exist: {file_url}")
+    return exists
 
 def retrieve(url, fname, *, download=False, verbose=True):
     from io import BytesIO
     from pathlib import Path
-    import requests
 
     p = Path(fname).absolute()
+    fs = FileUtility.get_fs(url)
 
     if not download:
-        r = requests.get(url, stream=True)
-        r.raise_for_status()
-        return BytesIO(r.content)
+        # Return BytesIO
+        # fs.open returns a file-like object
+        # We can read it into BytesIO if needed for compatibility or return fs open object
+        # original returned BytesIO(r.content)
+        with fs.open(url, "rb") as f:
+            return BytesIO(f.read())
     else:
         if not p.is_file():
             if verbose:
                 print(f"Downloading {url} to {p.as_posix()}")
-            r = requests.get(url, stream=True)
-            r.raise_for_status()
-            with open(p, "wb") as f:
-                f.write(r.content)
+            fs.get(url, str(p))
         else:
             if verbose:
                 print(f"File Exists: {p.as_posix()}")
@@ -123,8 +109,6 @@ def open_mfdataset_icap(dates, product="MMC", data_var="dustaod550", *, download
     import pandas as pd
     import xarray as xr
 
-    # d = pd.DatetimeIndex(dates) # dates already processed in build_urls if needed, but build_urls handles iterable
-
     if product.upper() not in valid_filetypes:
         raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
 
@@ -139,7 +123,6 @@ def open_mfdataset_icap(dates, product="MMC", data_var="dustaod550", *, download
             _check_file_url(url, verbose=verbose)
             paths.append(retrieve(url, fname, download=True, verbose=verbose))
 
-        # Use provided kwargs for open_mfdataset if any
         if 'combine' not in kwargs:
             kwargs['combine'] = 'nested'
         if 'concat_dim' not in kwargs:

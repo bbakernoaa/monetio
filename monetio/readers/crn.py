@@ -3,8 +3,11 @@
 import inspect
 import os
 import pandas as pd
+import dask
+import dask.dataframe as dd
 from numpy import array
 from .base import PointReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("crn")
 class CRNReader(PointReader):
@@ -32,7 +35,7 @@ class CRN:
         self.df = pd.DataFrame()
         self.baseurl = "https://www1.ncdc.noaa.gov/pub/data/uscrn/products/"
         self.monitor_df = None
-        # Columns definitions omitted for brevity but should be here if needed for parsing
+        # Columns definitions omitted for brevity
         self.hcols = [
             "WBANNO", "UTC_DATE", "UTC_TIME", "LST_DATE", "LST_TIME", "CRX_VN",
             "LONGITUDE", "LATITUDE", "T_CALC", "T_AVG", "T_MAX", "T_MIN",
@@ -63,6 +66,8 @@ class CRN:
 
     def load_file(self, url):
         nanvals = [-99999, -9999.0]
+        # Check url type via string (or regex if robust needed)
+        # The filename pattern indicates type
         if "CRND0103" in url:
             cols = self.dcols
             parse_dates = {"time_local": [1]}
@@ -80,14 +85,16 @@ class CRN:
                 "time_local": ["LST_DATE", "LST_TIME"],
             }
 
-        df = pd.read_csv(
-            url,
-            delim_whitespace=True,
-            names=cols,
-            parse_dates=parse_dates,
-            infer_datetime_format=True,
-            na_values=nanvals,
-        )
+        fs = FileUtility.get_fs(url)
+        with fs.open(url, "r") as f:
+            df = pd.read_csv(
+                f,
+                delim_whitespace=True,
+                names=cols,
+                parse_dates=parse_dates,
+                infer_datetime_format=True,
+                na_values=nanvals,
+            )
         return df
 
     def build_url(self, year, state, site, vector, daily=False, sub_hourly=False):
@@ -106,13 +113,12 @@ class CRN:
         return url, fname
 
     def check_url(self, url):
-        import requests
+        fs = FileUtility.get_fs(url)
         try:
-            if requests.head(url).status_code < 400:
-                return True
+            # For http, exists calls HEAD. For s3/local, it checks existence.
+            return fs.exists(url)
         except:
-            pass
-        return False
+            return False
 
     def build_urls(self, monitors, dates, daily=False, sub_hourly=False):
         years = pd.DatetimeIndex(dates).year.unique().astype(str)
@@ -124,20 +130,22 @@ class CRN:
                 site = monitors.iloc[i].LOCATION.replace(" ", "_")
                 vector = monitors.iloc[i].VECTOR.replace(" ", "_")
                 url, fname = self.build_url(y, state, site, vector, daily=daily, sub_hourly=sub_hourly)
-                # Check url is slow, maybe assume exist or let dask fail?
-                # Original code checks.
                 if self.check_url(url):
                     urls.append(url)
                     fnames.append(fname)
         return urls, fnames
 
+    def retrieve(self, url, fname):
+        fs = FileUtility.get_fs(url)
+        if not os.path.isfile(fname):
+            print("Retrieving: " + fname)
+            print(url)
+            fs.get(url, fname)
+        else:
+            print("File Exists: " + fname)
+
     def get_monitor_df(self):
-        # We need the stations.tsv file.
-        # monetio/data/stations.tsv
-        # We assume it is accessible.
         try:
-            from monetio import data # Assuming data module exposes path or similar
-            # Or use relative path based on __file__ of this module
             import monetio
             path = os.path.join(os.path.dirname(monetio.__file__), "data", "stations.tsv")
             self.monitor_df = pd.read_csv(path, delimiter="\t")
@@ -146,9 +154,6 @@ class CRN:
             self.monitor_df = pd.DataFrame(columns=["STATE", "LOCATION", "VECTOR", "WBANNO", "LATITUDE", "LONGITUDE"])
 
     def add_data(self, dates, daily=False, sub_hourly=False, download=False, latlonbox=None):
-        import dask
-        import dask.dataframe as dd
-
         if self.monitor_df is None:
             self.get_monitor_df()
 
@@ -167,19 +172,23 @@ class CRN:
         urls, fnames = self.build_urls(monitors, dates, daily=daily, sub_hourly=sub_hourly)
 
         if download:
-            # Not implemented fully here
-            pass
+            for url, fname in zip(urls, fnames):
+                 self.retrieve(url, fname)
+            # After download, files are local
+            # Original code used delayed(load_file)(fname)
+            # Here we just pass fnames (which are local paths)
+            dfs = [dask.delayed(self.load_file)(i) for i in fnames]
+        else:
+            dfs = [dask.delayed(self.load_file)(i) for i in urls]
 
-        dfs = [dask.delayed(self.load_file)(i) for i in urls]
         dff = dd.from_delayed(dfs)
         self.df = dff.compute()
 
         self.df = pd.merge(self.df, monitors, how="left", on=["WBANNO", "LATITUDE", "LONGITUDE"])
 
-        # Post proc
         if not self.df.columns.isin(["time"]).max():
-             # Calculate time from local if needed? Or check what load_file produces
-             pass
+             if "time_local" in self.df.columns and "GMT_OFFSET" in self.df.columns:
+                self.df["time"] = self.df.time_local + pd.to_timedelta(self.df.GMT_OFFSET, unit="H")
 
         self.df.rename(columns={"WBANNO": "siteid"}, inplace=True)
         self.df.columns = [i.lower() for i in self.df.columns]

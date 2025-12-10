@@ -5,6 +5,7 @@ import pandas as pd
 import dask
 import dask.dataframe as dd
 from .base import PointReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("ish_lite")
 class ISHLiteReader(PointReader):
@@ -49,7 +50,11 @@ class ISHLite:
     def read_ish_history(self, dates=None):
         if dates is None: dates = self.dates
         fname = self.history_file
-        self.history = pd.read_csv(fname, parse_dates=["BEGIN", "END"], infer_datetime_format=True)
+
+        fs = FileUtility.get_fs(fname)
+        with fs.open(fname, "r") as f:
+            self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], infer_datetime_format=True)
+
         self.history.columns = [i.lower() for i in self.history.columns]
         if dates is not None:
             index1 = (self.history.end >= dates.min()) & (self.history.begin <= dates.max())
@@ -74,7 +79,7 @@ class ISHLite:
         furls = []
         url = "https://www1.ncdc.noaa.gov/pub/data/noaa/isd-lite"
 
-        # We assume availability for speed
+        # Assume availability (skipping HTML parsing for speed/robustness)
         for syear in unique_years.strftime("%Y"):
             year_fnames = (
                 sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
@@ -90,14 +95,21 @@ class ISHLite:
             "year", "month", "day", "hour", "temp", "dew_pt_temp", "press",
             "wdir", "ws", "sky_condition", "precip_1hr", "precip_6hr",
         ]
-        df = pd.read_csv(
-            fname,
-            delim_whitespace=True,
-            header=None,
-            names=columns,
-            parse_dates={"time": [0, 1, 2, 3]},
-            infer_datetime_format=True,
-        )
+
+        # Use FileUtility
+        fs = FileUtility.get_fs(fname)
+        compression = "gzip" if fname.endswith(".gz") else None
+
+        with fs.open(fname, "rb", compression=compression) as f:
+            df = pd.read_csv(
+                f,
+                delim_whitespace=True,
+                header=None,
+                names=columns,
+                parse_dates={"time": [0, 1, 2, 3]},
+                infer_datetime_format=True,
+            )
+
         filename = fname.split("/")[-1].split("-")
         siteid = filename[0] + filename[1]
         for col in ["temp", "dew_pt_temp", "press", "ws", "precip_1hr", "precip_6hr"]:

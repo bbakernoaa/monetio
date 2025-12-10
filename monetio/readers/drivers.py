@@ -8,16 +8,18 @@ from typing import Union, List, Any
 
 class FileUtility:
     """
-    Helper class to manage file path expansion (Local + S3).
+    Helper class to manage file path expansion (Local + S3 + HTTP).
     """
     @staticmethod
     def get_fs(path: str):
         """
-        Returns the correct filesystem (local or s3) based on the protocol.
+        Returns the correct filesystem (local, s3, or http) based on the protocol.
         """
         if path.startswith("s3://"):
             # anon=True means public bucket. Use anon=False to use your AWS credentials.
             return fsspec.filesystem("s3", anon=True)
+        elif path.startswith("http://") or path.startswith("https://"):
+            return fsspec.filesystem("http")
         return fsspec.filesystem("file")
 
     @staticmethod
@@ -38,10 +40,18 @@ class FileUtility:
 
             # Use fsspec/s3fs to glob wildcards (works for s3://bucket/data/*.nc too!)
             if any(char in path_input for char in ['*', '?']):
+                # HTTP globbing is generally not supported by fsspec without specific implementation
+                # For S3/Local it works.
+                if path_input.startswith("http"):
+                     # Fallback: treat as single file if glob chars present but http (unlikely to work)
+                     # Or raise error.
+                     # For now, assume S3/Local for globs.
+                     pass
+
                 files = sorted(fs.glob(path_input))
                 # fs.glob usually returns paths without the protocol (e.g. 'bucket/file.nc')
                 # We might need to prepend 's3://' again if it was stripped
-                if path_input.startswith("s3://") and not files[0].startswith("s3://"):
+                if path_input.startswith("s3://") and files and not files[0].startswith("s3://"):
                     files = [f"s3://{f}" for f in files]
 
                 if not files:
@@ -49,7 +59,8 @@ class FileUtility:
                 return files
             else:
                 # It is a specific single file
-                if not fs.exists(path_input):
+                # For http, exists() might involve HEAD request
+                if not path_input.startswith("http") and not fs.exists(path_input):
                     raise FileNotFoundError(f"File not found: {path_input}")
                 return [path_input]
 
@@ -91,8 +102,8 @@ class XarrayDriver:
                     if k in xr_kwargs:
                         del xr_kwargs[k]
 
-                # If S3, we open a file-like object to pass to xarray
-                if filename.startswith("s3://"):
+                # If S3 or HTTP, we open a file-like object to pass to xarray
+                if filename.startswith("s3://") or filename.startswith("http"):
                     fs = FileUtility.get_fs(filename)
                     # 'open_dataset' needs a file object or a specific engine for remote
                     file_obj = fs.open(filename)

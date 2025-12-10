@@ -67,7 +67,7 @@ class AQS:
             "time_local", "time", "siteid", "latitude", "longitude", "obs", "units", "variable",
         ]
         self.df = pd.DataFrame()
-        self.monitor_file = None # Will be loaded if needed
+        self.monitor_file = None
         self.monitor_df = None
         self.daily = False
         self.d_df = None
@@ -173,12 +173,11 @@ class AQS:
         return urls, fnames
 
     def retrieve(self, url, fname):
-        import requests
+        fs = FileUtility.get_fs(url)
         if not os.path.isfile(fname):
             print("\n Retrieving: " + fname)
             print(url)
-            r = requests.get(url)
-            open(fname, "wb").write(r.content)
+            fs.get(url, fname)
         else:
             print("\n File Exists: " + fname)
 
@@ -215,7 +214,6 @@ class AQS:
                 self.retrieve(url, fname)
             dfs = [dask.delayed(self.load_aqs_file)(i, network) for i in fnames]
         elif local:
-            # Assuming fnames are local paths
             dfs = [dask.delayed(self.load_aqs_file)(i, network) for i in fnames]
         else:
             dfs = [dask.delayed(self.load_aqs_file)(i, network) for i in urls]
@@ -258,7 +256,6 @@ class AQS:
             df["variable"] = df.parameter_name.str.upper()
             return df
 
-        # Simplified mapping
         mapping = {
             88101: "PM2.5", 88502: "PM2.5", 44201: "OZONE", 81102: "PM10",
             42401: "SO2", 42602: "NO2", 42101: "CO", 62101: "TEMP",
@@ -272,9 +269,7 @@ class AQS:
             con = df.parameter_code == i
             if i in mapping:
                 df.loc[con, "variable"] = mapping[i]
-            # ... (truncated full mapping for brevity, but original has many more)
 
-        # Add warning for missing vars
         con = df.variable == ""
         if con.sum() > 0:
             df.loc[con, "variable"] = df.parameter_name

@@ -5,6 +5,7 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 from .base import GriddedReader, register_reader
+from .drivers import FileUtility
 
 @register_reader("nesdis_frp")
 class NESDISFRPReader(GriddedReader):
@@ -16,7 +17,6 @@ class NESDISFRPReader(GriddedReader):
         """
         Reads NESDIS FRP data (Download + Binary Read).
         """
-        # Check dependencies
         try:
             from scipy.io import FortranFile
         except ImportError:
@@ -30,19 +30,15 @@ class NESDISFRPReader(GriddedReader):
         try:
             files = download_data(date, ftype=ftype)
 
-            # Read files
             das = []
             for i, fname in enumerate(files):
                 tile_num = i + 1
                 da = read_tile(fname, tile=tile_num)
                 das.append(da)
 
-            # Combine
-            # We can concat along tile dimension
             ds = xr.concat(das, dim="tile")
             ds["tile"] = np.arange(1, 7)
 
-            # Optionally merge into dataset variables if ftype implies a variable name
             ds.name = ftype
             ds = ds.to_dataset()
 
@@ -58,8 +54,6 @@ class NESDISFRPReader(GriddedReader):
 base_dir = "https://gsce-dtn.sdstate.edu/index.php/s/e8wPYPOL1bGXk5z/download?path=%2F"
 
 def download_data(date, ftype="meanFRP"):
-    import requests as rq
-
     if isinstance(date, pd.Timestamp):
         yyyymmdd = date.strftime("%Y%m%d")
     else:
@@ -74,12 +68,10 @@ def download_data(date, ftype="meanFRP"):
         url = f"{base_dir}{yyyymmdd}{url_ftype}{yyyymmdd}{tile}"
         fname = f"{ftype}.{yyyymmdd}.FV3.C384Grid.tile{i}.bin"
 
+        fs = FileUtility.get_fs(url)
         if not os.path.isfile(fname):
             print("Retrieving file:", fname)
-            r = rq.get(url)
-            r.raise_for_status()
-            with open(fname, "wb") as f:
-                f.write(r.content)
+            fs.get(url, fname)
         else:
             print("File exists:", fname)
 
@@ -106,12 +98,7 @@ def read_tile(fname, tile=1, res="C384", dtype="f4"):
     if has_fv3grid:
         grid = fg.get_fv3_grid(res=res, tile=tile)
         grid["longitude"] = wrap_longitudes(grid.longitude)
-
-        # Add data to grid
-        # grid is a Dataset?
         da = xr.DataArray(s, dims=("x", "y"), coords=grid.coords)
-        # Merge other vars from grid if useful?
-        # For now return DataArray with coords
         return da
     else:
         return xr.DataArray(s, dims=("x", "y"))
