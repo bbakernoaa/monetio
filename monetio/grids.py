@@ -1,23 +1,25 @@
-import os
+import warnings
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple, Union
 
-path = os.path.abspath(__file__)
+import numpy as np
+import pandas as pd
+import xarray as xr
+
+# Define the data directory relative to this file
+DATA_DIR = Path(__file__).parent / "data"
 
 
-def _geos_16_grid(dset):
-    """Short summary.
+def _geos_16_grid(dset: xr.Dataset) -> Any:
+    """Calculates the AreaDefinition for GOES-16/ABI.
 
-    Parameters
-    ----------
-    dset : type
-        Description of parameter `dset`.
+    Args:
+        dset: The xarray Dataset containing the GOES-16 data.
+              Must have 'goes_imager_projection' and 'x', 'y' coordinates.
 
-    Returns
-    -------
-    type
-        Description of returned object.
-
+    Returns:
+        pyresample.geometry.AreaDefinition: The area definition for the grid.
     """
-    from numpy import asarray
     from pyresample import geometry
 
     projection = dset.goes_imager_projection
@@ -47,35 +49,41 @@ def _geos_16_grid(dset):
     }
 
     area = geometry.AreaDefinition(
-        "GEOS_ABI", "ABI", "GOES_ABI", proj_dict, len(x), len(y), asarray(area_extent)
+        "GEOS_ABI", "ABI", "GOES_ABI", proj_dict, len(x), len(y), np.asarray(area_extent)
     )
     return area
 
 
-def _get_sinu_grid_df():
-    """Short summary.
+def _get_sinu_grid_df() -> pd.DataFrame:
+    """Reads the sinusoidal grid boundary file.
 
-    Parameters
-    ----------
-
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
+    Returns:
+        pd.DataFrame: DataFrame containing grid boundaries.
     """
-    from pandas import read_csv
+    f = DATA_DIR / "sn_bound_10deg.txt"
+    if not f.exists():
+        raise FileNotFoundError(f"Sinusoidal grid file not found at {f}")
 
-    f = path[:-8] + "data/sn_bound_10deg.txt"
-    td = read_csv(f, skiprows=4, delim_whitespace=True)
+    td = pd.read_csv(f, skiprows=4, delim_whitespace=True)
     td = td.assign(ihiv="h" + td.ih.astype(str).str.zfill(2) + "v" + td.iv.astype(str).str.zfill(2))
     return td
 
 
-def _sinu_grid_latlon_boundary(h, v):
+def _sinu_grid_latlon_boundary(h: int, v: int) -> Tuple[float, float, float, float]:
+    """Get lat/lon boundaries for sinusoidal grid tile.
+
+    Args:
+        h: Horizontal tile index.
+        v: Vertical tile index.
+
+    Returns:
+        Tuple[float, float, float, float]: (lonmin, latmin, lonmax, latmax)
+    """
     td = _get_sinu_grid_df()
     o = td.loc[(td.ih == int(h)) & (td.iv == int(v))]
+    if o.empty:
+         raise ValueError(f"Tile h={h}, v={v} not found in grid definition.")
+
     latmin = o.lat_min.iloc[0]
     lonmin = o.lon_min.iloc[0]
     latmax = o.lat_max.iloc[0]
@@ -83,38 +91,79 @@ def _sinu_grid_latlon_boundary(h, v):
     return lonmin, latmin, lonmax, latmax
 
 
-def _get_sinu_xy(lon, lat):
+def _get_sinu_xy(lon: Any, lat: Any) -> Tuple[Any, Any]:
+    """Convert lon/lat to sinusoidal x/y.
+
+    Args:
+        lon: Longitude(s).
+        lat: Latitude(s).
+
+    Returns:
+        Tuple: (x, y) coordinates.
+    """
     from pyproj import Proj
 
     sinu = Proj("+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m")
     return sinu(lon, lat)
 
 
-def _get_sinu_latlon(x, y):
-    from numpy import meshgrid
+def _get_sinu_latlon(x: Any, y: Any) -> Tuple[Any, Any]:
+    """Convert sinusoidal x/y to lon/lat.
+
+    Args:
+        x: X coordinate(s).
+        y: Y coordinate(s).
+
+    Returns:
+        Tuple: (lon, lat) coordinates.
+    """
     from pyproj import Proj
 
-    xv, yv = meshgrid(x, y)
+    # Create meshgrid if inputs are 1D arrays representing axes
+    # But this function seems to expect x and y to be broadcastable or ready for meshgrid?
+    # The original implementation did:
+    # xv, yv = meshgrid(x, y)
+    # So it expects 1D x and y axes.
+    xv, yv = np.meshgrid(x, y)
     sinu = Proj(
         "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m, +R=6371007.181"
     )
     return sinu(xv, yv, inverse=True)
 
 
-def get_sinu_area_extent(lonmin, latmin, lonmax, latmax):
+def get_sinu_area_extent(lonmin: float, latmin: float, lonmax: float, latmax: float) -> Tuple[float, float, float, float]:
+    """Calculate area extent in sinusoidal projection.
+
+    Args:
+        lonmin: Minimum longitude.
+        latmin: Minimum latitude.
+        lonmax: Maximum longitude.
+        latmax: Maximum latitude.
+
+    Returns:
+        Tuple: (xmin, ymin, xmax, ymax)
+    """
     xmin, ymin = _get_sinu_xy(lonmin, latmin)
     xmax, ymax = _get_sinu_xy(lonmax, latmax)
     return (xmin, ymin, xmax, ymax)
 
 
-def get_modis_latlon_from_swath_hv(h, v, dset):
-    from numpy import linspace
+def get_modis_latlon_from_swath_hv(h: int, v: int, dset: xr.Dataset) -> xr.Dataset:
+    """Add longitude and latitude coordinates to MODIS dataset based on tile h/v.
 
+    Args:
+        h: Horizontal tile index.
+        v: Vertical tile index.
+        dset: Input dataset (must have 'x' and 'y' dimensions/coords).
+
+    Returns:
+        xr.Dataset: Dataset with 'longitude' and 'latitude' coordinates added.
+    """
     lonmin, latmin, lonmax, latmax = _sinu_grid_latlon_boundary(h, v)
     xmin, ymin = _get_sinu_xy(lonmin, latmin)
     xmax, ymax = _get_sinu_xy(lonmax, latmax)
-    x = linspace(xmin, xmax, len(dset.x))
-    y = linspace(ymin, ymax, len(dset.y))
+    x = np.linspace(xmin, xmax, len(dset.x))
+    y = np.linspace(ymin, ymax, len(dset.y))
     lon, lat = _get_sinu_latlon(x, y)
     dset.coords["longitude"] = (("x", "y"), lon)
     dset.coords["latitude"] = (("x", "y"), lat)
@@ -125,7 +174,15 @@ def get_modis_latlon_from_swath_hv(h, v, dset):
     return dset
 
 
-def get_sinu_area_def(dset):
+def get_sinu_area_def(dset: xr.Dataset) -> Any:
+    """Get pyresample AreaDefinition for sinusoidal grid from dataset.
+
+    Args:
+        dset: Input dataset with 'proj4_srs' and 'area_extent' attributes.
+
+    Returns:
+        pyresample.geometry.AreaDefinition: The area definition.
+    """
     from pyproj import Proj
     from pyresample import utils
 
@@ -139,7 +196,16 @@ def get_sinu_area_def(dset):
     return utils.get_area_def(area_id, area_name, proj_id, proj4_args, nx, ny, area_extent)
 
 
-def get_ioapi_pyresample_area_def(ds, proj4_srs):
+def get_ioapi_pyresample_area_def(ds: Any, proj4_srs: str) -> Any:
+    """Get pyresample AreaDefinition for IOAPI dataset.
+
+    Args:
+        ds: IOAPI dataset object (likely from monetio reader).
+        proj4_srs: Proj4 string.
+
+    Returns:
+        pyresample.geometry.AreaDefinition: The area definition.
+    """
     from pyresample import geometry, utils
 
     y_size = ds.NROWS
@@ -160,71 +226,55 @@ def get_ioapi_pyresample_area_def(ds, proj4_srs):
     return area_def
 
 
-def get_generic_projection_from_proj4(lat, lon, proj4_srs):
-    """Short summary.
+def get_generic_projection_from_proj4(lat: Any, lon: Any, proj4_srs: str) -> Any:
+    """Calculate optimal bounding box AreaDefinition from lat/lon and proj4 string.
 
-    Parameters
-    ----------
-    lat : type
-        Description of parameter `lat`.
-    lon : type
-        Description of parameter `lon`.
-    proj4_srs : type
-        Description of parameter `proj4_srs`.
+    Args:
+        lat: Latitude array.
+        lon: Longitude array.
+        proj4_srs: Proj4 string describing the projection.
 
-    Returns
-    -------
-    type
-        Description of returned object.
-
+    Returns:
+        pyresample.geometry.AreaDefinition: The area definition.
     """
     try:
         from pyresample.geometry import SwathDefinition
         from pyresample.utils import proj4_str_to_dict
     except ImportError:
         print("please install pyresample to use this functionality")
+        return None
+
     swath = SwathDefinition(lats=lat, lons=lon)
     area = swath.compute_optimal_bb_area(proj4_str_to_dict(proj4_srs))
     return area
 
 
-def get_optimal_cartopy_proj(lat, lon, proj4_srs):
-    """Short summary.
+def get_optimal_cartopy_proj(lat: Any, lon: Any, proj4_srs: str) -> Any:
+    """Get optimal Cartopy projection.
 
-    Parameters
-    ----------
-    lat : type
-        Description of parameter `lat`.
-    lon : type
-        Description of parameter `lon`.
-    proj4_srs : type
-        Description of parameter `proj4_srs`.
+    Args:
+        lat: Latitude array.
+        lon: Longitude array.
+        proj4_srs: Proj4 string.
 
-    Returns
-    -------
-    type
-        Description of returned object.
-
+    Returns:
+        cartopy.crs.Projection: The cartopy projection.
     """
     area = get_generic_projection_from_proj4(lat, lon, proj4_srs)
+    if area is None:
+        return None
     return area.to_cartopy_crs()
 
 
-def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
-    """SGet the IOAPI projection out of the file into proj4.
+def _ioapi_grid_from_dataset(ds: Any, earth_radius: float = 6370000) -> str:
+    """Get the IOAPI projection out of the file into proj4 string.
 
-    Parameters
-    ----------
-    ds : type
-        Description of parameter `ds`.
-    earth_radius : type
-        Description of parameter `earth_radius`.
+    Args:
+        ds: Dataset with IOAPI metadata attributes (P_ALP, P_BET, etc.).
+        earth_radius: Earth radius in meters.
 
-    Returns
-    -------
-    type
-        Description of returned object.
-
+    Returns:
+        str: Proj4 string.
     """
 
     pargs = dict()
@@ -261,21 +311,15 @@ def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
     return p4  # , area_def
 
 
-def grid_from_dataset(ds, earth_radius=6370000):
-    """Short summary.
+def grid_from_dataset(ds: Any, earth_radius: float = 6370000) -> Optional[str]:
+    """Identify and return grid projection from dataset.
 
-    Parameters
-    ----------
-    ds : type
-        Description of parameter `ds`.
-    earth_radius : type
-        Description of parameter `earth_radius`.
+    Args:
+        ds: Input dataset.
+        earth_radius: Earth radius in meters.
 
-    Returns
-    -------
-    type
-        Description of returned object.
-
+    Returns:
+        str: Proj4 string or None if not found.
     """
     # maybe its an IOAPI file
     if hasattr(ds, "IOAPI_VERSION") or hasattr(ds, "P_ALP"):
@@ -283,5 +327,5 @@ def grid_from_dataset(ds, earth_radius=6370000):
         return _ioapi_grid_from_dataset(ds, earth_radius=earth_radius)
 
     # Try out platte carree
-
     # return _lonlat_grid_from_dataset(ds)
+    return None
