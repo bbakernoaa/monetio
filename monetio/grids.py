@@ -259,10 +259,17 @@ def get_optimal_cartopy_proj(lat: Any, lon: Any, proj4_srs: str) -> Any:
 
     Returns:
         cartopy.crs.Projection: The cartopy projection.
+
+    Raises:
+        RuntimeError: If the projection cannot be created (e.g., pyresample is not installed).
     """
     area = get_generic_projection_from_proj4(lat, lon, proj4_srs)
     if area is None:
-        return None
+        raise RuntimeError(
+            "Could not create projection from proj4 string. "
+            "This may be due to missing dependencies (e.g., pyresample not installed) "
+            "or an invalid proj4 string."
+        )
     return area.to_cartopy_crs()
 
 
