@@ -241,8 +241,7 @@ def get_generic_projection_from_proj4(lat: Any, lon: Any, proj4_srs: str) -> Any
         from pyresample.geometry import SwathDefinition
         from pyresample.utils import proj4_str_to_dict
     except ImportError:
-        print("please install pyresample to use this functionality")
-        return None
+        raise ImportError("pyresample is required for get_generic_projection_from_proj4; please install pyresample to use this functionality")
 
     swath = SwathDefinition(lats=lat, lons=lon)
     area = swath.compute_optimal_bb_area(proj4_str_to_dict(proj4_srs))
