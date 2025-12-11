@@ -82,7 +82,7 @@ def _sinu_grid_latlon_boundary(h: int, v: int) -> Tuple[float, float, float, flo
     td = _get_sinu_grid_df()
     o = td.loc[(td.ih == int(h)) & (td.iv == int(v))]
     if o.empty:
-         raise ValueError(f"Tile h={h}, v={v} not found in grid definition.")
+        raise ValueError(f"Tile h={h}, v={v} not found in grid definition.")
 
     latmin = o.lat_min.iloc[0]
     lonmin = o.lon_min.iloc[0]
