@@ -430,7 +430,7 @@ def calc_13_category_usda_soil_type(
     8 -- SILTY CLAY LOAM
     9 -- CLAY LOAM
     10 --SANDY CLAY
-    11 --SILY CLAY
+    11 --SILTY CLAY
     12 --CLAY
 
     Args:
