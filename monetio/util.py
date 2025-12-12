@@ -5,21 +5,18 @@ def nearest(items, pivot):
 def search_listinlist(array1, array2):
     import numpy as np
 
-    # find intersections
+    # Find common elements and their indices
+    # This vectorizes the search using np.isin which is significantly faster
+    # than iterating over the intersection set and calling np.where in a loop.
+    # It also correctly handles multidimensional arrays by flattening logic
+    # implicit in np.isin for the check, but np.where acts on original shape.
+    # We return the indices along the first dimension, matching original behavior.
 
-    s1 = set(array1.flatten())
-    s2 = set(array2.flatten())
+    mask1 = np.isin(array1, array2)
+    index1 = np.where(mask1)[0]
 
-    inter = s1.intersection(s2)
-
-    index1 = np.array([])
-    index2 = np.array([])
-    # find the indexes in array1
-    for i in inter:
-        index11 = np.where(array1 == i)
-        index22 = np.where(array2 == i)
-        index1 = np.concatenate([index1[:], index11[0]])
-        index2 = np.concatenate([index2[:], index22[0]])
+    mask2 = np.isin(array2, array1)
+    index2 = np.where(mask2)[0]
 
     return np.sort(np.int32(index1)), np.sort(np.int32(index2))
 
