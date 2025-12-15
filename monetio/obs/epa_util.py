@@ -334,6 +334,10 @@ def convert_statenames_to_abv(df):
     return df
 
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
 def read_monitor_file(network=None, airnow=False, drop_latlon=True):
     import os
 

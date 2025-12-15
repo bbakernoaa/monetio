@@ -95,10 +95,10 @@ def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
     return urls, fnames
 
 
-def remote_file_exists(file_url, *, verbose=True):
+def remote_file_exists(file_url, *, verbose=True, verify=True):
     import requests
 
-    r = requests.head(file_url)
+    r = requests.head(file_url, verify=verify)
 
     if r.status_code == 200:
         return True
@@ -151,7 +151,7 @@ def retrieve(url, fname, *, download=False, verbose=True):
         return p
 
 
-def _check_file_url(url, *, verbose=True):
+def _check_file_url(url, *, verbose=True, verify=True):
     """
     Raises
     ------
@@ -159,7 +159,7 @@ def _check_file_url(url, *, verbose=True):
         If the file URL HEAD request doesn't return 200,
         with info about how to check available products / data vars for the date.
     """
-    if not remote_file_exists(url, verbose=verbose):
+    if not remote_file_exists(url, verbose=verbose, verify=verify):
         raise ValueError(
             f"File does not exist on ICAP HTTPS server: {url}. "
             f"Check {url[:url.index('icap_')]} to see the available "
@@ -167,7 +167,9 @@ def _check_file_url(url, *, verbose=True):
         )
 
 
-def open_dataset(date, product="MMC", data_var="dustaod550", *, download=False, verbose=True):
+def open_dataset(
+    date, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=True
+):
     """
     Parameters
     ----------
@@ -210,13 +212,15 @@ def open_dataset(date, product="MMC", data_var="dustaod550", *, download=False, 
     urls, fnames = build_urls(d, filetype=product, data_var=data_var, verbose=verbose)
     url = urls.values[0]
     fname = fnames.values[0]
-    _check_file_url(url, verbose=verbose)
+    _check_file_url(url, verbose=verbose, verify=verify)
     dset = xr.open_dataset(retrieve(url, fname, download=download, verbose=verbose))
 
     return dset
 
 
-def open_mfdataset(dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True):
+def open_mfdataset(
+    dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=True
+):
     """
     .. note::
        Depending on the selected product/variable and the provided dates,
@@ -264,13 +268,13 @@ def open_mfdataset(dates, product="MMC", data_var="dustaod550", *, download=Fals
     if download is True:
         paths = []
         for url, fname in zip(urls, fnames):
-            _check_file_url(url, verbose=verbose)
+            _check_file_url(url, verbose=verbose, verify=verify)
             paths.append(retrieve(url, fname, download=True, verbose=verbose))
         dset = xr.open_mfdataset(paths, combine="nested", concat_dim="time")
     else:
         dsets = []
         for url, fname in zip(urls, fnames):
-            _check_file_url(url, verbose=verbose)
+            _check_file_url(url, verbose=verbose, verify=verify)
             o = retrieve(url, fname, download=False, verbose=verbose)
             dsets.append(xr.open_dataset(o))
         dset = xr.concat(dsets, dim="time")
