@@ -15,7 +15,6 @@ jobs:
   test:
     name: Test (Py ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11"]
