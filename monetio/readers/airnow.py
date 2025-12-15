@@ -2,6 +2,7 @@
 
 import os
 from datetime import datetime
+from functools import lru_cache
 
 import pandas as pd
 import dask
@@ -13,8 +14,6 @@ from monetio.obs.epa_util import read_monitor_file
 from monetio.util import long_to_wide
 from .drivers import FileUtility
 
-# Global variable to hold TimezoneFinder instance
-_TFinder = None
 
 @register_reader("airnow")
 class AirNowReader(PointReader):
@@ -203,10 +202,17 @@ def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
         elif bad_utcoffset == "drop":
             df.drop(bad_rows.index, inplace=True)
         elif bad_utcoffset == "fix":
-            df.loc[bad_rows.index, "utcoffset"] = bad_rows.apply(
-                lambda row: get_utcoffset(row.latitude, row.longitude),
+            # TimezoneFinder is slow, so only call it for unique locations
+            unique_locs = bad_rows.drop_duplicates(subset=["latitude", "longitude"])
+            tz_map = {
+                (lat, lon): get_utcoffset(lat, lon)
+                for lat, lon in zip(unique_locs.latitude, unique_locs.longitude)
+            }
+            s_offset = bad_rows.apply(
+                lambda row: tz_map.get((row.latitude, row.longitude)),
                 axis="columns",
             )
+            df.loc[bad_rows.index, "utcoffset"] = s_offset
         elif bad_utcoffset == "leave":
             pass
         else:
@@ -215,16 +221,21 @@ def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
     return df
 
 
+@lru_cache(maxsize=1)
+def _get_tf(*, in_memory=True):
+    import timezonefinder
+
+    return timezonefinder.TimezoneFinder(in_memory=in_memory)
+
+
+@lru_cache(maxsize=1024)
 def get_utcoffset(lat, lon):
     import warnings
 
     try:
         import pytz
-        import timezonefinder
     except ImportError:
-        warnings.warn(
-            "timezonefinder and/or pytz not installed, guessing UTC offset based on longitude"
-        )
+        warnings.warn("pytz not installed, guessing UTC offset based on longitude")
         do_guess = True
     else:
         do_guess = False
@@ -234,16 +245,14 @@ def get_utcoffset(lat, lon):
         return round(lon_ / 15, 0)
 
     else:
-        global _TFinder
-
-        if _TFinder is None:
-            _TFinder = timezonefinder.TimezoneFinder(in_memory=True)
-
-        finder = _TFinder
+        finder = _get_tf()
         tz_str = finder.timezone_at(lng=lon, lat=lat)
-        tz = pytz.timezone(tz_str)
-        uo = tz.utcoffset(datetime(2020, 1, 1), is_dst=False).total_seconds() / 3600
-        return uo
+        if tz_str:
+            tz = pytz.timezone(tz_str)
+            uo = tz.utcoffset(datetime(2020, 1, 1), is_dst=False).total_seconds() / 3600
+            return uo
+        else:
+            return nan
 
 
 def get_station_locations(df):
