@@ -134,8 +134,6 @@ def _check_file_url(url, *, verbose=True):
 def open_mfdataset_icap(
     dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True, **kwargs
 ):
-    import pandas as pd
-    import xarray as xr
 
     if product.upper() not in valid_filetypes:
         raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")

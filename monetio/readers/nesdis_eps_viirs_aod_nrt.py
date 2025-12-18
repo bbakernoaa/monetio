@@ -2,14 +2,13 @@
 
 import ftplib
 import os
-from typing import List, Optional, Union
+from typing import List, Union
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .drivers import FileUtility
 
 # Configuration
 SERVER = "ftp.star.nesdis.noaa.gov"

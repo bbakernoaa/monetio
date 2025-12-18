@@ -1,3 +1,18 @@
+"""
+MONET IO - A library for reading and processing atmospheric data.
+
+This package provides tools for working with various atmospheric data formats
+including model outputs, observations, and satellite data. It includes:
+
+- Data readers for multiple file formats
+- Grid processing utilities
+- Data transformation and analysis functions
+- Support for various atmospheric models and observation networks
+
+The main entry point is the `load()` function which provides a unified interface
+for loading different data sources.
+"""
+
 import importlib
 
 from . import grids

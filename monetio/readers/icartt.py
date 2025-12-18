@@ -1,7 +1,6 @@
 """ICARTT Reader"""
 
 import datetime
-import sys
 
 import pandas as pd
 import xarray as xr

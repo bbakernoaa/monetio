@@ -1,8 +1,53 @@
 def nearest(items, pivot):
+    """Find the nearest value in a list to a pivot point.
+
+    Parameters
+    ----------
+    items : list
+        List of values to search through
+    pivot : float
+        Target value to find the nearest match for
+
+    Returns
+    -------
+    float
+        The value from items that is closest to pivot
+
+    Examples
+    --------
+    >>> nearest([1.0, 2.5, 3.7, 4.2], 3.1)
+    3.7
+    """
     return min(items, key=lambda x: abs(x - pivot))
 
 
 def search_listinlist(array1, array2):
+    """Find common elements and their indices between two arrays.
+
+    This function uses vectorized operations with numpy.isin for efficient
+    searching, significantly faster than iterating over intersection sets.
+
+    Parameters
+    ----------
+    array1 : numpy.ndarray
+        First array to compare
+    array2 : numpy.ndarray
+        Second array to compare
+
+    Returns
+    -------
+    tuple
+        (index1, index2) where index1 are sorted indices of common elements in array1,
+        and index2 are sorted indices of common elements in array2
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> arr1 = np.array([1, 2, 3, 4, 5])
+    >>> arr2 = np.array([3, 4, 5, 6, 7])
+    >>> search_listinlist(arr1, arr2)
+    (array([2, 3, 4], dtype=int32), array([0, 1, 2], dtype=int32))
+    """
     import numpy as np
 
     # Find common elements and their indices
@@ -22,6 +67,31 @@ def search_listinlist(array1, array2):
 
 
 def linregress(x, y):
+    """Perform linear regression using statsmodels OLS.
+
+    Parameters
+    ----------
+    x : array-like
+        Independent variable data
+    y : array-like
+        Dependent variable data
+
+    Returns
+    -------
+    tuple
+        (slope, intercept, r_squared, standard_error) where:
+        - slope: slope of the regression line
+        - intercept: y-intercept of the regression line
+        - r_squared: coefficient of determination
+        - standard_error: standard error of the regression
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.array([1, 2, 3, 4, 5])
+    >>> y = np.array([2, 4, 5, 4, 5])
+    >>> slope, intercept, r2, std_err = linregress(x, y)
+    """
     import numpy as np
     import statsmodels.api as sm
 
@@ -35,6 +105,26 @@ def linregress(x, y):
 
 
 def findclosest(list, value):
+    """Find the closest value and its index in a list.
+
+    Parameters
+    ----------
+    list : list
+        List of values to search through
+    value : float
+        Target value to find the closest match for
+
+    Returns
+    -------
+    tuple
+        (index, closest_value) where index is the position of the closest value
+        in the list, and closest_value is the actual value
+
+    Examples
+    --------
+    >>> findclosest([1.0, 2.5, 3.7, 4.2], 3.1)
+    (2, 3.7)
+    """
     a = min((abs(x - value), x, i) for i, x in enumerate(list))
     return a[2], a[1]
 
@@ -65,6 +155,25 @@ def kolmogorov_zurbenko_filter(df, window, iterations):
 
 
 def wsdir2uv(ws, wdir):
+    """Convert wind speed and direction to U and V components.
+
+    Parameters
+    ----------
+    ws : float or array-like
+        Wind speed in m/s
+    wdir : float or array-like
+        Wind direction in degrees (0-360)
+
+    Returns
+    -------
+    tuple
+        (u, v) where u is the east-west wind component and v is the north-south component
+
+    Examples
+    --------
+    >>> wsdir2uv(10, 180)  # 10 m/s wind from south
+    (-10.0, 0.0)
+    """
     from numpy import cos, pi, sin
 
     u = -ws * sin(wdir * pi / 180.0)
@@ -73,6 +182,24 @@ def wsdir2uv(ws, wdir):
 
 
 def long_to_wide(df):
+    """Convert long format data to wide format with variables as columns.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame in long format with columns: time, siteid, variable, obs, units
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame in wide format with variables as columns and units as separate columns
+
+    Examples
+    --------
+    >>> # Convert from long format (time, siteid, variable, obs, units)
+    >>> # to wide format (time, siteid, var1, var2, ..., var1_unit, var2_unit, ...)
+    >>> wide_df = long_to_wide(long_df)
+    """
     w = df.pivot_table(values="obs", index=["time", "siteid"], columns="variable").reset_index()
 
     # Add units (columns)
@@ -89,6 +216,26 @@ def long_to_wide(df):
 
 
 def calc_8hr_rolling_max(df, col=None, window=None):
+    """Calculate 8-hour rolling maximum for a column in a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame with time_local and siteid columns
+    col : str
+        Column name to calculate rolling maximum for
+    window : int, optional
+        Window size for rolling calculation
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with original data merged with 8-hour rolling maximum values
+
+    Examples
+    --------
+    >>> df_with_max = calc_8hr_rolling_max(df, col='pm25', window=8)
+    """
     df.index = df.time_local
     df_rolling = (
         df.groupby("siteid")[col]
@@ -105,6 +252,24 @@ def calc_8hr_rolling_max(df, col=None, window=None):
 
 
 def calc_24hr_ave(df, col=None):
+    """Calculate 24-hour average for a column in a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame with time_local and siteid columns
+    col : str
+        Column name to calculate 24-hour average for
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with original data merged with 24-hour average values
+
+    Examples
+    --------
+    >>> df_with_ave = calc_24hr_ave(df, col='pm25')
+    """
     df.index = df.time_local
     df_24hr_ave = df.groupby("siteid")[col].resample("D").mean().reset_index()
     df = df.reset_index(drop=True)
@@ -112,6 +277,24 @@ def calc_24hr_ave(df, col=None):
 
 
 def calc_3hr_ave(df, col=None):
+    """Calculate 3-hour average for a column in a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame with time_local and siteid columns
+    col : str
+        Column name to calculate 3-hour average for
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with original data merged with 3-hour average values
+
+    Examples
+    --------
+    >>> df_with_ave = calc_3hr_ave(df, col='pm25')
+    """
     df.index = df.time_local
     df_3hr_ave = df.groupby("siteid")[col].resample("3H").mean().reset_index()
     df = df.reset_index(drop=True)
@@ -119,6 +302,24 @@ def calc_3hr_ave(df, col=None):
 
 
 def calc_annual_ave(df, col=None):
+    """Calculate annual average for a column in a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame with time_local and siteid columns
+    col : str
+        Column name to calculate annual average for
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with original data merged with annual average values
+
+    Examples
+    --------
+    >>> df_with_ave = calc_annual_ave(df, col='pm25')
+    """
     df.index = df.time_local
     df_annual_ave = df.groupby("siteid")[col].resample("A").mean().reset_index()
     df = df.reset_index(drop=True)

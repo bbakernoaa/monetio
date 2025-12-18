@@ -1,8 +1,6 @@
 """AQS Reader"""
 
-import inspect
 import os
-import warnings
 
 import pandas as pd
 
@@ -218,7 +216,7 @@ class AQS:
                         fnames.append(fname)
                     else:
                         print("File is Empty or Not Found. Not Processing", url)
-                except:
+                except Exception:
                     pass
         return urls, fnames
 

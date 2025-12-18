@@ -1,7 +1,6 @@
 """IMPROVE Reader"""
 
 import pandas as pd
-from numpy import nan
 
 from monetio.obs.epa_util import read_monitor_file
 
@@ -106,7 +105,7 @@ class IMPROVE:
 
         try:
             pass
-        except:
+        except Exception:
             pass
 
         return df.copy()

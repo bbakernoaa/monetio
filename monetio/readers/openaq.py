@@ -1,7 +1,6 @@
 """OpenAQ Reader"""
 
 import json
-import warnings
 
 import dask
 import dask.dataframe as dd
@@ -27,7 +26,6 @@ class OpenAQReader(PointReader):
 
 
 def read_json(fp_or_url, verbose=False):
-    import numpy as np
 
     # Simple pandas read if local or url
     try:
@@ -60,7 +58,7 @@ def read_json(fp_or_url, verbose=False):
         # This is fragile but matches original code intent
         try:
             utcoffset = pd.to_timedelta(new["date.local"].str.slice(-6, None) + ":00")
-        except:
+        except Exception:
             utcoffset = pd.Timedelta(0)
     else:
         utcoffset = pd.Timedelta(0)
@@ -132,7 +130,7 @@ class OPENAQ:
             if dates_have.empty:
                 raise ValueError(f"No data available for requested dates: {dates_requested}.")
             return dates_have
-        except:
+        except Exception:
             # If fs.ls fails (no internet), return requested dates assuming they exist?
             # Or raise.
             raise
@@ -142,7 +140,7 @@ class OPENAQ:
         try:
             files = self.fs.ls(f"{self.s3bucket}/{sdate}")
             return files
-        except:
+        except Exception:
             return []
 
     def build_urls(self, dates):

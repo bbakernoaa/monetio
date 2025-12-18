@@ -2,7 +2,7 @@
 
 import warnings
 from datetime import datetime
-from functools import lru_cache, partial
+from functools import lru_cache
 from io import BytesIO
 
 import numpy as np
@@ -51,7 +51,7 @@ class AERONETReader(PointReader):
                     with open(f) as fid:
                         if "Inversion" in fid.readline():
                             a.inv_type = True
-                except:
+                except Exception:
                     pass
 
                 a.new_aod_values = interp_to_aod_values

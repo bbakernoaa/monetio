@@ -92,7 +92,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
         try:
             r = requests.get(url, timeout=TIMEOUT)
             r.raise_for_status()
-        except:
+        except Exception:
             return []
 
         data = []
@@ -214,7 +214,7 @@ def read_100m(fp_or_url):
             if line.startswith(("Station:", "Station: ", "Station  ")):
                 break
         else:
-            raise ValueError(f"Expected to find metadata to start with Station")
+            raise ValueError("Expected to find metadata to start with Station")
         meta_block = "\n".join(block_lines[i:])
         data_block = blocks[1]
     else:

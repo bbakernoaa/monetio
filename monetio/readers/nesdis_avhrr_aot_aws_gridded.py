@@ -1,7 +1,7 @@
 """NESDIS AVHRR AOT AWS Gridded Reader"""
 
 from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Union
 
 import pandas as pd
 import s3fs

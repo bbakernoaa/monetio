@@ -214,7 +214,7 @@ class UFSReader(GriddedReader):
         # Time fix
         try:
             dset["time"] = dset.indexes["time"].to_datetimeindex(unsafe=True)
-        except:
+        except Exception:
             pass  # Already datetime or error
 
         if var_list is not None and bool(list_remove_extra_only):

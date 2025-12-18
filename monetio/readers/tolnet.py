@@ -116,7 +116,7 @@ class TOLNet:
 
             dataset.coords["latitude"] = (("y", "x"), array(latitude).reshape(1, 1))
             dataset.coords["longitude"] = (("y", "x"), array(longitude).reshape(1, 1))
-        except:
+        except Exception:
             pass
 
         return dataset

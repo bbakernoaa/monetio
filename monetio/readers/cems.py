@@ -3,7 +3,6 @@
 import datetime
 import os
 
-import numpy as np
 import pandas as pd
 
 from .base import PointReader, register_reader

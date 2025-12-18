@@ -447,11 +447,11 @@ def get_latlongrid(attrs, xindx, yindx):
     success = True
     try:
         lonlist = [lon[x - 1] for x in xindx]
-    except Exception as eee:
+    except Exception:
         success = False
     try:
         latlist = [lat[x - 1] for x in yindx]
-    except Exception as eee:
+    except Exception:
         success = False
     if not success:
         return None

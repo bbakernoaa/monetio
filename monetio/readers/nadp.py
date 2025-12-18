@@ -56,7 +56,7 @@ class NADP:
         # Load meta
         try:
             meta = pd.read_csv("https://bit.ly/2sPMvaO")
-        except:
+        except Exception:
             # Fallback path logic omitted as we assume web access or mock
             meta = pd.DataFrame(columns=["siteid", "latitude", "longitude"])
 
@@ -80,7 +80,7 @@ class NADP:
         try:
             meta = pd.read_csv("https://bit.ly/2Lq6kgq")
             meta.drop(["startdate", "stopdate"], axis=1, inplace=True)
-        except:
+        except Exception:
             meta = pd.DataFrame(columns=["siteid", "latitude", "longitude"])
 
         meta.columns = [i.lower() for i in meta.columns]
@@ -96,7 +96,7 @@ class NADP:
         try:
             meta = pd.read_csv("https://bit.ly/2xMlgTW")
             meta.drop(["startdate", "stopdate"], axis=1, inplace=True)
-        except:
+        except Exception:
             meta = pd.DataFrame(columns=["siteid", "latitude", "longitude"])
 
         meta.columns = [i.lower() for i in meta.columns]
@@ -132,7 +132,7 @@ class NADP:
         try:
             meta = pd.read_csv("https://bit.ly/2sJmkCg")
             meta.drop(["startdate", "stopdate"], axis=1, inplace=True)
-        except:
+        except Exception:
             meta = pd.DataFrame(columns=["siteid", "latitude", "longitude"])
 
         meta.columns = [i.lower() for i in meta.columns]
@@ -149,7 +149,7 @@ class NADP:
         try:
             meta = pd.read_csv("https://bit.ly/2sJmkCg")
             meta.drop(["startdate", "stopdate"], axis=1, inplace=True)
-        except:
+        except Exception:
             meta = pd.DataFrame(columns=["siteid", "latitude", "longitude"])
 
         meta.columns = [i.lower() for i in meta.columns]

@@ -16,10 +16,6 @@ class NESDISFRPReader(GriddedReader):
         """
         Reads NESDIS FRP data (Download + Binary Read).
         """
-        try:
-            from scipy.io import FortranFile
-        except ImportError:
-            raise ImportError("scipy is required to read NESDIS FRP files")
 
         current = os.getcwd()
         if not os.path.exists(datapath):
@@ -82,7 +78,10 @@ def download_data(date, ftype="meanFRP"):
 
 
 def read_tile(fname, tile=1, res="C384", dtype="f4"):
-    from scipy.io import FortranFile
+    try:
+        from scipy.io import FortranFile
+    except ImportError:
+        raise ImportError("scipy is required to read NESDIS FRP Binary files")
 
     try:
         import fv3grid as fg

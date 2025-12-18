@@ -1,12 +1,10 @@
 """CRN Reader"""
 
-import inspect
 import os
 
 import dask
 import dask.dataframe as dd
 import pandas as pd
-from numpy import array
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
@@ -189,7 +187,7 @@ class CRN:
         try:
             # For http, exists calls HEAD. For s3/local, it checks existence.
             return fs.exists(url)
-        except:
+        except Exception:
             return False
 
     def build_urls(self, monitors, dates, daily=False, sub_hourly=False):
@@ -224,7 +222,7 @@ class CRN:
 
             path = os.path.join(os.path.dirname(monetio.__file__), "data", "stations.tsv")
             self.monitor_df = pd.read_csv(path, delimiter="\t")
-        except:
+        except Exception:
             print("Could not load stations.tsv")
             self.monitor_df = pd.DataFrame(
                 columns=["STATE", "LOCATION", "VECTOR", "WBANNO", "LATITUDE", "LONGITUDE"]

@@ -2,7 +2,8 @@
 
 from glob import glob
 
-import xarray as xr
+import numpy as np
+import pandas as pd
 from numpy import sort
 from pandas import Timedelta, to_datetime
 
@@ -116,7 +117,7 @@ def _fix_time_nemsio(f, fname):
                     hour = int(hour_str)
                     tdelta = Timedelta(hour, unit="h")
                     tarray.append(pd.Timestamp(t) + tdelta)  # Assuming t is base time?
-                except:
+                except Exception:
                     tarray.append(t)
             time = to_datetime(tarray)
             f["time"] = time
@@ -130,7 +131,7 @@ def _fix_time_nemsio(f, fname):
             # f.time might be size > 1 if single file has multiple times?
             # Original: time = f.time.to_index() + tdelta
             f["time"] = f.time.to_index() + tdelta
-        except:
+        except Exception:
             pass
 
     return f

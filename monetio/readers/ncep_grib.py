@@ -1,10 +1,5 @@
 """NCEP GRIB Reader"""
 
-from glob import glob
-
-import xarray as xr
-from numpy import sort
-
 from .base import GriddedReader, register_reader
 
 

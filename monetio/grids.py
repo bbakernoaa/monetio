@@ -4,18 +4,24 @@ path = os.path.abspath(__file__)
 
 
 def _geos_16_grid(dset):
-    """Short summary.
+    """Create a GEOS-16 grid area definition from a dataset.
+
+    This function extracts projection parameters from a GEOS-16 dataset
+    and creates a pyresample AreaDefinition object for reprojection.
 
     Parameters
     ----------
-    dset : type
-        Description of parameter `dset`.
+    dset : xarray.Dataset
+        Input dataset containing GEOS-16 projection information
 
     Returns
     -------
-    type
-        Description of returned object.
+    pyresample.geometry.AreaDefinition
+        Area definition object for the GEOS-16 grid
 
+    Examples
+    --------
+    >>> area = _geos_16_grid(goes_dataset)
     """
     from numpy import asarray
     from pyresample import geometry
@@ -53,17 +59,20 @@ def _geos_16_grid(dset):
 
 
 def _get_sinu_grid_df():
-    """Short summary.
+    """Load MODIS sinusoidal grid boundary data from file.
 
-    Parameters
-    ----------
-
+    This function reads the MODIS sinusoidal grid boundary file
+    and returns a DataFrame with grid information.
 
     Returns
     -------
-    type
-        Description of returned object.
+    pandas.DataFrame
+        DataFrame containing MODIS sinusoidal grid boundaries with columns:
+        ih, iv, lat_min, lon_min, lat_max, lon_max, ihiv
 
+    Examples
+    --------
+    >>> grid_df = _get_sinu_grid_df()
     """
     from pandas import read_csv
 
@@ -161,22 +170,28 @@ def get_ioapi_pyresample_area_def(ds, proj4_srs):
 
 
 def get_generic_projection_from_proj4(lat, lon, proj4_srs):
-    """Short summary.
+    """Create a pyresample area definition from latitude, longitude, and PROJ.4 string.
+
+    This function creates a swath definition from the input coordinates
+    and computes the optimal bounding box area for the given projection.
 
     Parameters
     ----------
-    lat : type
-        Description of parameter `lat`.
-    lon : type
-        Description of parameter `lon`.
-    proj4_srs : type
-        Description of parameter `proj4_srs`.
+    lat : array-like
+        Latitude coordinates
+    lon : array-like
+        Longitude coordinates
+    proj4_srs : str
+        PROJ.4 string defining the target projection
 
     Returns
     -------
-    type
-        Description of returned object.
+    pyresample.geometry.AreaDefinition
+        Optimal bounding box area definition for the given projection
 
+    Examples
+    --------
+    >>> area = get_generic_projection_from_proj4(lat, lon, "+proj=lcc +lat_1=33 +lat_2=45 +lon_0=-95")
     """
     try:
         from pyresample.geometry import SwathDefinition
@@ -189,42 +204,54 @@ def get_generic_projection_from_proj4(lat, lon, proj4_srs):
 
 
 def get_optimal_cartopy_proj(lat, lon, proj4_srs):
-    """Short summary.
+    """Convert a pyresample area definition to a cartopy CRS.
+
+    This function creates an optimal area definition from the input coordinates
+    and projection, then converts it to a cartopy coordinate reference system.
 
     Parameters
     ----------
-    lat : type
-        Description of parameter `lat`.
-    lon : type
-        Description of parameter `lon`.
-    proj4_srs : type
-        Description of parameter `proj4_srs`.
+    lat : array-like
+        Latitude coordinates
+    lon : array-like
+        Longitude coordinates
+    proj4_srs : str
+        PROJ.4 string defining the target projection
 
     Returns
     -------
-    type
-        Description of returned object.
+    cartopy.crs.CRS
+        Cartopy coordinate reference system for the optimal area
 
+    Examples
+    --------
+    >>> crs = get_optimal_cartopy_proj(lat, lon, "+proj=lcc +lat_1=33 +lat_2=45 +lon_0=-95")
     """
     area = get_generic_projection_from_proj4(lat, lon, proj4_srs)
     return area.to_cartopy_crs()
 
 
 def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
-    """SGet the IOAPI projection out of the file into proj4.
+    """Extract IOAPI projection parameters and convert to PROJ.4 string.
+
+    This function reads IOAPI projection parameters from a dataset
+    and converts them to a PROJ.4 string for use with other GIS tools.
 
     Parameters
     ----------
-    ds : type
-        Description of parameter `ds`.
-    earth_radius : type
-        Description of parameter `earth_radius`.
+    ds : xarray.Dataset
+        Input dataset containing IOAPI projection parameters
+    earth_radius : float, optional
+        Earth radius in meters (default: 6370000)
 
     Returns
     -------
-    type
-        Description of returned object.
+    str
+        PROJ.4 string representing the IOAPI projection
 
+    Examples
+    --------
+    >>> proj4_str = _ioapi_grid_from_dataset(ioapi_dataset)
     """
 
     pargs = dict()
@@ -262,20 +289,26 @@ def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
 
 
 def grid_from_dataset(ds, earth_radius=6370000):
-    """Short summary.
+    """Extract grid projection information from a dataset.
+
+    This function automatically detects the grid type (IOAPI, Plate Carree, etc.)
+    and extracts the appropriate projection information.
 
     Parameters
     ----------
-    ds : type
-        Description of parameter `ds`.
-    earth_radius : type
-        Description of parameter `earth_radius`.
+    ds : xarray.Dataset
+        Input dataset containing grid/projection information
+    earth_radius : float, optional
+        Earth radius in meters (default: 6370000)
 
     Returns
     -------
-    type
-        Description of returned object.
+    str
+        PROJ.4 string representing the dataset's projection
 
+    Examples
+    --------
+    >>> proj4_str = grid_from_dataset(dataset)
     """
     # maybe its an IOAPI file
     if hasattr(ds, "IOAPI_VERSION") or hasattr(ds, "P_ALP"):

@@ -1,6 +1,5 @@
 """GEOMS Reader"""
 
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -166,7 +165,7 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
     ds = ds.set_coords(list(rename_main_dims))
 
     if "DATA_START_DATE" in attrs:
-        tstart_from_attr = pd.Timestamp(attrs["DATA_START_DATE"])
+        _ = pd.Timestamp(attrs["DATA_START_DATE"])
         if "DATETIME" in ds:
             t = _dti_from_mjd2000(ds.DATETIME)
             ds["DATETIME"].values = t
