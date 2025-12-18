@@ -280,7 +280,12 @@ def get_utcoffset(lat, lon):
             return nan
 
 
+@lru_cache(maxsize=1)
+def _read_monitor_file_cached():
+    return read_monitor_file(airnow=True)
+
+
 def get_station_locations(df):
-    monitor_df = read_monitor_file(airnow=True)
+    monitor_df = _read_monitor_file_cached()
     df = df.merge(monitor_df.drop_duplicates(), on="siteid", how="left", copy=False)
     return df
