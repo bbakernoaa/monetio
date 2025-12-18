@@ -18,10 +18,14 @@ from .obs import (
 from .profile import geoms, gml_ozonesonde, icartt, tolnet
 from .sat import goes
 
+from .readers.base import READER_REGISTRY
+import importlib
+
 __version__ = "0.3.0"
 
 __all__ = [
     "__version__",
+    "load",
     #
     # utility functions
     "rename_latlon",
@@ -68,6 +72,79 @@ __all__ = [
     "prepchem",
     "raqms",
 ]
+
+# Map reader names to their module paths for lazy loading
+_READER_MODULES = {
+    # Models
+    "cmaq": ".readers.cmaq",
+    "camx": ".readers.camx",
+    "fv3chem": ".readers.fv3chem",
+    "hysplit": ".readers.hysplit",
+    "hytraj": ".readers.hytraj",
+    "icap_mme": ".readers.icap_mme",
+    "ncep_grib": ".readers.ncep_grib",
+    "pardump": ".readers.pardump",
+    "prepchem": ".readers.prepchem",
+    "raqms": ".readers.raqms",
+    "ufs": ".readers.ufs",
+
+    # Obs
+    "airnow": ".readers.airnow",
+    "aeronet": ".readers.aeronet",
+    "aqs": ".readers.aqs",
+    "cems": ".readers.cems",
+    "crn": ".readers.crn",
+    "improve": ".readers.improve",
+    "ish": ".readers.ish",
+    "ish_lite": ".readers.ish_lite",
+    "nadp": ".readers.nadp",
+    "openaq": ".readers.openaq",
+    "pams": ".readers.pams",
+
+    # Profile
+    "icartt": ".readers.icartt",
+    "tolnet": ".readers.tolnet",
+    "geoms": ".readers.geoms",
+    "gml_ozonesonde": ".readers.gml_ozonesonde",
+
+    # Sat
+    "goes": ".readers.goes",
+    "nesdis_edr_viirs": ".readers.nesdis_edr_viirs",
+    "nesdis_eps_viirs": ".readers.nesdis_eps_viirs",
+    "modis_ornl": ".readers.modis_ornl",
+    "nasa_modis": ".readers.nasa_modis",
+    "nesdis_frp": ".readers.nesdis_frp",
+}
+
+def load(source: str, files=None, **kwargs):
+    """
+    Universal load function.
+
+    Usage:
+        ds = monetio.load("cmaq", files="/path/to/data*.nc")
+        df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
+
+    Available sources:
+        Models: cmaq, camx, fv3chem, hysplit, hytraj, icap_mme, ncep_grib, pardump, prepchem, raqms, ufs
+        Obs: airnow, aeronet, aqs, cems, crn, improve, ish, ish_lite, nadp, openaq, pams
+        Profile: icartt, tolnet, geoms, gml_ozonesonde
+        Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp
+    """
+    if source not in READER_REGISTRY:
+        if source in _READER_MODULES:
+            # Lazy import
+            importlib.import_module(_READER_MODULES[source], package="monetio")
+        else:
+            raise ValueError(f"Unknown source '{source}'. Available: {list(_READER_MODULES.keys())}")
+
+    if source not in READER_REGISTRY:
+        # Should be registered by now if module was valid
+        raise RuntimeError(f"Source '{source}' found in lazy index but failed to register itself.")
+
+    # Instantiate the reader class and open data
+    reader_cls = READER_REGISTRY[source]
+    reader = reader_cls()
+    return reader.open_dataset(files=files, **kwargs)
 
 
 def rename_latlon(ds):
