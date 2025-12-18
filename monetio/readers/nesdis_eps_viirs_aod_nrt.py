@@ -2,10 +2,12 @@
 
 import ftplib
 import os
+from typing import List, Optional, Union
+
+import numpy as np
 import pandas as pd
 import xarray as xr
-import numpy as np
-from typing import Union, List, Optional
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -13,20 +15,23 @@ from .drivers import FileUtility
 SERVER = "ftp.star.nesdis.noaa.gov"
 BASE_DIR = "/pub/smcd/VIIRS_Aerosol/npp.viirs.aerosol.data/epsaot550/"
 
+
 @register_reader("nesdis_eps_viirs_aod_nrt")
 class NESDISEPSVIIRSAODNRTReader(GriddedReader):
     """
     Reader for NESDIS EPS VIIRS AOD NRT data.
     """
 
-    def open_dataset(self,
-                     files: Union[str, List[str], None] = None,
-                     date: Union[str, pd.Timestamp, pd.DatetimeIndex, None] = None,
-                     satellite: str = "NOAA20",
-                     data_resolution: float = 0.1,
-                     daily: bool = True,
-                     error_missing: bool = False,
-                     **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: Union[str, List[str], None] = None,
+        date: Union[str, pd.Timestamp, pd.DatetimeIndex, None] = None,
+        satellite: str = "NOAA20",
+        data_resolution: float = 0.1,
+        daily: bool = True,
+        error_missing: bool = False,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads NESDIS EPS VIIRS AOD NRT data.
 
@@ -44,28 +49,25 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
         """
 
         if date is None:
-             if files is not None:
-                 if isinstance(files, str):
-                     date = files
-                 else:
-                     raise ValueError("Date is required for NESDIS EPS VIIRS AOD NRT reader.")
-             else:
+            if files is not None:
+                if isinstance(files, str):
+                    date = files
+                else:
+                    raise ValueError("Date is required for NESDIS EPS VIIRS AOD NRT reader.")
+            else:
                 raise ValueError("Date is required for NESDIS EPS VIIRS AOD NRT reader.")
 
         if isinstance(date, (list, pd.DatetimeIndex)) or (isinstance(date, str) and "," in date):
-             return self._open_mfdataset(
+            return self._open_mfdataset(
                 dates=date,
                 satellite=satellite,
                 data_resolution=data_resolution,
                 daily=daily,
-                error_missing=error_missing
+                error_missing=error_missing,
             )
         else:
             return self._open_dataset(
-                date=date,
-                satellite=satellite,
-                data_resolution=data_resolution,
-                daily=daily
+                date=date, satellite=satellite, data_resolution=data_resolution, daily=daily
             )
 
     def _build_urls(self, dates, *, daily=True, data_resolution=0.1, satellite="NOAA20"):
@@ -81,8 +83,10 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
             dates = dates.to_period("M").to_timestamp().unique()
 
         if data_resolution != 0.25 and not daily:
-            print("Monthly data is only available at 0.25 deg resolution, "
-                  f"got 'data_resolution' {data_resolution!r}")
+            print(
+                "Monthly data is only available at 0.25 deg resolution, "
+                f"got 'data_resolution' {data_resolution!r}"
+            )
 
         sat_dirname = satellite.lower()
         if satellite.upper() == "SNPP":
@@ -98,7 +102,8 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
         print("Building VIIRS URLs...")
         base_url = (
             "https://www.star.nesdis.noaa.gov/pub/smcd/VIIRS_Aerosol/viirs_aerosol_gridded_data/"
-            f"{sat_dirname}/{aod_dirname}/")
+            f"{sat_dirname}/{aod_dirname}/"
+        )
 
         for date in dates:
             if daily:
@@ -156,7 +161,8 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
 
         if satellite.lower() not in ("noaa20", "snpp"):
             raise ValueError(
-                f"Invalid input for 'satellite' {satellite!r}: " "Valid values are 'NOAA20' or 'SNPP'"
+                f"Invalid input for 'satellite' {satellite!r}: "
+                "Valid values are 'NOAA20' or 'SNPP'"
             )
 
         if data_resolution not in {0.1, 0.25}:
@@ -165,10 +171,13 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
                 "Valid values are 0.1 or 0.25"
             )
 
-        urls, _ = self._build_urls(d, satellite=satellite, data_resolution=data_resolution, daily=daily)
+        urls, _ = self._build_urls(
+            d, satellite=satellite, data_resolution=data_resolution, daily=daily
+        )
+
+        from io import BytesIO
 
         import requests
-        from io import BytesIO
 
         r = requests.get(urls[0], stream=True)
         r.raise_for_status()
@@ -178,11 +187,14 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
 
         return dset
 
-    def _open_mfdataset(self, dates, satellite="NOAA20", data_resolution=0.1, daily=True, error_missing=False):
+    def _open_mfdataset(
+        self, dates, satellite="NOAA20", data_resolution=0.1, daily=True, error_missing=False
+    ):
         """Open multiple datasets."""
         import warnings
         from collections.abc import Iterable
         from io import BytesIO
+
         import requests
 
         if isinstance(dates, Iterable) and not isinstance(dates, str):
@@ -192,7 +204,8 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
 
         if satellite.lower() not in ("noaa20", "snpp"):
             raise ValueError(
-                f"Invalid input for 'satellite' {satellite!r}: " "Valid values are 'NOAA20' or 'SNPP'"
+                f"Invalid input for 'satellite' {satellite!r}: "
+                "Valid values are 'NOAA20' or 'SNPP'"
             )
 
         if data_resolution not in {0.1, 0.25}:
@@ -201,7 +214,9 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
                 "Valid values are 0.1 or 0.25"
             )
 
-        urls, _ = self._build_urls(dates, satellite=satellite, data_resolution=data_resolution, daily=daily)
+        urls, _ = self._build_urls(
+            dates, satellite=satellite, data_resolution=data_resolution, daily=daily
+        )
 
         dsets = []
         for url, date in zip(urls, dates):
@@ -213,7 +228,11 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
                 else:
                     warnings.warn(msg)
             else:
-                ds = xr.open_dataset(BytesIO(r.content)).expand_dims(time=[date]).set_coords(["time"])
+                ds = (
+                    xr.open_dataset(BytesIO(r.content))
+                    .expand_dims(time=[date])
+                    .set_coords(["time"])
+                )
                 dsets.append(ds)
 
         if len(dsets) == 0:

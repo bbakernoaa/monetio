@@ -1,19 +1,17 @@
 """PARDUMP Reader"""
 
 import datetime
+
 import numpy as np
 import pandas as pd
+
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("pardump")
 class PardumpReader(PointReader):
-    def open_dataset(self,
-                     files,
-                     drange=None,
-                     century=2000,
-                     verbose=False,
-                     **kwargs):
+    def open_dataset(self, files, drange=None, century=2000, verbose=False, **kwargs):
         """
         Reads HYSPLIT PARDUMP binary files.
         """
@@ -33,9 +31,11 @@ class PardumpReader(PointReader):
         else:
             return pd.concat(dfs)
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/pardump.py
 # -----------------------------------------------------------------------------
+
 
 class Pardump:
     def __init__(self, fname="PARINIT"):
@@ -144,6 +144,6 @@ class Pardump:
                     testf = False
 
         if not parframe_all.empty:
-             parframe_all = pd.concat([parframe_all], keys=[self.fname])
+            parframe_all = pd.concat([parframe_all], keys=[self.fname])
 
         return parframe_all

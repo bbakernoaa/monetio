@@ -1,6 +1,5 @@
 """this will read the goes_r data"""
 
-import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -205,18 +204,16 @@ def add_goes_bands(
         the original dataset with the true color image array added.
     """
     # make green band
-    green = (
-        0.45 * dset[red_band]
-        + 0.1 * dset[veggie_band]
-        + 0.45 * dset[blue_band]
-    )
+    green = 0.45 * dset[red_band] + 0.1 * dset[veggie_band] + 0.45 * dset[blue_band]
 
     # Get the dimensions from one of the input bands
     dims = dset[red_band].dims
 
     # Create the true color image DataArray
     # Stack the bands along a new 'rgb' dimension
-    tci = xr.concat([dset[red_band], green, dset[blue_band]], dim="rgb").transpose(*(dims + ("rgb",)))
+    tci = xr.concat([dset[red_band], green, dset[blue_band]], dim="rgb").transpose(
+        *(dims + ("rgb",))
+    )
 
     # add to the dataset
     dset["tci"] = tci

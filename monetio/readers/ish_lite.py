@@ -1,25 +1,29 @@
 """ISH Lite Reader"""
 
-import numpy as np
-import pandas as pd
 import dask
 import dask.dataframe as dd
+import numpy as np
+import pandas as pd
+
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("ish_lite")
 class ISHLiteReader(PointReader):
-    def open_dataset(self,
-                     dates,
-                     box=None,
-                     country=None,
-                     state=None,
-                     site=None,
-                     resample=False,
-                     window="H",
-                     n_procs=1,
-                     verbose=False,
-                     **kwargs):
+    def open_dataset(
+        self,
+        dates,
+        box=None,
+        country=None,
+        state=None,
+        site=None,
+        resample=False,
+        window="H",
+        n_procs=1,
+        verbose=False,
+        **kwargs,
+    ):
         """
         Reads ISH Lite data.
         """
@@ -36,9 +40,11 @@ class ISHLiteReader(PointReader):
             verbose=verbose,
         )
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/ish_lite.py
 # -----------------------------------------------------------------------------
+
 
 class ISHLite:
     def __init__(self):
@@ -48,7 +54,8 @@ class ISHLite:
         self.verbose = False
 
     def read_ish_history(self, dates=None):
-        if dates is None: dates = self.dates
+        if dates is None:
+            dates = self.dates
         fname = self.history_file
 
         fs = FileUtility.get_fs(fname)
@@ -72,8 +79,10 @@ class ISHLite:
         return dfloc
 
     def build_urls(self, dates=None, sites=None):
-        if dates is None: dates = self.dates
-        if sites is None: sites = self.history
+        if dates is None:
+            dates = self.dates
+        if sites is None:
+            sites = self.history
 
         unique_years = pd.to_datetime(dates.year.unique(), format="%Y")
         furls = []
@@ -91,9 +100,20 @@ class ISHLite:
 
     def read_csv(self, fname):
         from numpy import nan
+
         columns = [
-            "year", "month", "day", "hour", "temp", "dew_pt_temp", "press",
-            "wdir", "ws", "sky_condition", "precip_1hr", "precip_6hr",
+            "year",
+            "month",
+            "day",
+            "hour",
+            "temp",
+            "dew_pt_temp",
+            "press",
+            "wdir",
+            "ws",
+            "sky_condition",
+            "precip_1hr",
+            "precip_6hr",
         ]
 
         # Use FileUtility

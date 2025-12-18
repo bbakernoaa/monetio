@@ -1,40 +1,28 @@
 """NESDIS VIIRS NDVI AWS Gridded Reader"""
 
+from typing import List, Union
+
 import pandas as pd
-import xarray as xr
 import s3fs
-from typing import Union, List, Optional
+import xarray as xr
+
 from .base import GriddedReader, register_reader
 
 # Configuration dictionary for different data products
 DATA_CONFIGS = {
     "vhi": {
-        "viirs": {
-            "path": "noaa-cdr-ndvi-pds/data/",
-            "pattern": "VIIRS-Land_*"
-        },
-        "avhrr": {
-            "path": "noaa-cdr-vegetation-health-pds/data/",
-            "pattern": "AVHRR-Land_*"
-        }
+        "viirs": {"path": "noaa-cdr-ndvi-pds/data/", "pattern": "VIIRS-Land_*"},
+        "avhrr": {"path": "noaa-cdr-vegetation-health-pds/data/", "pattern": "AVHRR-Land_*"},
     },
     "lai_fpar": {
-        "viirs": {
-            "path": "noaa-cdr-leaf-area-index-fapar-pds/data/",
-            "pattern": "VIIRS-Land_*"
-        },
-        'avhrr': {
-            "path": "noaa-cdr-leaf-area-index-fapar-pds/data/",
-            "pattern": "AVHRR-Land_*"
-        }
+        "viirs": {"path": "noaa-cdr-leaf-area-index-fapar-pds/data/", "pattern": "VIIRS-Land_*"},
+        "avhrr": {"path": "noaa-cdr-leaf-area-index-fapar-pds/data/", "pattern": "AVHRR-Land_*"},
     },
     "snow": {
-        "ims": {
-            "path": "noaa-cdr-snow-cover-extent-ims-nrt/",
-            "pattern": "snow_cover_extent_*"
-        }
-    }
+        "ims": {"path": "noaa-cdr-snow-cover-extent-ims-nrt/", "pattern": "snow_cover_extent_*"}
+    },
 }
+
 
 @register_reader("nesdis_viirs_ndvi_aws_gridded")
 class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
@@ -46,12 +34,16 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
         super().__init__()
         self.fs = s3fs.S3FileSystem(anon=True)
 
-    def _validate_inputs(self, date_generated: List[pd.Timestamp], data_type: str, sensor: str) -> None:
+    def _validate_inputs(
+        self, date_generated: List[pd.Timestamp], data_type: str, sensor: str
+    ) -> None:
         """
         Validates input parameters.
         """
         if data_type not in DATA_CONFIGS:
-            raise ValueError(f"Unsupported data type: {data_type}. Available types: {list(DATA_CONFIGS.keys())}")
+            raise ValueError(
+                f"Unsupported data type: {data_type}. Available types: {list(DATA_CONFIGS.keys())}"
+            )
 
         if sensor not in DATA_CONFIGS[data_type]:
             raise ValueError(
@@ -59,13 +51,21 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
                 f"Available sensors: {list(DATA_CONFIGS[data_type].keys())}"
             )
 
-    def _get_cached_file_list(self, year: str, prod_path: str, pattern: str, file_date: str) -> List[str]:
+    def _get_cached_file_list(
+        self, year: str, prod_path: str, pattern: str, file_date: str
+    ) -> List[str]:
         """
         Cached version of file listing to improve performance for repeated requests.
         """
         return self.fs.glob(f"{prod_path}{year}/{pattern}{file_date}_*.nc")
 
-    def _create_daily_data_list(self, date_generated: List[pd.Timestamp], data_type: str = "vhi", sensor: str = "viirs", warning: bool = False) -> List[str]:
+    def _create_daily_data_list(
+        self,
+        date_generated: List[pd.Timestamp],
+        data_type: str = "vhi",
+        sensor: str = "viirs",
+        warning: bool = False,
+    ) -> List[str]:
         """
         Creates a list of daily data files and calculates the total size of the files.
         """
@@ -80,10 +80,7 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
 
             try:
                 file_names = self._get_cached_file_list(
-                    year,
-                    config["path"],
-                    config["pattern"],
-                    file_date
+                    year, config["path"], config["pattern"], file_date
                 )
 
                 if file_names:
@@ -123,12 +120,14 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
 
         return dataset
 
-    def open_dataset(self,
-                     files: Union[str, List[str], None] = None,
-                     date: Union[str, pd.Timestamp, pd.DatetimeIndex, None] = None,
-                     data_type: str = "vhi",
-                     sensor: str = "viirs",
-                     **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: Union[str, List[str], None] = None,
+        date: Union[str, pd.Timestamp, pd.DatetimeIndex, None] = None,
+        data_type: str = "vhi",
+        sensor: str = "viirs",
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads NESDIS VIIRS NDVI AWS Gridded data.
 
@@ -144,40 +143,43 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
         """
 
         if date is None:
-             if files is not None:
-                 if isinstance(files, str):
-                     date = files
-                 else:
-                     raise ValueError("Date is required for NESDIS VIIRS NDVI AWS Gridded reader.")
-             else:
+            if files is not None:
+                if isinstance(files, str):
+                    date = files
+                else:
+                    raise ValueError("Date is required for NESDIS VIIRS NDVI AWS Gridded reader.")
+            else:
                 raise ValueError("Date is required for NESDIS VIIRS NDVI AWS Gridded reader.")
 
         if isinstance(date, (list, pd.DatetimeIndex)) or (isinstance(date, str) and "," in date):
-             return self._open_mfdataset(
-                dates=date,
-                data_type=data_type,
-                sensor=sensor
-            )
+            return self._open_mfdataset(dates=date, data_type=data_type, sensor=sensor)
         else:
-            return self._open_dataset(
-                date=date,
-                data_type=data_type,
-                sensor=sensor
-            )
+            return self._open_dataset(date=date, data_type=data_type, sensor=sensor)
 
-    def _open_dataset(self, date: Union[str, pd.Timestamp], data_type: str = "vhi", sensor: str = "viirs") -> xr.Dataset:
+    def _open_dataset(
+        self, date: Union[str, pd.Timestamp], data_type: str = "vhi", sensor: str = "viirs"
+    ) -> xr.Dataset:
         """Opens a dataset for the given date."""
         date_generated = [pd.Timestamp(date)] if isinstance(date, str) else [date]
 
         file_list = self._create_daily_data_list(date_generated, data_type=data_type, sensor=sensor)
 
         if len(file_list) == 0 or all(f is None for f in file_list):
-            raise ValueError(f"Files not available for {data_type} ({sensor}) and date: {date_generated[0]}")
+            raise ValueError(
+                f"Files not available for {data_type} ({sensor}) and date: {date_generated[0]}"
+            )
 
         dset = xr.open_dataset(self.fs.open(file_list[0]), decode_cf=False)
         return self._process_timeofday(dset)
 
-    def _open_mfdataset(self, dates: Union[pd.DatetimeIndex, pd.Timestamp, str], data_type: str = "vhi", sensor: str = "viirs", error_missing: bool = False, **kwargs) -> xr.Dataset:
+    def _open_mfdataset(
+        self,
+        dates: Union[pd.DatetimeIndex, pd.Timestamp, str],
+        data_type: str = "vhi",
+        sensor: str = "viirs",
+        error_missing: bool = False,
+        **kwargs,
+    ) -> xr.Dataset:
         """Opens and combines multiple NetCDF files into a single dataset."""
         if isinstance(dates, (str, pd.Timestamp)):
             dates = pd.DatetimeIndex([dates])
@@ -185,10 +187,7 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
             dates = pd.DatetimeIndex(dates)
 
         file_list = self._create_daily_data_list(
-            dates,
-            data_type=data_type,
-            sensor=sensor,
-            warning=not error_missing
+            dates, data_type=data_type, sensor=sensor, warning=not error_missing
         )
 
         if len(file_list) == 0 or all(f is None for f in file_list):
@@ -196,11 +195,7 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
 
         aws_files = [self.fs.open(f) for f in file_list if f is not None]
         dset = xr.open_mfdataset(
-            aws_files,
-            concat_dim="time",
-            combine="nested",
-            decode_cf=False,
-            **kwargs
+            aws_files, concat_dim="time", combine="nested", decode_cf=False, **kwargs
         )
 
         return self._process_timeofday(dset)

@@ -2,17 +2,18 @@
 
 import datetime
 import sys
+
 import pandas as pd
 import xarray as xr
 from numpy import nan
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("icartt")
 class ICARTTReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     **kwargs):
+    def open_dataset(self, files, **kwargs):
         """
         Reads ICARTT files.
         """
@@ -32,9 +33,11 @@ class ICARTTReader(GriddedReader):
         else:
             return xr.concat(ds_list, dim="time")
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/profile/icartt.py
 # -----------------------------------------------------------------------------
+
 
 def var_to_da(o, var_name, time):
     unit = o.units(var_name)
@@ -52,6 +55,7 @@ def var_to_da(o, var_name, time):
     da.attrs["units"] = unit
     da.attrs["missing_value"] = bad_val
     return da
+
 
 def class_to_xarray(o, time_str="Time_Start"):
     time_index = pd.to_datetime(o.times)
@@ -75,6 +79,7 @@ def class_to_xarray(o, time_str="Time_Start"):
                 pass
     return ds
 
+
 class Variable:
     @property
     def desc(self):
@@ -86,6 +91,7 @@ class Variable:
         self.scale = scale
         self.miss = str(miss)
         self.splitChar = ","
+
 
 class Dataset:
     @property
@@ -165,7 +171,9 @@ class Dataset:
         self.NVOL = int(dmp[1])
         dmp = self.__readline()
         self.dateValid = datetime.datetime.strptime("".join([f"{x:s}" for x in dmp[0:3]]), "%Y%m%d")
-        self.dateRevised = datetime.datetime.strptime("".join([f"{x:s}" for x in dmp[3:6]]), "%Y%m%d")
+        self.dateRevised = datetime.datetime.strptime(
+            "".join([f"{x:s}" for x in dmp[3:6]]), "%Y%m%d"
+        )
         self.dataInterval = float(self.__readline()[0])
         dmp = self.__readline()
         self.IVAR = Variable(dmp[0], dmp[1])
@@ -182,7 +190,10 @@ class Dataset:
             dvname += [dmp[0]]
             dvunits += [dmp[1]]
 
-        self.DVAR = [Variable(name, unit, scale, miss) for name, unit, scale, miss in zip(dvname, dvunits, dvscale, dvmiss)]
+        self.DVAR = [
+            Variable(name, unit, scale, miss)
+            for name, unit, scale, miss in zip(dvname, dvunits, dvscale, dvmiss)
+        ]
 
         nscom = int(self.__readline()[0])
         self.SCOM = [self.__readline(do_split=False) for i in range(0, nscom)]
@@ -203,7 +214,9 @@ class Dataset:
         if self.input_fhandle.closed:
             self.input_fhandle = open(self.input_fhandle.name)
         _ = [self.input_fhandle.readline() for _ in range(self.nheader)]
-        self.data = [self.__nan_miss_float(line.split(self.splitChar)) for line in self.input_fhandle]
+        self.data = [
+            self.__nan_miss_float(line.split(self.splitChar)) for line in self.input_fhandle
+        ]
         self.input_fhandle.close()
 
     def read(self):
@@ -225,7 +238,10 @@ class Dataset:
         self.dateRevised = datetime.datetime.today()
         self.dataInterval = 0
         self.IVAR = Variable("Time_Start", "seconds_from_0_hours_on_valid_date", 1.0, -9999999)
-        self.DVAR = [Variable("Time_Stop", "seconds_from_0_hours_on_valid_date", 1.0, -9999999), Variable("Some_Variable", "ppbv", 1.0, -9999999)]
+        self.DVAR = [
+            Variable("Time_Stop", "seconds_from_0_hours_on_valid_date", 1.0, -9999999),
+            Variable("Some_Variable", "ppbv", 1.0, -9999999),
+        ]
         self.SCOM = []
         self.NCOM = []
         self.data = [[1.0, 2.0, 45.0], [2.0, 3.0, 36.0]]
@@ -258,7 +274,7 @@ class Dataset:
 
                 self.input_fhandle = fs.open(f, "r", encoding=encoding)
             else:
-                self.input_fhandle = f # Assume it's a file-like object
+                self.input_fhandle = f  # Assume it's a file-like object
 
             self.read_header()
             if loadData:

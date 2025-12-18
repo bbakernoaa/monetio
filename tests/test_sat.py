@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+
 from monetio.sat import goes
 
 
@@ -21,11 +22,7 @@ def test_add_goes_bands_default():
     assert dset_tci.tci.shape == (1, 10, 10, 3)
 
     # Check the green band calculation
-    green = (
-        0.45 * dset.red.values
-        + 0.1 * dset.veggie.values
-        + 0.45 * dset.blue.values
-    )
+    green = 0.45 * dset.red.values + 0.1 * dset.veggie.values + 0.45 * dset.blue.values
     expected_tci = np.stack([dset.red.values, green, dset.blue.values], axis=-1)
     np.testing.assert_allclose(dset_tci.tci.values, expected_tci)
 
@@ -48,11 +45,7 @@ def test_add_goes_bands_custom_names():
     assert dset_tci.tci.shape == (1, 10, 10, 3)
 
     # Check the green band calculation
-    green = (
-        0.45 * dset.b2.values
-        + 0.1 * dset.b3.values
-        + 0.45 * dset.b1.values
-    )
+    green = 0.45 * dset.b2.values + 0.1 * dset.b3.values + 0.45 * dset.b1.values
     expected_tci = np.stack([dset.b2.values, green, dset.b1.values], axis=-1)
     np.testing.assert_allclose(dset_tci.tci.values, expected_tci)
 

@@ -202,7 +202,9 @@ def _check_file_url(url, *, verbose=True, verify=False):
         )
 
 
-def open_dataset(date, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=False):
+def open_dataset(
+    date, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=False
+):
     """
     Parameters
     ----------
@@ -253,7 +255,9 @@ def open_dataset(date, product="MMC", data_var="dustaod550", *, download=False, 
     return dset
 
 
-def open_mfdataset(dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=False):
+def open_mfdataset(
+    dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=False
+):
     """
     .. note::
        Depending on the selected product/variable and the provided dates,

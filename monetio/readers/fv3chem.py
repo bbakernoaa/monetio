@@ -1,11 +1,13 @@
 """FV3-CHEM Reader"""
 
+from glob import glob
+
 import xarray as xr
 from numpy import sort
-from glob import glob
 from pandas import Timedelta, to_datetime
 
 from .base import GriddedReader, register_reader
+
 
 @register_reader("fv3chem")
 class FV3ChemReader(GriddedReader):
@@ -32,20 +34,20 @@ class FV3ChemReader(GriddedReader):
             expanded_files = sort(files)
 
         if len(expanded_files) == 0:
-             raise FileNotFoundError(f"No files found for {files}")
+            raise FileNotFoundError(f"No files found for {files}")
 
         names, nemsio, grib = self._check_file_type(expanded_files)
 
         if not nemsio and not grib:
-             # Fallback or error
-             # Original code raises ValueError
-             raise ValueError("File format not recognized. Ensure nemsio or grib2/grb2 in filename.")
+            # Fallback or error
+            # Original code raises ValueError
+            raise ValueError("File format not recognized. Ensure nemsio or grib2/grb2 in filename.")
 
         # Prepare kwargs
-        if 'concat_dim' not in kwargs:
-            kwargs['concat_dim'] = 'time'
-        if 'combine' not in kwargs:
-            kwargs['combine'] = 'nested' # Default for mfdataset usually
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "time"
+        if "combine" not in kwargs:
+            kwargs["combine"] = "nested"  # Default for mfdataset usually
 
         # Open
         ds = self.driver.open(names, **kwargs)
@@ -71,23 +73,25 @@ class FV3ChemReader(GriddedReader):
             grib = True
         return names, nemsio, grib
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/fv3chem.py
 # -----------------------------------------------------------------------------
+
 
 def _fix_time_nemsio(f, fname):
 
     time = None
     # If fname is a list, we handle it.
-    is_multi = isinstance(fname, (list, tuple,  np.ndarray)) and len(fname) > 1
+    is_multi = isinstance(fname, (list, tuple, np.ndarray)) and len(fname) > 1
 
     if "time" in f.coords and f.time.size > 1 and is_multi:
-         # This logic seems to assume one time per file usually?
-         # Original code: zip(f.time.to_index(), fname)
-         # This implies f.time length equals fname length?
-         # If open_mfdataset concatenated them, f.time has all times.
-         # We need to be careful.
-         pass
+        # This logic seems to assume one time per file usually?
+        # Original code: zip(f.time.to_index(), fname)
+        # This implies f.time length equals fname length?
+        # If open_mfdataset concatenated them, f.time has all times.
+        # We need to be careful.
+        pass
 
     # Re-implementing logic carefully.
     # The original logic extracted hour from filename and added to time index?
@@ -102,20 +106,20 @@ def _fix_time_nemsio(f, fname):
         tarray = []
         # If f.time matches fname length (one time per file)
         if f.time.size == len(fname):
-             # Try to use existing time index if possible, but original code ignores it mostly
-             # except as a base? "t + tdelta"
-             # But "t" comes from f.time.to_index().
-             times = f.time.values
-             for t, fn in zip(times, fname):
+            # Try to use existing time index if possible, but original code ignores it mostly
+            # except as a base? "t + tdelta"
+            # But "t" comes from f.time.to_index().
+            times = f.time.values
+            for t, fn in zip(times, fname):
                 try:
                     hour_str = [i for i in fn.split(".") if "atmf" in i][0][-3:]
                     hour = int(hour_str)
                     tdelta = Timedelta(hour, unit="h")
-                    tarray.append(pd.Timestamp(t) + tdelta) # Assuming t is base time?
+                    tarray.append(pd.Timestamp(t) + tdelta)  # Assuming t is base time?
                 except:
                     tarray.append(t)
-             time = to_datetime(tarray)
-             f["time"] = time
+            time = to_datetime(tarray)
+            f["time"] = time
     else:
         # Single file
         fn = fname[0] if isinstance(fname, (list, tuple)) else fname
@@ -131,13 +135,15 @@ def _fix_time_nemsio(f, fname):
 
     return f
 
+
 def _fix_nemsio(f):
     f = _rename_func(f, {})
     try:
         f["geohgt"] = _calc_nemsio_hgt(f)
     except Exception:
-        pass # print("geoht calculation not completed")
+        pass  # print("geoht calculation not completed")
     return f
+
 
 def _rename_func(f, rename_dict):
     final_dict = {}
@@ -151,8 +157,9 @@ def _rename_func(f, rename_dict):
     try:
         f = f.rename({"pp25": "pm25", "pp10": "pm10"})
     except ValueError:
-        pass # print("PM25 and PM10 are not available")
+        pass  # print("PM25 and PM10 are not available")
     return f
+
 
 def _fix_grib2(f):
     rename_dict = {
@@ -249,17 +256,17 @@ def _fix_grib2(f):
 
     if "latitude" not in f.coords:
         if "lat_0" in f.coords:
-             f = f.rename({"lat_0": "latitude", "lon_0": "longitude"})
+            f = f.rename({"lat_0": "latitude", "lon_0": "longitude"})
         elif "lat" in f.coords:
-             f = f.rename({"lat": "latitude", "lon": "longitude"})
+            f = f.rename({"lat": "latitude", "lon": "longitude"})
 
     # Create 2D grid if 1D (Meshgrid)
     # The original code did manual meshgrid logic.
     if f.latitude.ndim == 1 and f.longitude.ndim == 1:
         from numpy import meshgrid
+
         # Original logic implies lat/lon were 1D arrays of unique values?
         # "f['latitude'] = range(len(f.latitude))" -> this suggests original coords were 1D
-
         # NOTE: XarrayDriver typically gives what xarray gives.
         # If we want to replicate exactly:
         lat_vals = f.latitude.values
@@ -267,9 +274,9 @@ def _fix_grib2(f):
 
         # Rename dims to y, x if not present
         if "lat_0" in f.dims:
-             f = f.rename({"lat_0": "y", "lon_0": "x"})
-        elif "latitude" in f.dims: # If we renamed coords above
-             f = f.rename({"latitude": "y", "longitude": "x"})
+            f = f.rename({"lat_0": "y", "lon_0": "x"})
+        elif "latitude" in f.dims:  # If we renamed coords above
+            f = f.rename({"latitude": "y", "longitude": "x"})
 
         lon, lat = meshgrid(lon_vals, lat_vals)
         f["longitude"] = (("y", "x"), lon)
@@ -277,6 +284,7 @@ def _fix_grib2(f):
         f = f.set_coords(["latitude", "longitude"])
 
     return f
+
 
 def _calc_nemsio_hgt(f):
     sfc = f.hgtsfc

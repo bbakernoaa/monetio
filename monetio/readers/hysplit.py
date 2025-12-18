@@ -1,22 +1,27 @@
 """HYSPLIT Reader"""
 
 import datetime
+
 import numpy as np
 import pandas as pd
 import xarray as xr
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("hysplit")
 class HYSPLITReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     drange=None,
-                     century=None,
-                     verbose=False,
-                     sample_time_stamp="start",
-                     check_grid=True,
-                     **kwargs):
+    def open_dataset(
+        self,
+        files,
+        drange=None,
+        century=None,
+        verbose=False,
+        sample_time_stamp="start",
+        check_grid=True,
+        **kwargs,
+    ):
         """
         Reads HYSPLIT binary concentration (cdump) files.
         """
@@ -29,25 +34,27 @@ class HYSPLITReader(GriddedReader):
                 century=century,
                 verbose=verbose,
                 sample_time_stamp=sample_time_stamp,
-                check_grid=check_grid
+                check_grid=check_grid,
             )
         else:
-            blist = [(f, f, 'met') for f in file_list]
+            blist = [(f, f, "met") for f in file_list]
             return combine_dataset(
                 blist,
                 drange=drange,
                 century=century,
                 verbose=verbose,
                 sample_time_stamp=sample_time_stamp,
-                check_grid=check_grid
+                check_grid=check_grid,
             )
 
     def harmonize(self, ds):
         return ds
 
+
 # -----------------------------------------------------------------------------
 # HYSPLIT Core Logic Ported
 # -----------------------------------------------------------------------------
+
 
 def open_dataset_hysplit(
     fname,
@@ -70,6 +77,7 @@ def open_dataset_hysplit(
         return fix_grid_continuity(dset)
     else:
         return dset
+
 
 class ModelBin:
     def __init__(
@@ -376,6 +384,7 @@ class ModelBin:
             return False
         return True
 
+
 def check_drange(drange, pdate1, pdate2):
     savedata = True
     testf = True
@@ -389,6 +398,7 @@ def check_drange(drange, pdate1, pdate2):
     else:
         savedata = False
     return testf, savedata
+
 
 def fix_grid_continuity(dset):
     if not dset.any():
@@ -413,6 +423,7 @@ def fix_grid_continuity(dset):
     cdset = cdset.assign_coords(longitude=(("y", "x"), mgrid[0]))
     return cdset.fillna(0)
 
+
 def check_grid_continuity(dset):
     xvv = dset.x.values
     yvv = dset.y.values
@@ -423,6 +434,7 @@ def check_grid_continuity(dset):
     if np.any(tt2 != 1):
         return False
     return True
+
 
 def get_latlongrid(attrs, xindx, yindx):
     xindx = np.array(xindx)
@@ -446,6 +458,7 @@ def get_latlongrid(attrs, xindx, yindx):
     mgrid = np.meshgrid(lonlist, latlist)
     return mgrid
 
+
 def getlatlon(attrs):
     lon_tolerance = 0.001
     llcrnr_lat = attrs["llcrnr latitude"]
@@ -461,6 +474,7 @@ def getlatlon(attrs):
     lon = np.array([x - 360 if x >= 180 + lon_tolerance else x for x in lon])
     return lat, lon
 
+
 def combine_dataset(
     blist,
     drange=None,
@@ -471,6 +485,7 @@ def combine_dataset(
     check_grid=True,
 ):
     import sys
+
     mlat_p = mlon_p = None
     ylist = []
     dtlist = []
@@ -567,6 +582,7 @@ def combine_dataset(
         rval = newhxr
     return rval
 
+
 def add_species(dset, species=None):
     sflist = []
     splist = dset.attrs["Species ID"]
@@ -590,6 +606,7 @@ def add_species(dset, species=None):
     atthash["Species ID"] = sflist
     total_par = total_par.assign_attrs(atthash)
     return total_par
+
 
 def reset_latlon_coords(hxr):
     mgrid = get_latlongrid(hxr.attrs, hxr.x.values, hxr.y.values)

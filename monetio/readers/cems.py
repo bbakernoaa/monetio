@@ -2,19 +2,24 @@
 
 import datetime
 import os
+
 import numpy as np
 import pandas as pd
+
 from .base import PointReader, register_reader
+
 
 @register_reader("cems")
 class CEMSReader(PointReader):
-    def open_dataset(self,
-                     rdate,
-                     states=["md"],
-                     download=False,
-                     verbose=True,
-                     files=None, # Support local files directly
-                     **kwargs):
+    def open_dataset(
+        self,
+        rdate,
+        states=["md"],
+        download=False,
+        verbose=True,
+        files=None,  # Support local files directly
+        **kwargs,
+    ):
         """
         Reads CEMS data.
         """
@@ -37,12 +42,15 @@ class CEMSReader(PointReader):
         else:
             return c.add_data(rdate, states=states, download=download, verbose=verbose)
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/cems_mod.py
 # -----------------------------------------------------------------------------
 
+
 def getdegrees(degrees, minutes, seconds):
     return degrees + minutes / 60.0 + seconds / 3600.00
+
 
 def addmonth(dt):
     month = dt.month + 1
@@ -61,6 +69,7 @@ def addmonth(dt):
                 day = 28
     return datetime.datetime(year, month, day, hour)
 
+
 def get_date_fmt(date, verbose=False):
     temp = date.split("-")
     if len(temp[0]) == 4:
@@ -68,6 +77,7 @@ def get_date_fmt(date, verbose=False):
     else:
         fmt = "%m-%d-%Y %H"
     return fmt
+
 
 class CEMS:
     def __init__(self):
@@ -99,7 +109,8 @@ class CEMS:
         else:
             rdatelist = [rdate]
         for rd in rdatelist:
-            if verbose: print("getting data", rd)
+            if verbose:
+                print("getting data", rd)
             for st in states:
                 url = self.retrieve(rd, st, download=download, verbose=verbose)
                 self.load(url, verbose=verbose)
@@ -190,6 +201,6 @@ class CEMS:
         if self.df.empty:
             self.df = dftemp
         else:
-            self.df = pd.concat([self.df, dftemp]) # Fixed append
+            self.df = pd.concat([self.df, dftemp])  # Fixed append
 
         return dftemp

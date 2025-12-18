@@ -34,7 +34,9 @@ def test_open_mfdataset():
     # This test should be updated to use open_mfdataset or removed
     # For now, we'll test that it raises the expected error
     dates = ["2023-01-01", "2023-01-02"]
-    with pytest.raises(ValueError, match="Date is required for NESDIS AVHRR AOT AWS Gridded reader."):
+    with pytest.raises(
+        ValueError, match="Date is required for NESDIS AVHRR AOT AWS Gridded reader."
+    ):
         avhrr_reader.open_dataset(dates)
 
 
@@ -42,7 +44,9 @@ def test_open_mfdataset_error():
     dates = ["1900-01-01", "2023-01-01"]
 
     # The new reader raises ValueError instead of warning for missing dates
-    with pytest.raises(ValueError, match="Date is required for NESDIS AVHRR AOT AWS Gridded reader."):
+    with pytest.raises(
+        ValueError, match="Date is required for NESDIS AVHRR AOT AWS Gridded reader."
+    ):
         avhrr_reader.open_dataset(dates)
 
     # Test single date that doesn't exist

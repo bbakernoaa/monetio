@@ -1,18 +1,15 @@
 """GOES Reader"""
 
 import pandas as pd
-import xarray as xr
 import s3fs
+import xarray as xr
+
 from .base import GriddedReader, register_reader
+
 
 @register_reader("goes")
 class GOESReader(GriddedReader):
-    def open_dataset(self,
-                     date=None,
-                     filename=None,
-                     satellite="16",
-                     product=None,
-                     **kwargs):
+    def open_dataset(self, date=None, filename=None, satellite="16", product=None, **kwargs):
         """
         Reads GOES data (S3 or local).
         """
@@ -20,7 +17,9 @@ class GOESReader(GriddedReader):
         if filename is None:
             # S3 mode
             if date is None or product is None:
-                raise ValueError("Please provide a date and product to be able to retrieve data from Amazon S3")
+                raise ValueError(
+                    "Please provide a date and product to be able to retrieve data from Amazon S3"
+                )
             ds = g.open_amazon_file(date=date, satellite=satellite, product=product)
         else:
             # Local mode
@@ -28,9 +27,11 @@ class GOESReader(GriddedReader):
 
         return ds
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/sat/goes.py
 # -----------------------------------------------------------------------------
+
 
 class GOES:
     def __init__(self):
@@ -47,7 +48,8 @@ class GOES:
 
     def get_products(self):
         # Requires s3fs
-        if self.fs is None: self._set_s3fs()
+        if self.fs is None:
+            self._set_s3fs()
         products = [value.split("/")[-1] for value in self.fs.ls(self.baseurl)[:-1]]
         return products
 
@@ -68,7 +70,8 @@ class GOES:
             return []
 
     def _get_closest_date(self, files=[]):
-        if not files: return None
+        if not files:
+            return None
         file_dates = [pd.to_datetime(f.split("_")[-1][:-4], format="c%Y%j%H%M%S") for f in files]
         date = pd.Timestamp(self.date)
         nearest_date = min(file_dates, key=lambda x: abs(x - date))
@@ -81,7 +84,8 @@ class GOES:
 
     def _product_exists(self, product):
         try:
-            if self.fs is None: self._set_s3fs()
+            if self.fs is None:
+                self._set_s3fs()
             products = self.get_products()
             if product not in products:
                 raise ValueError
@@ -97,14 +101,16 @@ class GOES:
         self._update_baseurl()
         self._set_s3fs()
         self.product = self._product_exists(product)
-        if not self.product: return xr.Dataset()
+        if not self.product:
+            return xr.Dataset()
 
         self.url = f"{self.baseurl}{self.product}/"
         self.date_to_url()
 
         files = self._get_files(url=self.url)
         f = self._get_closest_date(files=files)
-        if not f: return xr.Dataset()
+        if not f:
+            return xr.Dataset()
 
         # s3fs open returns a file-like object
         fo = self.fs.open(f)
@@ -138,6 +144,7 @@ class GOES:
         # We can use FileUtility.get_fs logic if we want to be consistent, but original used direct s3fs for remote
         # For local, assume f is path
         from .drivers import FileUtility
+
         fs = FileUtility.get_fs(f)
         fo = fs.open(f)
         out = xr.open_dataset(fo, engine="h5netcdf")

@@ -3,25 +3,31 @@
 import inspect
 import os
 import warnings
+
 import pandas as pd
-from .base import PointReader, register_reader
+
 from monetio.obs.epa_util import read_monitor_file
 from monetio.util import long_to_wide
+
+from .base import PointReader, register_reader
 from .drivers import FileUtility
+
 
 @register_reader("aqs")
 class AQSReader(PointReader):
-    def open_dataset(self,
-                     dates,
-                     param=None,
-                     daily=False,
-                     network=None,
-                     download=False,
-                     local=False,
-                     wide_fmt=True,
-                     n_procs=1,
-                     meta=False,
-                     **kwargs):
+    def open_dataset(
+        self,
+        dates,
+        param=None,
+        daily=False,
+        network=None,
+        download=False,
+        local=False,
+        wide_fmt=True,
+        n_procs=1,
+        meta=False,
+        **kwargs,
+    ):
         """
         Reads AQS data.
         """
@@ -42,24 +48,56 @@ class AQSReader(PointReader):
         else:
             return df
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/aqs.py
 # -----------------------------------------------------------------------------
+
 
 class AQS:
     def __init__(self):
         self.objtype = "AQS"
         self.baseurl = "https://aqs.epa.gov/aqsweb/airdata/"
         self.renameddcols = [
-            "time", "state_code", "county_code", "site_num", "parameter_code", "poc",
-            "latitude", "longitude", "datum", "parameter_name", "sample_duration",
-            "pollutant_standard", "units", "event_type", "observation_count",
-            "observation_percent", "obs", "1st_max_value", "1st_max_hour", "aqi",
-            "method_code", "method_name", "local_site_name", "address", "state_name",
-            "county_name", "city_name", "msa_name", "date_of_last_change",
+            "time",
+            "state_code",
+            "county_code",
+            "site_num",
+            "parameter_code",
+            "poc",
+            "latitude",
+            "longitude",
+            "datum",
+            "parameter_name",
+            "sample_duration",
+            "pollutant_standard",
+            "units",
+            "event_type",
+            "observation_count",
+            "observation_percent",
+            "obs",
+            "1st_max_value",
+            "1st_max_hour",
+            "aqi",
+            "method_code",
+            "method_name",
+            "local_site_name",
+            "address",
+            "state_name",
+            "county_name",
+            "city_name",
+            "msa_name",
+            "date_of_last_change",
         ]
         self.savecols = [
-            "time_local", "time", "siteid", "latitude", "longitude", "obs", "units", "variable",
+            "time_local",
+            "time",
+            "siteid",
+            "latitude",
+            "longitude",
+            "obs",
+            "units",
+            "variable",
         ]
         self.df = pd.DataFrame()
         self.monitor_file = None
@@ -127,22 +165,38 @@ class AQS:
             fname = "hourly_"
 
         p = param.upper()
-        if p in ["OZONE", "O3"]: code = "44201_"
-        elif p == "PM2.5": code = "88101_"
-        elif p == "PM2.5_FRM": code = "88502_"
-        elif p == "PM10": code = "81102_"
-        elif p == "SO2": code = "42401_"
-        elif p == "NO2": code = "42602_"
-        elif p == "CO": code = "42101_"
-        elif p == "NONOXNOY": code = "NONOxNOy_"
-        elif p == "VOC": code = "VOCS_"
-        elif p == "SPEC": code = "SPEC_"
-        elif p == "PM10SPEC": code = "PM10SPEC_"
-        elif p == "WIND": code = "WIND_"
-        elif p == "TEMP": code = "TEMP_"
-        elif p == "RHDP": code = "RH_DP_"
-        elif p in ["WS", "WDIR"]: code = "WIND_"
-        else: code = p + "_"
+        if p in ["OZONE", "O3"]:
+            code = "44201_"
+        elif p == "PM2.5":
+            code = "88101_"
+        elif p == "PM2.5_FRM":
+            code = "88502_"
+        elif p == "PM10":
+            code = "81102_"
+        elif p == "SO2":
+            code = "42401_"
+        elif p == "NO2":
+            code = "42602_"
+        elif p == "CO":
+            code = "42101_"
+        elif p == "NONOXNOY":
+            code = "NONOxNOy_"
+        elif p == "VOC":
+            code = "VOCS_"
+        elif p == "SPEC":
+            code = "SPEC_"
+        elif p == "PM10SPEC":
+            code = "PM10SPEC_"
+        elif p == "WIND":
+            code = "WIND_"
+        elif p == "TEMP":
+            code = "TEMP_"
+        elif p == "RHDP":
+            code = "RH_DP_"
+        elif p in ["WS", "WDIR"]:
+            code = "WIND_"
+        else:
+            code = p + "_"
 
         url = beginning + code + year + ".zip"
         fname = fname + code + year + ".zip"
@@ -150,6 +204,7 @@ class AQS:
 
     def build_urls(self, params, dates, daily=False):
         import requests
+
         years = pd.DatetimeIndex(dates).year.unique().astype(str)
         urls = []
         fnames = []
@@ -194,8 +249,18 @@ class AQS:
 
         if param is None:
             params = [
-                "SPEC", "PM10", "PM2.5", "PM2.5_FRM", "CO", "OZONE", "SO2",
-                "VOC", "NONOXNOY", "WIND", "TEMP", "RHDP",
+                "SPEC",
+                "PM10",
+                "PM2.5",
+                "PM2.5_FRM",
+                "CO",
+                "OZONE",
+                "SO2",
+                "VOC",
+                "NONOXNOY",
+                "WIND",
+                "TEMP",
+                "RHDP",
             ]
         elif isinstance(param, str):
             params = [param]
@@ -229,7 +294,9 @@ class AQS:
             self.monitor_df = read_monitor_file()
 
         if network is not None:
-            monitors = self.monitor_df.loc[self.monitor_df.isin([network])].drop_duplicates(subset=["siteid"])
+            monitors = self.monitor_df.loc[self.monitor_df.isin([network])].drop_duplicates(
+                subset=["siteid"]
+            )
         else:
             monitors = self.monitor_df.drop_duplicates(subset=["siteid"])
 
@@ -252,12 +319,29 @@ class AQS:
             return df
 
         mapping = {
-            88101: "PM2.5", 88502: "PM2.5", 44201: "OZONE", 81102: "PM10",
-            42401: "SO2", 42602: "NO2", 42101: "CO", 62101: "TEMP",
-            88305: "OC", 88306: "NO3f", 88307: "ECf", 88316: "ECf_optical",
-            88403: "SO4f", 88312: "TCf", 42600: "NOY", 42601: "NO", 42603: "NOX",
-            61103: "WS", 61101: "WS", 61104: "WD", 61102: "WD",
-            62201: "RH", 62103: "DP"
+            88101: "PM2.5",
+            88502: "PM2.5",
+            44201: "OZONE",
+            81102: "PM10",
+            42401: "SO2",
+            42602: "NO2",
+            42101: "CO",
+            62101: "TEMP",
+            88305: "OC",
+            88306: "NO3f",
+            88307: "ECf",
+            88316: "ECf_optical",
+            88403: "SO4f",
+            88312: "TCf",
+            42600: "NOY",
+            42601: "NO",
+            42603: "NOX",
+            61103: "WS",
+            61101: "WS",
+            61104: "WD",
+            61102: "WD",
+            62201: "RH",
+            62103: "DP",
         }
 
         for i in pc:

@@ -2,25 +2,24 @@
 
 import pandas as pd
 from numpy import nan
+
 from .base import PointReader, register_reader
+
 
 @register_reader("nadp")
 class NADPReader(PointReader):
-    def open_dataset(self,
-                     dates,
-                     network="NTN",
-                     siteid=None,
-                     weekly=True,
-                     **kwargs):
+    def open_dataset(self, dates, network="NTN", siteid=None, weekly=True, **kwargs):
         """
         Reads NADP data.
         """
         n = NADP()
         return n.add_data(dates, network=network, siteid=siteid, weekly=weekly)
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/nadp.py
 # -----------------------------------------------------------------------------
+
 
 class NADP:
     def __init__(self):
@@ -41,9 +40,13 @@ class NADP:
             url = "http://nadp.slh.wisc.edu/datalib/AIRMoN/AIRMoN-ALL.csv"
         else:
             if self.weekly:
-                url = (baseurl + network.lower() + "/weekly/" + siteid + network.upper() + "-All-w.csv")
+                url = (
+                    baseurl + network.lower() + "/weekly/" + siteid + network.upper() + "-All-w.csv"
+                )
             else:
-                url = (baseurl + network.lower() + "/annual/" + siteid + network.upper() + "-All-a.csv")
+                url = (
+                    baseurl + network.lower() + "/annual/" + siteid + network.upper() + "-All-a.csv"
+                )
         return url
 
     def read_ntn(self, url):
@@ -58,7 +61,8 @@ class NADP:
             meta = pd.DataFrame(columns=["siteid", "latitude", "longitude"])
 
         meta.columns = [i.lower() for i in meta.columns]
-        if "startdate" in meta.columns: meta.drop(["startdate", "stopdate"], axis=1, inplace=True)
+        if "startdate" in meta.columns:
+            meta.drop(["startdate", "stopdate"], axis=1, inplace=True)
 
         dfn = pd.merge(df, meta, on="siteid", how="left")
         dfn.dropna(subset=["latitude", "longitude"], inplace=True)
@@ -99,8 +103,25 @@ class NADP:
         dfn = pd.merge(df, meta, on="siteid", how="left")
         dfn.dropna(subset=["latitude", "longitude"], inplace=True)
         if "qrcode" in dfn.columns:
-            cols = ["subppt", "pptnws", "pptbel", "svol", "ca", "mg", "k", "na", "nh4",
-                    "no3", "cl", "so4", "po4", "phlab", "phfield", "conduclab", "conducfield"]
+            cols = [
+                "subppt",
+                "pptnws",
+                "pptbel",
+                "svol",
+                "ca",
+                "mg",
+                "k",
+                "na",
+                "nh4",
+                "no3",
+                "cl",
+                "so4",
+                "po4",
+                "phlab",
+                "phfield",
+                "conduclab",
+                "conducfield",
+            ]
             dfn.loc[dfn.qrcode == "C", cols] = nan
         return dfn
 
@@ -141,11 +162,16 @@ class NADP:
     def add_data(self, dates, network="NTN", siteid=None, weekly=True):
         url = self.build_url(network=network, siteid=siteid)
         n = network.lower()
-        if n == "ntn": df = self.read_ntn(url)
-        elif n == "mdn": df = self.read_mdn(url)
-        elif n == "amon": df = self.read_amon(url)
-        elif n == "airmon": df = self.read_airmon(url)
-        else: df = self.read_amnet(url)
+        if n == "ntn":
+            df = self.read_ntn(url)
+        elif n == "mdn":
+            df = self.read_mdn(url)
+        elif n == "amon":
+            df = self.read_amon(url)
+        elif n == "airmon":
+            df = self.read_airmon(url)
+        else:
+            df = self.read_amnet(url)
 
         self.df = df
         if "time" in self.df.columns and "time_off" in self.df.columns:

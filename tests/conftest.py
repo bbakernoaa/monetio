@@ -13,6 +13,7 @@ def is_ci():
 def data_dir() -> Path:
     return Path(__file__).parent / "data"
 
+
 @pytest.fixture
 def printer():
     return print

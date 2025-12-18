@@ -1,18 +1,17 @@
 """TOLNet Reader"""
 
 import os
+
 import pandas as pd
 import xarray as xr
-from numpy import sort
-from glob import glob
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("tolnet")
 class TOLNetReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     **kwargs):
+    def open_dataset(self, files, **kwargs):
         """
         Reads TOLNet HDF5 files.
         """
@@ -32,9 +31,11 @@ class TOLNetReader(GriddedReader):
         else:
             return xr.concat(dsets, dim="time")
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/profile/tolnet.py
 # -----------------------------------------------------------------------------
+
 
 class TOLNet:
     def __init__(self):
@@ -46,6 +47,7 @@ class TOLNet:
 
     def add_data(self, fname):
         from h5py import File
+
         # FileUtility logic for HDF5?
         # h5py can take a file-like object (bytes)
 
@@ -101,12 +103,16 @@ class TOLNet:
 
         try:
             a, b = dataset.Location_Latitude.decode("ascii").split()
-            if b == "S": latitude = -1 * float(a)
-            else: latitude = float(a)
+            if b == "S":
+                latitude = -1 * float(a)
+            else:
+                latitude = float(a)
 
             a, b = dataset.Location_Longitude.decode("ascii").split()
-            if b == "W": longitude = -1 * float(a)
-            else: longitude = float(a)
+            if b == "W":
+                longitude = -1 * float(a)
+            else:
+                longitude = float(a)
 
             dataset.coords["latitude"] = (("y", "x"), array(latitude).reshape(1, 1))
             dataset.coords["longitude"] = (("y", "x"), array(longitude).reshape(1, 1))

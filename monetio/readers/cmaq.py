@@ -5,30 +5,28 @@ from numpy import array, concatenate, ones
 from pandas import Series, to_datetime
 
 from monetio.grids import get_ioapi_pyresample_area_def, grid_from_dataset
+
 from .base import GriddedReader, register_reader
 
 
 @register_reader("cmaq")
 class CMAQReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     earth_radius=6370000,
-                     convert_to_ppb=True,
-                     drop_duplicates=False,
-                     **kwargs):
+    def open_dataset(
+        self, files, earth_radius=6370000, convert_to_ppb=True, drop_duplicates=False, **kwargs
+    ):
         """
         Reads CMAQ netCDF files.
         """
         # 1. Open the dataset using standard xarray (Lazy loading)
 
         # We ensure standard CMAQ combination logic is present
-        if 'combine' not in kwargs:
-            kwargs['combine'] = 'nested'
-        if 'concat_dim' not in kwargs:
-            kwargs['concat_dim'] = 'TSTEP'
+        if "combine" not in kwargs:
+            kwargs["combine"] = "nested"
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "TSTEP"
 
         # Use cmaq_preprocess to add lazy diagnostic variables
-        kwargs['preprocess'] = cmaq_preprocess
+        kwargs["preprocess"] = cmaq_preprocess
 
         ds = self.driver.open(files, **kwargs)
 
@@ -48,8 +46,8 @@ class CMAQReader(GriddedReader):
                     ds[i].attrs[j] = ds[i].attrs[j].strip()
 
         # get the times
-        if 'TFLAG' in ds.variables or 'TFLAG' in ds.coords:
-             ds = _get_times(ds, drop_duplicates=drop_duplicates)
+        if "TFLAG" in ds.variables or "TFLAG" in ds.coords:
+            ds = _get_times(ds, drop_duplicates=drop_duplicates)
 
         # get the lat lon
         ds = _get_latlon(ds, area_def)
@@ -80,9 +78,11 @@ class CMAQReader(GriddedReader):
         # Placeholder for future harmonization logic
         return ds
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/cmaq.py
 # -----------------------------------------------------------------------------
+
 
 def cmaq_preprocess(ds):
     """
@@ -103,11 +103,13 @@ def cmaq_preprocess(ds):
     ds = add_lazy_rh(ds)
     return ds
 
+
 def can_do(index):
     if index.max():
         return True
     else:
         return False
+
 
 def _get_times(d, drop_duplicates):
     idims = len(d.TFLAG.dims)
@@ -126,6 +128,7 @@ def _get_times(d, drop_duplicates):
         d["TSTEP"] = date
     return d.rename({"TSTEP": "time"})
 
+
 def _get_latlon(dset, area):
     lon, lat = area.get_lonlats()
     dset["longitude"] = xr.DataArray(lon[::-1, :], dims=["ROW", "COL"])
@@ -133,9 +136,11 @@ def _get_latlon(dset, area):
     dset = dset.assign_coords(longitude=dset.longitude, latitude=dset.latitude)
     return dset
 
+
 def _get_keys(d):
     keys = Series([i for i in d.data_vars.keys()])
     return keys
+
 
 def add_multiple_lazy(dset, variables, weights=None):
     if weights is None:
@@ -148,29 +153,92 @@ def add_multiple_lazy(dset, variables, weights=None):
         new = new + dset[i] * j
     return new
 
+
 # Variable lists
 accumulation = array(
     [
-        "AALJ", "AALK1J", "AALK2J", "ABNZ1J", "ABNZ2J", "ABNZ3J", "ACAJ", "ACLJ", "AECJ", "AFEJ",
-        "AISO1J", "AISO2J", "AISO3J", "AKJ", "AMGJ", "AMNJ", "ANAJ", "ANH4J", "ANO3J", "AOLGAJ",
-        "AOLGBJ", "AORGCJ", "AOTHRJ", "APAH1J", "APAH2J", "APAH3J", "APNCOMJ", "APOCJ", "ASIJ",
-        "ASO4J", "ASQTJ", "ATIJ", "ATOL1J", "ATOL2J", "ATOL3J", "ATRP1J", "ATRP2J", "AXYL1J",
-        "AXYL2J", "AXYL3J", "AORGAJ", "AORGPAJ", "AORGBJ",
+        "AALJ",
+        "AALK1J",
+        "AALK2J",
+        "ABNZ1J",
+        "ABNZ2J",
+        "ABNZ3J",
+        "ACAJ",
+        "ACLJ",
+        "AECJ",
+        "AFEJ",
+        "AISO1J",
+        "AISO2J",
+        "AISO3J",
+        "AKJ",
+        "AMGJ",
+        "AMNJ",
+        "ANAJ",
+        "ANH4J",
+        "ANO3J",
+        "AOLGAJ",
+        "AOLGBJ",
+        "AORGCJ",
+        "AOTHRJ",
+        "APAH1J",
+        "APAH2J",
+        "APAH3J",
+        "APNCOMJ",
+        "APOCJ",
+        "ASIJ",
+        "ASO4J",
+        "ASQTJ",
+        "ATIJ",
+        "ATOL1J",
+        "ATOL2J",
+        "ATOL3J",
+        "ATRP1J",
+        "ATRP2J",
+        "AXYL1J",
+        "AXYL2J",
+        "AXYL3J",
+        "AORGAJ",
+        "AORGPAJ",
+        "AORGBJ",
     ]
 )
 aitken = array(
     [
-        "ACLI", "AECI", "ANAI", "ANH4I", "ANO3I", "AOTHRI", "APNCOMI", "APOCI", "ASO4I", "AORGAI",
-        "AORGPAI", "AORGBI",
+        "ACLI",
+        "AECI",
+        "ANAI",
+        "ANH4I",
+        "ANO3I",
+        "AOTHRI",
+        "APNCOMI",
+        "APOCI",
+        "ASO4I",
+        "AORGAI",
+        "AORGPAI",
+        "AORGBI",
     ]
 )
 coarse = array(["ACLK", "ACORS", "ANH4K", "ANO3K", "ASEACAT", "ASO4K", "ASOIL"])
 noy_gas = array(
     [
-        "NO", "NO2", "NO3", "N2O5", "HONO", "HNO3", "PAN", "PANX", "PNA", "NTR", "CRON", "CRN2",
-        "CRNO", "CRPX", "OPAN",
+        "NO",
+        "NO2",
+        "NO3",
+        "N2O5",
+        "HONO",
+        "HNO3",
+        "PAN",
+        "PANX",
+        "PNA",
+        "NTR",
+        "CRON",
+        "CRN2",
+        "CRNO",
+        "CRPX",
+        "OPAN",
     ]
 )
+
 
 # Diagnostic Additions
 def add_lazy_pm25(d):
@@ -178,13 +246,67 @@ def add_lazy_pm25(d):
     allvars = Series(concatenate([aitken, accumulation, coarse]))
     weights = Series(
         [
-            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-            1.0, 1.0, 1.0, 1.0,
-            0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
         ]
     )
     if "PM25_TOT" in keys.to_list():
@@ -199,6 +321,7 @@ def add_lazy_pm25(d):
                 {"units": r"$\mu g m^{-3}$", "name": "PM2.5", "long_name": "PM2.5"}
             )
     return d
+
 
 def add_lazy_pm10(d):
     keys = _get_keys(d)
@@ -219,6 +342,7 @@ def add_lazy_pm10(d):
             )
     return d
 
+
 def add_lazy_pm_course(d):
     keys = _get_keys(d)
     allvars = Series(coarse)
@@ -235,6 +359,7 @@ def add_lazy_pm_course(d):
         )
     return d
 
+
 def add_lazy_clf(d):
     keys = _get_keys(d)
     allvars = Series(["ACLI", "ACLJ", "ACLK"])
@@ -248,6 +373,7 @@ def add_lazy_clf(d):
             {"units": r"$\mu g m^{-3}$", "name": "CLf", "long_name": "Fine Mode particulate Cl"}
         )
     return d
+
 
 def add_lazy_caf(d):
     keys = _get_keys(d)
@@ -263,6 +389,7 @@ def add_lazy_caf(d):
         )
     return d
 
+
 def add_lazy_naf(d):
     keys = _get_keys(d)
     allvars = Series(["ANAI", "ANAJ", "ASEACAT", "ASOIL", "ACORS"])
@@ -276,6 +403,7 @@ def add_lazy_naf(d):
             {"units": r"$\mu g m^{-3}$", "name": "NAf", "long_name": "NAf"}
         )
     return d
+
 
 def add_lazy_so4f(d):
     keys = _get_keys(d)
@@ -291,6 +419,7 @@ def add_lazy_so4f(d):
         )
     return d
 
+
 def add_lazy_nh4f(d):
     keys = _get_keys(d)
     allvars = Series(["ANH4I", "ANH4J", "ANH4K"])
@@ -304,6 +433,7 @@ def add_lazy_nh4f(d):
             {"units": r"$\mu g m^{-3}$", "name": "NH4f", "long_name": "NH4f"}
         )
     return d
+
 
 def add_lazy_no3f(d):
     keys = _get_keys(d)
@@ -319,6 +449,7 @@ def add_lazy_no3f(d):
         )
     return d
 
+
 def add_lazy_noy(d):
     keys = _get_keys(d)
     allvars = Series(noy_gas)
@@ -329,6 +460,7 @@ def add_lazy_noy(d):
         d["NOy"] = d["NOy"].assign_attrs({"name": "NOy", "long_name": "NOy"})
     return d
 
+
 def add_lazy_nox(d):
     keys = _get_keys(d)
     allvars = Series(["NO", "NO2"])
@@ -338,6 +470,7 @@ def add_lazy_nox(d):
         d["NOx"] = add_multiple_lazy(d, newkeys)
         d["NOx"] = d["NOx"].assign_attrs({"name": "NOx", "long_name": "NOx"})
     return d
+
 
 def add_lazy_rh(d):
     # Placeholder as in original code

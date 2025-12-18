@@ -60,7 +60,9 @@ def test_open_mfdataset_bad_input():
 
 
 def test_open_mfdataset_daily():
-    ds = viirs_aod_reader.open_dataset(date=["2020-01-01", "2020-01-02"], satellite="SNPP", data_resolution=0.25)
+    ds = viirs_aod_reader.open_dataset(
+        date=["2020-01-01", "2020-01-02"], satellite="SNPP", data_resolution=0.25
+    )
     assert set(ds.dims) == {"time", "lat", "lon"}
     assert ds.sizes["time"] == 2
     assert ds.attrs["spatial_resolution"].strip().startswith("0.25")

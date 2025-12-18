@@ -1,18 +1,15 @@
 """RAQMS Reader"""
 
-import xarray as xr
 import pandas as pd
+import xarray as xr
 from numpy import meshgrid
+
 from .base import GriddedReader, register_reader
+
 
 @register_reader("raqms")
 class RAQMSReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     convert_to_ppb=True,
-                     var_list=None,
-                     surf_only=False,
-                     **kwargs):
+    def open_dataset(self, files, convert_to_ppb=True, var_list=None, surf_only=False, **kwargs):
         """
         Reads RAQMS netCDF files.
         """
@@ -21,17 +18,17 @@ class RAQMSReader(GriddedReader):
         # Let's rely on user passing correct files or glob.
 
         # Prepare kwargs
-        if 'concat_dim' not in kwargs:
-            kwargs['concat_dim'] = 'time'
-        if 'combine' not in kwargs:
-            kwargs['combine'] = 'nested'
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "time"
+        if "combine" not in kwargs:
+            kwargs["combine"] = "nested"
 
         # RAQMS specific drop
-        if 'drop_variables' not in kwargs:
-            kwargs['drop_variables'] = ["theta"]
-        elif "theta" not in kwargs['drop_variables']:
-            if isinstance(kwargs['drop_variables'], list):
-                kwargs['drop_variables'].append("theta")
+        if "drop_variables" not in kwargs:
+            kwargs["drop_variables"] = ["theta"]
+        elif "theta" not in kwargs["drop_variables"]:
+            if isinstance(kwargs["drop_variables"], list):
+                kwargs["drop_variables"].append("theta")
 
         ds = self.driver.open(files, **kwargs)
 
@@ -49,9 +46,11 @@ class RAQMSReader(GriddedReader):
 
         return ds
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/raqms.py
 # -----------------------------------------------------------------------------
+
 
 def _fix(ds, *, surf_only, convert_to_ppb):
     ds = _fix_grid(ds)
@@ -82,6 +81,7 @@ def _fix(ds, *, surf_only, convert_to_ppb):
 
     return ds
 
+
 def _fix_grid(ds):
     lat = ds.lat.values
     lon = ds.lon.values
@@ -90,9 +90,12 @@ def _fix_grid(ds):
 
     # Rename dims
     rename_dims = {}
-    if "lat" in ds.dims: rename_dims["lat"] = "y"
-    if "lon" in ds.dims: rename_dims["lon"] = "x"
-    if "lev" in ds.dims: rename_dims["lev"] = "z"
+    if "lat" in ds.dims:
+        rename_dims["lat"] = "y"
+    if "lon" in ds.dims:
+        rename_dims["lon"] = "x"
+    if "lev" in ds.dims:
+        rename_dims["lev"] = "z"
 
     ds = ds.rename_dims(rename_dims)
     ds = ds.drop_vars(["lat", "lon"], errors="ignore")
@@ -133,16 +136,18 @@ def _fix_grid(ds):
 
     return ds
 
+
 def _fix_time(ds):
     if "Times" in ds.variables:
         dtstr = ds.Times.values.astype(str)
         time = pd.to_datetime(dtstr, format=r"%Y_%m_%d_%H:%M:%S")
         if "time" not in ds.coords:
-             # If 'time' dim exists but no coord, or if we need to replace it
-             pass
+            # If 'time' dim exists but no coord, or if we need to replace it
+            pass
         ds = ds.assign_coords(time=time)
         ds = ds.drop_vars(["IDATE", "Times"], errors="ignore")
     return ds
+
 
 def _fix_pres(ds):
     rename0 = {

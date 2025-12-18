@@ -4,26 +4,30 @@ import dask
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
+
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("ish")
 class ISHReader(PointReader):
-    def open_dataset(self,
-                     dates,
-                     box=None,
-                     country=None,
-                     state=None,
-                     site=None,
-                     resample=True,
-                     window="H",
-                     download=False,
-                     n_procs=1,
-                     request_timeout=10,
-                     request_retries=4,
-                     verbose=False,
-                     source="ncdc",
-                     **kwargs):
+    def open_dataset(
+        self,
+        dates,
+        box=None,
+        country=None,
+        state=None,
+        site=None,
+        resample=True,
+        window="H",
+        download=False,
+        n_procs=1,
+        request_timeout=10,
+        request_retries=4,
+        verbose=False,
+        source="ncdc",
+        **kwargs,
+    ):
         """
         Reads ISH data.
 
@@ -46,9 +50,11 @@ class ISHReader(PointReader):
             source=source,
         )
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/ish.py
 # -----------------------------------------------------------------------------
+
 
 class ISH:
     _VAR_INFO = [
@@ -140,14 +146,14 @@ class ISH:
         fs = FileUtility.get_fs(url_or_file)
 
         if url_or_file.startswith("http"):
-             # Fallback to requests logic for robust HTTP if needed,
-             # or trust fsspec http filesystem (simple read).
-             # Original code had retries.
-             # If source="ncdc" (http), we keep retries?
-             # For now, use FileUtility (fsspec) which handles S3/Local well.
-             # For HTTP, fsspec doesn't retry by default as aggressively as the original logic.
-             # But let's try to use fsspec for everything.
-             pass
+            # Fallback to requests logic for robust HTTP if needed,
+            # or trust fsspec http filesystem (simple read).
+            # Original code had retries.
+            # If source="ncdc" (http), we keep retries?
+            # For now, use FileUtility (fsspec) which handles S3/Local well.
+            # For HTTP, fsspec doesn't retry by default as aggressively as the original logic.
+            # But let's try to use fsspec for everything.
+            pass
 
         # Open file object
         # gzip handling: if .gz, fsspec usually handles it if compression is inferred,
@@ -208,16 +214,18 @@ class ISH:
         return dfloc
 
     def build_urls(self, dates=None, sites=None):
-        if dates is None: dates = self.dates
-        if sites is None: sites = self.history
+        if dates is None:
+            dates = self.dates
+        if sites is None:
+            sites = self.history
 
         unique_years = pd.to_datetime(dates.year.unique(), format="%Y")
         furls = []
 
         if self.source == "aws":
-             url = "s3://noaa-isd-pds/data"
+            url = "s3://noaa-isd-pds/data"
         else:
-             url = "https://www1.ncdc.noaa.gov/pub/data/noaa"
+            url = "https://www1.ncdc.noaa.gov/pub/data/noaa"
 
         # For AWS, we assume availability based on standard naming.
         # AWS structure: s3://noaa-isd-pds/data/<year>/<usaf>-<wban>-<year>.gz (Need to confirm)
@@ -236,9 +244,22 @@ class ISH:
 
         return pd.Series(furls, name="name").to_frame()
 
-    def add_data(self, dates, box=None, country=None, state=None, site=None,
-                 resample=True, window="H", download=False, n_procs=1,
-                 request_timeout=10, request_retries=4, verbose=False, source="ncdc"):
+    def add_data(
+        self,
+        dates,
+        box=None,
+        country=None,
+        state=None,
+        site=None,
+        resample=True,
+        window="H",
+        download=False,
+        n_procs=1,
+        request_timeout=10,
+        request_retries=4,
+        verbose=False,
+        source="ncdc",
+    ):
         self.dates = pd.to_datetime(dates)
         self.verbose = verbose
         self.source = source
@@ -262,7 +283,9 @@ class ISH:
 
         # Parallel read logic
         def func(fname):
-            return self.read_data_frame(fname, request_timeout=request_timeout, request_retries=request_retries)
+            return self.read_data_frame(
+                fname, request_timeout=request_timeout, request_retries=request_retries
+            )
 
         # Using name column
         dfs = [dask.delayed(func)(f) for f in urls.name]

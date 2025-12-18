@@ -2,19 +2,23 @@
 
 import pandas as pd
 import xarray as xr
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("icap_mme")
 class ICAPMMEReader(GriddedReader):
-    def open_dataset(self,
-                     files=None, # if local
-                     dates=None, # if downloading
-                     product="MMC",
-                     data_var="dustaod550",
-                     download=False,
-                     verbose=True,
-                     **kwargs):
+    def open_dataset(
+        self,
+        files=None,  # if local
+        dates=None,  # if downloading
+        product="MMC",
+        data_var="dustaod550",
+        download=False,
+        verbose=True,
+        **kwargs,
+    ):
         """
         Open ICAP-MME data.
         Supports opening by dates (downloads from FTP/HTTPS) or local files.
@@ -25,14 +29,25 @@ class ICAPMMEReader(GriddedReader):
         if dates is not None:
             if download:
                 return open_mfdataset_icap(
-                    dates, product=product, data_var=data_var, download=True, verbose=verbose, **kwargs
+                    dates,
+                    product=product,
+                    data_var=data_var,
+                    download=True,
+                    verbose=verbose,
+                    **kwargs,
                 )
             else:
                 return open_mfdataset_icap(
-                    dates, product=product, data_var=data_var, download=False, verbose=verbose, **kwargs
+                    dates,
+                    product=product,
+                    data_var=data_var,
+                    download=False,
+                    verbose=verbose,
+                    **kwargs,
                 )
 
         raise ValueError("Must provide 'files' or 'dates'.")
+
 
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/icap_mme.py
@@ -40,11 +55,18 @@ class ICAPMMEReader(GriddedReader):
 
 valid_filetypes = ("MMC", "C4", "MME")
 valid_data_vars = (
-    "modeaod550", "dustaod550", "pm", "seasaltaod550", "smokeaod550", "totaldustaod550",
+    "modeaod550",
+    "dustaod550",
+    "pm",
+    "seasaltaod550",
+    "smokeaod550",
+    "totaldustaod550",
 )
+
 
 def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
     from collections.abc import Iterable
+
     if isinstance(dates, Iterable) and not isinstance(dates, str):
         dates = pd.DatetimeIndex(dates)
     else:
@@ -66,12 +88,14 @@ def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
 
     return pd.Series(urls, index=None), pd.Series(fnames, index=None)
 
+
 def remote_file_exists(file_url, *, verbose=True):
     fs = FileUtility.get_fs(file_url)
     exists = fs.exists(file_url)
     if not exists and verbose:
         print(f"File does not exist: {file_url}")
     return exists
+
 
 def retrieve(url, fname, *, download=False, verbose=True):
     from io import BytesIO
@@ -97,6 +121,7 @@ def retrieve(url, fname, *, download=False, verbose=True):
                 print(f"File Exists: {p.as_posix()}")
         return p
 
+
 def _check_file_url(url, *, verbose=True):
     if not remote_file_exists(url, verbose=verbose):
         raise ValueError(
@@ -105,7 +130,10 @@ def _check_file_url(url, *, verbose=True):
             "`product` and `data_var`s for this month."
         )
 
-def open_mfdataset_icap(dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True, **kwargs):
+
+def open_mfdataset_icap(
+    dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True, **kwargs
+):
     import pandas as pd
     import xarray as xr
 
@@ -123,10 +151,10 @@ def open_mfdataset_icap(dates, product="MMC", data_var="dustaod550", *, download
             _check_file_url(url, verbose=verbose)
             paths.append(retrieve(url, fname, download=True, verbose=verbose))
 
-        if 'combine' not in kwargs:
-            kwargs['combine'] = 'nested'
-        if 'concat_dim' not in kwargs:
-            kwargs['concat_dim'] = 'time'
+        if "combine" not in kwargs:
+            kwargs["combine"] = "nested"
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "time"
 
         dset = xr.open_mfdataset(paths, **kwargs)
     else:

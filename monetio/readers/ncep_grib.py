@@ -1,9 +1,12 @@
 """NCEP GRIB Reader"""
 
+from glob import glob
+
 import xarray as xr
 from numpy import sort
-from glob import glob
+
 from .base import GriddedReader, register_reader
+
 
 @register_reader("ncep_grib")
 class NCEPGribReader(GriddedReader):
@@ -20,16 +23,18 @@ class NCEPGribReader(GriddedReader):
             kwargs["engine"] = "pynio"
 
         # Also supports open_mfdataset logic
-        if 'concat_dim' not in kwargs:
-            kwargs['concat_dim'] = 'time'
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "time"
 
         ds = self.driver.open(files, **kwargs)
 
         return _fix_grib2(ds)
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/ncep_grib.py
 # -----------------------------------------------------------------------------
+
 
 def _fix_grib2(f):
     from numpy import meshgrid

@@ -1,16 +1,15 @@
 """NESDIS EDR VIIRS Reader"""
 
 import os
+
 import xarray as xr
+
 from .base import GriddedReader, register_reader
+
 
 @register_reader("nesdis_edr_viirs")
 class NESDISEDRVIIRSReader(GriddedReader):
-    def open_dataset(self,
-                     date,
-                     resolution="high",
-                     datapath=".",
-                     **kwargs):
+    def open_dataset(self, date, resolution="high", datapath=".", **kwargs):
         """
         Reads NESDIS EDR VIIRS data (FTP download).
         """
@@ -35,12 +34,14 @@ class NESDISEDRVIIRSReader(GriddedReader):
 
         return data
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/sat/nesdis_edr_viirs.py
 # -----------------------------------------------------------------------------
 
 server = "ftp.star.nesdis.noaa.gov"
 base_dir = "/pub/smcd/jhuang/npp.viirs.aerosol.data/edraot550/"
+
 
 def change_dir(to_path):
     current = os.getcwd()
@@ -49,8 +50,10 @@ def change_dir(to_path):
     os.chdir(to_path)
     return current
 
+
 def _get_latlons(nlat, nlon):
     from numpy import linspace, meshgrid
+
     lon_min = -179.875
     lon_max = -1 * lon_min
     lat_min = -89.875
@@ -60,8 +63,10 @@ def _get_latlons(nlat, nlon):
     lon, lat = meshgrid(lons, lats)
     return lon, lat
 
+
 def download_data(date, resolution="high"):
     import ftplib
+
     from pandas import Timestamp
 
     date = Timestamp(date)
@@ -82,6 +87,7 @@ def download_data(date, resolution="high"):
 
     return file, date
 
+
 def _unzip_file(fname):
     import gzip
     import shutil
@@ -89,10 +95,11 @@ def _unzip_file(fname):
     # Pythonic unzip to avoid subprocess gunzip dependency
     out_fname = fname[:-3]
     if not os.path.isfile(out_fname):
-        with gzip.open(fname, 'rb') as f_in:
-            with open(out_fname, 'wb') as f_out:
+        with gzip.open(fname, "rb") as f_in:
+            with open(out_fname, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
     return out_fname
+
 
 def read_data(fname, lat, lon, date):
     from numpy import float32, fromfile, nan

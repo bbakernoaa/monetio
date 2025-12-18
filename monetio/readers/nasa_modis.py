@@ -1,14 +1,14 @@
 """NASA MODIS Reader"""
 
-import xarray as xr
 import pandas as pd
+import xarray as xr
+
 from .base import GriddedReader, register_reader
+
 
 @register_reader("nasa_modis")
 class NASAMODISReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     **kwargs):
+    def open_dataset(self, files, **kwargs):
         """
         Reads NASA MODIS swath data.
         """
@@ -24,6 +24,7 @@ class NASAMODISReader(GriddedReader):
         # Let's iterate files.
         # Use FileUtility from drivers if needed, or rely on user passing valid list.
         from .drivers import FileUtility
+
         file_list = FileUtility.expand_paths(files)
 
         dsets = []
@@ -39,19 +40,23 @@ class NASAMODISReader(GriddedReader):
         else:
             return xr.concat(dsets, dim="time")
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/sat/nasa_modis.py
 # -----------------------------------------------------------------------------
+
 
 def _get_swath_from_fname(fname):
     vert_grid_num = fname.split(".")[-4].split("v")[-1]
     hori_grid_num = fname.split(".")[-4].split("v")[0].split("h")[-1]
     return hori_grid_num, vert_grid_num
 
+
 def _get_time_from_fname(fname):
     u = pd.Series([fname.split(".")[-2]])
     date = pd.to_datetime(u, format="%Y%j%H%M%S")[0]
     return date
+
 
 def open_single_file(fname):
     from monetio.grids import get_modis_latlon_from_swath_hv, get_sinu_area_def

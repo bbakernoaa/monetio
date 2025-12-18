@@ -2,27 +2,26 @@
 
 import re
 import warnings
-import pandas as pd
-import numpy as np
-import requests
+from io import StringIO
+from typing import NamedTuple, Optional, Tuple, Union
+
 import dask
 import dask.dataframe as dd
-from io import StringIO
-from typing import NamedTuple, Optional, Union, Tuple
+import numpy as np
+import pandas as pd
+import requests
+
 from .base import PointReader, register_reader
+
 
 @register_reader("gml_ozonesonde")
 class GMLOzonesondeReader(PointReader):
-    def open_dataset(self,
-                     dates,
-                     location=None,
-                     n_procs=1,
-                     errors="raise",
-                     **kwargs):
+    def open_dataset(self, dates, location=None, n_procs=1, errors="raise", **kwargs):
         """
         Reads GML Ozonesonde data.
         """
         return add_data(dates, location=location, n_procs=n_procs, errors=errors)
+
 
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/profile/gml_ozonesonde.py
@@ -32,17 +31,26 @@ TIMEOUT = 15
 RETRIES = 5
 
 LOCATIONS = [
-    "Boulder, Colorado", "Hilo, Hawaii", "Huntsville, Alabama", "Narragansett, Rhode Island",
-    "Pago Pago, American Samoa", "San Cristobal, Galapagos", "South Pole, Antarctica",
-    "Summit, Greenland", "Suva, Fiji", "Trinidad Head, California",
+    "Boulder, Colorado",
+    "Hilo, Hawaii",
+    "Huntsville, Alabama",
+    "Narragansett, Rhode Island",
+    "Pago Pago, American Samoa",
+    "San Cristobal, Galapagos",
+    "South Pole, Antarctica",
+    "Summit, Greenland",
+    "Suva, Fiji",
+    "Trinidad Head, California",
 ]
 
 _FILES_L100_CACHE = {location: None for location in LOCATIONS}
+
 
 def retry(func):
     import time
     from functools import wraps
     from random import random as rand
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         for i in range(RETRIES):
@@ -55,22 +63,30 @@ def retry(func):
         else:
             raise RuntimeError(f"{func.__name__} failed after {RETRIES} tries.")
         return res
+
     return wrapper
+
 
 def discover_files(location=None, *, n_threads=3, cache=True):
     import itertools
     from multiprocessing.pool import ThreadPool
+
     base = "https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde"
-    if location is None: locations = LOCATIONS
-    elif isinstance(location, str): locations = [location]
-    else: locations = location
+    if location is None:
+        locations = LOCATIONS
+    elif isinstance(location, str):
+        locations = [location]
+    else:
+        locations = location
     invalid = set(locations) - set(LOCATIONS)
-    if invalid: raise ValueError(f"Invalid location(s): {invalid}.")
+    if invalid:
+        raise ValueError(f"Invalid location(s): {invalid}.")
 
     @retry
     def get_files(location):
         cached = _FILES_L100_CACHE[location]
-        if cached is not None: return cached
+        if cached is not None:
+            return cached
         url_location = "South Pole, Antartica" if location == "South Pole, Antarctica" else location
         url = f"{base}/{url_location}/100 Meter Average Files/".replace(" ", "%20")
         try:
@@ -96,8 +112,11 @@ def discover_files(location=None, *, n_threads=3, cache=True):
     df = pd.DataFrame(data, columns=["location", "time", "fn", "url"])
     if cache:
         for location in locations:
-            _FILES_L100_CACHE[location] = list(df[df["location"] == location].itertuples(index=False, name=None))
+            _FILES_L100_CACHE[location] = list(
+                df[df["location"] == location].itertuples(index=False, name=None)
+            )
     return df
+
 
 def add_data(dates, *, location=None, n_procs=1, errors="raise"):
     dates = pd.DatetimeIndex(dates)
@@ -111,8 +130,10 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise"):
         try:
             return read_100m(fp_or_url)
         except Exception as e:
-            if errors == "raise": raise RuntimeError(f"Failed to read {fp_or_url}") from e
-            elif errors == "warn": warnings.warn(f"Failed to read {fp_or_url}: {e}")
+            if errors == "raise":
+                raise RuntimeError(f"Failed to read {fp_or_url}") from e
+            elif errors == "warn":
+                warnings.warn(f"Failed to read {fp_or_url}: {e}")
             return pd.DataFrame()
 
     dfs = [dask.delayed(func)(url) for url in urls]
@@ -121,19 +142,25 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise"):
     df = df[df["time"].between(dates_min, dates_max, inclusive="both")]
 
     repl = {
-        "Boulder, CO": "Boulder, Colorado", "Hilo,Hawaii": "Hilo, Hawaii", "Huntsville": "Huntsville, Alabama",
-        "Huntsville, AL": "Huntsville, Alabama", "San Cristobal, Galapagos, Ecuador": "San Cristobal, Galapagos",
-        "South Pole": "South Pole, Antarctica", "Trinidad Head, CA": "Trinidad Head, California",
+        "Boulder, CO": "Boulder, Colorado",
+        "Hilo,Hawaii": "Hilo, Hawaii",
+        "Huntsville": "Huntsville, Alabama",
+        "Huntsville, AL": "Huntsville, Alabama",
+        "San Cristobal, Galapagos, Ecuador": "San Cristobal, Galapagos",
+        "South Pole": "South Pole, Antarctica",
+        "Trinidad Head, CA": "Trinidad Head, California",
     }
     df["station"] = df["station"].replace(repl)
     df = df.rename(columns={"station": "siteid"})
     return df.drop(columns=["index"], errors="ignore").reset_index(drop=True)
+
 
 class ColInfo(NamedTuple):
     name: str
     long_name: str
     units: str
     na_val: Optional[Union[str, Tuple[str, ...]]]
+
 
 COL_INFO_L100 = [
     ColInfo("lev", "level", "", None),
@@ -161,13 +188,16 @@ Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp 
  Num     hPa      km     K      C       C       %    mPa    ppmv   atmcm    C   10^11/cc   DU
 """
 
+
 def read_100m(fp_or_url):
     if isinstance(fp_or_url, str) and fp_or_url.startswith(("http://", "https://")):
+
         @retry
         def get_text():
             r = requests.get(fp_or_url, timeout=TIMEOUT)
             r.raise_for_status()
             return r.text
+
         text = get_text()
     else:
         with open(fp_or_url) as f:
@@ -213,7 +243,8 @@ def read_100m(fp_or_url):
         raise ValueError("Data block header mismatch")
 
     col_info = COL_INFO_L100[:]
-    if not have_uncert: _ = col_info.pop()
+    if not have_uncert:
+        _ = col_info.pop()
 
     names = [c.name for c in col_info]
     dtype = {c.name: float for c in col_info}
@@ -221,8 +252,13 @@ def read_100m(fp_or_url):
     na_values = {c.name: c.na_val for c in col_info if c.na_val is not None}
 
     df = pd.read_csv(
-        StringIO(data_block), skiprows=2, header=None, delimiter=r"\s+",
-        names=names, dtype=dtype, na_values=na_values,
+        StringIO(data_block),
+        skiprows=2,
+        header=None,
+        delimiter=r"\s+",
+        names=names,
+        dtype=dtype,
+        na_values=na_values,
     )
 
     df["time"] = pd.Timestamp(f"{meta['Launch Date']} {meta['Launch Time']}").tz_localize(None)

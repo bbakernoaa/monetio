@@ -1,18 +1,23 @@
 """NESDIS AVHRR AOT AWS Gridded Reader"""
 
-import pandas as pd
-import xarray as xr
-import s3fs
-from typing import Union, List, Optional
 from enum import Enum
+from typing import List, Optional, Union
+
+import pandas as pd
+import s3fs
+import xarray as xr
+
 from .base import GriddedReader, register_reader
+
 
 class AveragingTime(Enum):
     DAILY = "daily"
     MONTHLY = "monthly"
 
+
 AOD_BASE_PATH = "noaa-cdr-aerosol-optical-thickness-pds/data/daily"
 AOD_FILE_PATTERN = "AOT_AVHRR_*_daily-avg_"
+
 
 @register_reader("nesdis_avhrr_aot_aws_gridded")
 class NESDISAVHRRAOTAWSGriddedReader(GriddedReader):
@@ -24,7 +29,9 @@ class NESDISAVHRRAOTAWSGriddedReader(GriddedReader):
         super().__init__()
         self.fs = s3fs.S3FileSystem(anon=True)
 
-    def _create_daily_aod_list(self, date_generated: List[pd.Timestamp], warning: bool = False) -> List[str]:
+    def _create_daily_aod_list(
+        self, date_generated: List[pd.Timestamp], warning: bool = False
+    ) -> List[str]:
         """
         Creates a list of daily AOD files.
         """
@@ -47,7 +54,9 @@ class NESDISAVHRRAOTAWSGriddedReader(GriddedReader):
 
         return file_list
 
-    def _create_monthly_aod_list(self, date_generated: List[pd.Timestamp], warning: bool = False) -> List[str]:
+    def _create_monthly_aod_list(
+        self, date_generated: List[pd.Timestamp], warning: bool = False
+    ) -> List[str]:
         """
         Creates a list of monthly AOD files.
         """
@@ -71,11 +80,13 @@ class NESDISAVHRRAOTAWSGriddedReader(GriddedReader):
 
         return file_list
 
-    def open_dataset(self,
-                     files: Union[str, List[str], None] = None,
-                     date: Union[str, pd.Timestamp, pd.DatetimeIndex, None] = None,
-                     averaging_time: Union[AveragingTime, str] = AveragingTime.DAILY,
-                     **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: Union[str, List[str], None] = None,
+        date: Union[str, pd.Timestamp, pd.DatetimeIndex, None] = None,
+        averaging_time: Union[AveragingTime, str] = AveragingTime.DAILY,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads NESDIS AVHRR AOT AWS Gridded data.
 
@@ -90,26 +101,24 @@ class NESDISAVHRRAOTAWSGriddedReader(GriddedReader):
         """
 
         if date is None:
-             if files is not None:
-                 if isinstance(files, str):
-                     date = files
-                 else:
-                     raise ValueError("Date is required for NESDIS AVHRR AOT AWS Gridded reader.")
-             else:
+            if files is not None:
+                if isinstance(files, str):
+                    date = files
+                else:
+                    raise ValueError("Date is required for NESDIS AVHRR AOT AWS Gridded reader.")
+            else:
                 raise ValueError("Date is required for NESDIS AVHRR AOT AWS Gridded reader.")
 
         if isinstance(date, (list, pd.DatetimeIndex)) or (isinstance(date, str) and "," in date):
-             return self._open_mfdataset(
-                dates=date,
-                averaging_time=averaging_time
-            )
+            return self._open_mfdataset(dates=date, averaging_time=averaging_time)
         else:
-            return self._open_dataset(
-                date=date,
-                averaging_time=averaging_time
-            )
+            return self._open_dataset(date=date, averaging_time=averaging_time)
 
-    def _open_dataset(self, date: Union[str, pd.Timestamp], averaging_time: Union[AveragingTime, str] = AveragingTime.DAILY) -> xr.Dataset:
+    def _open_dataset(
+        self,
+        date: Union[str, pd.Timestamp],
+        averaging_time: Union[AveragingTime, str] = AveragingTime.DAILY,
+    ) -> xr.Dataset:
         """Open single dataset."""
         if isinstance(date, str):
             date_generated = [pd.Timestamp(date)]
@@ -133,7 +142,12 @@ class NESDISAVHRRAOTAWSGriddedReader(GriddedReader):
 
         return dset
 
-    def _open_mfdataset(self, dates: Union[pd.DatetimeIndex, pd.Timestamp, str], averaging_time: Union[AveragingTime, str] = AveragingTime.DAILY, error_missing: bool = False) -> xr.Dataset:
+    def _open_mfdataset(
+        self,
+        dates: Union[pd.DatetimeIndex, pd.Timestamp, str],
+        averaging_time: Union[AveragingTime, str] = AveragingTime.DAILY,
+        error_missing: bool = False,
+    ) -> xr.Dataset:
         """Open multiple datasets."""
         # Convert dates to DatetimeIndex
         if isinstance(dates, (str, pd.Timestamp)):
