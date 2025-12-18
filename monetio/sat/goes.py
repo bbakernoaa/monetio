@@ -1,5 +1,6 @@
 """this will read the goes_r data"""
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -176,6 +177,55 @@ class GOES:
         out = xr.open_dataset(fo, engine="h5netcdf")
         out = self._get_grid(out)
         return out
+
+
+def add_goes_bands(
+    dset: xr.Dataset,
+    blue_band: str = "blue",
+    red_band: str = "red",
+    veggie_band: str = "veggie",
+) -> xr.Dataset:
+    """makes true color image from GOES-R satellite. Must have blue, red, veggie bands.
+
+    Note: This function modifies the input Dataset in-place by adding the 'tci' variable.
+
+    Parameters
+    ----------
+    dset : xarray.Dataset
+        needs to have at least blue, red, veggie bands as data variables.
+    blue_band : str
+        Name of the blue band variable in the dataset.
+    red_band : str
+        Name of the red band variable in the dataset.
+    veggie_band : str
+        Name of the veggie band variable in the dataset.
+    Returns
+    -------
+    xarray.Dataset
+        the original dataset with the true color image array added.
+    """
+    # make green band
+    green = (
+        0.45 * dset[red_band]
+        + 0.1 * dset[veggie_band]
+        + 0.45 * dset[blue_band]
+    )
+
+    # Get the dimensions from one of the input bands
+    dims = dset[red_band].dims
+
+    # Create the true color image DataArray
+    # Stack the bands along a new 'rgb' dimension
+    tci = xr.concat([dset[red_band], green, dset[blue_band]], dim="rgb").transpose(*(dims + ("rgb",)))
+
+    # add to the dataset
+    dset["tci"] = tci
+    dset["tci"].attrs = {
+        "long_name": "GOES-R True Color Image",
+        "standard_name": "tci",
+    }
+
+    return dset
 
     def _get_grid(self, ds):
         from numpy import meshgrid, ndarray
