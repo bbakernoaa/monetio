@@ -8,11 +8,7 @@ from . import (
     _tropomi_l2_no2_mm,
     goes,
     modis_ornl,
-    nesdis_avhrr_aot_aws_gridded,
-    nesdis_eps_viirs_aod_nrt,
     nesdis_frp,
-    nesdis_viirs_aod_aws_gridded,
-    nesdis_viirs_ndvi_aws_gridded,
 )
 
 __all__ = [
@@ -25,11 +21,7 @@ __all__ = [
     "_tropomi_l2_no2_mm",
     "goes",
     "modis_ornl",
-    "nesdis_avhrr_aot_aws_gridded",
-    "nesdis_eps_viirs_aod_nrt",
     "nesdis_frp",
-    "nesdis_viirs_aod_aws_gridded",
-    "nesdis_viirs_ndvi_aws_gridded",
 ]
 
 __name__ = "sat"
