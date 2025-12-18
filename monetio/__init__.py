@@ -131,17 +131,33 @@ _READER_MODULES = {
 
 def load(source: str, files=None, **kwargs):
     """
-    Universal load function.
+    Universal load function for atmospheric data.
 
-    Usage:
-        ds = monetio.load("cmaq", files="/path/to/data*.nc")
-        df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
+    Loads data from various sources including atmospheric models, observations,
+    and satellite data using a unified interface.
 
-    Available sources:
+    Parameters
+    ----------
+    source : str
+        Data source to load. Available sources include:
         Models: cmaq, camx, fv3chem, hysplit, hytraj, icap_mme, ncep_grib, pardump, prepchem, raqms, ufs
         Obs: airnow, aeronet, aqs, cems, crn, improve, ish, ish_lite, nadp, openaq, pams
         Profile: icartt, tolnet, geoms, gml_ozonesonde
         Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp
+    files : str or list, optional
+        File path(s) to load. Can be a single path, glob pattern, or list of files.
+    **kwargs : dict
+        Additional keyword arguments passed to the specific reader.
+
+    Returns
+    -------
+    xarray.Dataset or pandas.DataFrame
+        Loaded data in the appropriate format for the source.
+
+    Examples
+    --------
+    >>> ds = monetio.load("cmaq", files="/path/to/data*.nc")
+    >>> df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
     """
     if source not in READER_REGISTRY:
         if source in _READER_MODULES:

@@ -24,6 +24,33 @@ class HYSPLITReader(GriddedReader):
     ):
         """
         Reads HYSPLIT binary concentration (cdump) files.
+
+        Parameters
+        ----------
+        files : str or list
+            File path(s) to HYSPLIT concentration files
+        drange : tuple, optional
+            Date range as (start_date, end_date) for filtering data
+        century : int, optional
+            Century to use for date parsing (e.g., 1900 or 2000)
+        verbose : bool, optional
+            Whether to print verbose output during processing
+        sample_time_stamp : str, optional
+            Time stamp position ('start' or 'end')
+        check_grid : bool, optional
+            Whether to check and fix grid continuity
+        **kwargs : dict
+            Additional keyword arguments
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset containing HYSPLIT concentration data
+
+        Examples
+        --------
+        >>> reader = HYSPLITReader()
+        >>> ds = reader.open_dataset('hysplit_cdump.bin')
         """
         file_list = FileUtility.expand_paths(files)
 
@@ -64,6 +91,33 @@ def open_dataset_hysplit(
     sample_time_stamp="start",
     check_grid=True,
 ):
+    """
+    Open a single HYSPLIT concentration file and return as xarray Dataset.
+
+    Parameters
+    ----------
+    fname : str
+        Path to HYSPLIT binary concentration file
+    drange : tuple, optional
+        Date range as (start_date, end_date) for filtering data
+    century : int, optional
+        Century to use for date parsing (e.g., 1900 or 2000)
+    verbose : bool, optional
+        Whether to print verbose output during processing
+    sample_time_stamp : str, optional
+        Time stamp position ('start' or 'end')
+    check_grid : bool, optional
+        Whether to check and fix grid continuity
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset containing HYSPLIT concentration data
+
+    Examples
+    --------
+    >>> ds = open_dataset_hysplit('hysplit_cdump.bin', verbose=True)
+    """
     binfile = ModelBin(
         fname,
         drange=drange,
@@ -386,6 +440,29 @@ class ModelBin:
 
 
 def check_drange(drange, pdate1, pdate2):
+    """
+    Check if a time period falls within a specified date range.
+
+    Parameters
+    ----------
+    drange : tuple or None
+        Date range as (start_date, end_date)
+    pdate1 : datetime
+        Start date of the period to check
+    pdate2 : datetime
+        End date of the period to check
+
+    Returns
+    -------
+    tuple
+        (testf, savedata) where:
+        - testf: bool indicating if processing should continue
+        - savedata: bool indicating if data should be saved
+
+    Examples
+    --------
+    >>> testf, savedata = check_drange((start_date, end_date), period_start, period_end)
+    """
     savedata = True
     testf = True
     if drange is None:
@@ -401,6 +478,26 @@ def check_drange(drange, pdate1, pdate2):
 
 
 def fix_grid_continuity(dset):
+    """
+    Fix grid continuity issues in HYSPLIT dataset.
+
+    Ensures that the grid has continuous x and y indices by filling
+    missing grid points with zeros.
+
+    Parameters
+    ----------
+    dset : xarray.Dataset
+        Input HYSPLIT dataset with potential grid discontinuities
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with continuous grid and filled missing values
+
+    Examples
+    --------
+    >>> fixed_ds = fix_grid_continuity(hysplit_dataset)
+    """
     if not dset.any():
         return dset
     if check_grid_continuity(dset):
