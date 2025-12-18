@@ -105,10 +105,8 @@ def cmaq_preprocess(ds):
 
 
 def can_do(index):
-    if index.max():
-        return True
-    else:
-        return False
+    """Return if any of the booleans in the index are True."""
+    return bool(index.max())
 
 
 def _get_times(d, drop_duplicates):
@@ -137,21 +135,17 @@ def _get_latlon(dset, area):
     return dset
 
 
-def _get_keys(d):
-    keys = Series([i for i in d.data_vars.keys()])
-    return keys
-
-
 def add_multiple_lazy(dset, variables, weights=None):
-    if weights is None:
-        weights = ones(len(variables))
-    else:
-        weights = weights.values
-    variables = variables.values
-    new = dset[variables[0]].copy() * weights[0]
-    for i, j in zip(variables[1:], weights[1:]):
-        new = new + dset[i] * j
-    return new
+    """Sum variables in dset with weights."""
+    data_da = dset[variables.values].to_array(dim="variable")
+
+    if weights is not None:
+        weights_da = xr.DataArray(
+            weights.values, dims=["variable"], coords={"variable": variables.values}
+        )
+        return (data_da * weights_da).sum("variable")
+
+    return data_da.sum("variable")
 
 
 # Variable lists
@@ -242,7 +236,7 @@ noy_gas = array(
 
 # Diagnostic Additions
 def add_lazy_pm25(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(concatenate([aitken, accumulation, coarse]))
     weights = Series(
         [
@@ -309,7 +303,7 @@ def add_lazy_pm25(d):
             0.2,
         ]
     )
-    if "PM25_TOT" in keys.to_list():
+    if "PM25_TOT" in keys:
         d["PM25"] = d["PM25_TOT"]
     else:
         index = allvars.isin(keys)
@@ -324,9 +318,9 @@ def add_lazy_pm25(d):
 
 
 def add_lazy_pm10(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(concatenate([aitken, accumulation, coarse]))
-    if "PMC_TOT" in keys.to_list():
+    if "PMC_TOT" in keys:
         d["PM10"] = d["PMC_TOT"]
     else:
         index = allvars.isin(keys)
@@ -344,7 +338,7 @@ def add_lazy_pm10(d):
 
 
 def add_lazy_pm_course(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(coarse)
     index = allvars.isin(keys)
     if can_do(index):
@@ -361,7 +355,7 @@ def add_lazy_pm_course(d):
 
 
 def add_lazy_clf(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(["ACLI", "ACLJ", "ACLK"])
     weights = Series([1, 1, 0.2])
     index = allvars.isin(keys)
@@ -376,7 +370,7 @@ def add_lazy_clf(d):
 
 
 def add_lazy_caf(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(["ACAI", "ACAJ", "ASEACAT", "ASOIL", "ACORS"])
     weights = Series([1, 1, 0.2 * 32.0 / 1000.0, 0.2 * 83.8 / 1000.0, 0.2 * 56.2 / 1000.0])
     index = allvars.isin(keys)
@@ -391,7 +385,7 @@ def add_lazy_caf(d):
 
 
 def add_lazy_naf(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(["ANAI", "ANAJ", "ASEACAT", "ASOIL", "ACORS"])
     weights = Series([1, 1, 0.2 * 837.3 / 1000.0, 0.2 * 62.6 / 1000.0, 0.2 * 2.3 / 1000.0])
     index = allvars.isin(keys)
@@ -406,7 +400,7 @@ def add_lazy_naf(d):
 
 
 def add_lazy_so4f(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(["ASO4I", "ASO4J", "ASO4K"])
     weights = Series([1.0, 1.0, 0.2])
     index = allvars.isin(keys)
@@ -421,7 +415,7 @@ def add_lazy_so4f(d):
 
 
 def add_lazy_nh4f(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(["ANH4I", "ANH4J", "ANH4K"])
     weights = Series([1.0, 1.0, 0.2])
     index = allvars.isin(keys)
@@ -436,7 +430,7 @@ def add_lazy_nh4f(d):
 
 
 def add_lazy_no3f(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(["ANO3I", "ANO3J", "ANO3K"])
     weights = Series([1.0, 1.0, 0.2])
     index = allvars.isin(keys)
@@ -451,7 +445,7 @@ def add_lazy_no3f(d):
 
 
 def add_lazy_noy(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(noy_gas)
     index = allvars.isin(keys)
     if can_do(index):
@@ -462,7 +456,7 @@ def add_lazy_noy(d):
 
 
 def add_lazy_nox(d):
-    keys = _get_keys(d)
+    keys = d.data_vars
     allvars = Series(["NO", "NO2"])
     index = allvars.isin(keys)
     if can_do(index):
