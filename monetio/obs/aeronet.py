@@ -209,7 +209,8 @@ def get_valid_sites():
         )
     except URLError:
         print("getting valid sites failed")
-        return None
+        # Return an empty DataFrame with the expected columns instead of None
+        return pd.DataFrame(columns=["siteid", "longitude", "latitude", "elevation"])
     except Exception:
         raise
 
@@ -365,10 +366,15 @@ class AERONET:
             # sites if the site isn't valid.
             # Note that having a valid site ID doesn't mean there will be any data
             # (depends on time period).
-            if self.siteid in get_valid_sites().siteid.values:
-                loc_ = f"&site={self.siteid}"
+            valid_sites = get_valid_sites()
+            if valid_sites is not None and len(valid_sites) > 0:
+                if self.siteid in valid_sites.siteid.values:
+                    loc_ = f"&site={self.siteid}"
+                else:
+                    raise ValueError(f"invalid site {self.siteid!r}")
             else:
-                raise ValueError(f"invalid site {self.siteid!r}")
+                # If we can't get valid sites, skip validation
+                loc_ = f"&site={self.siteid}"
         elif self.latlonbox is None:
             loc_ = ""
         else:

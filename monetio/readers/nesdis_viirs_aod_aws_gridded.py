@@ -66,7 +66,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
         """Get the lowercase satellite name used in file paths."""
         return "npp" if satellite == "SNPP" else "noaa20"
 
-    def _create_daily_aod_list(self, data_resolution: str, satellite: str, date_generated: List[pd.Timestamp]) -> List[str]:
+    def _create_daily_aod_list(self, data_resolution: str, satellite: str, date_generated: List[pd.Timestamp], error_missing: bool = False) -> List[str]:
         """
         Creates a list of daily AOD files.
         """
@@ -98,13 +98,15 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                 file_list.append(full_path)
             else:
                 if error_missing:
-                    raise ValueError(f"File does not exist: {full_path}")
+                    raise ValueError(f"File does not exist on AWS: {full_path}")
                 else:
-                    print(f"File does not exist: {full_path}")
+                    import warnings
+                    warnings.warn(f"File does not exist on AWS: {full_path}")
+                    file_list.append(None)  # Add None for missing files
 
         return file_list
 
-    def _create_monthly_aod_list(self, satellite: str, date_generated: List[pd.Timestamp]) -> List[str]:
+    def _create_monthly_aod_list(self, satellite: str, date_generated: List[pd.Timestamp], error_missing: bool = False) -> List[str]:
         """
         Creates a list of monthly AOD files.
         """
@@ -133,13 +135,15 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                 file_list.append(full_path)
             else:
                 if error_missing:
-                    raise ValueError(f"File does not exist: {full_path}")
+                    raise ValueError(f"File does not exist on AWS: {full_path}")
                 else:
-                    print(f"File does not exist: {full_path}")
+                    import warnings
+                    warnings.warn(f"File does not exist on AWS: {full_path}")
+                    file_list.append(None)  # Add None for missing files
 
         return file_list
 
-    def _create_weekly_aod_list(self, satellite: str, date_generated: List[pd.Timestamp]) -> List[str]:
+    def _create_weekly_aod_list(self, satellite: str, date_generated: List[pd.Timestamp], error_missing: bool = False) -> List[str]:
         """
         Creates a list of weekly AOD files.
         """
@@ -168,9 +172,10 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                         file_list.append(file)
             except Exception as e:
                 if error_missing:
-                    raise ValueError(str(e))
+                    raise ValueError(f"File does not exist on AWS: {str(e)}")
                 else:
-                    print(str(e))
+                    import warnings
+                    warnings.warn(f"File does not exist on AWS: {str(e)}")
 
         return file_list
 
@@ -180,6 +185,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                      satellite: str = "SNPP",
                      data_resolution: Union[float, str] = 0.1,
                      averaging_time: str = "daily",
+                     error_missing: bool = False,
                      **kwargs) -> xr.Dataset:
         """
         Reads NESDIS VIIRS AOD AWS Gridded data.
@@ -190,6 +196,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
             satellite: 'SNPP' or 'NOAA20'.
             data_resolution: 0.05, 0.1, or 0.25.
             averaging_time: 'daily', 'weekly', or 'monthly'.
+            error_missing: If True, raise error when files are missing. If False, print warning.
             **kwargs: Additional arguments passed to xarray.
 
         Returns:
@@ -210,17 +217,19 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                 dates=date,
                 satellite=satellite,
                 data_resolution=data_resolution,
-                averaging_time=averaging_time
+                averaging_time=averaging_time,
+                error_missing=error_missing
             )
         else:
             return self._open_dataset(
                 date=date,
                 satellite=satellite,
                 data_resolution=data_resolution,
-                averaging_time=averaging_time
+                averaging_time=averaging_time,
+                error_missing=error_missing
             )
 
-    def _open_dataset(self, date: Union[str, pd.Timestamp], satellite: str, data_resolution: Union[float, str], averaging_time: str) -> xr.Dataset:
+    def _open_dataset(self, date: Union[str, pd.Timestamp], satellite: str, data_resolution: Union[float, str], averaging_time: str, error_missing: bool = False) -> xr.Dataset:
         """Open single dataset."""
         self._validate_inputs(satellite, str(data_resolution).ljust(5, "0"), averaging_time)
 
@@ -231,15 +240,20 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
 
         # Get file list based on averaging time
         if averaging_time == AveragingTime.MONTHLY:
-            file_list = self._create_monthly_aod_list(satellite, date_generated)
+            file_list = self._create_monthly_aod_list(satellite, date_generated, error_missing)
         elif averaging_time == AveragingTime.WEEKLY:
-            file_list = self._create_weekly_aod_list(satellite, date_generated)
+            file_list = self._create_weekly_aod_list(satellite, date_generated, error_missing)
         else:  # daily
             data_resolution = str(data_resolution).ljust(5, "0")
-            file_list = self._create_daily_aod_list(data_resolution, satellite, date_generated)
+            file_list = self._create_daily_aod_list(data_resolution, satellite, date_generated, error_missing)
 
         if len(file_list) == 0:
-            raise ValueError(f"Files not available for {averaging_time} data and date: {date_generated[0]}")
+            if error_missing:
+                raise ValueError(f"Files not available for {averaging_time} data and date: {date_generated[0]}")
+            else:
+                # When error_missing=False, we should have already emitted warnings for missing files
+                # So we just return an empty dataset or raise the appropriate error
+                raise ValueError(f"File does not exist on AWS: {date_generated[0]}")
 
         # Open and process dataset
         dset = xr.open_dataset(self.fs.open(file_list[0]))
@@ -247,7 +261,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
 
         return dset
 
-    def _open_mfdataset(self, dates: Union[pd.DatetimeIndex, pd.Timestamp, str], satellite: str, data_resolution: Union[float, str], averaging_time: str) -> xr.Dataset:
+    def _open_mfdataset(self, dates: Union[pd.DatetimeIndex, pd.Timestamp, str], satellite: str, data_resolution: Union[float, str], averaging_time: str, error_missing: bool = False) -> xr.Dataset:
         """Open multiple datasets."""
         # Convert dates to DatetimeIndex
         if isinstance(dates, (str, pd.Timestamp)):
@@ -259,21 +273,15 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
 
         # Get file list based on averaging time
         if averaging_time == AveragingTime.MONTHLY:
-            file_list = self._create_monthly_aod_list(satellite, dates)
+            file_list = self._create_monthly_aod_list(satellite, dates, error_missing)
         elif averaging_time == AveragingTime.WEEKLY:
-            file_list = self._create_weekly_aod_list(satellite, dates)
+            file_list = self._create_weekly_aod_list(satellite, dates, error_missing)
         else:  # daily
             data_resolution = str(data_resolution).ljust(5, "0")
-            file_list = self._create_daily_aod_list(data_resolution, satellite, dates)
+            file_list = self._create_daily_aod_list(data_resolution, satellite, dates, error_missing)
 
         if len(file_list) == 0:
             raise ValueError(f"Files not available for {averaging_time} data and dates: {dates}")
-
-        if not len(file_list) == len(dates):
-            raise ValueError(
-                "'dates' and discovered file list are not the same length. "
-                f"Check your dates input for {averaging_time} frequency."
-            )
 
         # Process valid files and dates
         dates_good = []
@@ -282,6 +290,14 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
             if f is not None:
                 aws_files.append(self.fs.open(f))
                 dates_good.append(d)
+            else:
+                # This shouldn't happen since we already handled missing files in _create_*_list methods
+                # But if it does, skip this file
+                if error_missing:
+                    raise ValueError(f"File does not exist on AWS: {d}")
+
+        if len(aws_files) == 0:
+            raise ValueError(f"Files not available for {averaging_time} data and dates: {dates}")
 
         # Combine datasets
         dset = xr.open_mfdataset(aws_files, concat_dim="time", combine="nested")

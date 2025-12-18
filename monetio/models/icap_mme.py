@@ -95,11 +95,11 @@ def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
     return urls, fnames
 
 
-def remote_file_exists(file_url, *, verbose=True):
+def remote_file_exists(file_url, *, verbose=True, verify=False):
     import requests
 
     try:
-        r = requests.head(file_url, verify=False, timeout=10, allow_redirects=True)
+        r = requests.head(file_url, verify=verify, timeout=10, allow_redirects=True)
 
         if r.status_code == 200:
             return True
@@ -121,7 +121,7 @@ def remote_file_exists(file_url, *, verbose=True):
         return False
 
 
-def retrieve(url, fname, *, download=False, verbose=True):
+def retrieve(url, fname, *, download=False, verbose=True, verify=False):
     """Return BytesIO of the file at `url` or
     download it to path `fname` if it doesn't exist.
 
@@ -133,6 +133,8 @@ def retrieve(url, fname, *, download=False, verbose=True):
         If True, download the file (if it doesn't already exist)
         and return ``pathlib.Path``.
         Otherwise, return ``io.BytesIO`` of the file in memory.
+    verify : bool, optional
+        Whether to verify SSL certificates. Passed to requests functions.
 
     Returns
     -------
@@ -148,7 +150,7 @@ def retrieve(url, fname, *, download=False, verbose=True):
 
     if not download:
         try:
-            r = requests.get(url, stream=True, verify=False, timeout=30)
+            r = requests.get(url, stream=True, verify=verify, timeout=30)
             if r.status_code == 404:
                 raise ValueError(f"File does not exist on ICAP HTTPS server: {url}")
             r.raise_for_status()
@@ -166,7 +168,7 @@ def retrieve(url, fname, *, download=False, verbose=True):
             try:
                 if verbose:
                     print(f"Downloading {url} to {p.as_posix()}")
-                r = requests.get(url, stream=True, verify=False, timeout=30)
+                r = requests.get(url, stream=True, verify=verify, timeout=30)
                 r.raise_for_status()
                 with open(p, "wb") as f:
                     f.write(r.content)
@@ -184,7 +186,7 @@ def retrieve(url, fname, *, download=False, verbose=True):
         return p
 
 
-def _check_file_url(url, *, verbose=True):
+def _check_file_url(url, *, verbose=True, verify=False):
     """
     Raises
     ------
@@ -192,7 +194,7 @@ def _check_file_url(url, *, verbose=True):
         If the file URL HEAD request doesn't return 200,
         with info about how to check available products / data vars for the date.
     """
-    if not remote_file_exists(url, verbose=verbose):
+    if not remote_file_exists(url, verbose=verbose, verify=verify):
         raise ValueError(
             f"File does not exist on ICAP HTTPS server: {url}. "
             f"Check {url[:url.index('icap_')]} to see the available "
@@ -200,7 +202,7 @@ def _check_file_url(url, *, verbose=True):
         )
 
 
-def open_dataset(date, product="MMC", data_var="dustaod550", *, download=False, verbose=True):
+def open_dataset(date, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=False):
     """
     Parameters
     ----------
@@ -216,6 +218,8 @@ def open_dataset(date, product="MMC", data_var="dustaod550", *, download=False, 
     download : bool, optional
         If True, use files on disk, downloading if necessary.
         If False, download and load dataset in memory.
+    verify : bool, optional
+        Whether to verify SSL certificates. Passed to requests functions.
 
     Returns
     -------
@@ -243,13 +247,13 @@ def open_dataset(date, product="MMC", data_var="dustaod550", *, download=False, 
     urls, fnames = build_urls(d, filetype=product, data_var=data_var, verbose=verbose)
     url = urls.values[0]
     fname = fnames.values[0]
-    _check_file_url(url, verbose=verbose)
-    dset = xr.open_dataset(retrieve(url, fname, download=download, verbose=verbose))
+    _check_file_url(url, verbose=verbose, verify=verify)
+    dset = xr.open_dataset(retrieve(url, fname, download=download, verbose=verbose, verify=verify))
 
     return dset
 
 
-def open_mfdataset(dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True):
+def open_mfdataset(dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=False):
     """
     .. note::
        Depending on the selected product/variable and the provided dates,
@@ -271,6 +275,8 @@ def open_mfdataset(dates, product="MMC", data_var="dustaod550", *, download=Fals
         If True, use files on disk, downloading if necessary.
         If False, download and load dataset in memory.
         In this case, the files are fully loaded instead of being opened lazily.
+    verify : bool, optional
+        Whether to verify SSL certificates. Passed to requests functions.
 
     Returns
     -------
@@ -297,14 +303,14 @@ def open_mfdataset(dates, product="MMC", data_var="dustaod550", *, download=Fals
     if download is True:
         paths = []
         for url, fname in zip(urls, fnames):
-            _check_file_url(url, verbose=verbose)
-            paths.append(retrieve(url, fname, download=True, verbose=verbose))
+            _check_file_url(url, verbose=verbose, verify=verify)
+            paths.append(retrieve(url, fname, download=True, verbose=verbose, verify=verify))
         dset = xr.open_mfdataset(paths, combine="nested", concat_dim="time")
     else:
         dsets = []
         for url, fname in zip(urls, fnames):
-            _check_file_url(url, verbose=verbose)
-            o = retrieve(url, fname, download=False, verbose=verbose)
+            _check_file_url(url, verbose=verbose, verify=verify)
+            o = retrieve(url, fname, download=False, verbose=verbose, verify=verify)
             dsets.append(xr.open_dataset(o))
         dset = xr.concat(dsets, dim="time")
 
