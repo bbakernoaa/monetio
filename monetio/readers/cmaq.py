@@ -145,12 +145,17 @@ def add_lazy_derived_vars(ds):
         The dataset with new diagnostic variables.
     """
     for species, formula in CMAQ_SPECIES.items():
-        # If an alternative name is already in the dataset, use it and continue
+        # If an alternative name is already in the dataset, use it and skip calculation
         alt_names = formula.get("alt_names", [])
+        species_added = False
         for alt_name in alt_names:
             if alt_name in ds:
                 ds[species] = ds[alt_name]
-                continue
+                species_added = True
+                break  # Found one, no need to check others
+
+        if species_added:
+            continue  # Move to the next species
 
         # Find which constituent variables are available in the dataset
         available_vars = [v for v in formula["vars"] if v in ds]
