@@ -1,10 +1,11 @@
 """CMAQ File Reader"""
 
 import xarray as xr
-from numpy import array, concatenate, ones
-from pandas import Series, to_datetime
+from numpy import array, unique
+from pandas import to_datetime, to_timedelta
 
 from monetio.grids import get_ioapi_pyresample_area_def, grid_from_dataset
+from monetio.models.cmaq_specs import CMAQ_SPECIES
 
 from .base import GriddedReader, register_reader
 
@@ -79,51 +80,45 @@ class CMAQReader(GriddedReader):
         return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/models/cmaq.py
-# -----------------------------------------------------------------------------
-
-
 def cmaq_preprocess(ds):
     """
     Preprocess function to add lazy diagnostic variables.
     Can be passed to xarray.open_mfdataset.
     """
-    ds = add_lazy_pm25(ds)
-    ds = add_lazy_pm10(ds)
-    ds = add_lazy_pm_course(ds)
-    ds = add_lazy_clf(ds)
-    ds = add_lazy_naf(ds)
-    ds = add_lazy_caf(ds)
-    ds = add_lazy_noy(ds)
-    ds = add_lazy_nox(ds)
-    ds = add_lazy_no3f(ds)
-    ds = add_lazy_nh4f(ds)
-    ds = add_lazy_so4f(ds)
+    ds = add_lazy_derived_vars(ds)
     ds = add_lazy_rh(ds)
     return ds
 
 
-def can_do(index):
-    """Return if any of the booleans in the index are True."""
-    return bool(index.max())
-
-
 def _get_times(d, drop_duplicates):
-    idims = len(d.TFLAG.dims)
-    if idims == 2:
-        tflag1 = Series(d["TFLAG"][:, 0]).astype(str).str.zfill(7)
-        tflag2 = Series(d["TFLAG"][:, 1]).astype(str).str.zfill(6)
-    else:
-        tflag1 = Series(d["TFLAG"][:, 0, 0]).astype(str).str.zfill(7)
-        tflag2 = Series(d["TFLAG"][:, 0, 1]).astype(str).str.zfill(6)
-    date = to_datetime([i + j for i, j in zip(tflag1, tflag2)], format="%Y%j%H%M%S")
+    """
+    Vectorized function to parse TFLAG time variables.
+    """
+    tflag = d["TFLAG"].values
+    if tflag.ndim == 2:
+        dates = tflag[:, 0]
+        times = tflag[:, 1]
+    else:  # Assuming 3D with a singleton dimension
+        dates = tflag[:, 0, 0]
+        times = tflag[:, 0, 1]
+
+    # Vectorized datetime parsing
+    dates_pd = to_datetime(dates, format="%Y%j")
+    times_pd = to_timedelta(
+        (times // 10000), unit="h") + \
+        to_timedelta((times % 10000) // 100, unit="m") + \
+        to_timedelta((times % 100), unit="s"
+    )
+
+    final_times = dates_pd + times_pd
+
     if drop_duplicates:
-        indexdates = Series(date).drop_duplicates(keep="last").index.values
-        d = d.isel(TSTEP=indexdates)
-        d["TSTEP"] = date[indexdates]
+        _, index = unique(final_times, return_index=True)
+        d = d.isel(TSTEP=index)
+        d["TSTEP"] = final_times[index]
     else:
-        d["TSTEP"] = date
+        d["TSTEP"] = final_times
+
     return d.rename({"TSTEP": "time"})
 
 
@@ -135,335 +130,57 @@ def _get_latlon(dset, area):
     return dset
 
 
-def add_multiple_lazy(dset, variables, weights=None):
-    """Sum variables in dset with weights."""
-    data_da = dset[variables.values].to_array(dim="variable")
+def add_lazy_derived_vars(ds):
+    """
+    Adds lazily-computed diagnostic variables to the dataset.
 
-    if weights is not None:
-        weights_da = xr.DataArray(
-            weights.values, dims=["variable"], coords={"variable": variables.values}
-        )
-        return (data_da * weights_da).sum("variable")
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The dataset to which variables will be added.
 
-    return data_da.sum("variable")
+    Returns
+    -------
+    xarray.Dataset
+        The dataset with new diagnostic variables.
+    """
+    for species, formula in CMAQ_SPECIES.items():
+        # If an alternative name is already in the dataset, use it and skip calculation
+        alt_names = formula.get("alt_names", [])
+        species_added = False
+        for alt_name in alt_names:
+            if alt_name in ds:
+                ds[species] = ds[alt_name]
+                species_added = True
+                break  # Found one, no need to check others
 
+        if species_added:
+            continue  # Move to the next species
 
-# Variable lists
-accumulation = array(
-    [
-        "AALJ",
-        "AALK1J",
-        "AALK2J",
-        "ABNZ1J",
-        "ABNZ2J",
-        "ABNZ3J",
-        "ACAJ",
-        "ACLJ",
-        "AECJ",
-        "AFEJ",
-        "AISO1J",
-        "AISO2J",
-        "AISO3J",
-        "AKJ",
-        "AMGJ",
-        "AMNJ",
-        "ANAJ",
-        "ANH4J",
-        "ANO3J",
-        "AOLGAJ",
-        "AOLGBJ",
-        "AORGCJ",
-        "AOTHRJ",
-        "APAH1J",
-        "APAH2J",
-        "APAH3J",
-        "APNCOMJ",
-        "APOCJ",
-        "ASIJ",
-        "ASO4J",
-        "ASQTJ",
-        "ATIJ",
-        "ATOL1J",
-        "ATOL2J",
-        "ATOL3J",
-        "ATRP1J",
-        "ATRP2J",
-        "AXYL1J",
-        "AXYL2J",
-        "AXYL3J",
-        "AORGAJ",
-        "AORGPAJ",
-        "AORGBJ",
-    ]
-)
-aitken = array(
-    [
-        "ACLI",
-        "AECI",
-        "ANAI",
-        "ANH4I",
-        "ANO3I",
-        "AOTHRI",
-        "APNCOMI",
-        "APOCI",
-        "ASO4I",
-        "AORGAI",
-        "AORGPAI",
-        "AORGBI",
-    ]
-)
-coarse = array(["ACLK", "ACORS", "ANH4K", "ANO3K", "ASEACAT", "ASO4K", "ASOIL"])
-noy_gas = array(
-    [
-        "NO",
-        "NO2",
-        "NO3",
-        "N2O5",
-        "HONO",
-        "HNO3",
-        "PAN",
-        "PANX",
-        "PNA",
-        "NTR",
-        "CRON",
-        "CRN2",
-        "CRNO",
-        "CRPX",
-        "OPAN",
-    ]
-)
+        # Find which constituent variables are available in the dataset
+        available_vars = [v for v in formula["vars"] if v in ds]
+        if not available_vars:
+            continue
 
+        # Lazily sum the available variables
+        # to_array().sum() is a fast, vectorized way to sum DataArrays
+        subset_ds = ds[available_vars]
 
-# Diagnostic Additions
-def add_lazy_pm25(d):
-    keys = d.data_vars
-    allvars = Series(concatenate([aitken, accumulation, coarse]))
-    weights = Series(
-        [
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            0.2,
-            0.2,
-            0.2,
-            0.2,
-            0.2,
-            0.2,
-            0.2,
-        ]
-    )
-    if "PM25_TOT" in keys:
-        d["PM25"] = d["PM25_TOT"]
-    else:
-        index = allvars.isin(keys)
-        if can_do(index):
-            newkeys = allvars.loc[index]
-            newweights = weights.loc[index]
-            d["PM25"] = add_multiple_lazy(d, newkeys, weights=newweights)
-            d["PM25"] = d["PM25"].assign_attrs(
-                {"units": r"$\mu g m^{-3}$", "name": "PM2.5", "long_name": "PM2.5"}
+        if "weights" in formula:
+            # Create a DataArray of weights aligned with the variables
+            weights = xr.DataArray(
+                [formula["weights"][formula["vars"].index(v)] for v in available_vars],
+                dims=["variable"],
+                coords={"variable": available_vars},
             )
-    return d
+            derived_var = (subset_ds.to_array(dim="variable") * weights).sum("variable")
+        else:
+            derived_var = subset_ds.to_array(dim="variable").sum("variable")
 
+        # Assign the new variable and its attributes to the dataset
+        ds[species] = derived_var.assign_attrs(formula.get("attrs", {}))
 
-def add_lazy_pm10(d):
-    keys = d.data_vars
-    allvars = Series(concatenate([aitken, accumulation, coarse]))
-    if "PMC_TOT" in keys:
-        d["PM10"] = d["PMC_TOT"]
-    else:
-        index = allvars.isin(keys)
-        if can_do(index):
-            newkeys = allvars.loc[index]
-            d["PM10"] = add_multiple_lazy(d, newkeys)
-            d["PM10"] = d["PM10"].assign_attrs(
-                {
-                    "units": r"$\mu g m^{-3}$",
-                    "name": "PM10",
-                    "long_name": "Particulate Matter < 10 microns",
-                }
-            )
-    return d
-
-
-def add_lazy_pm_course(d):
-    keys = d.data_vars
-    allvars = Series(coarse)
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        d["PM_COURSE"] = add_multiple_lazy(d, newkeys)
-        d["PM_COURSE"] = d["PM_COURSE"].assign_attrs(
-            {
-                "units": r"$\mu g m^{-3}$",
-                "name": "PM_COURSE",
-                "long_name": "Course Mode Particulate Matter",
-            }
-        )
-    return d
-
-
-def add_lazy_clf(d):
-    keys = d.data_vars
-    allvars = Series(["ACLI", "ACLJ", "ACLK"])
-    weights = Series([1, 1, 0.2])
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        neww = weights.loc[index]
-        d["CLf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["CLf"] = d["CLf"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "CLf", "long_name": "Fine Mode particulate Cl"}
-        )
-    return d
-
-
-def add_lazy_caf(d):
-    keys = d.data_vars
-    allvars = Series(["ACAI", "ACAJ", "ASEACAT", "ASOIL", "ACORS"])
-    weights = Series([1, 1, 0.2 * 32.0 / 1000.0, 0.2 * 83.8 / 1000.0, 0.2 * 56.2 / 1000.0])
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        neww = weights.loc[index]
-        d["CAf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["CAf"] = d["CAf"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "CAf", "long_name": "Fine Mode particulate CA"}
-        )
-    return d
-
-
-def add_lazy_naf(d):
-    keys = d.data_vars
-    allvars = Series(["ANAI", "ANAJ", "ASEACAT", "ASOIL", "ACORS"])
-    weights = Series([1, 1, 0.2 * 837.3 / 1000.0, 0.2 * 62.6 / 1000.0, 0.2 * 2.3 / 1000.0])
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        neww = weights.loc[index]
-        d["NAf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NAf"] = d["NAf"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NAf", "long_name": "NAf"}
-        )
-    return d
-
-
-def add_lazy_so4f(d):
-    keys = d.data_vars
-    allvars = Series(["ASO4I", "ASO4J", "ASO4K"])
-    weights = Series([1.0, 1.0, 0.2])
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        neww = weights.loc[index]
-        d["SO4f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["SO4f"] = d["SO4f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "SO4f", "long_name": "SO4f"}
-        )
-    return d
-
-
-def add_lazy_nh4f(d):
-    keys = d.data_vars
-    allvars = Series(["ANH4I", "ANH4J", "ANH4K"])
-    weights = Series([1.0, 1.0, 0.2])
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        neww = weights.loc[index]
-        d["NH4f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NH4f"] = d["NH4f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NH4f", "long_name": "NH4f"}
-        )
-    return d
-
-
-def add_lazy_no3f(d):
-    keys = d.data_vars
-    allvars = Series(["ANO3I", "ANO3J", "ANO3K"])
-    weights = Series([1.0, 1.0, 0.2])
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        neww = weights.loc[index]
-        d["NO3f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NO3f"] = d["NO3f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NO3f", "long_name": "NO3f"}
-        )
-    return d
-
-
-def add_lazy_noy(d):
-    keys = d.data_vars
-    allvars = Series(noy_gas)
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        d["NOy"] = add_multiple_lazy(d, newkeys)
-        d["NOy"] = d["NOy"].assign_attrs({"name": "NOy", "long_name": "NOy"})
-    return d
-
-
-def add_lazy_nox(d):
-    keys = d.data_vars
-    allvars = Series(["NO", "NO2"])
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        d["NOx"] = add_multiple_lazy(d, newkeys)
-        d["NOx"] = d["NOx"].assign_attrs({"name": "NOx", "long_name": "NOx"})
-    return d
+    return ds
 
 
 def add_lazy_rh(d):
