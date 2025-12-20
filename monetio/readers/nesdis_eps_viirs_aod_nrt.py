@@ -39,7 +39,7 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
             f"{sat_dirname}/{aod_dirname}/"
         )
 
-        files = []
+        urls = []
         for date in dates:
             year = date.strftime("%Y")
             date_str = date.strftime("%Y%m%d") if daily else date.strftime("%Y%m")
@@ -48,9 +48,9 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
                 if daily
                 else f"viirs_aod_monthly_{sat}_{res}_deg_{date_str}_nrt.nc"
             )
-            files.append((base_url + fname, fname))
+            urls.append(base_url + fname)
 
-        return files
+        return urls
 
     def open_dataset(
         self,
@@ -77,7 +77,7 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
             dates = pd.DatetimeIndex(date)
         else:
             dates = date
-        files = self._build_urls(
+        urls = self._build_urls(
             dates,
             satellite=satellite,
             data_resolution=data_resolution,
@@ -85,21 +85,26 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
             **kwargs,
         )
 
-        dsets = []
-        for (url, fname), date in zip(files, dates):
-            try:
-                ds = self.driver.open(url, **kwargs)
-                ds.attrs["dataset_name"] = fname
-                dsets.append(ds.expand_dims(time=[date]).set_coords(["time"]))
-            except Exception as e:
-                if error_missing:
-                    raise
-                else:
-                    import warnings
+        def preprocess(ds):
+            fname = ds.encoding["source"].split("/")[-1]
+            ds.attrs["dataset_name"] = fname
+            return ds
 
-                    warnings.warn(f"Failed to access file on NESDIS FTP server: {e}")
+        try:
+            if len(urls) > 1:
+                ds = self.driver.open(
+                    urls, concat_dim="time", combine="nested", preprocess=preprocess, **kwargs
+                )
+                return ds.assign_coords(time=dates)
+            else:
+                ds = self.driver.open(urls[0], **kwargs)
+                ds = preprocess(ds)
+                return ds.expand_dims(time=dates)
+        except Exception as e:
+            if error_missing:
+                raise
+            else:
+                import warnings
 
-        if not dsets:
-            return xr.Dataset()
-
-        return xr.concat(dsets, dim="time") if len(dsets) > 1 else dsets[0]
+                warnings.warn(f"Failed to access file on NESDIS FTP server: {e}")
+                return xr.Dataset()

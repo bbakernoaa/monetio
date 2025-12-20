@@ -25,45 +25,37 @@ class FileUtility:
         return fsspec.filesystem("file")
 
     @staticmethod
-    def expand_paths(path_input: Union[str, List[str]], fs=None) -> List[str]:
+    def expand_paths(path_input: Union[str, List[str]]) -> List[str]:
         """
         Converts a string (with wildcards), a single path, or a list of paths
-        into a guaranteed list of file paths/objects.
+        into a guaranteed list of file paths.
         """
-        # Case 1: It's a list already
-        if isinstance(path_input, list):
-            return sorted(path_input)
-
-        # Case 2: It's a single string (S3 or Local)
         if isinstance(path_input, str):
-            # If no specific filesystem provided, guess it from the path
-            if fs is None:
-                fs = FileUtility.get_fs(path_input)
+            paths_to_process = [path_input]
+        elif isinstance(path_input, list):
+            paths_to_process = path_input
+        else:
+            raise TypeError(f"Invalid path type: {type(path_input)}. Must be str or list.")
 
-            # Use fsspec/s3fs to glob wildcards (works for s3://bucket/data/*.nc too!)
-            if any(char in path_input for char in ["*", "?"]):
-                # HTTP globbing is generally not supported by fsspec without specific implementation
-                # For S3/Local it works.
-                if path_input.startswith("http"):
-                    # Fallback: treat as single file if glob chars present but http (unlikely to work)
-                    # Or raise error.
-                    # For now, assume S3/Local for globs.
-                    pass
-
-                files = sorted(fs.glob(path_input))
-                if path_input.startswith("s3://") and files and not files[0].startswith("s3://"):
-                    files = [f"s3://{f}" for f in files]
-                if not files:
-                    raise FileNotFoundError(f"No files found matching pattern: {path_input}")
-                return files
+        all_files = []
+        for path in paths_to_process:
+            fs = FileUtility.get_fs(path)
+            if any(char in path for char in ["*", "?"]):
+                # Expand glob pattern
+                globbed_files = sorted(fs.glob(path))
+                if path.startswith("s3://") and globbed_files and not globbed_files[0].startswith("s3://"):
+                    globbed_files = [f"s3://{f}" for f in globbed_files]
+                all_files.extend(globbed_files)
             else:
-                # It is a specific single file
-                # For http, exists() might involve HEAD request
-                if not path_input.startswith("http") and not fs.exists(path_input):
-                    raise FileNotFoundError(f"File not found: {path_input}")
-                return [path_input]
+                # It's a single file path, verify existence
+                if not path.startswith("http") and not fs.exists(path):
+                    raise FileNotFoundError(f"File not found: {path}")
+                all_files.append(path)
 
-        raise TypeError(f"Invalid path type: {type(path_input)}. Must be str or list.")
+        if not all_files:
+            raise FileNotFoundError(f"No files found matching pattern: {path_input}")
+
+        return all_files
 
 
 class XarrayDriver:
