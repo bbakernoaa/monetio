@@ -1,5 +1,4 @@
 """NESDIS VIIRS AOD AWS Gridded Reader"""
-
 from enum import Enum
 from typing import List, Union
 
@@ -7,7 +6,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .drivers import FileUtility, XarrayDriver
+from .drivers import XarrayDriver
 
 
 class AveragingTime(str, Enum):
@@ -34,6 +33,7 @@ PRODUCT_CONFIG = {
     },
     AveragingTime.WEEKLY: {
         "path_template": "s3://noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Weekly/{year}/",
+        "file_template": "viirs_eps_{sat_name}_aod_0.250_deg_{date_range}.nc",
         "resolutions": {"0.250"},
     },
     AveragingTime.MONTHLY: {
@@ -52,7 +52,6 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.fs = None
         self.driver = XarrayDriver()
 
     def _validate_inputs(self, satellite: str, data_resolution: str, averaging_time: str) -> None:
@@ -77,125 +76,42 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
         """Get the lowercase satellite name used in file paths."""
         return "npp" if satellite == "SNPP" else "noaa20"
 
-    def _create_daily_aod_list(
+    def _generate_file_list(
         self,
-        data_resolution: str,
+        dates: pd.DatetimeIndex,
         satellite: str,
-        date_generated: List[pd.Timestamp],
-        error_missing: bool = False,
+        data_resolution: str,
+        averaging_time: str,
+        error_missing: bool,
     ) -> List[str]:
-        """
-        Creates a list of daily AOD files.
-        """
-        self._validate_inputs(satellite, data_resolution, AveragingTime.DAILY)
-
+        """Generate list of files to open."""
         file_list = []
         sat_name = self._get_satellite_name(satellite)
-        config = PRODUCT_CONFIG[AveragingTime.DAILY]
+        config = PRODUCT_CONFIG[averaging_time]
 
-        for date in date_generated:
-            file_date = date.strftime("%Y%m%d")
-            year = file_date[:4]
-
-            file_name = config["file_template"].format(
-                sat_name=sat_name, resolution=data_resolution, date=file_date
-            )
-
-            prod_path = config["path_template"].format(
-                satellite=satellite, resolution=data_resolution[:4], year=year
-            )
-
-            full_path = prod_path + file_name
-            if self.fs is None:
-                self.fs = FileUtility.get_fs(full_path)
-
-            if self.fs.exists(full_path):
-                file_list.append(full_path)
-            else:
-                if error_missing:
-                    raise ValueError(f"File does not exist on AWS: {full_path}")
-                else:
-                    import warnings
-
-                    warnings.warn(f"File does not exist on AWS: {full_path}")
-                    file_list.append(None)
-
-        return file_list
-
-    def _create_monthly_aod_list(
-        self, satellite: str, date_generated: List[pd.Timestamp], error_missing: bool = False
-    ) -> List[str]:
-        """
-        Creates a list of monthly AOD files.
-        """
-        self._validate_inputs(satellite, "0.250", AveragingTime.MONTHLY)
-
-        file_list = []
-        processed_months = set()
-        sat_name = self._get_satellite_name(satellite)
-        config = PRODUCT_CONFIG[AveragingTime.MONTHLY]
-
-        for date in date_generated:
-            year_month = date.strftime("%Y%m")
-            if year_month in processed_months:
-                continue
-
-            processed_months.add(year_month)
-            file_name = config["file_template"].format(sat_name=sat_name, date=year_month)
-
-            prod_path = config["path_template"].format(satellite=satellite)
-            full_path = prod_path + file_name
-            if self.fs is None:
-                self.fs = FileUtility.get_fs(full_path)
-
-            if self.fs.exists(full_path):
-                file_list.append(full_path)
-            else:
-                if error_missing:
-                    raise ValueError(f"File does not exist on AWS: {full_path}")
-                else:
-                    import warnings
-
-                    warnings.warn(f"File does not exist on AWS: {full_path}")
-                    file_list.append(None)
-
-        return file_list
-
-    def _create_weekly_aod_list(
-        self, satellite: str, date_generated: List[pd.Timestamp], error_missing: bool = False
-    ) -> List[str]:
-        """
-        Creates a list of weekly AOD files.
-        """
-        self._validate_inputs(satellite, "0.250", AveragingTime.WEEKLY)
-
-        file_list = []
-        config = PRODUCT_CONFIG[AveragingTime.WEEKLY]
-
-        for date in date_generated:
-            file_date = date.strftime("%Y%m%d")
-            year = file_date[:4]
-
-            prod_path = config["path_template"].format(satellite=satellite, year=year)
-            if self.fs is None:
-                self.fs = FileUtility.get_fs(prod_path)
-
-            try:
-                all_files = self.fs.ls(prod_path)
-                for file in all_files:
-                    file_name = file.split("/")[-1]
-                    date_range = file_name.split("_")[7].split(".")[0]
-                    file_start, file_end = date_range.split("-")
-
-                    if file_start <= file_date <= file_end and file not in file_list:
-                        file_list.append(file)
-            except Exception as e:
-                if error_missing:
-                    raise ValueError(f"File does not exist on AWS: {str(e)}")
-                else:
-                    import warnings
-
-                    warnings.warn(f"File does not exist on AWS: {str(e)}")
+        if averaging_time == AveragingTime.DAILY:
+            for date in dates:
+                file_date = date.strftime("%Y%m%d")
+                year = file_date[:4]
+                prod_path = config["path_template"].format(
+                    satellite=satellite, resolution=data_resolution[:4], year=year
+                )
+                file_name = config["file_template"].format(
+                    sat_name=sat_name, resolution=data_resolution, date=file_date
+                )
+                file_list.append(prod_path + file_name)
+        elif averaging_time == AveragingTime.MONTHLY:
+            for date in dates.to_period("M").unique():
+                year_month = date.strftime("%Y%m")
+                prod_path = config["path_template"].format(satellite=satellite)
+                file_name = config["file_template"].format(sat_name=sat_name, date=year_month)
+                file_list.append(prod_path + file_name)
+        elif averaging_time == AveragingTime.WEEKLY:
+            for date in dates:
+                year = date.strftime("%Y")
+                prod_path = config["path_template"].format(satellite=satellite, year=year)
+                # Since we don't know the exact weekly file name, we use a wildcard
+                file_list.append(f"{prod_path}viirs_eps_{sat_name}_aod_0.250_deg_*.nc")
 
         return file_list
 
@@ -209,140 +125,35 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
         error_missing: bool = False,
         **kwargs,
     ) -> xr.Dataset:
-        """
-        Reads NESDIS VIIRS AOD AWS Gridded data.
-
-        Args:
-            files: (Ignored for this reader, uses 'date' instead)
-            date: Date(s) to download/read data for.
-            satellite: 'SNPP' or 'NOAA20'.
-            data_resolution: 0.05, 0.1, or 0.25.
-            averaging_time: 'daily', 'weekly', or 'monthly'.
-            error_missing: If True, raise error when files are missing. If False, print warning.
-            **kwargs: Additional arguments passed to xarray.
-
-        Returns:
-            xarray.Dataset
-        """
-
         if date is None:
-            if files is not None:
-                if isinstance(files, str):
-                    date = files
-                else:
-                    raise ValueError("Date is required for NESDIS VIIRS AOD AWS Gridded reader.")
-            else:
-                raise ValueError("Date is required for NESDIS VIIRS AOD AWS Gridded reader.")
+            raise ValueError("Date is required for NESDIS VIIRS AOD AWS Gridded reader.")
 
-        if isinstance(date, (list, pd.DatetimeIndex)) or (isinstance(date, str) and "," in date):
-            return self._open_mfdataset(
-                dates=date,
-                satellite=satellite,
-                data_resolution=data_resolution,
-                averaging_time=averaging_time,
-                error_missing=error_missing,
-                **kwargs,
-            )
+        if isinstance(date, (str, pd.Timestamp)):
+            dates = pd.DatetimeIndex([date])
+        elif not isinstance(date, pd.DatetimeIndex):
+            dates = pd.DatetimeIndex(date)
         else:
-            return self._open_dataset(
-                date=date,
-                satellite=satellite,
-                data_resolution=data_resolution,
-                averaging_time=averaging_time,
-                error_missing=error_missing,
-                **kwargs,
-            )
+            dates = date
 
-    def _open_dataset(
-        self,
-        date: Union[str, pd.Timestamp],
-        satellite: str,
-        data_resolution: Union[float, str],
-        averaging_time: str,
-        error_missing: bool = False,
-        **kwargs,
-    ) -> xr.Dataset:
-        """Open single dataset."""
-        self._validate_inputs(satellite, str(data_resolution).ljust(5, "0"), averaging_time)
+        data_res_str = f"{float(data_resolution):.3f}"
+        self._validate_inputs(satellite, data_res_str, averaging_time)
 
-        if isinstance(date, str):
-            date_generated = [pd.Timestamp(date)]
-        else:
-            date_generated = [date]
-
-        # Get file list based on averaging time
-        if averaging_time == AveragingTime.MONTHLY:
-            file_list = self._create_monthly_aod_list(satellite, date_generated, error_missing)
-        elif averaging_time == AveragingTime.WEEKLY:
-            file_list = self._create_weekly_aod_list(satellite, date_generated, error_missing)
-        else:  # daily
-            data_resolution = str(data_resolution).ljust(5, "0")
-            file_list = self._create_daily_aod_list(
-                data_resolution, satellite, date_generated, error_missing
-            )
-
-        file_list = [f for f in file_list if f is not None]
-        if len(file_list) == 0:
-            if error_missing:
-                raise ValueError(
-                    f"Files not available for {averaging_time} data and date: {date_generated[0]}"
-                )
-            else:
-                raise ValueError(f"File does not exist on AWS: {date_generated[0]}")
-
-        # Open and process dataset
-        dset = self.driver.open(file_list[0], **kwargs)
-        dset = dset.expand_dims(time=date_generated).set_coords(["time"])
-
-        return dset
-
-    def _open_mfdataset(
-        self,
-        dates: Union[pd.DatetimeIndex, pd.Timestamp, str],
-        satellite: str,
-        data_resolution: Union[float, str],
-        averaging_time: str,
-        error_missing: bool = False,
-        **kwargs,
-    ) -> xr.Dataset:
-        """Open multiple datasets."""
-        # Convert dates to DatetimeIndex
-        if isinstance(dates, (str, pd.Timestamp)):
-            dates = pd.DatetimeIndex([dates])
-        elif not isinstance(dates, pd.DatetimeIndex):
-            dates = pd.DatetimeIndex(dates)
-
-        self._validate_inputs(satellite, str(data_resolution).ljust(5, "0"), averaging_time)
-
-        # Get file list based on averaging time
-        if averaging_time == AveragingTime.MONTHLY:
-            file_list = self._create_monthly_aod_list(satellite, dates, error_missing)
-        elif averaging_time == AveragingTime.WEEKLY:
-            file_list = self._create_weekly_aod_list(satellite, dates, error_missing)
-        else:  # daily
-            data_resolution = str(data_resolution).ljust(5, "0")
-            file_list = self._create_daily_aod_list(
-                data_resolution, satellite, dates, error_missing
-            )
-
-        # Process valid files and dates
-        dates_good = []
-        aws_files = []
-        for d, f in zip(dates, file_list):
-            if f is not None:
-                aws_files.append(f)
-                dates_good.append(d)
-            else:
-                if error_missing:
-                    raise ValueError(f"File does not exist on AWS: {d}")
-
-        if len(aws_files) == 0:
-            raise ValueError(f"Files not available for {averaging_time} data and dates: {dates}")
-
-        # Combine datasets
-        dset = self.driver.open(
-            aws_files, concat_dim="time", combine="nested", **kwargs
+        file_list = self._generate_file_list(
+            dates, satellite, data_res_str, averaging_time, error_missing
         )
-        dset["time"] = dates_good
 
-        return dset
+        try:
+            if len(file_list) > 1:
+                return self.driver.open(
+                    file_list, concat_dim="time", combine="nested", **kwargs
+                ).assign_coords(time=dates)
+            else:
+                return self.driver.open(file_list[0], **kwargs).expand_dims(time=dates)
+        except Exception as e:
+            if error_missing:
+                raise
+            else:
+                import warnings
+
+                warnings.warn(f"File does not exist on AWS: {e}")
+                return xr.Dataset()

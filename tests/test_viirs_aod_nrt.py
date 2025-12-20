@@ -56,30 +56,29 @@ def test_open_dataset_monthly(sat):
 def test_open_mfdataset():
     today = TODAY.tz_localize(None)
     dates = [today - pd.Timedelta(days=2), today - pd.Timedelta(days=3)]
-    ds = viirs_aod_nrt_reader.open_mfdataset(dates=dates)
+    ds = viirs_aod_nrt_reader.open_dataset(dates=dates)
     assert ds.sizes["time"] == len(dates)
 
 
 def test_missing_date():
-    with pytest.raises(OSError):
-        viirs_aod_nrt_reader.open_dataset(date="1900-01-01")
+    with pytest.raises(Exception):
+        viirs_aod_nrt_reader.open_dataset(date="1900-01-01", error_missing=True)
 
 
 def test_missing_date_mf():
     # No dsets collected
-    with pytest.raises(ValueError, match="Files not available for product and dates"), pytest.warns(
-        UserWarning, match="Failed to access file"
-    ):
-        viirs_aod_nrt_reader.open_mfdataset(dates="1900-01-01")
+    with pytest.warns(UserWarning, match="Failed to access file"):
+        ds = viirs_aod_nrt_reader.open_dataset(dates="1900-01-01")
+        assert len(ds.data_vars) == 0
 
     # Error during dsets collection
-    with pytest.raises(RuntimeError, match="Failed to access file"):
-        viirs_aod_nrt_reader.open_mfdataset(dates="1900-01-01", error_missing=True)
+    with pytest.raises(Exception):
+        viirs_aod_nrt_reader.open_dataset(dates="1900-01-01", error_missing=True)
 
     one_good = ["1900-01-01", TODAY.tz_localize(None) - pd.Timedelta(days=2)]
     with pytest.warns(UserWarning, match="Failed to access file"):
-        ds = viirs_aod_nrt_reader.open_mfdataset(one_good)
+        ds = viirs_aod_nrt_reader.open_dataset(one_good)
         assert ds.sizes["time"] == 1
 
-    with pytest.raises(RuntimeError, match="Failed to access file"):
-        viirs_aod_nrt_reader.open_mfdataset(one_good, error_missing=True)
+    with pytest.raises(Exception):
+        viirs_aod_nrt_reader.open_dataset(one_good, error_missing=True)

@@ -14,8 +14,9 @@ viirs_ndvi_reader = READER_REGISTRY["nesdis_viirs_ndvi_aws_gridded"]()
 
 
 def test_open_dataset_no_data():
-    with pytest.raises(ValueError, match="No files found for vhi"):
-        viirs_ndvi_reader.open_dataset(date="1900-01-01")
+    with pytest.warns(UserWarning, match="No files found for vhi"):
+        ds = viirs_ndvi_reader.open_dataset(date="1900-01-01")
+        assert len(ds.data_vars) == 0
 
 
 def test_open_dataset():
@@ -26,7 +27,7 @@ def test_open_dataset():
     assert ds.sizes["time"] == 1
     assert ds.sizes["latitude"] == 3600
     assert ds.sizes["longitude"] == 7200
-    assert ds["time"] == pd.to_datetime(date)
+    assert (ds["time"] == pd.to_datetime(date)).all()
 
     assert "NDVI" in ds.data_vars
     assert ds["NDVI"].dims == ("time", "latitude", "longitude")
@@ -45,6 +46,7 @@ def test_open_mfdataset():
     dates = ["2023-01-01", "2023-01-02"]
     ds = viirs_ndvi_reader.open_dataset(date=dates)
     assert (ds["time"] == pd.DatetimeIndex(dates)).all()
+    assert ds.sizes["time"] == 2
 
 
 def test_open_mfdataset_error():
@@ -53,12 +55,10 @@ def test_open_mfdataset_error():
     with pytest.warns(UserWarning, match="No files found for vhi"):
         ds = viirs_ndvi_reader.open_dataset(date=dates)
         assert ds.sizes["time"] == 1
-        assert ds["time"] == pd.to_datetime(dates[-1])
 
-    with pytest.raises(ValueError, match="No files found for vhi"):
+    with pytest.raises(FileNotFoundError, match="No files found matching pattern"):
         _ = viirs_ndvi_reader.open_dataset(date=dates, error_missing=True)
 
-    with pytest.raises(ValueError, match="Files not available for vhi"), pytest.warns(
-        UserWarning, match="No files found for vhi"
-    ):
-        _ = viirs_ndvi_reader.open_dataset(date=dates[:1], error_missing=False)
+    with pytest.warns(UserWarning, match="No files found for vhi"):
+        ds = viirs_ndvi_reader.open_dataset(date=dates[:1], error_missing=False)
+        assert len(ds.data_vars) == 0

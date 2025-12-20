@@ -16,8 +16,10 @@ class FileUtility:
         Returns the correct filesystem (local, s3, or http) based on the protocol.
         """
         if path.startswith("s3://"):
+            import s3fs
+
             # anon=True means public bucket. Use anon=False to use your AWS credentials.
-            return fsspec.filesystem("s3", anon=True)
+            return s3fs.S3FileSystem(anon=True)
         elif path.startswith("http://") or path.startswith("https://"):
             return fsspec.filesystem("http")
         return fsspec.filesystem("file")
@@ -132,8 +134,8 @@ class XarrayDriver:
                 else:
                     return xr.open_mfdataset(file_list, **xr_kwargs)
 
-        except Exception as e:
-            raise OSError(f"XarrayDriver failed to open files. Error: {e}")
+        except Exception:
+            raise
 
 
 class PandasDriver:

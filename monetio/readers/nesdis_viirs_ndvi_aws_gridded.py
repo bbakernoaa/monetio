@@ -6,7 +6,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .drivers import FileUtility, XarrayDriver
+from .drivers import XarrayDriver
 
 # Configuration dictionary for different data products
 DATA_CONFIGS = {
@@ -32,12 +32,9 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.fs = None
         self.driver = XarrayDriver()
 
-    def _validate_inputs(
-        self, date_generated: List[pd.Timestamp], data_type: str, sensor: str
-    ) -> None:
+    def _validate_inputs(self, data_type: str, sensor: str) -> None:
         """
         Validates input parameters.
         """
@@ -52,60 +49,16 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
                 f"Available sensors: {list(DATA_CONFIGS[data_type].keys())}"
             )
 
-    def _get_cached_file_list(
-        self, year: str, prod_path: str, pattern: str, file_date: str
-    ) -> List[str]:
-        """
-        Cached version of file listing to improve performance for repeated requests.
-        """
-        path_to_glob = f"{prod_path}{year}/{pattern}{file_date}_*.nc"
-        if self.fs is None:
-            self.fs = FileUtility.get_fs(path_to_glob)
-        files = self.fs.glob(path_to_glob)
-        if path_to_glob.startswith("s3://") and files and not files[0].startswith("s3://"):
-            files = [f"s3://{f}" for f in files]
-        return files
-
-    def _create_daily_data_list(
-        self,
-        date_generated: List[pd.Timestamp],
-        data_type: str = "vhi",
-        sensor: str = "viirs",
-        warning: bool = False,
-    ) -> List[str]:
-        """
-        Creates a list of daily data files and calculates the total size of the files.
-        """
-        self._validate_inputs(date_generated, data_type, sensor)
-
-        file_list = []
+    def _generate_file_list(self, dates: pd.DatetimeIndex, data_type: str, sensor: str) -> List[str]:
+        """Generate list of files to open."""
+        self._validate_inputs(data_type, sensor)
         config = DATA_CONFIGS[data_type][sensor]
-
-        for date in date_generated:
+        file_list = []
+        for date in dates:
+            year = date.strftime("%Y")
             file_date = date.strftime("%Y%m%d")
-            year = file_date[:4]
-
-            try:
-                file_names = self._get_cached_file_list(
-                    year, config["path"], config["pattern"], file_date
-                )
-
-                if file_names:
-                    file_list.extend(file_names)
-                else:
-                    raise FileNotFoundError(
-                        f"No files found for {data_type} ({sensor}) on {file_date}"
-                    )
-
-            except Exception as e:
-                if warning:
-                    import warnings
-
-                    warnings.warn(str(e))
-                    file_list.append(None)
-                else:
-                    raise ValueError(str(e))
-
+            path_to_glob = f"{config['path']}{year}/{config['pattern']}{file_date}_*.nc"
+            file_list.append(path_to_glob)
         return file_list
 
     def _process_timeofday(self, dataset: xr.Dataset) -> xr.Dataset:
@@ -135,81 +88,45 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
         date: Union[str, pd.Timestamp, pd.DatetimeIndex, None] = None,
         data_type: str = "vhi",
         sensor: str = "viirs",
-        **kwargs,
-    ) -> xr.Dataset:
-        """
-        Reads NESDIS VIIRS NDVI AWS Gridded data.
-
-        Args:
-            files: (Ignored for this reader, uses 'date' instead)
-            date: Date(s) to download/read data for.
-            data_type: 'vhi', 'lai_fpar', or 'snow'.
-            sensor: 'viirs', 'avhrr', or 'ims'.
-            **kwargs: Additional arguments passed to xarray.
-
-        Returns:
-            xarray.Dataset
-        """
-
-        if date is None:
-            if files is not None:
-                if isinstance(files, str):
-                    date = files
-                else:
-                    raise ValueError("Date is required for NESDIS VIIRS NDVI AWS Gridded reader.")
-            else:
-                raise ValueError("Date is required for NESDIS VIIRS NDVI AWS Gridded reader.")
-
-        if isinstance(date, (list, pd.DatetimeIndex)) or (isinstance(date, str) and "," in date):
-            return self._open_mfdataset(dates=date, data_type=data_type, sensor=sensor, **kwargs)
-        else:
-            return self._open_dataset(date=date, data_type=data_type, sensor=sensor, **kwargs)
-
-    def _open_dataset(
-        self,
-        date: Union[str, pd.Timestamp],
-        data_type: str = "vhi",
-        sensor: str = "viirs",
-        **kwargs,
-    ) -> xr.Dataset:
-        """Opens a dataset for the given date."""
-        date_generated = [pd.Timestamp(date)] if isinstance(date, str) else [date]
-
-        file_list = self._create_daily_data_list(date_generated, data_type=data_type, sensor=sensor)
-        file_list = [f for f in file_list if f is not None]
-
-        if len(file_list) == 0:
-            raise ValueError(
-                f"Files not available for {data_type} ({sensor}) and date: {date_generated[0]}"
-            )
-
-        dset = self.driver.open(file_list[0], decode_cf=False, **kwargs)
-        return self._process_timeofday(dset)
-
-    def _open_mfdataset(
-        self,
-        dates: Union[pd.DatetimeIndex, pd.Timestamp, str],
-        data_type: str = "vhi",
-        sensor: str = "viirs",
         error_missing: bool = False,
         **kwargs,
     ) -> xr.Dataset:
-        """Opens and combines multiple NetCDF files into a single dataset."""
-        if isinstance(dates, (str, pd.Timestamp)):
-            dates = pd.DatetimeIndex([dates])
-        elif not isinstance(dates, pd.DatetimeIndex):
-            dates = pd.DatetimeIndex(dates)
+        if date is None:
+            raise ValueError("Date is required for NESDIS VIIRS NDVI AWS Gridded reader.")
 
-        file_list = self._create_daily_data_list(
-            dates, data_type=data_type, sensor=sensor, warning=not error_missing
-        )
+        if isinstance(date, (str, pd.Timestamp)):
+            dates = pd.DatetimeIndex([date])
+        elif not isinstance(date, pd.DatetimeIndex):
+            dates = pd.DatetimeIndex(date)
+        else:
+            dates = date
 
-        aws_files = [f for f in file_list if f is not None]
-        if len(aws_files) == 0:
-            raise ValueError(f"Files not available for {data_type} ({sensor}) and dates: {dates}")
+        file_list = self._generate_file_list(dates, data_type, sensor)
 
-        dset = self.driver.open(
-            aws_files, concat_dim="time", combine="nested", decode_cf=False, **kwargs
-        )
+        try:
+            if len(file_list) > 1:
+                dset = self.driver.open(
+                    file_list,
+                    concat_dim="time",
+                    combine="nested",
+                    decode_cf=False,
+                    **kwargs,
+                )
+                if not dset:
+                    return xr.Dataset()
+                dset = dset.assign_coords(time=dates)
+            else:
+                dset = self.driver.open(file_list[0], decode_cf=False, **kwargs)
+                if not dset:
+                    return xr.Dataset()
+                dset = dset.expand_dims(time=dates)
 
-        return self._process_timeofday(dset)
+            return self._process_timeofday(dset)
+        except Exception as e:
+            if error_missing:
+                raise
+            else:
+                import warnings
+
+                warnings.warn(f"No files found for {data_type} ({sensor}) on {dates}: {e}")
+                return xr.Dataset()
