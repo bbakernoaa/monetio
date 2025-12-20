@@ -4,10 +4,10 @@ from enum import Enum
 from typing import List, Union
 
 import pandas as pd
-import s3fs
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .drivers import FileUtility, XarrayDriver
 
 
 class AveragingTime(str, Enum):
@@ -28,16 +28,16 @@ class Satellite(str, Enum):
 # Configuration dictionary for data products
 PRODUCT_CONFIG = {
     AveragingTime.DAILY: {
-        "path_template": "noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/{resolution}_Degrees_Daily/{year}/",
+        "path_template": "s3://noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/{resolution}_Degrees_Daily/{year}/",
         "file_template": "viirs_eps_{sat_name}_aod_{resolution}_deg_{date}.nc",
         "resolutions": {"0.050", "0.100", "0.250"},
     },
     AveragingTime.WEEKLY: {
-        "path_template": "noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Weekly/{year}/",
+        "path_template": "s3://noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Weekly/{year}/",
         "resolutions": {"0.250"},
     },
     AveragingTime.MONTHLY: {
-        "path_template": "noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Monthly/",
+        "path_template": "s3://noaa-jpss/{satellite}/VIIRS/{satellite}_VIIRS_Aerosol_Optical_Depth_Gridded_Reprocessed/0.25_Degrees_Monthly/",
         "file_template": "viirs_aod_monthly_{sat_name}_0.250_deg_{date}.nc",
         "resolutions": {"0.250"},
     },
@@ -50,9 +50,10 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
     Reader for NESDIS VIIRS AOD AWS Gridded data.
     """
 
-    def __init__(self):
-        super().__init__()
-        self.fs = s3fs.S3FileSystem(anon=True)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fs = None
+        self.driver = XarrayDriver()
 
     def _validate_inputs(self, satellite: str, data_resolution: str, averaging_time: str) -> None:
         """
@@ -105,6 +106,8 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
             )
 
             full_path = prod_path + file_name
+            if self.fs is None:
+                self.fs = FileUtility.get_fs(full_path)
 
             if self.fs.exists(full_path):
                 file_list.append(full_path)
@@ -115,7 +118,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                     import warnings
 
                     warnings.warn(f"File does not exist on AWS: {full_path}")
-                    file_list.append(None)  # Add None for missing files
+                    file_list.append(None)
 
         return file_list
 
@@ -142,6 +145,8 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
 
             prod_path = config["path_template"].format(satellite=satellite)
             full_path = prod_path + file_name
+            if self.fs is None:
+                self.fs = FileUtility.get_fs(full_path)
 
             if self.fs.exists(full_path):
                 file_list.append(full_path)
@@ -152,7 +157,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                     import warnings
 
                     warnings.warn(f"File does not exist on AWS: {full_path}")
-                    file_list.append(None)  # Add None for missing files
+                    file_list.append(None)
 
         return file_list
 
@@ -172,6 +177,8 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
             year = file_date[:4]
 
             prod_path = config["path_template"].format(satellite=satellite, year=year)
+            if self.fs is None:
+                self.fs = FileUtility.get_fs(prod_path)
 
             try:
                 all_files = self.fs.ls(prod_path)
@@ -234,6 +241,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                 data_resolution=data_resolution,
                 averaging_time=averaging_time,
                 error_missing=error_missing,
+                **kwargs,
             )
         else:
             return self._open_dataset(
@@ -242,6 +250,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                 data_resolution=data_resolution,
                 averaging_time=averaging_time,
                 error_missing=error_missing,
+                **kwargs,
             )
 
     def _open_dataset(
@@ -251,6 +260,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
         data_resolution: Union[float, str],
         averaging_time: str,
         error_missing: bool = False,
+        **kwargs,
     ) -> xr.Dataset:
         """Open single dataset."""
         self._validate_inputs(satellite, str(data_resolution).ljust(5, "0"), averaging_time)
@@ -271,18 +281,17 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                 data_resolution, satellite, date_generated, error_missing
             )
 
+        file_list = [f for f in file_list if f is not None]
         if len(file_list) == 0:
             if error_missing:
                 raise ValueError(
                     f"Files not available for {averaging_time} data and date: {date_generated[0]}"
                 )
             else:
-                # When error_missing=False, we should have already emitted warnings for missing files
-                # So we just return an empty dataset or raise the appropriate error
                 raise ValueError(f"File does not exist on AWS: {date_generated[0]}")
 
         # Open and process dataset
-        dset = xr.open_dataset(self.fs.open(file_list[0]))
+        dset = self.driver.open(file_list[0], **kwargs)
         dset = dset.expand_dims(time=date_generated).set_coords(["time"])
 
         return dset
@@ -294,6 +303,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
         data_resolution: Union[float, str],
         averaging_time: str,
         error_missing: bool = False,
+        **kwargs,
     ) -> xr.Dataset:
         """Open multiple datasets."""
         # Convert dates to DatetimeIndex
@@ -315,19 +325,14 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
                 data_resolution, satellite, dates, error_missing
             )
 
-        if len(file_list) == 0:
-            raise ValueError(f"Files not available for {averaging_time} data and dates: {dates}")
-
         # Process valid files and dates
         dates_good = []
         aws_files = []
         for d, f in zip(dates, file_list):
             if f is not None:
-                aws_files.append(self.fs.open(f))
+                aws_files.append(f)
                 dates_good.append(d)
             else:
-                # This shouldn't happen since we already handled missing files in _create_*_list methods
-                # But if it does, skip this file
                 if error_missing:
                     raise ValueError(f"File does not exist on AWS: {d}")
 
@@ -335,7 +340,7 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
             raise ValueError(f"Files not available for {averaging_time} data and dates: {dates}")
 
         # Combine datasets
-        dset = xr.open_mfdataset(aws_files, concat_dim="time", combine="nested")
+        dset = self.driver.open(aws_files, **kwargs)
         dset["time"] = dates_good
 
         return dset

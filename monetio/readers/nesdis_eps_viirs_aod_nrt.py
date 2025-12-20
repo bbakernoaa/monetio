@@ -1,7 +1,5 @@
 """NESDIS EPS VIIRS AOD NRT Reader"""
 
-import ftplib
-import os
 from typing import List, Union
 
 import numpy as np
@@ -9,6 +7,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .drivers import XarrayDriver
 
 # Configuration
 SERVER = "ftp.star.nesdis.noaa.gov"
@@ -20,6 +19,10 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
     """
     Reader for NESDIS EPS VIIRS AOD NRT data.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.driver = XarrayDriver()
 
     def open_dataset(
         self,
@@ -46,7 +49,6 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
         Returns:
             xarray.Dataset
         """
-
         if date is None:
             if files is not None:
                 if isinstance(files, str):
@@ -63,10 +65,15 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
                 data_resolution=data_resolution,
                 daily=daily,
                 error_missing=error_missing,
+                **kwargs,
             )
         else:
             return self._open_dataset(
-                date=date, satellite=satellite, data_resolution=data_resolution, daily=daily
+                date=date,
+                satellite=satellite,
+                data_resolution=data_resolution,
+                daily=daily,
+                **kwargs,
             )
 
     def _build_urls(self, dates, *, daily=True, data_resolution=0.1, satellite="NOAA20"):
@@ -124,22 +131,6 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
 
         return urls, fnames
 
-    def _download_data(self, date):
-        """Download data from FTP server."""
-        date = pd.Timestamp(date)
-        year = date.strftime("%Y")
-        yyyymmdd = date.strftime("%Y%m%d")
-
-        file = f"npp_eaot_ip_gridded_0.25_{yyyymmdd}.high.nc"
-        if not os.path.isfile(file):
-            ftp = ftplib.FTP(SERVER)
-            ftp.login()
-            ftp.cwd(BASE_DIR + year)
-            ftp.retrbinary("RETR " + file, open(file, "wb").write)
-        else:
-            print(f"File Already Exists! Reading: {file}")
-        return file, date
-
     def _get_latlons(self, nlat, nlon):
         """Get latitude and longitude grids."""
         lon_min = -179.875
@@ -151,7 +142,9 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
         lon, lat = np.meshgrid(lons, lats)
         return lon, lat
 
-    def _open_dataset(self, date, *, satellite="NOAA20", data_resolution=0.1, daily=True):
+    def _open_dataset(
+        self, date, *, satellite="NOAA20", data_resolution=0.1, daily=True, **kwargs
+    ):
         """Open single dataset."""
         if not isinstance(date, pd.Timestamp):
             d = pd.to_datetime(date)
@@ -174,27 +167,57 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
             d, satellite=satellite, data_resolution=data_resolution, daily=daily
         )
 
-        from io import BytesIO
-
-        import requests
-
-        r = requests.get(urls[0], stream=True)
-        r.raise_for_status()
-        dset = xr.open_dataset(BytesIO(r.content))
-
+        dset = self.driver.open(urls[0], **kwargs)
         dset = dset.expand_dims(time=[d]).set_coords(["time"])
 
         return dset
 
+    def open_mfdataset(
+        self,
+        dates: Union[pd.DatetimeIndex, List[str]],
+        files: Union[str, List[str], None] = None,
+        satellite: str = "NOAA20",
+        data_resolution: float = 0.1,
+        daily: bool = True,
+        error_missing: bool = False,
+        **kwargs,
+    ) -> xr.Dataset:
+        """
+        Reads multiple NESDIS EPS VIIRS AOD NRT data.
+
+        Args:
+            dates: Date(s) to download/read data for.
+            files: (Ignored for this reader, uses 'date' instead)
+            satellite: 'NOAA20' or 'SNPP'.
+            data_resolution: 0.1 or 0.25.
+            daily: True for daily data, False for monthly.
+            error_missing: If True, raise error if files are missing.
+            **kwargs: Additional arguments passed to xarray.
+
+        Returns:
+            xarray.Dataset
+        """
+        return self._open_mfdataset(
+            dates=dates,
+            satellite=satellite,
+            data_resolution=data_resolution,
+            daily=daily,
+            error_missing=error_missing,
+            **kwargs,
+        )
+
     def _open_mfdataset(
-        self, dates, satellite="NOAA20", data_resolution=0.1, daily=True, error_missing=False
+        self,
+        dates,
+        satellite="NOAA20",
+        data_resolution=0.1,
+        daily=True,
+        error_missing=False,
+        **kwargs,
     ):
         """Open multiple datasets."""
         import warnings
         from collections.abc import Iterable
-        from io import BytesIO
-
-        import requests
 
         if isinstance(dates, Iterable) and not isinstance(dates, str):
             dates = pd.DatetimeIndex(dates)
@@ -219,20 +242,16 @@ class NESDISEPSVIIRSAODNRTReader(GriddedReader):
 
         dsets = []
         for url, date in zip(urls, dates):
-            r = requests.get(url, stream=True)
-            if r.status_code != 200:
-                msg = f"Failed to access file on NESDIS FTP server: {url}"
+            try:
+                ds = self.driver.open(url, **kwargs)
+                ds = ds.expand_dims(time=[date]).set_coords(["time"])
+                dsets.append(ds)
+            except Exception as e:
+                msg = f"Failed to access file on NESDIS FTP server: {url}. Error: {e}"
                 if error_missing:
                     raise RuntimeError(msg)
                 else:
                     warnings.warn(msg)
-            else:
-                ds = (
-                    xr.open_dataset(BytesIO(r.content))
-                    .expand_dims(time=[date])
-                    .set_coords(["time"])
-                )
-                dsets.append(ds)
 
         if len(dsets) == 0:
             raise ValueError(f"Files not available for product and dates: {dates}")

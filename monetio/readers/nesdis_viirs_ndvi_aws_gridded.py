@@ -3,23 +3,23 @@
 from typing import List, Union
 
 import pandas as pd
-import s3fs
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .drivers import FileUtility, XarrayDriver
 
 # Configuration dictionary for different data products
 DATA_CONFIGS = {
     "vhi": {
-        "viirs": {"path": "noaa-cdr-ndvi-pds/data/", "pattern": "VIIRS-Land_*"},
-        "avhrr": {"path": "noaa-cdr-vegetation-health-pds/data/", "pattern": "AVHRR-Land_*"},
+        "viirs": {"path": "s3://noaa-cdr-ndvi-pds/data/", "pattern": "VIIRS-Land_*"},
+        "avhrr": {"path": "s3://noaa-cdr-vegetation-health-pds/data/", "pattern": "AVHRR-Land_*"},
     },
     "lai_fpar": {
-        "viirs": {"path": "noaa-cdr-leaf-area-index-fapar-pds/data/", "pattern": "VIIRS-Land_*"},
-        "avhrr": {"path": "noaa-cdr-leaf-area-index-fapar-pds/data/", "pattern": "AVHRR-Land_*"},
+        "viirs": {"path": "s3://noaa-cdr-leaf-area-index-fapar-pds/data/", "pattern": "VIIRS-Land_*"},
+        "avhrr": {"path": "s3://noaa-cdr-leaf-area-index-fapar-pds/data/", "pattern": "AVHRR-Land_*"},
     },
     "snow": {
-        "ims": {"path": "noaa-cdr-snow-cover-extent-ims-nrt/", "pattern": "snow_cover_extent_*"}
+        "ims": {"path": "s3://noaa-cdr-snow-cover-extent-ims-nrt/", "pattern": "snow_cover_extent_*"}
     },
 }
 
@@ -30,9 +30,10 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
     Reader for NESDIS VIIRS NDVI AWS Gridded data.
     """
 
-    def __init__(self):
-        super().__init__()
-        self.fs = s3fs.S3FileSystem(anon=True)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fs = None
+        self.driver = XarrayDriver()
 
     def _validate_inputs(
         self, date_generated: List[pd.Timestamp], data_type: str, sensor: str
@@ -57,7 +58,10 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
         """
         Cached version of file listing to improve performance for repeated requests.
         """
-        return self.fs.glob(f"{prod_path}{year}/{pattern}{file_date}_*.nc")
+        path_to_glob = f"{prod_path}{year}/{pattern}{file_date}_*.nc"
+        if self.fs is None:
+            self.fs = FileUtility.get_fs(path_to_glob)
+        return self.fs.glob(path_to_glob)
 
     def _create_daily_data_list(
         self,
@@ -92,7 +96,9 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
 
             except Exception as e:
                 if warning:
-                    print(str(e))
+                    import warnings
+
+                    warnings.warn(str(e))
                     file_list.append(None)
                 else:
                     raise ValueError(str(e))
@@ -152,24 +158,29 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
                 raise ValueError("Date is required for NESDIS VIIRS NDVI AWS Gridded reader.")
 
         if isinstance(date, (list, pd.DatetimeIndex)) or (isinstance(date, str) and "," in date):
-            return self._open_mfdataset(dates=date, data_type=data_type, sensor=sensor)
+            return self._open_mfdataset(dates=date, data_type=data_type, sensor=sensor, **kwargs)
         else:
-            return self._open_dataset(date=date, data_type=data_type, sensor=sensor)
+            return self._open_dataset(date=date, data_type=data_type, sensor=sensor, **kwargs)
 
     def _open_dataset(
-        self, date: Union[str, pd.Timestamp], data_type: str = "vhi", sensor: str = "viirs"
+        self,
+        date: Union[str, pd.Timestamp],
+        data_type: str = "vhi",
+        sensor: str = "viirs",
+        **kwargs,
     ) -> xr.Dataset:
         """Opens a dataset for the given date."""
         date_generated = [pd.Timestamp(date)] if isinstance(date, str) else [date]
 
         file_list = self._create_daily_data_list(date_generated, data_type=data_type, sensor=sensor)
+        file_list = [f for f in file_list if f is not None]
 
-        if len(file_list) == 0 or all(f is None for f in file_list):
+        if len(file_list) == 0:
             raise ValueError(
                 f"Files not available for {data_type} ({sensor}) and date: {date_generated[0]}"
             )
 
-        dset = xr.open_dataset(self.fs.open(file_list[0]), decode_cf=False)
+        dset = self.driver.open(file_list[0], decode_cf=False, **kwargs)
         return self._process_timeofday(dset)
 
     def _open_mfdataset(
@@ -190,12 +201,10 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
             dates, data_type=data_type, sensor=sensor, warning=not error_missing
         )
 
-        if len(file_list) == 0 or all(f is None for f in file_list):
+        aws_files = [f for f in file_list if f is not None]
+        if len(aws_files) == 0:
             raise ValueError(f"Files not available for {data_type} ({sensor}) and dates: {dates}")
 
-        aws_files = [self.fs.open(f) for f in file_list if f is not None]
-        dset = xr.open_mfdataset(
-            aws_files, concat_dim="time", combine="nested", decode_cf=False, **kwargs
-        )
+        dset = self.driver.open(aws_files, decode_cf=False, **kwargs)
 
         return self._process_timeofday(dset)

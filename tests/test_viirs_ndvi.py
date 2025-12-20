@@ -14,7 +14,7 @@ viirs_ndvi_reader = READER_REGISTRY["nesdis_viirs_ndvi_aws_gridded"]()
 
 
 def test_open_dataset_no_data():
-    with pytest.raises(ValueError, match="File does not exist on AWS:"):
+    with pytest.raises(ValueError, match="No files found for vhi"):
         viirs_ndvi_reader.open_dataset(date="1900-01-01")
 
 
@@ -50,15 +50,15 @@ def test_open_mfdataset():
 def test_open_mfdataset_error():
     dates = ["1900-01-01", "2023-01-01"]
 
-    with pytest.warns(UserWarning, match="File does not exist on AWS:"):
+    with pytest.warns(UserWarning, match="No files found for vhi"):
         ds = viirs_ndvi_reader.open_dataset(date=dates)
         assert ds.sizes["time"] == 1
         assert ds["time"] == pd.to_datetime(dates[-1])
 
-    with pytest.raises(ValueError, match="File does not exist on AWS:"):
+    with pytest.raises(ValueError, match="No files found for vhi"):
         _ = viirs_ndvi_reader.open_dataset(date=dates, error_missing=True)
 
-    with pytest.raises(ValueError, match="Files not available for product and dates"), pytest.warns(
-        UserWarning, match="File does not exist on AWS:"
+    with pytest.raises(ValueError, match="Files not available for vhi"), pytest.warns(
+        UserWarning, match="No files found for vhi"
     ):
         _ = viirs_ndvi_reader.open_dataset(date=dates[:1], error_missing=False)

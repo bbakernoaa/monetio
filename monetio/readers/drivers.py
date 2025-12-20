@@ -134,7 +134,7 @@ class XarrayDriver:
                     # Create list of file objects (buffers)
                     # Note: This can be slow for 1000s of files;
                     # optimization: pass s3://.../*.nc directly to open_mfdataset if engine supports it
-                    return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
+                    return xr.open_mfdataset(file_list, engine="netcdf4", **xr_kwargs)
                 else:
                     return xr.open_mfdataset(file_list, **xr_kwargs)
 

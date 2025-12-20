@@ -19,43 +19,44 @@ def test_open_dataset_daily(sat, res):
     s_res = f"{res:.3f}"
 
     ds = viirs_aod_reader.open_dataset(date=date, satellite=sat, data_resolution=s_res)
-    assert set(ds.dims) == {"time", "lat", "lon"}
+    assert set(ds.dims) == {"time", "latitude", "longitude"}
     assert ds.sizes["time"] == 1
-    assert ds.sizes["lat"] == int(180 / res)
-    assert ds.sizes["lon"] == int(360 / res)
+    assert ds.sizes["latitude"] == int(180 / res)
+    assert ds.sizes["longitude"] == int(360 / res)
     assert ds.attrs["satellite_name"] == ("NPP" if sat == "SNPP" else "NOAA 20")
     assert ds.attrs["spatial_resolution"].strip().startswith(str(res))
     assert (ds.time == pd.DatetimeIndex([date])).all()
 
 
 def test_open_dataset_bad_input():
-    with pytest.raises(ValueError, match="Invalid input"):
+    with pytest.raises(ValueError, match="Invalid satellite: GOES-16"):
         viirs_aod_reader.open_dataset(date="2020-01-01", satellite="GOES-16")
 
-    with pytest.raises(ValueError, match="Invalid input"):
+    with pytest.raises(ValueError, match="Invalid satellite: both"):
         viirs_aod_reader.open_dataset(date="2020-01-01", satellite="both")
 
-    with pytest.raises(ValueError, match="Invalid input"):
+    with pytest.raises(ValueError, match="Invalid resolution 100.000 for daily data"):
         viirs_aod_reader.open_dataset(date="2020-01-01", data_resolution=100)
 
-    with pytest.raises(ValueError, match="Invalid input"):
+    with pytest.raises(ValueError, match="Invalid averaging_time: asdf"):
         viirs_aod_reader.open_dataset(date="2020-01-01", averaging_time="asdf")
 
 
 def test_open_dataset_no_data():
-    with pytest.raises(ValueError, match="File does not exist on AWS:"):
+    with pytest.raises(ValueError, match="File does not exist on AWS: "):
         viirs_aod_reader.open_dataset(date="1900-01-01")
 
 
 def test_open_mfdataset_bad_input():
     cases = [
-        {"satellite": "GOES-16"},
-        {"satellite": "both"},
-        {"data_resolution": 100},
-        {"averaging_time": "asdf"},
+        {"satellite": "GOES-16", "match": "Invalid satellite: GOES-16"},
+        {"satellite": "both", "match": "Invalid satellite: both"},
+        {"data_resolution": 100, "match": "Invalid resolution 100.000 for daily data"},
+        {"averaging_time": "asdf", "match": "Invalid averaging_time: asdf"},
     ]
     for case in cases:
-        with pytest.raises(ValueError, match="Invalid input"):
+        match = case.pop("match")
+        with pytest.raises(ValueError, match=match):
             viirs_aod_reader.open_dataset(date=["2020-01-01"], **case)
 
 
@@ -63,18 +64,20 @@ def test_open_mfdataset_daily():
     ds = viirs_aod_reader.open_dataset(
         date=["2020-01-01", "2020-01-02"], satellite="SNPP", data_resolution=0.25
     )
-    assert set(ds.dims) == {"time", "lat", "lon"}
+    assert set(ds.dims) == {"time", "latitude", "longitude"}
     assert ds.sizes["time"] == 2
     assert ds.attrs["spatial_resolution"].strip().startswith("0.25")
     assert (ds.time == pd.DatetimeIndex(["2020-01-01", "2020-01-02"])).all()
 
 
 def test_open_mfdataset_monthly():
-    with pytest.raises(ValueError, match="not the same length"):
+    with pytest.raises(ValueError, match="Invalid resolution 0.100 for monthly data"):
         viirs_aod_reader.open_dataset(date=["2020-01-01", "2020-01-02"], averaging_time="monthly")
 
     months = pd.date_range(start="2020-01-01", freq="MS", periods=2)
-    ds = viirs_aod_reader.open_dataset(date=months, averaging_time="monthly")
+    ds = viirs_aod_reader.open_dataset(
+        date=months, averaging_time="monthly", data_resolution=0.25
+    )
     assert ds.sizes["time"] == 2
 
 
@@ -82,7 +85,7 @@ def test_open_mfdataset_daily_warning():
     dates = ["2012-01-18", "2012-01-19"]  # 2012-01-19 is the first available date
 
     # Warn and skip by default
-    with pytest.warns(match="File does not exist on AWS:"):
+    with pytest.warns(UserWarning, match="File does not exist on AWS:"):
         ds = viirs_aod_reader.open_dataset(
             date=dates,
             satellite="SNPP",
@@ -107,7 +110,7 @@ def test_open_mfdataset_monthly_warning():
     dates = ["2011-12-01", "2012-01-01"]
 
     # Warn and skip by default
-    with pytest.warns(match="File does not exist on AWS:"):
+    with pytest.warns(UserWarning, match="File does not exist on AWS:"):
         ds = viirs_aod_reader.open_dataset(
             date=dates,
             satellite="SNPP",
@@ -130,6 +133,6 @@ def test_open_mfdataset_monthly_warning():
 
 def test_open_mfdataset_no_data():
     with pytest.raises(ValueError, match="Files not available"), pytest.warns(
-        match="File does not exist on AWS:"
+        UserWarning, match="File does not exist on AWS:"
     ):
         viirs_aod_reader.open_dataset(date=["1900-01-01"])

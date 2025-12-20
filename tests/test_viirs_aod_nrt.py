@@ -27,7 +27,7 @@ LAST_LAST_MONTH = LAST_MONTH - pd.DateOffset(months=1)
 def test_open_dataset_daily(sat, res):
     # Note: only NRT
     date = (TODAY - pd.Timedelta(days=2)).tz_localize(None)
-    ds = viirs_aod_nrt_reader.open_dataset(date, satellite=sat, data_resolution=res)
+    ds = viirs_aod_nrt_reader.open_dataset(date=date, satellite=sat, data_resolution=res)
 
     assert date.strftime(r"%Y%m%d") in ds.attrs["dataset_name"]
     assert ds.attrs["spatial_resolution"].strip() == f"{res:.2f} degree"
@@ -49,22 +49,20 @@ def test_open_dataset_monthly(sat):
     else:
         date = LAST_LAST_MONTH
 
-    ds = viirs_aod_nrt_reader.open_dataset(date, satellite=sat, daily=False, data_resolution=0.25)
+    ds = viirs_aod_nrt_reader.open_dataset(date=date, satellite=sat, daily=False, data_resolution=0.25)
     assert ds.sizes["time"] == 1
 
 
 def test_open_mfdataset():
     today = TODAY.tz_localize(None)
     dates = [today - pd.Timedelta(days=2), today - pd.Timedelta(days=3)]
-    ds = viirs_aod_nrt_reader.open_mfdataset(dates)
+    ds = viirs_aod_nrt_reader.open_mfdataset(dates=dates)
     assert ds.sizes["time"] == len(dates)
 
 
 def test_missing_date():
-    from requests.exceptions import HTTPError
-
-    with pytest.raises(HTTPError):
-        viirs_aod_nrt_reader.open_dataset("1900-01-01")
+    with pytest.raises(OSError):
+        viirs_aod_nrt_reader.open_dataset(date="1900-01-01")
 
 
 def test_missing_date_mf():
@@ -72,11 +70,11 @@ def test_missing_date_mf():
     with pytest.raises(ValueError, match="Files not available for product and dates"), pytest.warns(
         UserWarning, match="Failed to access file"
     ):
-        viirs_aod_nrt_reader.open_mfdataset("1900-01-01")
+        viirs_aod_nrt_reader.open_mfdataset(dates="1900-01-01")
 
     # Error during dsets collection
     with pytest.raises(RuntimeError, match="Failed to access file"):
-        viirs_aod_nrt_reader.open_mfdataset("1900-01-01", error_missing=True)
+        viirs_aod_nrt_reader.open_mfdataset(dates="1900-01-01", error_missing=True)
 
     one_good = ["1900-01-01", TODAY.tz_localize(None) - pd.Timedelta(days=2)]
     with pytest.warns(UserWarning, match="Failed to access file"):
