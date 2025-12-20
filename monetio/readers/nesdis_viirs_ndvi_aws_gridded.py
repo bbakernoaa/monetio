@@ -61,7 +61,10 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
         path_to_glob = f"{prod_path}{year}/{pattern}{file_date}_*.nc"
         if self.fs is None:
             self.fs = FileUtility.get_fs(path_to_glob)
-        return self.fs.glob(path_to_glob)
+        files = self.fs.glob(path_to_glob)
+        if path_to_glob.startswith("s3://") and files and not files[0].startswith("s3://"):
+            files = [f"s3://{f}" for f in files]
+        return files
 
     def _create_daily_data_list(
         self,
@@ -205,6 +208,8 @@ class NESDISVIIRSNDVIAWSGriddedReader(GriddedReader):
         if len(aws_files) == 0:
             raise ValueError(f"Files not available for {data_type} ({sensor}) and dates: {dates}")
 
-        dset = self.driver.open(aws_files, decode_cf=False, **kwargs)
+        dset = self.driver.open(
+            aws_files, concat_dim="time", combine="nested", decode_cf=False, **kwargs
+        )
 
         return self._process_timeofday(dset)

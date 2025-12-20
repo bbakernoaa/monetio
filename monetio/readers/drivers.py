@@ -49,11 +49,8 @@ class FileUtility:
                     pass
 
                 files = sorted(fs.glob(path_input))
-                # fs.glob usually returns paths without the protocol (e.g. 'bucket/file.nc')
-                # We might need to prepend 's3://' again if it was stripped
                 if path_input.startswith("s3://") and files and not files[0].startswith("s3://"):
                     files = [f"s3://{f}" for f in files]
-
                 if not files:
                     raise FileNotFoundError(f"No files found matching pattern: {path_input}")
                 return files
@@ -112,10 +109,7 @@ class XarrayDriver:
 
                 # If S3 or HTTP, we open a file-like object to pass to xarray
                 if filename.startswith("s3://") or filename.startswith("http"):
-                    fs = FileUtility.get_fs(filename)
-                    # 'open_dataset' needs a file object or a specific engine for remote
-                    file_obj = fs.open(filename)
-                    ds = xr.open_dataset(file_obj, **xr_kwargs)
+                    ds = xr.open_dataset(filename, engine="h5netcdf", **xr_kwargs)
                 else:
                     ds = xr.open_dataset(filename, **xr_kwargs)
 
@@ -134,7 +128,7 @@ class XarrayDriver:
                     # Create list of file objects (buffers)
                     # Note: This can be slow for 1000s of files;
                     # optimization: pass s3://.../*.nc directly to open_mfdataset if engine supports it
-                    return xr.open_mfdataset(file_list, engine="netcdf4", **xr_kwargs)
+                    return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
                 else:
                     return xr.open_mfdataset(file_list, **xr_kwargs)
 

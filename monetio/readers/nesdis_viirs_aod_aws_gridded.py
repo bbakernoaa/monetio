@@ -340,7 +340,9 @@ class NESDISVIIRSAODAWSGriddedReader(GriddedReader):
             raise ValueError(f"Files not available for {averaging_time} data and dates: {dates}")
 
         # Combine datasets
-        dset = self.driver.open(aws_files, **kwargs)
+        dset = self.driver.open(
+            aws_files, concat_dim="time", combine="nested", **kwargs
+        )
         dset["time"] = dates_good
 
         return dset
