@@ -38,7 +38,8 @@ dependencies = [
     "lxml",
     "pyhdf!=0.11.3",
     "timezonefinder",
-    "pyarrow"
+    "pyarrow",
+    "pyresample"
 ]
 
 [tool.setuptools.dynamic]

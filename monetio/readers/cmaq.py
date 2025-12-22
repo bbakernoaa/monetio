@@ -1,4 +1,6 @@
 """CMAQ File Reader"""
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
 import xarray as xr
 from numpy import array, concatenate, ones
@@ -12,10 +14,32 @@ from .base import GriddedReader, register_reader
 @register_reader("cmaq")
 class CMAQReader(GriddedReader):
     def open_dataset(
-        self, files, earth_radius=6370000, convert_to_ppb=True, drop_duplicates=False, **kwargs
-    ):
-        """
-        Reads CMAQ netCDF files.
+        self,
+        files: Union[str, List[str]],
+        earth_radius: float = 6370000,
+        convert_to_ppb: bool = True,
+        drop_duplicates: bool = False,
+        **kwargs: Any,
+    ) -> xr.Dataset:
+        """Read CMAQ netCDF files and apply MONET-standard corrections.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            Path to CMAQ file(s).
+        earth_radius : float, optional
+            Earth radius in meters, by default 6370000.
+        convert_to_ppb : bool, optional
+            Convert gas species from ppmV to ppbV, by default True.
+        drop_duplicates : bool, optional
+            Drop duplicate time steps, by default False.
+        **kwargs : Any
+            Additional keyword arguments to pass to xarray.open_mfdataset.
+
+        Returns
+        -------
+        xr.Dataset
+            CMAQ dataset with MONET-standard corrections.
         """
         # 1. Open the dataset using standard xarray (Lazy loading)
 
@@ -69,13 +93,24 @@ class CMAQReader(GriddedReader):
                 if "micrograms" in ds[i].attrs["units"]:
                     ds[i].attrs["units"] = r"$\mu g m^{-3}$"
 
+        # Add history attribute
+        history_message = (
+            f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}: "
+            f"Applied MONET-standard corrections via monetio.readers.cmaq.CMAQReader. "
+            f"Added lazy diagnostic variables. Converted ppmV to ppbV: {convert_to_ppb}."
+        )
+        if "history" in ds.attrs:
+            ds.attrs["history"] += f"\n{history_message}"
+        else:
+            ds.attrs["history"] = history_message
+
         # 3. Harmonize (Standardize names)
         ds = self.harmonize(ds)
 
         return ds
 
-    def harmonize(self, ds):
-        # Placeholder for future harmonization logic
+    def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
+        """Placeholder for future harmonization logic."""
         return ds
 
 
@@ -84,10 +119,18 @@ class CMAQReader(GriddedReader):
 # -----------------------------------------------------------------------------
 
 
-def cmaq_preprocess(ds):
-    """
-    Preprocess function to add lazy diagnostic variables.
-    Can be passed to xarray.open_mfdataset.
+def cmaq_preprocess(ds: xr.Dataset) -> xr.Dataset:
+    """Add lazy diagnostic variables to a CMAQ dataset.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy diagnostic variables.
     """
     ds = add_lazy_pm25(ds)
     ds = add_lazy_pm10(ds)
@@ -104,14 +147,40 @@ def cmaq_preprocess(ds):
     return ds
 
 
-def can_do(index):
+def can_do(index: Series) -> bool:
+    """Check if any True values exist in a boolean Series.
+
+    Parameters
+    ----------
+    index : Series
+        Boolean Series.
+
+    Returns
+    -------
+    bool
+        True if any True values exist in the Series, False otherwise.
+    """
     if index.max():
         return True
     else:
         return False
 
 
-def _get_times(d, drop_duplicates):
+def _get_times(d: xr.Dataset, drop_duplicates: bool) -> xr.Dataset:
+    """Extract and set time coordinates for a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+    drop_duplicates : bool
+        Drop duplicate time steps.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with time coordinates.
+    """
     idims = len(d.TFLAG.dims)
     if idims == 2:
         tflag1 = Series(d["TFLAG"][:, 0]).astype(str).str.zfill(7)
@@ -129,7 +198,21 @@ def _get_times(d, drop_duplicates):
     return d.rename({"TSTEP": "time"})
 
 
-def _get_latlon(dset, area):
+def _get_latlon(dset: xr.Dataset, area: Any) -> xr.Dataset:
+    """Get latitude and longitude coordinates from a pyresample area definition.
+
+    Parameters
+    ----------
+    dset : xr.Dataset
+        CMAQ dataset.
+    area : Any
+        Pyresample area definition.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with latitude and longitude coordinates.
+    """
     lon, lat = area.get_lonlats()
     dset["longitude"] = xr.DataArray(lon[::-1, :], dims=["ROW", "COL"])
     dset["latitude"] = xr.DataArray(lat[::-1, :], dims=["ROW", "COL"])
@@ -137,12 +220,42 @@ def _get_latlon(dset, area):
     return dset
 
 
-def _get_keys(d):
+def _get_keys(d: xr.Dataset) -> Series:
+    """Get the data variable keys from a dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    Series
+        Data variable keys.
+    """
     keys = Series([i for i in d.data_vars.keys()])
     return keys
 
 
-def add_multiple_lazy(dset, variables, weights=None):
+def add_multiple_lazy(
+    dset: xr.Dataset, variables: Series, weights: Optional[Series] = None
+) -> xr.DataArray:
+    """Combine multiple variables into a single DataArray.
+
+    Parameters
+    ----------
+    dset : xr.Dataset
+        CMAQ dataset.
+    variables : Series
+        Variable names to combine.
+    weights : Optional[Series], optional
+        Weights to apply to each variable, by default None.
+
+    Returns
+    -------
+    xr.DataArray
+        Combined DataArray.
+    """
     if weights is None:
         weights = ones(len(variables))
     else:
@@ -241,7 +354,19 @@ noy_gas = array(
 
 
 # Diagnostic Additions
-def add_lazy_pm25(d):
+def add_lazy_pm25(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy PM2.5 to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy PM2.5.
+    """
     keys = _get_keys(d)
     allvars = Series(concatenate([aitken, accumulation, coarse]))
     weights = Series(
@@ -323,7 +448,19 @@ def add_lazy_pm25(d):
     return d
 
 
-def add_lazy_pm10(d):
+def add_lazy_pm10(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy PM10 to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy PM10.
+    """
     keys = _get_keys(d)
     allvars = Series(concatenate([aitken, accumulation, coarse]))
     if "PMC_TOT" in keys.to_list():
@@ -343,7 +480,19 @@ def add_lazy_pm10(d):
     return d
 
 
-def add_lazy_pm_course(d):
+def add_lazy_pm_course(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy coarse mode particulate matter to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy coarse mode particulate matter.
+    """
     keys = _get_keys(d)
     allvars = Series(coarse)
     index = allvars.isin(keys)
@@ -360,7 +509,19 @@ def add_lazy_pm_course(d):
     return d
 
 
-def add_lazy_clf(d):
+def add_lazy_clf(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy fine mode particulate Cl to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy fine mode particulate Cl.
+    """
     keys = _get_keys(d)
     allvars = Series(["ACLI", "ACLJ", "ACLK"])
     weights = Series([1, 1, 0.2])
@@ -375,7 +536,19 @@ def add_lazy_clf(d):
     return d
 
 
-def add_lazy_caf(d):
+def add_lazy_caf(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy fine mode particulate Ca to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy fine mode particulate Ca.
+    """
     keys = _get_keys(d)
     allvars = Series(["ACAI", "ACAJ", "ASEACAT", "ASOIL", "ACORS"])
     weights = Series([1, 1, 0.2 * 32.0 / 1000.0, 0.2 * 83.8 / 1000.0, 0.2 * 56.2 / 1000.0])
@@ -390,7 +563,19 @@ def add_lazy_caf(d):
     return d
 
 
-def add_lazy_naf(d):
+def add_lazy_naf(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy fine mode particulate Na to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy fine mode particulate Na.
+    """
     keys = _get_keys(d)
     allvars = Series(["ANAI", "ANAJ", "ASEACAT", "ASOIL", "ACORS"])
     weights = Series([1, 1, 0.2 * 837.3 / 1000.0, 0.2 * 62.6 / 1000.0, 0.2 * 2.3 / 1000.0])
@@ -405,7 +590,19 @@ def add_lazy_naf(d):
     return d
 
 
-def add_lazy_so4f(d):
+def add_lazy_so4f(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy fine mode particulate SO4 to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy fine mode particulate SO4.
+    """
     keys = _get_keys(d)
     allvars = Series(["ASO4I", "ASO4J", "ASO4K"])
     weights = Series([1.0, 1.0, 0.2])
@@ -420,7 +617,19 @@ def add_lazy_so4f(d):
     return d
 
 
-def add_lazy_nh4f(d):
+def add_lazy_nh4f(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy fine mode particulate NH4 to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy fine mode particulate NH4.
+    """
     keys = _get_keys(d)
     allvars = Series(["ANH4I", "ANH4J", "ANH4K"])
     weights = Series([1.0, 1.0, 0.2])
@@ -435,7 +644,19 @@ def add_lazy_nh4f(d):
     return d
 
 
-def add_lazy_no3f(d):
+def add_lazy_no3f(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy fine mode particulate NO3 to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy fine mode particulate NO3.
+    """
     keys = _get_keys(d)
     allvars = Series(["ANO3I", "ANO3J", "ANO3K"])
     weights = Series([1.0, 1.0, 0.2])
@@ -450,7 +671,19 @@ def add_lazy_no3f(d):
     return d
 
 
-def add_lazy_noy(d):
+def add_lazy_noy(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy NOy to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy NOy.
+    """
     keys = _get_keys(d)
     allvars = Series(noy_gas)
     index = allvars.isin(keys)
@@ -461,7 +694,19 @@ def add_lazy_noy(d):
     return d
 
 
-def add_lazy_nox(d):
+def add_lazy_nox(d: xr.Dataset) -> xr.Dataset:
+    """Add lazy NOx to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset with lazy NOx.
+    """
     keys = _get_keys(d)
     allvars = Series(["NO", "NO2"])
     index = allvars.isin(keys)
@@ -472,6 +717,18 @@ def add_lazy_nox(d):
     return d
 
 
-def add_lazy_rh(d):
+def add_lazy_rh(d: xr.Dataset) -> xr.Dataset:
+    """Placeholder for adding lazy relative humidity to a CMAQ dataset.
+
+    Parameters
+    ----------
+    d : xr.Dataset
+        CMAQ dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        CMAQ dataset.
+    """
     # Placeholder as in original code
     return d
