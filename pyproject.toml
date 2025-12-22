@@ -38,8 +38,7 @@ dependencies = [
     "lxml",
     "pyhdf!=0.11.3",
     "timezonefinder",
-    "pyarrow",
-    "pyresample"
+    "pyarrow"
 ]
 
 [tool.setuptools.dynamic]
@@ -60,7 +59,12 @@ test = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
-    "filelock"
+    "filelock",
+    "pyresample"
+]
+
+cmaq = [
+    "pyresample"
 ]
 
 
