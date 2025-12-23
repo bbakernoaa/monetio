@@ -15,7 +15,10 @@ def fake_cmaq_file(tmp_path):
     filepath = tmp_path / "cmaq_test.nc"
     ds = xr.Dataset(
         {
-            "TFLAG": (("TSTEP", "VAR", "DATE-TIME"), np.array([[[2023001, 20000]]], dtype=np.int32)),
+            "TFLAG": (
+                ("TSTEP", "VAR", "DATE-TIME"),
+                np.array([[[2023001, 20000]]], dtype=np.int32),
+            ),
             "O3": (
                 ("TSTEP", "LAY", "ROW", "COL"),
                 np.random.rand(1, 1, 10, 10).astype(np.float32),
@@ -84,7 +87,6 @@ def test_cmaq_reader_opens_and_corrects(fake_cmaq_file):
     # without re-reading it. For this test, we assume the initial random values are < 1.
     assert ds["O3"].mean() > 1
     assert ds["NO2"].mean() > 1
-
 
     # 4. Test Lazy Variable Addition
     assert "PM25" in ds.variables

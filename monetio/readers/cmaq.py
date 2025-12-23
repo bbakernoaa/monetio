@@ -1,6 +1,7 @@
 """CMAQ File Reader"""
+
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 import xarray as xr
 from numpy import array, concatenate, ones
