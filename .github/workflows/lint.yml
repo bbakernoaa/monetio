@@ -10,7 +10,7 @@ jobs:
   lint:
     name: pre-commit
     runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
+    # if: github.repository == 'noaa-oar-arl/monetio'
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
@@ -21,7 +21,7 @@ jobs:
   cff:
     name: Validate CITATION.cff
     runs-on: ubuntu-latest
-    if: github.repository == 'noaa-oar-arl/monetio'
+    # if: github.repository == 'noaa-oar-arl/monetio'
     steps:
       - uses: actions/checkout@v6
       - uses: citation-file-format/cffconvert-github-action@2.0.0
