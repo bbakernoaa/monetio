@@ -52,14 +52,20 @@ dev = [
     "pytest-xdist",
     "filelock",
     "black",
-    "isort"
+    "isort",
+    "pre-commit"
 ]
 
 test = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
-    "filelock"
+    "filelock",
+    "pyresample"
+]
+
+cmaq = [
+    "pyresample"
 ]
 
 

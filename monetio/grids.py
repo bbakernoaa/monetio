@@ -149,7 +149,13 @@ def get_sinu_area_def(dset):
 
 
 def get_ioapi_pyresample_area_def(ds, proj4_srs):
-    from pyresample import geometry, utils
+    try:
+        from pyresample import geometry, utils
+    except ImportError:
+        raise ImportError(
+            "The cmaq reader requires the 'pyresample' package. "
+            "Please install it with 'pip install monetio[cmaq]' or 'pip install pyresample'."
+        )
 
     y_size = ds.NROWS
     x_size = ds.NCOLS
