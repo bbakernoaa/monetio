@@ -4,8 +4,6 @@ from . import (
     modis_l2,
     modis_ornl,
     mopitt_l3,
-    nesdis_edr_viirs,
-    nesdis_eps_viirs,
     nesdis_frp,
     omps_l3,
     omps_nadir,
