@@ -55,14 +55,14 @@ def fake_cmaq_file(tmp_path):
             "YCENT": 40.0,
         },
     )
-    ds.to_netcdf(filepath)
+    ds.to_netcdf(str(filepath), engine="h5netcdf")
     return filepath
 
 
 def test_cmaq_reader_opens_and_corrects(fake_cmaq_file):
     """Test that the CMAQReader opens a file, applies corrections, and adds history."""
     reader = CMAQReader()
-    ds = reader.open_dataset(str(fake_cmaq_file))
+    ds = reader.open_dataset(str(fake_cmaq_file), engine="h5netcdf")
 
     # 1. Test Time Coordinate
     assert "time" in ds.coords
