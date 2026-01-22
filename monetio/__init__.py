@@ -16,7 +16,18 @@ for loading different data sources.
 import importlib
 
 from . import grids
-from .models import camx, cmaq, fv3chem, hysplit, hytraj, ncep_grib, pardump, prepchem, raqms
+from .models import (
+    camx,
+    chimere,
+    cmaq,
+    fv3chem,
+    hysplit,
+    hytraj,
+    ncep_grib,
+    pardump,
+    prepchem,
+    raqms,
+)
 from .obs import (
     aeronet,
     airnow,
@@ -86,6 +97,7 @@ __all__ = [
     "pardump",
     "prepchem",
     "raqms",
+    "chimere",
 ]
 
 # Map reader names to their module paths for lazy loading
