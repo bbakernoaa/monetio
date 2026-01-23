@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 from pandas import Series, to_datetime
 
-from ..grids import get_ioapi_pyresample_area_def, grid_from_dataset
+from ..grids import get_latlon_ioapi, grid_from_dataset
 
 
 def can_do(index):
@@ -84,15 +84,13 @@ def open_mfdataset(
 
     # get the grid information
     grid = grid_from_dataset(dset, earth_radius=earth_radius)
-    area_def = get_ioapi_pyresample_area_def(dset, grid)
+
     # assign attributes for dataset and all DataArrays
     dset = dset.assign_attrs({"proj4_srs": grid})
     for i in dset.variables:
         dset[i] = dset[i].assign_attrs({"proj4_srs": grid})
         for j in dset[i].attrs:
             dset[i].attrs[j] = dset[i].attrs[j].strip()
-        dset[i] = dset[i].assign_attrs({"area": area_def})
-    dset = dset.assign_attrs(area=area_def)
 
     # add lazy diagnostic variables
     if "PM25" in var_list:
@@ -110,7 +108,7 @@ def open_mfdataset(
     dset = _get_times(dset)
 
     # get the lat lon
-    dset = _get_latlon(dset)
+    dset = _get_latlon(dset, grid)
 
     # get Predefined mapping tables for observations
     dset = _predefined_mapping_tables(dset)
@@ -148,8 +146,8 @@ def _get_times(d):
     return d.rename({"TSTEP": "time"})
 
 
-def _get_latlon(dset):
-    """gets the lat and lons from the pyreample.geometry.AreaDefinition
+def _get_latlon(dset, proj4_srs):
+    """gets the lat and lons using pyproj.
 
     Parameters
     ----------
@@ -162,9 +160,9 @@ def _get_latlon(dset):
         Description of returned object.
 
     """
-    lon, lat = dset.area.get_lonlats()
-    dset["longitude"] = xr.DataArray(lon[::-1, :], dims=["ROW", "COL"])
-    dset["latitude"] = xr.DataArray(lat[::-1, :], dims=["ROW", "COL"])
+    lon, lat = get_latlon_ioapi(dset, proj4_srs)
+    dset["longitude"] = xr.DataArray(lon, dims=["ROW", "COL"])
+    dset["latitude"] = xr.DataArray(lat, dims=["ROW", "COL"])
     dset = dset.assign_coords(longitude=dset.longitude, latitude=dset.latitude)
     return dset
 

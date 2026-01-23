@@ -34,7 +34,9 @@ def open_dataset_prepchem(fname, dtype="f4", res="C384", tile=1):
     except ImportError:
         has_fv3grid = False
 
-    from pyresample.utils import wrap_longitudes
+    def wrap_longitudes(lon):
+        return (lon + 180) % 360 - 180
+
     from scipy.io import FortranFile
 
     fs = FileUtility.get_fs(fname)

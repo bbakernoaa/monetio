@@ -4,7 +4,7 @@ import xarray as xr
 from numpy import array, concatenate
 from pandas import Series, to_datetime
 
-from monetio.grids import get_ioapi_pyresample_area_def, grid_from_dataset
+from monetio.grids import get_latlon_ioapi, grid_from_dataset
 from .base import GriddedReader, register_reader
 
 
@@ -35,7 +35,6 @@ class CAMxReader(GriddedReader):
 
         # get the grid information
         grid = grid_from_dataset(ds, earth_radius=earth_radius)
-        area_def = get_ioapi_pyresample_area_def(ds, grid)
 
         # assign attributes for dataset and all DataArrays
         ds = ds.assign_attrs({"proj4_srs": grid})
@@ -53,9 +52,7 @@ class CAMxReader(GriddedReader):
         ds = _get_times(ds)
 
         # get the lat lon
-        # The original code relied on dset.area which isn't standard xarray.
-        # But we calculated area_def above.
-        ds = _get_latlon(ds, area_def)
+        ds = _get_latlon(ds, grid)
 
         # get Predefined mapping tables for observations
         ds = _predefined_mapping_tables(ds)
@@ -95,10 +92,11 @@ def _get_times(d):
     d["TSTEP"] = date[indexdates]
     return d.rename({"TSTEP": "time"})
 
-def _get_latlon(dset, area_def):
-    lon, lat = area_def.get_lonlats()
-    dset["longitude"] = xr.DataArray(lon[::-1, :], dims=["ROW", "COL"])
-    dset["latitude"] = xr.DataArray(lat[::-1, :], dims=["ROW", "COL"])
+def _get_latlon(dset, proj4_srs):
+    lon, lat = get_latlon_ioapi(dset, proj4_srs)
+
+    dset["longitude"] = xr.DataArray(lon, dims=["ROW", "COL"])
+    dset["latitude"] = xr.DataArray(lat, dims=["ROW", "COL"])
     dset = dset.assign_coords(longitude=dset.longitude, latitude=dset.latitude)
     return dset
 

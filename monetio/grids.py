@@ -18,7 +18,6 @@ def _geos_16_grid(dset):
 
     """
     from numpy import asarray
-    from pyresample import geometry
 
     projection = dset.goes_imager_projection
     h = projection.perspective_point_height
@@ -45,11 +44,8 @@ def _geos_16_grid(dset):
         "units": "m",
         "sweep": sweep,
     }
-
-    area = geometry.AreaDefinition(
-        "GEOS_ABI", "ABI", "GOES_ABI", proj_dict, len(x), len(y), asarray(area_extent)
-    )
-    return area
+    # Return PROJ dict instead of AreaDefinition
+    return proj_dict, asarray(area_extent)
 
 
 def _get_sinu_grid_df():
@@ -125,39 +121,18 @@ def get_modis_latlon_from_swath_hv(h, v, dset):
     return dset
 
 
-def get_sinu_area_def(dset):
-    from pyproj import Proj
-    from pyresample import utils
-
-    p = Proj(dset.attrs["proj4_srs"])
-    proj4_args = p.srs
-    area_name = "MODIS Grid Def"
-    area_id = "modis"
-    proj_id = area_id
-    area_extent = dset.attrs["area_extent"]
-    nx, ny = dset.longitude.shape
-    return utils.get_area_def(area_id, area_name, proj_id, proj4_args, nx, ny, area_extent)
-
-
 def get_ioapi_pyresample_area_def(ds, proj4_srs):
-    from pyresample import geometry, utils
+    # This function originally returned a pyresample AreaDefinition.
+    # Since we are removing pyresample, we will return the information needed for pyproj.
+    # Warning: Calling code expecting AreaDefinition will break.
 
-    y_size = ds.NROWS
-    x_size = ds.NCOLS
-    projection = utils.proj4_str_to_dict(proj4_srs)
-    proj_id = "IOAPI_Dataset"
-    description = "IOAPI area_def for pyresample"
-    area_id = "MONET_Object_Grid"
     x_ll, y_ll = ds.XORIG + ds.XCELL * 0.5, ds.YORIG + ds.YCELL * 0.5
     x_ur, y_ur = (
         ds.XORIG + (ds.NCOLS * ds.XCELL) + 0.5 * ds.XCELL,
         ds.YORIG + (ds.YCELL * ds.NROWS) + 0.5 * ds.YCELL,
     )
     area_extent = (x_ll, y_ll, x_ur, y_ur)
-    area_def = geometry.AreaDefinition(
-        area_id, description, proj_id, projection, x_size, y_size, area_extent
-    )
-    return area_def
+    return proj4_srs, area_extent
 
 
 def get_generic_projection_from_proj4(lat, lon, proj4_srs):
@@ -178,14 +153,10 @@ def get_generic_projection_from_proj4(lat, lon, proj4_srs):
         Description of returned object.
 
     """
-    try:
-        from pyresample.geometry import SwathDefinition
-        from pyresample.utils import proj4_str_to_dict
-    except ImportError:
-        print("please install pyresample to use this functionality")
-    swath = SwathDefinition(lats=lat, lons=lon)
-    area = swath.compute_optimal_bb_area(proj4_str_to_dict(proj4_srs))
-    return area
+    # This relied heavily on SwathDefinition.compute_optimal_bb_area.
+    # Without pyresample, we might just return the CRS.
+    import pyproj
+    return pyproj.CRS.from_user_input(proj4_srs)
 
 
 def get_optimal_cartopy_proj(lat, lon, proj4_srs):
@@ -206,8 +177,14 @@ def get_optimal_cartopy_proj(lat, lon, proj4_srs):
         Description of returned object.
 
     """
-    area = get_generic_projection_from_proj4(lat, lon, proj4_srs)
-    return area.to_cartopy_crs()
+    # Original used .to_cartopy_crs() on AreaDefinition.
+    # With pyproj CRS, we can use cartopy's CRS directly if installed.
+    try:
+        import cartopy.crs as ccrs
+        crs = get_generic_projection_from_proj4(lat, lon, proj4_srs)
+        return ccrs.Projection(crs)
+    except ImportError:
+        return None
 
 
 def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
@@ -259,6 +236,40 @@ def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
         raise NotImplementedError("IOAPI proj not implemented yet: " "{}".format(proj_id))
     # area_def = _get_ioapi_pyresample_area_def(ds)
     return p4  # , area_def
+
+
+def get_latlon_ioapi(dset, proj4_srs):
+    """gets the lat and lons using pyproj.
+
+    Parameters
+    ----------
+    dset : xarray.Dataset
+        Input dataset with IOAPI grid metadata.
+    proj4_srs : str
+        PROJ4 projection string.
+
+    Returns
+    -------
+    (numpy.ndarray, numpy.ndarray)
+        Longitude and latitude arrays.
+    """
+    import numpy as np
+    from pyproj import Proj
+
+    x = np.linspace(
+        dset.XORIG + dset.XCELL * 0.5,
+        dset.XORIG + (dset.NCOLS - 0.5) * dset.XCELL,
+        dset.NCOLS,
+    )
+    y = np.linspace(
+        dset.YORIG + dset.YCELL * 0.5,
+        dset.YORIG + (dset.NROWS - 0.5) * dset.YCELL,
+        dset.NROWS,
+    )
+    xv, yv = np.meshgrid(x, y)
+    p = Proj(proj4_srs)
+    lon, lat = p(xv, yv, inverse=True)
+    return lon, lat
 
 
 def grid_from_dataset(ds, earth_radius=6370000):

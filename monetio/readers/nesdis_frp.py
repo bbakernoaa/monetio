@@ -86,7 +86,9 @@ def read_tile(fname, tile=1, res="C384", dtype="f4"):
         has_fv3grid = True
     except ImportError:
         has_fv3grid = False
-    from pyresample.utils import wrap_longitudes
+
+    def wrap_longitudes(lon):
+        return (lon + 180) % 360 - 180
 
     with open(fname, "rb") as f:
         w = FortranFile(f)
