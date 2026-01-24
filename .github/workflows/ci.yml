@@ -53,7 +53,7 @@ jobs:
 
       - name: Test with pytspack installed
         run: |
-          pip install "https://github.com/noaa-oar-arl/pytspack/archive/master.zip"
+          pip install "git+https://github.com/noaa-oar-arl/pytspack.git"
           pytest -k with_pytspack -n auto -v -ra -W "ignore:API key length is 0:UserWarning::"
 
   docs:
