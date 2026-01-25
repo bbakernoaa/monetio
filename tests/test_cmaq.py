@@ -1,8 +1,8 @@
 import numpy as np
-import pytest
 import xarray as xr
 import pandas as pd
 from monetio.readers.cmaq import CMAQReader
+
 
 def create_mock_cmaq_dataset(n_times=2, n_lay=1, n_rows=10, n_cols=10, use_dask=False):
     """Creates a mock CMAQ dataset."""
@@ -26,29 +26,43 @@ def create_mock_cmaq_dataset(n_times=2, n_lay=1, n_rows=10, n_cols=10, use_dask=
         },
         data_vars={
             "TFLAG": (("TSTEP", "VAR", "DATE_TIME"), tflag),
-            "O3": (("TSTEP", "LAY", "ROW", "COL"), np.random.rand(n_times, n_lay, n_rows, n_cols).astype(np.float32)),
-            "ASO4J": (("TSTEP", "LAY", "ROW", "COL"), np.random.rand(n_times, n_lay, n_rows, n_cols).astype(np.float32)),
-            "ANO3J": (("TSTEP", "LAY", "ROW", "COL"), np.random.rand(n_times, n_lay, n_rows, n_cols).astype(np.float32)),
-            "ANH4J": (("TSTEP", "LAY", "ROW", "COL"), np.random.rand(n_times, n_lay, n_rows, n_cols).astype(np.float32)),
+            "O3": (
+                ("TSTEP", "LAY", "ROW", "COL"),
+                np.random.rand(n_times, n_lay, n_rows, n_cols).astype(np.float32),
+            ),
+            "ASO4J": (
+                ("TSTEP", "LAY", "ROW", "COL"),
+                np.random.rand(n_times, n_lay, n_rows, n_cols).astype(np.float32),
+            ),
+            "ANO3J": (
+                ("TSTEP", "LAY", "ROW", "COL"),
+                np.random.rand(n_times, n_lay, n_rows, n_cols).astype(np.float32),
+            ),
+            "ANH4J": (
+                ("TSTEP", "LAY", "ROW", "COL"),
+                np.random.rand(n_times, n_lay, n_rows, n_cols).astype(np.float32),
+            ),
         },
     )
 
     # Set IOAPI attributes
-    ds.attrs.update({
-        "IOAPI_VERSION": "mock",
-        "GDTYP": 2,  # Lambert
-        "P_ALP": 33.0,
-        "P_BET": 45.0,
-        "YCENT": 40.0,
-        "P_GAM": -97.0,
-        "XCENT": -97.0,
-        "XORIG": -100000.0,
-        "YORIG": -100000.0,
-        "XCELL": 12000.0,
-        "YCELL": 12000.0,
-        "NCOLS": n_cols,
-        "NROWS": n_rows,
-    })
+    ds.attrs.update(
+        {
+            "IOAPI_VERSION": "mock",
+            "GDTYP": 2,  # Lambert
+            "P_ALP": 33.0,
+            "P_BET": 45.0,
+            "YCENT": 40.0,
+            "P_GAM": -97.0,
+            "XCENT": -97.0,
+            "XORIG": -100000.0,
+            "YORIG": -100000.0,
+            "XCELL": 12000.0,
+            "YCELL": 12000.0,
+            "NCOLS": n_cols,
+            "NROWS": n_rows,
+        }
+    )
 
     ds.O3.attrs["units"] = "ppmV"
     ds.ASO4J.attrs["units"] = "micrograms/m**3"
@@ -59,6 +73,7 @@ def create_mock_cmaq_dataset(n_times=2, n_lay=1, n_rows=10, n_cols=10, use_dask=
         ds = ds.chunk({"TSTEP": 1})
 
     return ds
+
 
 def test_cmaq_reader_eager_vs_lazy(tmp_path):
     """Verifies CMAQ reader with both Eager and Lazy data."""
@@ -84,6 +99,7 @@ def test_cmaq_reader_eager_vs_lazy(tmp_path):
     # 4. Verify results are identical
     xr.testing.assert_allclose(ds_out_eager.compute(), ds_out_lazy.compute())
 
+
 def test_cmaq_coordinates(tmp_path):
     """Verifies that coordinates are correctly generated."""
     ds = create_mock_cmaq_dataset()
@@ -100,6 +116,7 @@ def test_cmaq_coordinates(tmp_path):
 
     # Latitude should increase with row index (y) in our mock dataset (Northern Hemisphere)
     assert ds_out.latitude.isel(y=-1, x=0) > ds_out.latitude.isel(y=0, x=0)
+
 
 def test_add_lazy_diagnostic():
     """Test the generic diagnostic addition logic."""
@@ -118,7 +135,7 @@ def test_add_lazy_diagnostic():
         weights=[1.0, 0.5, 2.0],
         units="test_units",
         long_name="test_long",
-        name="test_name"
+        name="test_name",
     )
 
     # C is missing, should still work with A and B
@@ -128,22 +145,16 @@ def test_add_lazy_diagnostic():
     xr.testing.assert_allclose(ds_out["TEST"], expected)
     assert ds_out["TEST"].attrs["units"] == "test_units"
 
+
 def test_get_times():
     """Test time extraction logic."""
     from monetio.readers.cmaq import _get_times
     import numpy as np
 
     # TFLAG: YYYYDDD, HHMMSS
-    tflag = np.array([
-        [2023001, 0],
-        [2023001, 10000]
-    ], dtype=np.int32).reshape(2, 1, 2)
+    tflag = np.array([[2023001, 0], [2023001, 10000]], dtype=np.int32).reshape(2, 1, 2)
 
-    ds = xr.Dataset(
-        data_vars={
-            "TFLAG": (("TSTEP", "VAR", "DATE-TIME"), tflag)
-        }
-    )
+    ds = xr.Dataset(data_vars={"TFLAG": (("TSTEP", "VAR", "DATE-TIME"), tflag)})
 
     ds_out = _get_times(ds, drop_duplicates=False)
     assert "time" in ds_out.coords

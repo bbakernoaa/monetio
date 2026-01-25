@@ -7,23 +7,26 @@ import pandas as pd
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("ish")
 class ISHReader(PointReader):
-    def open_dataset(self,
-                     dates,
-                     box=None,
-                     country=None,
-                     state=None,
-                     site=None,
-                     resample=True,
-                     window="H",
-                     download=False,
-                     n_procs=1,
-                     request_timeout=10,
-                     request_retries=4,
-                     verbose=False,
-                     source="ncdc",
-                     **kwargs):
+    def open_dataset(
+        self,
+        dates,
+        box=None,
+        country=None,
+        state=None,
+        site=None,
+        resample=True,
+        window="h",
+        download=False,
+        n_procs=1,
+        request_timeout=10,
+        request_retries=4,
+        verbose=False,
+        source="ncdc",
+        **kwargs,
+    ):
         """
         Reads ISH data.
 
@@ -46,9 +49,11 @@ class ISHReader(PointReader):
             source=source,
         )
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/ish.py
 # -----------------------------------------------------------------------------
+
 
 class ISH:
     _VAR_INFO = [
@@ -140,14 +145,14 @@ class ISH:
         fs = FileUtility.get_fs(url_or_file)
 
         if url_or_file.startswith("http"):
-             # Fallback to requests logic for robust HTTP if needed,
-             # or trust fsspec http filesystem (simple read).
-             # Original code had retries.
-             # If source="ncdc" (http), we keep retries?
-             # For now, use FileUtility (fsspec) which handles S3/Local well.
-             # For HTTP, fsspec doesn't retry by default as aggressively as the original logic.
-             # But let's try to use fsspec for everything.
-             pass
+            # Fallback to requests logic for robust HTTP if needed,
+            # or trust fsspec http filesystem (simple read).
+            # Original code had retries.
+            # If source="ncdc" (http), we keep retries?
+            # For now, use FileUtility (fsspec) which handles S3/Local well.
+            # For HTTP, fsspec doesn't retry by default as aggressively as the original logic.
+            # But let's try to use fsspec for everything.
+            pass
 
         # Open file object
         # gzip handling: if .gz, fsspec usually handles it if compression is inferred,
@@ -187,37 +192,45 @@ class ISH:
         # Use FileUtility for history file too
         fs = FileUtility.get_fs(fname)
         with fs.open(fname, "r") as f:
-            self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], infer_datetime_format=True)
+            self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"])
 
         self.history.columns = [i.lower() for i in self.history.columns]
 
         if dates is not None:
-            index1 = (self.history.end >= dates.min()) & (self.history.begin <= dates.max())
+            index1 = (self.history.end >= dates.min()) & (
+                self.history.begin <= dates.max()
+            )
             self.history = self.history.loc[index1, :]
         self.history = self.history.dropna(subset=["lat", "lon"])
 
-        self.history.loc[:, "usaf"] = self.history.usaf.astype("str").str.zfill(6)
-        self.history.loc[:, "wban"] = self.history.wban.astype("str").str.zfill(5)
+        self.history["usaf"] = self.history.usaf.astype("str").str.zfill(6)
+        self.history["wban"] = self.history.wban.astype("str").str.zfill(5)
         self.history["station_id"] = self.history.usaf + self.history.wban
-        self.history.rename(columns={"lat": "latitude", "lon": "longitude"}, inplace=True)
+        self.history.rename(
+            columns={"lat": "latitude", "lon": "longitude"}, inplace=True
+        )
 
     def subset_sites(self, latmin=32.65, lonmin=-113.3, latmax=34.5, lonmax=-110.4):
         latindex = (self.history.latitude >= latmin) & (self.history.latitude <= latmax)
-        lonindex = (self.history.longitude >= lonmin) & (self.history.longitude <= lonmax)
+        lonindex = (self.history.longitude >= lonmin) & (
+            self.history.longitude <= lonmax
+        )
         dfloc = self.history.loc[latindex & lonindex, :]
         return dfloc
 
     def build_urls(self, dates=None, sites=None):
-        if dates is None: dates = self.dates
-        if sites is None: sites = self.history
+        if dates is None:
+            dates = self.dates
+        if sites is None:
+            sites = self.history
 
         unique_years = pd.to_datetime(dates.year.unique(), format="%Y")
         furls = []
 
         if self.source == "aws":
-             url = "s3://noaa-isd-pds/data"
+            url = "s3://noaa-isd-pds/data"
         else:
-             url = "https://www1.ncdc.noaa.gov/pub/data/noaa"
+            url = "https://www1.ncdc.noaa.gov/pub/data/noaa"
 
         # For AWS, we assume availability based on standard naming.
         # AWS structure: s3://noaa-isd-pds/data/<year>/<usaf>-<wban>-<year>.gz (Need to confirm)
@@ -229,16 +242,34 @@ class ISH:
 
         for syear in unique_years.strftime("%Y"):
             year_fnames = (
-                sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
+                sites.usaf.astype(str)
+                + "-"
+                + sites.wban.astype(str)
+                + "-"
+                + syear
+                + ".gz"
             )
             for fname in year_fnames:
                 furls.append(f"{url}/{syear}/{fname}")
 
         return pd.Series(furls, name="name").to_frame()
 
-    def add_data(self, dates, box=None, country=None, state=None, site=None,
-                 resample=True, window="H", download=False, n_procs=1,
-                 request_timeout=10, request_retries=4, verbose=False, source="ncdc"):
+    def add_data(
+        self,
+        dates,
+        box=None,
+        country=None,
+        state=None,
+        site=None,
+        resample=True,
+        window="h",
+        download=False,
+        n_procs=1,
+        request_timeout=10,
+        request_retries=4,
+        verbose=False,
+        source="ncdc",
+    ):
         self.dates = pd.to_datetime(dates)
         self.verbose = verbose
         self.source = source
@@ -248,7 +279,9 @@ class ISH:
         dfloc = self.history.copy()
 
         if box is not None:
-            dfloc = self.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
+            dfloc = self.subset_sites(
+                latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3]
+            )
         elif country is not None:
             dfloc = dfloc.loc[dfloc.ctry == country, :]
         elif state is not None:
@@ -262,7 +295,9 @@ class ISH:
 
         # Parallel read logic
         def func(fname):
-            return self.read_data_frame(fname, request_timeout=request_timeout, request_retries=request_retries)
+            return self.read_data_frame(
+                fname, request_timeout=request_timeout, request_retries=request_retries
+            )
 
         # Using name column
         dfs = [dask.delayed(func)(f) for f in urls.name]

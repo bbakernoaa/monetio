@@ -99,7 +99,6 @@ _READER_MODULES = {
     "prepchem": ".readers.prepchem",
     "raqms": ".readers.raqms",
     "ufs": ".readers.ufs",
-
     # Obs
     "airnow": ".readers.airnow",
     "aeronet": ".readers.aeronet",
@@ -112,13 +111,11 @@ _READER_MODULES = {
     "nadp": ".readers.nadp",
     "openaq": ".readers.openaq",
     "pams": ".readers.pams",
-
     # Profile
     "icartt": ".readers.icartt",
     "tolnet": ".readers.tolnet",
     "geoms": ".readers.geoms",
     "gml_ozonesonde": ".readers.gml_ozonesonde",
-
     # Sat
     "goes": ".readers.goes",
     "nesdis_edr_viirs": ".readers.nesdis_edr_viirs",
@@ -127,6 +124,7 @@ _READER_MODULES = {
     "nasa_modis": ".readers.nasa_modis",
     "nesdis_frp": ".readers.nesdis_frp",
 }
+
 
 def load(source: str, files=None, **kwargs):
     """
@@ -147,11 +145,15 @@ def load(source: str, files=None, **kwargs):
             # Lazy import
             importlib.import_module(_READER_MODULES[source], package="monetio")
         else:
-            raise ValueError(f"Unknown source '{source}'. Available: {list(_READER_MODULES.keys())}")
+            raise ValueError(
+                f"Unknown source '{source}'. Available: {list(_READER_MODULES.keys())}"
+            )
 
     if source not in READER_REGISTRY:
         # Should be registered by now if module was valid
-        raise RuntimeError(f"Source '{source}' found in lazy index but failed to register itself.")
+        raise RuntimeError(
+            f"Source '{source}' found in lazy index but failed to register itself."
+        )
 
     # Instantiate the reader class and open data
     reader_cls = READER_REGISTRY[source]

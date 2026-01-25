@@ -181,11 +181,15 @@ class AQS:
         if "daily" in url:
             df = pd.read_csv(
                 url,
-                parse_dates={"time_local": ["Date Local"]},
-                infer_datetime_format=True,
                 dtype={0: str, 1: str, 2: str},
                 encoding="ISO-8859-1",
             )
+            df["time_local"] = pd.to_datetime(df["Date Local"])
+            df.drop(["Date Local"], axis=1, inplace=True)
+            # Match the expected order for self.renameddcols
+            cols = df.columns.tolist()
+            cols.insert(0, cols.pop(cols.index("time_local")))
+            df = df[cols]
             df.columns = self.renameddcols
             df["pollutant_standard"] = df.pollutant_standard.astype(str)
             self.daily = True
@@ -193,14 +197,21 @@ class AQS:
         else:
             df = pd.read_csv(
                 url,
-                parse_dates={
-                    "time": ["Date GMT", "Time GMT"],
-                    "time_local": ["Date Local", "Time Local"],
-                },
-                infer_datetime_format=True,
                 low_memory=False,
             )
-            # print(df.columns.values)
+            df["time"] = pd.to_datetime(df["Date GMT"] + " " + df["Time GMT"])
+            df["time_local"] = pd.to_datetime(df["Date Local"] + " " + df["Time Local"])
+            df.drop(
+                ["Date GMT", "Time GMT", "Date Local", "Time Local"],
+                axis=1,
+                inplace=True,
+            )
+            # Match the expected order from parse_dates (usually puts them at the front or in place)
+            # Based on legacy behavior, they often ended up at the front
+            cols = df.columns.tolist()
+            cols.insert(0, cols.pop(cols.index("time_local")))
+            cols.insert(0, cols.pop(cols.index("time")))
+            df = df[cols]
             df.columns = self.columns_rename(df.columns.values)
 
         df["siteid"] = (
@@ -275,7 +286,11 @@ class AQS:
             code = "TEMP_"
         elif param.upper() == "RHDP":
             code = "RH_DP_"
-        elif (param.upper() == "WIND") | (param.upper() == "WS") | (param.upper() == "WDIR"):
+        elif (
+            (param.upper() == "WIND")
+            | (param.upper() == "WS")
+            | (param.upper() == "WDIR")
+        ):
             code = "WIND_"
         url = beginning + code + year + ".zip"
         fname = fname + code + year + ".zip"
@@ -436,15 +451,21 @@ class AQS:
             drop_monitor_cols = False
         if daily:
             if drop_monitor_cols:
-                monitor_drop = ["msa_name", "city_name", "local_site_name", "address", "datum"]
+                monitor_drop = [
+                    "msa_name",
+                    "city_name",
+                    "local_site_name",
+                    "address",
+                    "datum",
+                ]
                 self.monitor_df.drop(monitor_drop, axis=1, inplace=True)
         # else:
         #     monitor_drop = [u'datum']
         #     self.monitor_df.drop(monitor_drop, axis=1, inplace=True)
         if network is not None:
-            monitors = self.monitor_df.loc[self.monitor_df.isin([network])].drop_duplicates(
-                subset=["siteid"]
-            )
+            monitors = self.monitor_df.loc[
+                self.monitor_df.isin([network])
+            ].drop_duplicates(subset=["siteid"])
         else:
             monitors = self.monitor_df.drop_duplicates(subset=["siteid"])
         # AMC - merging only on siteid was causing latitude_x latitude_y to be
@@ -452,7 +473,9 @@ class AQS:
         mlist = ["siteid"]
         self.df = pd.merge(self.df, monitors, on=mlist, how="left")
         if daily:
-            self.df["time"] = self.df.time_local - pd.to_timedelta(self.df.gmt_offset, unit="H")
+            self.df["time"] = self.df.time_local - pd.to_timedelta(
+                self.df.gmt_offset, unit="h"
+            )
         if pd.Series(self.df.columns).isin(["parameter_name"]).max():
             self.df.drop("parameter_name", axis=1, inplace=True)
         return self.df  # .copy()

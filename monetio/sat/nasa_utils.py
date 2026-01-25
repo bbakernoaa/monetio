@@ -74,7 +74,11 @@ def get_filenames_http(archive_url, ext):
     r = requests.get(archive_url)
     soup = BeautifulSoup(r.content, "html.parser")
     links = soup.findAll("a")
-    return [archive_url + link["href"] for link in links if link["href"].endswith("%s" % ext)]
+    return [
+        archive_url + link["href"]
+        for link in links
+        if link["href"].endswith("%s" % ext)
+    ]
 
 
 def get_available_satellites(archive_url="https://e4ftl01.cr.usgs.gov"):
@@ -86,7 +90,9 @@ def get_available_product(archive_url="https://e4ftl01.cr.usgs.gov", satellite=N
     return get_filenames_http(url, "/")
 
 
-def get_files_to_download(year, doy, tiles, output_path, ext, sat="MOLA", product="MYD09A1.006"):
+def get_files_to_download(
+    year, doy, tiles, output_path, ext, sat="MOLA", product="MYD09A1.006"
+):
     import pandas as pd
     from numpy import array
 

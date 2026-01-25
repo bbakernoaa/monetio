@@ -66,5 +66,7 @@ def test_issue78():
     assert not left.x.equals(right.x)
     assert not left.y.equals(right.y)
 
-    with pytest.raises(ValueError, match="Unable to merge blah due to issue matching coordinates."):
+    with pytest.raises(
+        ValueError, match="Unable to merge blah due to issue matching coordinates."
+    ):
         _ = _try_merge_exact(left, right, right_name="blah")

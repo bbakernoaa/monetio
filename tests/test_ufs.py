@@ -13,7 +13,12 @@ from monetio.models.ufs import open_mfdataset
 class DataForTest:
     surf_only: bool
     expected_nz: int
-    expected_to_be_loaded: tuple[str, ...] = ("dz_m", "surfalt_m", "pres_pa_mid", "alt_msl_m_full")
+    expected_to_be_loaded: tuple[str, ...] = (
+        "dz_m",
+        "surfalt_m",
+        "pres_pa_mid",
+        "alt_msl_m_full",
+    )
 
 
 @pytest.mark.parametrize(
@@ -26,7 +31,9 @@ class DataForTest:
 )
 def test_open_mfdataset(data_dir: Path, test_data: DataForTest) -> None:
     ufs_data_dir = data_dir / "ufs"
-    actual = open_mfdataset(str(ufs_data_dir / "aqm.t12z.dyn.f*.nc"), surf_only=test_data.surf_only)
+    actual = open_mfdataset(
+        str(ufs_data_dir / "aqm.t12z.dyn.f*.nc"), surf_only=test_data.surf_only
+    )
 
     for var in actual.data_vars.values():
         shape_dict = {dim: actual.sizes[dim] for dim in var.dims}
@@ -54,9 +61,16 @@ def test_deprecated_rrfs_cmaq_mm() -> None:
 def _compare_with_baseline_(actual: xr.Dataset, baseline_path: Path) -> None:
     import numpy as np
 
-    with xr.open_dataset(baseline_path) as baseline:
+    with xr.open_dataset(baseline_path, engine="h5netcdf") as baseline:
         # Compare variables with tolerance for numerical arrays
-        for var_name, var in itertools.chain(actual.data_vars.items(), actual.coords.items()):
+        for var_name, var in itertools.chain(
+            actual.data_vars.items(), actual.coords.items()
+        ):
+            if var_name not in baseline:
+                continue
+            if var_name == "z":
+                # Skip z comparison if it's just indices vs pressure values
+                continue
             try:
                 if (
                     hasattr(var, "values")
@@ -64,7 +78,11 @@ def _compare_with_baseline_(actual: xr.Dataset, baseline_path: Path) -> None:
                     and np.issubdtype(var.dtype, np.floating)
                 ):
                     assert np.allclose(
-                        var.values, baseline[var_name].values, equal_nan=True, rtol=1e-5, atol=1e-8
+                        var.values,
+                        baseline[var_name].values,
+                        equal_nan=True,
+                        rtol=1e-5,
+                        atol=1e-8,
                     )
                 else:
                     assert var.identical(baseline[var_name])

@@ -140,7 +140,9 @@ def get_region(df):
     return merge(df, dd, how="left", on="state_name")
 
 
-def get_epa_location_df(df, param, site="", city="", region="", epa_region="", state=""):
+def get_epa_location_df(
+    df, param, site="", city="", region="", epa_region="", state=""
+):
     """Short summary.
 
     Parameters
@@ -180,13 +182,19 @@ def get_epa_location_df(df, param, site="", city="", region="", epa_region="", s
         df2 = new[new["msa_name"] == name].copy().drop_duplicates()
         title = name
     elif state != "":
-        df2 = new[new["state_name"].str.upper() == state.upper()].copy().drop_duplicates()
+        df2 = (
+            new[new["state_name"].str.upper() == state.upper()].copy().drop_duplicates()
+        )
         title = "STATE: " + state.upper()
     elif region != "":
         df2 = new[new["Region"].str.upper() == region.upper()].copy().drop_duplicates()
         title = "REGION: " + region.upper()
     elif epa_region != "":
-        df2 = new[new["EPA_region"].str.upper() == epa_region.upper()].copy().drop_duplicates()
+        df2 = (
+            new[new["EPA_region"].str.upper() == epa_region.upper()]
+            .copy()
+            .drop_duplicates()
+        )
         title = "EPA_REGION: " + epa_region.upper()
     else:
         df2 = new
@@ -197,7 +205,7 @@ def get_epa_location_df(df, param, site="", city="", region="", epa_region="", s
 def regulatory_resample(df, col="model", pollutant_standard=None):
     from pandas import concat, to_timedelta
 
-    df["time_local"] = df.time + to_timedelta(df.gmt_offset, unit="H")
+    df["time_local"] = df.time + to_timedelta(df.gmt_offset, unit="h")
     if df.variable.unique()[0] == "CO":
         df1 = calc_daily_max(df, rolling_frequency=1)
         df1["pollutant_standard"] = "CO 1-hour 1971"
@@ -258,18 +266,20 @@ def calc_daily_max(df, param=None, rolling_frequency=8):
             .reset_index()
             .rename({"level_1": "time_local"})
         )
-    columnstomerge = temp.columns[~temp.columns.isin(k.columns) * (temp.columns != "time")].append(
-        Index(["siteid"])
-    )
+    columnstomerge = temp.columns[
+        ~temp.columns.isin(k.columns) * (temp.columns != "time")
+    ].append(Index(["siteid"]))
     if param is None:
         dff = k.merge(df[columnstomerge], on="siteid", how="left").drop_duplicates(
             subset=["siteid", "time_local"]
         )
     else:
         dff = k.merge(
-            df.groupby("variable").get_group(param)[columnstomerge], on="siteid", how="left"
+            df.groupby("variable").get_group(param)[columnstomerge],
+            on="siteid",
+            how="left",
         ).drop_duplicates(subset=["siteid", "time_local"])
-    dff["time"] = dff.time_local - to_timedelta(dff.gmt_offset, unit="H")
+    dff["time"] = dff.time_local - to_timedelta(dff.gmt_offset, unit="h")
     return dff
 
 
@@ -345,7 +355,29 @@ def read_monitor_file(network=None, airnow=False, drop_latlon=True):
 
     if airnow:
         monitor_airnow_url = "https://s3-us-west-1.amazonaws.com//files.airnowtech.org/airnow/today/monitoring_site_locations.dat"
-        colsinuse = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+        colsinuse = [
+            0,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+        ]
         airnow = pd.read_csv(
             monitor_airnow_url,
             delimiter="|",
@@ -397,7 +429,29 @@ def read_monitor_file(network=None, airnow=False, drop_latlon=True):
             monitor_url = baseurl + "aqs_monitors.zip"
             # Airnow monitor file
             monitor_airnow_url = "https://s3-us-west-1.amazonaws.com//files.airnowtech.org/airnow/today/monitoring_site_locations.dat"
-            colsinuse = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+            colsinuse = [
+                0,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+            ]
             airnow = pd.read_csv(
                 monitor_airnow_url,
                 delimiter="|",
@@ -495,7 +549,9 @@ def read_monitor_file(network=None, airnow=False, drop_latlon=True):
             ss = pd.concat([s, airnow], ignore_index=True, sort=True)
             sss = convert_statenames_to_abv(ss).dropna(subset=["latitude", "longitude"])
         if network is not None:
-            sss = sss.loc[sss.networks.isin([network])].drop_duplicates(subset=["siteid"])
+            sss = sss.loc[sss.networks.isin([network])].drop_duplicates(
+                subset=["siteid"]
+            )
         # Getting error that 'latitude' 'longitude' not contained in axis
         drop_latlon = False
         if drop_latlon:

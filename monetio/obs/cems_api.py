@@ -459,7 +459,15 @@ class EmissionsCall(EpaApiObject):
     """
 
     def __init__(
-        self, oris, mid, year, quarter, fname=None, calltype="CEM", save=True, prompt=False
+        self,
+        oris,
+        mid,
+        year,
+        quarter,
+        fname=None,
+        calltype="CEM",
+        save=True,
+        prompt=False,
     ):
         self.oris = oris  # oris code of facility
         self.mid = mid  # monitoring location id.
@@ -501,7 +509,9 @@ class EmissionsCall(EpaApiObject):
             estr = "emissions/hourlyData/csv"
         else:
             estr = "emissions/hourlyData/csv"
-        getstr = quote("/".join([estr, str(self.oris), str(self.mid), self.year, self.quarter]))
+        getstr = quote(
+            "/".join([estr, str(self.oris), str(self.mid), self.year, self.quarter])
+        )
         return getstr
 
     def load(self):
@@ -695,7 +705,9 @@ class EmissionsCall(EpaApiObject):
                     return -10
 
         df["SO2MODC"] = df.apply(
-            lambda row: checkmodc(row["SO2CEMSO2FormulaCode"], row["SO2MODC"], row["so2_lbs"]),
+            lambda row: checkmodc(
+                row["SO2CEMSO2FormulaCode"], row["SO2MODC"], row["so2_lbs"]
+            ),
             axis=1,
         )
         return df
@@ -766,12 +778,25 @@ class EmissionsCall(EpaApiObject):
         if self.calltype == "LME":
             df["so2_lbs"] = df.apply(lambda row: lme_getmass(row[cname]), axis=1)
         else:
-            df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
+            df["so2_lbs"] = df.apply(
+                lambda row: getmass(row[optime], row[cname]), axis=1
+            )
         temp = df[["time local", "so2_lbs", cname, optime]]
         temp = df[df["OperatingTime"] > 1.0]
         if not temp.empty:
             print("Operating Time greater than 1 ")
-            print(temp[["oris", "unit", "OperatingTime", "time local", "so2_lbs", self.so2name]])
+            print(
+                temp[
+                    [
+                        "oris",
+                        "unit",
+                        "OperatingTime",
+                        "time local",
+                        "so2_lbs",
+                        self.so2name,
+                    ]
+                ]
+            )
         # -------------------------------------------------------------
         # these were checks to see what values the fields were holding.
         # temp is values that are not valid
@@ -1013,7 +1038,9 @@ class MonitoringPlan(EpaApiObject):
         if temp.empty:
             return None
 
-        temp["testdate"] = temp.apply(lambda row: test_end(row["endDateHour"], edate), axis=1)
+        temp["testdate"] = temp.apply(
+            lambda row: test_end(row["endDateHour"], edate), axis=1
+        )
         temp = temp[temp["testdate"]]
         method = temp["methodCode"].unique()
 
@@ -1058,7 +1085,14 @@ class MonitoringPlan(EpaApiObject):
     def save(self):
         # do not want to overwrite other mplans in the file.
         df = pd.DataFrame()
-        subset = ["oris", "name", "request_date", "methodCode", "beginDateHour", "endDateHour"]
+        subset = [
+            "oris",
+            "name",
+            "request_date",
+            "methodCode",
+            "beginDateHour",
+            "endDateHour",
+        ]
         try:
             df, bval = self.load()
         except BaseException:
@@ -1172,7 +1206,9 @@ class MonitoringPlan(EpaApiObject):
                     dhash["beginDateHour"] = pd.to_datetime(
                         method["beginDateHour"], format=self.dfmt
                     )
-                    dhash["endDateHour"] = pd.to_datetime(method["endDateHour"], format=self.dfmt)
+                    dhash["endDateHour"] = pd.to_datetime(
+                        method["endDateHour"], format=self.dfmt
+                    )
                     dhash["oris"] = self.oris
                     dhash["mid"] = self.mid
                     dhash["request_date"] = self.date
@@ -1343,8 +1379,12 @@ class FacilitiesData(EpaApiObject):
                 dt = datetime.datetime(year, 10, 1)
             return dt
 
-        df["begin time"] = df.apply(lambda row: process_unit_time(row["begin time"]), axis=1)
-        df["end time"] = df.apply(lambda row: process_unit_time(row["end time"]), axis=1)
+        df["begin time"] = df.apply(
+            lambda row: process_unit_time(row["begin time"]), axis=1
+        )
+        df["end time"] = df.apply(
+            lambda row: process_unit_time(row["end time"]), axis=1
+        )
         return df
 
     def __str__(self):
@@ -1426,7 +1466,9 @@ class FacilitiesData(EpaApiObject):
         temp = temp[temp["begin time"] <= sdate]
         if temp.empty:
             return None
-        temp["testdate"] = temp.apply(lambda row: test_end(row["end time"], sdate), axis=1)
+        temp["testdate"] = temp.apply(
+            lambda row: test_end(row["end time"], sdate), axis=1
+        )
         print("--------------------------------------------")
         print("Monitoring Plans available")
         klist = ["testdate", "begin time", "end time", "unit", "oris", "request_string"]
@@ -1539,7 +1581,9 @@ class FacilitiesData(EpaApiObject):
                 dlist.extend(blist)
 
         df = pd.DataFrame(dlist)
-        df = pd.merge(df, unitdf, how="left", left_on=["unit", "oris"], right_on=["unit", "oris"])
+        df = pd.merge(
+            df, unitdf, how="left", left_on=["unit", "oris"], right_on=["unit", "oris"]
+        )
         return df
 
 
@@ -1692,13 +1736,17 @@ class CEMS:
         statuslist = []
         for ndate in datelist:
             quarter = findquarter(ndate)
-            print(str(oris) + " " + str(mid) + " Loading data for quarter " + str(quarter))
+            print(
+                str(oris) + " " + str(mid) + " Loading data for quarter " + str(quarter)
+            )
             status = self.emit.add(oris, mid, ndate.year, quarter, method)
             if status == 200:
                 self.orislist.append((oris, mid))
                 write_status_message(status, oris, mid, quarter, "log.txt")
             else:
-                write_status_message(status, oris, "no mp " + str(mid), quarter, "log.txt")
+                write_status_message(
+                    status, oris, "no mp " + str(mid), quarter, "log.txt"
+                )
             statuslist.append(status)
         return statuslist
 
@@ -1797,7 +1845,9 @@ class CEMS:
                         fid.write("\n")
 
                     # update dflist from the monitoring plan.
-                    dflist, method = get_monitoring_plan(oris, mid, mrequest, udate, dflist)
+                    dflist, method = get_monitoring_plan(
+                        oris, mid, mrequest, udate, dflist
+                    )
                     if not method:
                         method = []
                     # add emissions for each quarter list.

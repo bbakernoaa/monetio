@@ -323,7 +323,9 @@ class OPENAQ:
 
         dates_have = pd.merge(dates_available, dates_requested, how="inner")["dates"]
         if dates_have.empty:
-            raise ValueError(f"No data available for requested dates: {dates_requested}.")
+            raise ValueError(
+                f"No data available for requested dates: {dates_requested}."
+            )
 
         return dates_have
 
@@ -431,10 +433,14 @@ class OPENAQ:
             if not good:
                 unique_params = sorted(df.parameter.unique())
                 molec = [p for p in unique_params if p not in non_molec]
-                raise ValueError(f"Expected these species to all be in ppm now: {molec}.")
+                raise ValueError(
+                    f"Expected these species to all be in ppm now: {molec}."
+                )
             good = (df[df.parameter.isin(non_molec)].unit.dropna() == "µg/m³").all()
             if not good:
-                raise ValueError(f"Expected these species to all be in µg/m³: {non_molec}.")
+                raise ValueError(
+                    f"Expected these species to all be in µg/m³: {non_molec}."
+                )
 
             # Determine averaging periods for each parameter
             aps = {}
@@ -443,7 +449,11 @@ class OPENAQ:
             mult_ap_lines = []
             for p, ap in aps.items():
                 if len(ap) > 1:
-                    counts = df.averagingPeriod.loc[df.parameter == p].dropna().value_counts()
+                    counts = (
+                        df.averagingPeriod.loc[df.parameter == p]
+                        .dropna()
+                        .value_counts()
+                    )
                     s_counts = ", ".join(f"'{v}' ({n})" for v, n in counts.items())
                     mult_ap_lines.append(f"{p!r}: {s_counts}")
             if mult_ap_lines:
@@ -479,7 +489,7 @@ class OPENAQ:
             na_locations = ["Wampanoag Laboratory"]
             df = (
                 df[
-                    (df.averagingPeriod == pd.Timedelta("1H"))
+                    (df.averagingPeriod == pd.Timedelta("1h"))
                     & ~(df.location.isin(na_locations) & (df.city == "N/A"))
                 ]
                 .pivot_table(
@@ -489,9 +499,13 @@ class OPENAQ:
                 )
                 .reset_index()
             )
-            df["averagingPeriod"] = pd.Timedelta("1H")  # TODO: could just not include
-            df = df.rename(columns={p: f"{p}_ugm3" for p in self.NON_MOLEC_PARAMS}, errors="ignore")
-            df = df.rename(columns={p: f"{p}_ppm" for p in self.PPM_TO_UGM3}, errors="ignore")
+            df["averagingPeriod"] = pd.Timedelta("1h")  # TODO: could just not include
+            df = df.rename(
+                columns={p: f"{p}_ugm3" for p in self.NON_MOLEC_PARAMS}, errors="ignore"
+            )
+            df = df.rename(
+                columns={p: f"{p}_ppm" for p in self.PPM_TO_UGM3}, errors="ignore"
+            )
 
         # Construct site IDs
         # Sometimes, at a given time, there are multiple measurements at the same lat/lon
@@ -509,8 +523,14 @@ class OPENAQ:
                 return hashlib.sha1(b).hexdigest()
 
         # to_hash = df.latitude.astype(str) + " " + df.longitude.astype(str)
-        to_hash = df.location + " " + df.latitude.astype(str) + " " + df.longitude.astype(str)
-        df["siteid"] = df.country + "_" + to_hash.str.encode("utf-8").apply(do_hash).str.slice(0, 7)
+        to_hash = (
+            df.location + " " + df.latitude.astype(str) + " " + df.longitude.astype(str)
+        )
+        df["siteid"] = (
+            df.country
+            + "_"
+            + to_hash.str.encode("utf-8").apply(do_hash).str.slice(0, 7)
+        )
 
         return df
 

@@ -17,7 +17,7 @@ def add_data(
     state=None,
     site=None,
     resample=True,
-    window="H",
+    window="h",
     download=False,
     n_procs=1,
     request_timeout=10,
@@ -184,16 +184,22 @@ class ISH:
         frame = ISH._clean_column_by_name(frame, "ceiling", missing=99999)
         frame = ISH._clean_column_by_name(frame, "vsb", missing=999999)
         frame = ISH._clean_column_by_name(frame, "vsb", missing=99999)  # m
-        frame = ISH._clean_column_by_name(frame, "t", multiplier=10, missing=9999)  # degC
-        frame = ISH._clean_column_by_name(frame, "dpt", multiplier=10, missing=9999)  # degC
-        frame = ISH._clean_column_by_name(frame, "p", multiplier=10, missing=99999)  # hPa
+        frame = ISH._clean_column_by_name(
+            frame, "t", multiplier=10, missing=9999
+        )  # degC
+        frame = ISH._clean_column_by_name(
+            frame, "dpt", multiplier=10, missing=9999
+        )  # degC
+        frame = ISH._clean_column_by_name(
+            frame, "p", multiplier=10, missing=99999
+        )  # hPa
         return frame
 
     @staticmethod
     def _decode_bytes(df):
         if df.empty:
             return df
-        bytes_cols = [col for col in df.columns if type(df[col][0]) is bytes]
+        bytes_cols = [col for col in df.columns if isinstance(df[col].iloc[0], bytes)]
         with pd.option_context("mode.chained_assignment", None):
             df.loc[:, bytes_cols] = df[bytes_cols].apply(
                 lambda x: x.str.decode("utf-8"),
@@ -216,7 +222,9 @@ class ISH:
             import requests
 
             if not request_retries >= 0:
-                raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
+                raise ValueError(
+                    f"`request_retries` must be >= 0, got {request_retries!r}"
+                )
 
             tries = 0
             while tries - 1 < request_retries:
@@ -234,9 +242,13 @@ class ISH:
                     break
 
             with gzip.open(io.BytesIO(r.content), "rb") as f:
-                frame_as_array = np.genfromtxt(f, delimiter=self.WIDTHS, dtype=self.DTYPES)
+                frame_as_array = np.genfromtxt(
+                    f, delimiter=self.WIDTHS, dtype=self.DTYPES
+                )
         else:
-            frame_as_array = np.genfromtxt(url_or_file, delimiter=self.WIDTHS, dtype=self.DTYPES)
+            frame_as_array = np.genfromtxt(
+                url_or_file, delimiter=self.WIDTHS, dtype=self.DTYPES
+            )
 
         frame = pd.DataFrame.from_records(np.atleast_1d(frame_as_array))
         df = self._clean(frame)
@@ -289,19 +301,25 @@ class ISH:
         self.history.columns = [i.lower() for i in self.history.columns]
 
         if dates is not None:
-            index1 = (self.history.end >= dates.min()) & (self.history.begin <= dates.max())
+            index1 = (self.history.end >= dates.min()) & (
+                self.history.begin <= dates.max()
+            )
             self.history = self.history.loc[index1, :]
         self.history = self.history.dropna(subset=["lat", "lon"])
 
-        self.history.loc[:, "usaf"] = self.history.usaf.astype("str").str.zfill(6)
-        self.history.loc[:, "wban"] = self.history.wban.astype("str").str.zfill(5)
+        self.history["usaf"] = self.history.usaf.astype("str").str.zfill(6)
+        self.history["wban"] = self.history.wban.astype("str").str.zfill(5)
         self.history["station_id"] = self.history.usaf + self.history.wban
-        self.history.rename(columns={"lat": "latitude", "lon": "longitude"}, inplace=True)
+        self.history.rename(
+            columns={"lat": "latitude", "lon": "longitude"}, inplace=True
+        )
 
     def subset_sites(self, latmin=32.65, lonmin=-113.3, latmax=34.5, lonmax=-110.4):
         """find sites within designated region"""
         latindex = (self.history.latitude >= latmin) & (self.history.latitude <= latmax)
-        lonindex = (self.history.longitude >= lonmin) & (self.history.longitude <= lonmax)
+        lonindex = (self.history.longitude >= lonmin) & (
+            self.history.longitude <= lonmax
+        )
         dfloc = self.history.loc[latindex & lonindex, :]
         print("SUBSET")
         print(dfloc.latitude.unique())
@@ -317,7 +335,7 @@ class ISH:
         state=None,
         site=None,
         resample=True,
-        window="H",
+        window="h",
         download=False,
         n_procs=1,
         request_timeout=10,
@@ -360,13 +378,27 @@ class ISH:
             self.read_ish_history()
         dfloc = self.history.copy()
 
-        if sum([box is not None, country is not None, state is not None, site is not None]) > 1:
-            raise ValueError("Only one of `box`, `country`, `state`, or `site` can be used")
+        if (
+            sum(
+                [
+                    box is not None,
+                    country is not None,
+                    state is not None,
+                    site is not None,
+                ]
+            )
+            > 1
+        ):
+            raise ValueError(
+                "Only one of `box`, `country`, `state`, or `site` can be used"
+            )
 
         if box is not None:  # type(box) is not type(None):
             if verbose:
                 print("Retrieving Sites in: " + " ".join(map(str, box)))
-            dfloc = self.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
+            dfloc = self.subset_sites(
+                latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3]
+            )
         elif country is not None:
             if verbose:
                 print("Retrieving Country: " + country)
@@ -383,7 +415,9 @@ class ISH:
         # this is the overall urls built from the total ISH history file
         urls = self.build_urls(sites=dfloc)
         if urls.empty:
-            raise ValueError("No data URLs found for the given dates and site selection")
+            raise ValueError(
+                "No data URLs found for the given dates and site selection"
+            )
         if download:
             objs = self.get_url_file_objs(urls.name)
             print("  Reading ISH into pandas DataFrame...")
@@ -420,13 +454,12 @@ class ISH:
                 self.df[group_cols + list(numeric_cols)]
                 .groupby("station_id")
                 .resample(window)
-                .mean()
+                .mean(numeric_only=True)
                 .reset_index()
             )
             # Merge back with non-numeric columns (e.g., time, station_id) if needed
             # For now, assign to self.df
             self.df = resampled
-            # TODO: mean(numeric_only=True)
 
         self.df = self.df.merge(dfloc, on="station_id", how="left")
         self.df = self.df.rename(columns={"station_id": "siteid", "ctry": "country"})
@@ -519,7 +552,9 @@ class ISH:
                 if self.verbose:
                     print("Year:", date)
                 year_url = (
-                    pd.read_html(f"{url}/{date}/")[0]["Name"].iloc[2:-1].to_frame(name="name")
+                    pd.read_html(f"{url}/{date}/")[0]["Name"]
+                    .iloc[2:-1]
+                    .to_frame(name="name")
                 )
                 all_urls.append(
                     f"{url}/{date}/" + year_url
@@ -528,13 +563,22 @@ class ISH:
             all_urls = pd.concat(all_urls, ignore_index=True)
         else:
             year = unique_years.strftime("%Y")[0]
-            all_urls = pd.read_html(f"{url}/{year}/")[0]["Name"].iloc[2:-1].to_frame(name="name")
+            all_urls = (
+                pd.read_html(f"{url}/{year}/")[0]["Name"]
+                .iloc[2:-1]
+                .to_frame(name="name")
+            )
             all_urls = f"{url}/{year}/" + all_urls
 
         # Construct expected URLs based on sites and year(s) requested
         for syear in unique_years.strftime("%Y"):
             year_fnames = (
-                sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
+                sites.usaf.astype(str)
+                + "-"
+                + sites.wban.astype(str)
+                + "-"
+                + syear
+                + ".gz"
             )
             for fname in year_fnames:
                 furls.append(f"{url}/{syear}/{fname}")

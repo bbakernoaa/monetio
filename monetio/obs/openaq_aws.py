@@ -110,7 +110,9 @@ def _cache_site_days():
     glb = "openaq-data-archive/records/csv.gz/locationid=*/year=*/month=*/location-*-*.csv.gz"
     tic = perf_counter()
     paths = fs.glob(glb)
-    print(f"found {len(paths)} site-day(s) in {pd.Timedelta(seconds=perf_counter() - tic)}")
+    print(
+        f"found {len(paths)} site-day(s) in {pd.Timedelta(seconds=perf_counter() - tic)}"
+    )
 
     df = pd.DataFrame({"path": paths})
     df["filename"] = df["path"].str.rsplit("/", n=1, expand=True)[1]
@@ -166,7 +168,9 @@ def get_paths(dates, *, siteid=None, country=None, provider=None):
                 glb = tpl.format(loc=loc, date=date)
                 if "*" in glb:
                     loc_date_paths = fs.glob(glb)
-                    logger.debug(f"found {len(loc_date_paths)} path(s) for glob='{glb}'")
+                    logger.debug(
+                        f"found {len(loc_date_paths)} path(s) for glob='{glb}'"
+                    )
                     paths.extend(loc_date_paths)
                 else:
                     if fs.exists(glb):

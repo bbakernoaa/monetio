@@ -51,7 +51,7 @@ def build_urls(dates, *, daily=False):
     if daily:
         dates = dates.floor("D").unique()
     else:  # hourly
-        dates = dates.floor("H").unique()
+        dates = dates.floor("h").unique()
 
     urls = []
     fnames = []
@@ -100,7 +100,16 @@ def read_csv(fn):
         "obs",
         "source",
     ]
-    daily_cols = ["date", "siteid", "site", "variable", "units", "obs", "hours", "source"]
+    daily_cols = [
+        "date",
+        "siteid",
+        "site",
+        "variable",
+        "units",
+        "obs",
+        "hours",
+        "source",
+    ]
     try:
         dft = pd.read_csv(
             fn,
@@ -130,7 +139,9 @@ def read_csv(fn):
     dft["siteid"] = dft.siteid.str.zfill(9)
     # ^ TODO: does nothing; and some site IDs are longer (12) or start with letters
     if not daily:
-        dft["utcoffset"] = dft.utcoffset.astype(int)  # FIXME: some sites have fractional UTC offset
+        dft["utcoffset"] = dft.utcoffset.astype(
+            int
+        )  # FIXME: some sites have fractional UTC offset
 
     return dft
 
@@ -164,7 +175,9 @@ def retrieve(url, fname):
         print("\n File Exists: " + fname)
 
 
-def aggregate_files(dates=dates, *, download=False, n_procs=1, daily=False, bad_utcoffset="drop"):
+def aggregate_files(
+    dates=dates, *, download=False, n_procs=1, daily=False, bad_utcoffset="drop"
+):
     """Short summary.
 
     Parameters
@@ -208,7 +221,7 @@ def aggregate_files(dates=dates, *, download=False, n_procs=1, daily=False, bad_
         df["time"] = pd.to_datetime(
             df.date + " " + df.time, format=r"%m/%d/%y %H:%M", exact=True
         )  # TODO: move to read_csv? (and some of this other stuff too?)
-        df["time_local"] = df.time + pd.to_timedelta(df.utcoffset, unit="H")
+        df["time_local"] = df.time + pd.to_timedelta(df.utcoffset, unit="h")
     df.drop(["date"], axis=1, inplace=True)
 
     print("    Adding in Meta-data")
@@ -224,7 +237,15 @@ def aggregate_files(dates=dates, *, download=False, n_procs=1, daily=False, bad_
     return df.reset_index(drop=True)
 
 
-def add_data(dates, *, download=False, wide_fmt=True, n_procs=1, daily=False, bad_utcoffset="drop"):
+def add_data(
+    dates,
+    *,
+    download=False,
+    wide_fmt=True,
+    n_procs=1,
+    daily=False,
+    bad_utcoffset="drop",
+):
     """Retrieve and load AirNow data as a DataFrame.
 
     Note: to obtain full hourly data you must pass all desired hours
@@ -311,7 +332,9 @@ def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
         elif bad_utcoffset == "leave":
             pass
         else:
-            raise ValueError("`bad_utcoffset` must be one of: 'null', 'drop', 'fix', 'leave'")
+            raise ValueError(
+                "`bad_utcoffset` must be one of: 'null', 'drop', 'fix', 'leave'"
+            )
 
     return df  # TODO: dropna here (since it is called `filter_bad_values`)?
 
@@ -412,6 +435,8 @@ def get_station_locations_remerge(df):
         Description of returned object.
 
     """
-    df = pd.merge(df, monitor_df.drop(["Latitude", "Longitude"], axis=1), on="siteid")  # ,
+    df = pd.merge(
+        df, monitor_df.drop(["Latitude", "Longitude"], axis=1), on="siteid"
+    )  # ,
     # how='left')
     return df

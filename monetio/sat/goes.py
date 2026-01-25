@@ -1,6 +1,5 @@
 """this will read the goes_r data"""
 
-import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -79,7 +78,9 @@ def open_dataset(date=None, filename=None, satellite="16", product=None):
             if product is None:
                 raise ValueError
         except ValueError:
-            print("Please provide a date and product to be able to retrieve data from Amazon S3")
+            print(
+                "Please provide a date and product to be able to retrieve data from Amazon S3"
+            )
         ds = g.open_amazon_file(date=date, satellite=satellite, product=product)
     else:
         ds = g.open_local(filename)
@@ -128,7 +129,9 @@ class GOES:
             print("Files not available for product and date")
 
     def _get_closest_date(self, files=[]):
-        file_dates = [pd.to_datetime(f.split("_")[-1][:-4], format="c%Y%j%H%M%S") for f in files]
+        file_dates = [
+            pd.to_datetime(f.split("_")[-1][:-4], format="c%Y%j%H%M%S") for f in files
+        ]
         date = pd.Timestamp(self.date)
         nearest_date = min(file_dates, key=lambda x: abs(x - date))
         nearest_date_str = nearest_date.strftime("c%Y%j%H%M%S")
@@ -205,18 +208,16 @@ def add_goes_bands(
         the original dataset with the true color image array added.
     """
     # make green band
-    green = (
-        0.45 * dset[red_band]
-        + 0.1 * dset[veggie_band]
-        + 0.45 * dset[blue_band]
-    )
+    green = 0.45 * dset[red_band] + 0.1 * dset[veggie_band] + 0.45 * dset[blue_band]
 
     # Get the dimensions from one of the input bands
     dims = dset[red_band].dims
 
     # Create the true color image DataArray
     # Stack the bands along a new 'rgb' dimension
-    tci = xr.concat([dset[red_band], green, dset[blue_band]], dim="rgb").transpose(*(dims + ("rgb",)))
+    tci = xr.concat([dset[red_band], green, dset[blue_band]], dim="rgb").transpose(
+        *(dims + ("rgb",))
+    )
 
     # add to the dataset
     dset["tci"] = tci
@@ -239,7 +240,9 @@ def add_goes_bands(
         ds.attrs["projection"] = crs.to_wkt()
         proj = Proj(crs)
         satellite_height = ds.goes_imager_projection.perspective_point_height
-        xx, yy = meshgrid(ds.x.values * satellite_height, ds.y.values * satellite_height)
+        xx, yy = meshgrid(
+            ds.x.values * satellite_height, ds.y.values * satellite_height
+        )
         lon, lat = proj(xx, yy, inverse=True)
         ds["latitude"] = (("y", "x"), lat)
         ds["longitude"] = (("y", "x"), lon)

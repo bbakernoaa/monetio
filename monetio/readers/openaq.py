@@ -1,32 +1,29 @@
 """OpenAQ Reader"""
 
 import json
-import warnings
 import pandas as pd
 import numpy as np
 import dask
 import dask.dataframe as dd
 from .base import PointReader, register_reader
 
+
 @register_reader("openaq")
 class OpenAQReader(PointReader):
-    def open_dataset(self,
-                     dates,
-                     n_procs=1,
-                     wide_fmt=True,
-                     **kwargs):
+    def open_dataset(self, dates, n_procs=1, wide_fmt=True, **kwargs):
         """
         Reads OpenAQ data from S3.
         """
         a = OPENAQ()
         return a.add_data(dates, num_workers=n_procs, wide_fmt=wide_fmt)
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/openaq.py
 # -----------------------------------------------------------------------------
 
+
 def read_json(fp_or_url, verbose=False):
-    import numpy as np
 
     # Simple pandas read if local or url
     try:
@@ -90,17 +87,24 @@ def read_json(fp_or_url, verbose=False):
 
     return df
 
+
 class OPENAQ:
     NON_MOLEC_PARAMS = ["pm1", "pm25", "pm4", "pm10", "bc"]
     PPM_TO_UGM3 = {
-        "o3": 1990, "co": 1160, "no2": 1900, "no": 1240,
-        "so2": 2650, "ch4": 664, "co2": 1820,
+        "o3": 1990,
+        "co": 1160,
+        "no2": 1900,
+        "no": 1240,
+        "so2": 2650,
+        "ch4": 664,
+        "co2": 1820,
     }
     # NOx assumption
     PPM_TO_UGM3["nox"] = PPM_TO_UGM3["no2"]
 
     def __init__(self):
         import s3fs
+
         self.fs = s3fs.S3FileSystem(anon=True)
         self.s3bucket = "openaq-fetches/realtime"
         # We use pandas engine by default
@@ -114,11 +118,19 @@ class OPENAQ:
         try:
             folders = self.fs.ls(self.s3bucket)
             days = [folder.split("/")[2] for folder in folders]
-            dates_available = pd.Series(pd.to_datetime(days, format=r"%Y-%m-%d", errors="coerce"), name="dates")
-            dates_requested = pd.Series(pd.to_datetime(dates).floor(freq="D"), name="dates").drop_duplicates()
-            dates_have = pd.merge(dates_available, dates_requested, how="inner")["dates"]
+            dates_available = pd.Series(
+                pd.to_datetime(days, format=r"%Y-%m-%d", errors="coerce"), name="dates"
+            )
+            dates_requested = pd.Series(
+                pd.to_datetime(dates).floor(freq="D"), name="dates"
+            ).drop_duplicates()
+            dates_have = pd.merge(dates_available, dates_requested, how="inner")[
+                "dates"
+            ]
             if dates_have.empty:
-                raise ValueError(f"No data available for requested dates: {dates_requested}.")
+                raise ValueError(
+                    f"No data available for requested dates: {dates_requested}."
+                )
             return dates_have
         except:
             # If fs.ls fails (no internet), return requested dates assuming they exist?
@@ -166,23 +178,47 @@ class OPENAQ:
                 df.loc[is_ug, "unit"] = "ppm"
 
             index = [
-                "time", "time_local", "latitude", "longitude", "utcoffset",
-                "location", "city", "country", "sourceName", "sourceType", "mobile",
+                "time",
+                "time_local",
+                "latitude",
+                "longitude",
+                "utcoffset",
+                "location",
+                "city",
+                "country",
+                "sourceName",
+                "sourceType",
+                "mobile",
             ]
             # remove index cols that might not exist
             index = [c for c in index if c in df.columns]
 
-            df = df.pivot_table(values="value", index=index, columns="parameter").reset_index()
+            df = df.pivot_table(
+                values="value", index=index, columns="parameter"
+            ).reset_index()
 
             # Renames
-            df = df.rename(columns={p: f"{p}_ugm3" for p in self.NON_MOLEC_PARAMS}, errors="ignore")
-            df = df.rename(columns={p: f"{p}_ppm" for p in self.PPM_TO_UGM3}, errors="ignore")
+            df = df.rename(
+                columns={p: f"{p}_ugm3" for p in self.NON_MOLEC_PARAMS}, errors="ignore"
+            )
+            df = df.rename(
+                columns={p: f"{p}_ppm" for p in self.PPM_TO_UGM3}, errors="ignore"
+            )
 
         # Site ID hash
         if "location" in df.columns and "country" in df.columns:
             import hashlib
-            def do_hash(b): return hashlib.sha1(b.encode("utf-8")).hexdigest()
-            to_hash = df.location.astype(str) + " " + df.latitude.astype(str) + " " + df.longitude.astype(str)
+
+            def do_hash(b):
+                return hashlib.sha1(b.encode("utf-8")).hexdigest()
+
+            to_hash = (
+                df.location.astype(str)
+                + " "
+                + df.latitude.astype(str)
+                + " "
+                + df.longitude.astype(str)
+            )
             df["siteid"] = df.country + "_" + to_hash.apply(do_hash).str.slice(0, 7)
 
         return df

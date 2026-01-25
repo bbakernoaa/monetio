@@ -14,6 +14,7 @@ FUNCTIONS
 
 
 """
+
 import datetime
 
 import numpy as np
@@ -238,7 +239,9 @@ class Pardump:
                         parframe_all = par_frame.copy()
                     else:
                         parframe_all = pd.concat([parframe_all, par_frame], axis=0)
-                    par_frame = pd.concat([par_frame], keys=[self.fname])  # add a filename key
+                    par_frame = pd.concat(
+                        [par_frame], keys=[self.fname]
+                    )  # add a filename key
 
                 iii += 1
 
@@ -253,7 +256,13 @@ class Pardump:
                     #   if verbose:
                     #      print "Before date. Closing file"
                 if iii > imax:
-                    print("Read pardump. Limited to" + str(imax) + "  iterations. Stopping")
+                    print(
+                        "Read pardump. Limited to"
+                        + str(imax)
+                        + "  iterations. Stopping"
+                    )
                     testf = False
-        parframe_all = pd.concat([parframe_all], keys=[self.fname])  # add a filename key
+        parframe_all = pd.concat(
+            [parframe_all], keys=[self.fname]
+        )  # add a filename key
         return parframe_all

@@ -196,7 +196,9 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
     if isinstance(found, str) and found.startswith(">"):
         print(f"warning: some query results not fetched ('found' is {found!r})")
     elif isinstance(found, int) and len(data) < found:
-        print(f"warning: some query results not fetched (found={found}, got {len(data)} results)")
+        print(
+            f"warning: some query results not fetched (found={found}, got {len(data)} results)"
+        )
 
     return data
 
@@ -223,7 +225,9 @@ def get_locations(**kwargs):
         if p.is_file():
             now = pd.Timestamp.now(tz="UTC")
             mtime = pd.Timestamp.fromtimestamp(p.stat().st_mtime, tz="UTC")
-            logger.info(f"locations cache file exists, mtime {mtime:%Y-%m-%d %H:%M:%SZ}")
+            logger.info(
+                f"locations cache file exists, mtime {mtime:%Y-%m-%d %H:%M:%SZ}"
+            )
             if now - mtime < pd.Timedelta(days=7):
                 return True
             else:
@@ -447,7 +451,8 @@ def _to_wide_fmt(df):
         if not unique.all():
             site_col_non_unique = site_col[~unique]
             warnings.warn(
-                f"non-unique {col!r} among site IDs:\n{site_col_non_unique}" "\nUsing first."
+                f"non-unique {col!r} among site IDs:\n{site_col_non_unique}"
+                "\nUsing first."
             )
             df = df.drop(columns=[col]).merge(
                 site_col.str.get(0),
@@ -698,10 +703,13 @@ def add_data(
     def iter_queries():
         for sensor_id in sensors["sensor_id"]:
             for t_from, t_to in iter_time_slices():
-                yield sensor_id, {
-                    "datetime_from": t_from,
-                    "datetime_to": t_to,
-                }
+                yield (
+                    sensor_id,
+                    {
+                        "datetime_from": t_from,
+                        "datetime_to": t_to,
+                    },
+                )
 
     threads = kwargs.pop("threads", None)
 

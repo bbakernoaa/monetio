@@ -115,7 +115,9 @@ def test_open_dataset(test_file_path):
         assert ds2[f"longitude_bounds_{i}"].max() <= 180
 
     assert not ds2["preslev"].isnull().all()
-    assert ds2.preslev.mean(dim=("y", "x")).diff("z").to_series().lt(0).all(), "surface first"
+    assert ds2.preslev.mean(dim=("y", "x")).diff("z").to_series().lt(0).all(), (
+        "surface first"
+    )
     assert not ds2["troppres"].isnull().all()
     assert ds2["troppres"].mean() < ds2["preslev"].mean()
 
@@ -130,7 +132,11 @@ def test_open_dataset_qa(test_file_path):
     ds = open_dataset(
         test_file_path,
         {
-            "qa_value": {"quality_flag_min": 0.7, "var_applied": [vn], "fillvalue": None},
+            "qa_value": {
+                "quality_flag_min": 0.7,
+                "var_applied": [vn],
+                "fillvalue": None,
+            },
             vn: {"scale": 60221410000000000000, "fillvalue": 9.96921e36},
             "averaging_kernel": {"fillvalue": 9.96921e36},
             "air_mass_factor_total": {"fillvalue": 9.96921e36},
@@ -140,7 +146,10 @@ def test_open_dataset_qa(test_file_path):
             "preslev": {
                 "tm5_constant_a": {"group": ["PRODUCT"], "maximum": 9e36},
                 "tm5_constant_b": {"group": ["PRODUCT"], "maximum": 9e36},
-                "surface_pressure": {"group": ["PRODUCT/SUPPORT_DATA/INPUT_DATA"], "maximum": 9e36},
+                "surface_pressure": {
+                    "group": ["PRODUCT/SUPPORT_DATA/INPUT_DATA"],
+                    "maximum": 9e36,
+                },
                 "tm5_tropopause_layer_index": {"group": ["PRODUCT"]},
             },
         },

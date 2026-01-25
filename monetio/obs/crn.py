@@ -118,10 +118,16 @@ import pandas as pd
 from numpy import array
 
 
-def add_data(dates, param=None, daily=False, sub_hourly=False, download=False, latlonbox=None):
+def add_data(
+    dates, param=None, daily=False, sub_hourly=False, download=False, latlonbox=None
+):
     a = CRN()
     df = a.add_data(
-        dates, daily=daily, sub_hourly=sub_hourly, download=download, latlonbox=latlonbox
+        dates,
+        daily=daily,
+        sub_hourly=sub_hourly,
+        download=download,
+        latlonbox=latlonbox,
     )
     return df
 
@@ -132,14 +138,20 @@ class CRN:
         self.daily = False
         self.ftp = None
         self.df = pd.DataFrame()
-        self.se_states = array(["AL", "FL", "GA", "MS", "NC", "SC", "TN", "VA", "WV"], dtype="|S14")
-        self.ne_states = array(
-            ["CT", "DE", "DC", "ME", "MD", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"], dtype="|S20"
+        self.se_states = array(
+            ["AL", "FL", "GA", "MS", "NC", "SC", "TN", "VA", "WV"], dtype="|S14"
         )
-        self.nc_states = array(["IL", "IN", "IA", "KY", "MI", "MN", "MO", "OH", "WI"], dtype="|S9")
+        self.ne_states = array(
+            ["CT", "DE", "DC", "ME", "MD", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"],
+            dtype="|S20",
+        )
+        self.nc_states = array(
+            ["IL", "IN", "IA", "KY", "MI", "MN", "MO", "OH", "WI"], dtype="|S9"
+        )
         self.sc_states = array(["AR", "LA", "OK", "TX"], dtype="|S9")
         self.r_states = array(
-            ["AZ", "CO", "ID", "KS", "MT", "NE", "NV", "NM", "ND", "SD", "UT", "WY"], dtype="|S12"
+            ["AZ", "CO", "ID", "KS", "MT", "NE", "NV", "NM", "ND", "SD", "UT", "WY"],
+            dtype="|S12",
         )
         self.p_states = array(["CA", "OR", "WA"], dtype="|S10")
         self.objtype = "CRN"
@@ -259,10 +271,9 @@ class CRN:
             cols = self.dcols
             df = pd.read_csv(
                 url,
-                delim_whitespace=True,
+                sep=r"\s+",
                 names=cols,
                 parse_dates={"time_local": [1]},
-                infer_datetime_format=True,
                 na_values=nanvals,
             )
             self.daily = True
@@ -270,26 +281,24 @@ class CRN:
             cols = self.shcols
             df = pd.read_csv(
                 url,
-                delim_whitespace=True,
+                sep=r"\s+",
                 names=cols,
                 parse_dates={
                     "time": ["UTC_DATE", "UTC_TIME"],
                     "time_local": ["LST_DATE", "LST_TIME"],
                 },
-                infer_datetime_format=True,
                 na_values=nanvals,
             )
         else:
             cols = self.hcols
             df = pd.read_csv(
                 url,
-                delim_whitespace=True,
+                sep=r"\s+",
                 names=cols,
                 parse_dates={
                     "time": ["UTC_DATE", "UTC_TIME"],
                     "time_local": ["LST_DATE", "LST_TIME"],
                 },
-                infer_datetime_format=True,
                 na_values=nanvals,
             )
         return df
@@ -399,7 +408,9 @@ class CRN:
         else:
             print("File Exists: " + fname)
 
-    def add_data(self, dates, daily=False, sub_hourly=False, download=False, latlonbox=None):
+    def add_data(
+        self, dates, daily=False, sub_hourly=False, download=False, latlonbox=None
+    ):
         """Short summary.
 
         Parameters
@@ -437,7 +448,9 @@ class CRN:
             monitors = mdf.loc[con].copy()
         else:
             monitors = self.monitor_df.copy()
-        urls, fnames = self.build_urls(monitors, dates, daily=daily, sub_hourly=sub_hourly)
+        urls, fnames = self.build_urls(
+            monitors, dates, daily=daily, sub_hourly=sub_hourly
+        )
         if download:
             for url, fname in zip(urls, fnames):
                 self.retrieve(url, fname)
@@ -446,9 +459,13 @@ class CRN:
             dfs = [dask.delayed(self.load_file)(i) for i in urls]
         dff = dd.from_delayed(dfs)
         self.df = dff.compute()
-        self.df = pd.merge(self.df, monitors, how="left", on=["WBANNO", "LATITUDE", "LONGITUDE"])
+        self.df = pd.merge(
+            self.df, monitors, how="left", on=["WBANNO", "LATITUDE", "LONGITUDE"]
+        )
         if ~self.df.columns.isin(["time"]).max():
-            self.df["time"] = self.df.time_local + pd.to_timedelta(self.df.GMT_OFFSET, unit="H")
+            self.df["time"] = self.df.time_local + pd.to_timedelta(
+                self.df.GMT_OFFSET, unit="h"
+            )
         id_vars = self.monitor_df.columns.append(pd.Index(["time", "time_local"]))
         keys = self.df.columns[self.df.columns.isin(id_vars)]
         self.df = pd.melt(
@@ -511,7 +528,11 @@ class CRN:
             Description of returned object.
 
         """
-        dates = pd.date_range(start=begin, end=end, freq="H").values.astype("M8[s]").astype("O")
+        dates = (
+            pd.date_range(start=begin, end=end, freq="h")
+            .values.astype("M8[s]")
+            .astype("O")
+        )
         self.dates = dates
 
     def get_monitor_df(self):

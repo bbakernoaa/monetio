@@ -1,9 +1,9 @@
 import os
 import numpy as np
-import xarray as xr
 from pyproj import Proj, CRS
 
 path = os.path.abspath(__file__)
+
 
 class MockArea:
     def __init__(self, proj_dict, area_extent, nx, ny):
@@ -28,9 +28,12 @@ class MockArea:
     def to_cartopy_crs(self):
         try:
             import cartopy.crs as ccrs
-            return ccrs.Projection(CRS.from_user_input(self.proj_dict))
+
+            # Use ccrs.Proj to wrap a Proj string, which is a concrete class.
+            return ccrs.Proj(CRS.from_user_input(self.proj_dict).to_proj4())
         except ImportError:
             return None
+
 
 def _geos_16_grid(dset):
     projection = dset.goes_imager_projection
@@ -60,12 +63,17 @@ def _geos_16_grid(dset):
     }
     return MockArea(proj_dict, area_extent, len(dset.x), len(dset.y))
 
+
 def _get_sinu_grid_df():
     from pandas import read_csv
+
     f = os.path.join(os.path.dirname(path), "data/sn_bound_10deg.txt")
-    td = read_csv(f, skiprows=4, delim_whitespace=True)
-    td = td.assign(ihiv="h" + td.ih.astype(str).str.zfill(2) + "v" + td.iv.astype(str).str.zfill(2))
+    td = read_csv(f, skiprows=4, sep=r"\s+")
+    td = td.assign(
+        ihiv="h" + td.ih.astype(str).str.zfill(2) + "v" + td.iv.astype(str).str.zfill(2)
+    )
     return td
+
 
 def _sinu_grid_latlon_boundary(h, v):
     td = _get_sinu_grid_df()
@@ -76,19 +84,27 @@ def _sinu_grid_latlon_boundary(h, v):
     lonmax = o.lon_max.iloc[0]
     return lonmin, latmin, lonmax, latmax
 
+
 def _get_sinu_xy(lon, lat):
-    sinu = Proj("+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m")
+    sinu = Proj(
+        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m"
+    )
     return sinu(lon, lat)
+
 
 def _get_sinu_latlon(x, y):
     xv, yv = np.meshgrid(x, y)
-    sinu = Proj("+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +R=6371007.181")
+    sinu = Proj(
+        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +R=6371007.181"
+    )
     return sinu(xv, yv, inverse=True)
+
 
 def get_sinu_area_extent(lonmin, latmin, lonmax, latmax):
     xmin, ymin = _get_sinu_xy(lonmin, latmin)
     xmax, ymax = _get_sinu_xy(lonmax, latmax)
     return (xmin, ymin, xmax, ymax)
+
 
 def get_modis_latlon_from_swath_hv(h, v, dset):
     lonmin, latmin, lonmax, latmax = _sinu_grid_latlon_boundary(h, v)
@@ -100,14 +116,18 @@ def get_modis_latlon_from_swath_hv(h, v, dset):
     dset.coords["longitude"] = (("x", "y"), lon)
     dset.coords["latitude"] = (("x", "y"), lat)
     dset.attrs["area_extent"] = (x.min(), y.min(), x.max(), y.max())
-    dset.attrs["proj4_srs"] = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m"
+    dset.attrs["proj4_srs"] = (
+        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m"
+    )
     return dset
+
 
 def get_sinu_area_def(dset):
     proj4_srs = dset.attrs["proj4_srs"]
     area_extent = dset.attrs["area_extent"]
     nx, ny = dset.longitude.shape
     return MockArea(proj4_srs, area_extent, nx, ny)
+
 
 def get_ioapi_pyresample_area_def(ds, proj4_srs):
     x_ll, y_ll = ds.XORIG + ds.XCELL * 0.5, ds.YORIG + ds.YCELL * 0.5
@@ -118,16 +138,21 @@ def get_ioapi_pyresample_area_def(ds, proj4_srs):
     area_extent = (x_ll, y_ll, x_ur, y_ur)
     return MockArea(proj4_srs, area_extent, ds.NCOLS, ds.NROWS)
 
+
 def get_generic_projection_from_proj4(lat, lon, proj4_srs):
     # This used to compute optimal BB area. Without pyresample, we just return CRS.
     return CRS.from_user_input(proj4_srs)
 
+
 def get_optimal_cartopy_proj(lat, lon, proj4_srs):
     try:
         import cartopy.crs as ccrs
-        return ccrs.Projection(CRS.from_user_input(proj4_srs))
+
+        # Use ccrs.Proj to wrap a Proj string, which is a concrete class.
+        return ccrs.Proj(CRS.from_user_input(proj4_srs).to_proj4())
     except ImportError:
         return None
+
 
 def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
     pargs = dict()
@@ -153,6 +178,7 @@ def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
         raise NotImplementedError(f"IOAPI proj not implemented yet: {proj_id}")
     return p4
 
+
 def get_latlon_ioapi(dset, proj4_srs):
     x = np.linspace(
         dset.XORIG + dset.XCELL * 0.5,
@@ -168,6 +194,7 @@ def get_latlon_ioapi(dset, proj4_srs):
     p = Proj(proj4_srs)
     lon, lat = p(xv, yv, inverse=True)
     return lon, lat
+
 
 def grid_from_dataset(ds, earth_radius=6370000):
     if hasattr(ds, "IOAPI_VERSION") or hasattr(ds, "P_ALP"):

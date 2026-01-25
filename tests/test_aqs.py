@@ -9,7 +9,9 @@ def test_aqs_daily_long():
     dates = pd.date_range(start="2019-08-01", end="2019-08-31", freq="D")
     # Note: will retrieve full year
     network = "NCORE"  # CSN NCORE CASTNET
-    with pytest.warns(UserWarning, match="Short names not available for these variables"):
+    with pytest.warns(
+        UserWarning, match="Short names not available for these variables"
+    ):
         df = aqs.add_data(
             dates,
             param=["PM10SPEC"],

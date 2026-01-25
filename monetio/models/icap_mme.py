@@ -195,13 +195,19 @@ def _check_file_url(url, *, verbose=True, verify=True):
     if not remote_file_exists(url, verbose=verbose, verify=verify):
         raise ValueError(
             f"File does not exist on ICAP HTTPS server: {url}. "
-            f"Check {url[:url.index('icap_')]} to see the available "
+            f"Check {url[: url.index('icap_')]} to see the available "
             "`product` and `data_var`s for this month."
         )
 
 
 def open_dataset(
-    date, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=True
+    date,
+    product="MMC",
+    data_var="dustaod550",
+    *,
+    download=False,
+    verbose=True,
+    verify=True,
 ):
     """
     Parameters
@@ -237,10 +243,14 @@ def open_dataset(
         d = date
 
     if product.upper() not in valid_filetypes:
-        raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
+        raise ValueError(
+            f"Invalid input for 'product': Valid values are {valid_filetypes}."
+        )
 
     if data_var.lower() not in valid_data_vars:
-        raise ValueError(f"Invalid input for 'data_var': Valid values are {valid_data_vars}.")
+        raise ValueError(
+            f"Invalid input for 'data_var': Valid values are {valid_data_vars}."
+        )
 
     urls, fnames = build_urls(d, filetype=product, data_var=data_var, verbose=verbose)
     url = urls.values[0]
@@ -252,7 +262,13 @@ def open_dataset(
 
 
 def open_mfdataset(
-    dates, product="MMC", data_var="dustaod550", *, download=False, verbose=True, verify=True
+    dates,
+    product="MMC",
+    data_var="dustaod550",
+    *,
+    download=False,
+    verbose=True,
+    verify=True,
 ):
     """
     .. note::
@@ -291,10 +307,14 @@ def open_mfdataset(
     d = pd.DatetimeIndex(dates)
 
     if product.upper() not in valid_filetypes:
-        raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
+        raise ValueError(
+            f"Invalid input for 'product': Valid values are {valid_filetypes}."
+        )
 
     if data_var.lower() not in valid_data_vars:
-        raise ValueError(f"Invalid input for 'data_var': Valid values are {valid_data_vars}.")
+        raise ValueError(
+            f"Invalid input for 'data_var': Valid values are {valid_data_vars}."
+        )
 
     urls, fnames = build_urls(d, filetype=product, data_var=data_var, verbose=verbose)
 

@@ -92,7 +92,11 @@ def open_dataset(fp, *, rename_all=True, squeeze=True):
     )
 
     # Set instrument position as coords
-    instru_coords = ["LATITUDE.INSTRUMENT", "LONGITUDE.INSTRUMENT", "ALTITUDE.INSTRUMENT"]
+    instru_coords = [
+        "LATITUDE.INSTRUMENT",
+        "LONGITUDE.INSTRUMENT",
+        "ALTITUDE.INSTRUMENT",
+    ]
     for vn in instru_coords:
         da = ds[vn]
         if da.ndim == 0:
@@ -129,7 +133,9 @@ def open_dataset(fp, *, rename_all=True, squeeze=True):
     # 'TEMPERATURE_INDEPENDENT_SOURCE'
     # These are '|S1' char arrays that need to be joined to make strings along the last dim
     remaining_vns = [
-        vn for vn, da in ds.variables.items() if any(dim.startswith("fakeDim") for dim in da.dims)
+        vn
+        for vn, da in ds.variables.items()
+        if any(dim.startswith("fakeDim") for dim in da.dims)
     ]
     for vn in remaining_vns:
         da = ds[vn]
@@ -166,7 +172,8 @@ def open_dataset(fp, *, rename_all=True, squeeze=True):
             for dim in ds[vn].dims:
                 dim_to_vn[dim].append(vn)
         fake_dim_info = ", ".join(
-            f"{dim}({ds.sizes[dim]}) [{', '.join(dim_to_vn[dim])}]" for dim in sorted(fake_dims)
+            f"{dim}({ds.sizes[dim]}) [{', '.join(dim_to_vn[dim])}]"
+            for dim in sorted(fake_dims)
         )
         warnings.warn(f"There are still some fakeDim's around: {fake_dim_info}")
 
@@ -240,7 +247,9 @@ def _rename_h5_dim(s):
     s_re = r'<"(.*)" dimension (\d+) of HDF5 dataset at (\d+)>'
     m = re.fullmatch(s_re, s)
     if m is None:
-        raise ValueError(f"unexpected str of h5 dim: {s!r}. Expected to match {s_re!r}.")
+        raise ValueError(
+            f"unexpected str of h5 dim: {s!r}. Expected to match {s_re!r}."
+        )
 
     label, num, _ = m.groups()
 

@@ -1,10 +1,9 @@
 """CMAQ File Reader"""
 
 import datetime
-from typing import List, Optional, Union
+from typing import List, Union
 
 import xarray as xr
-from numpy import ones
 from pandas import DatetimeIndex, Series, to_datetime
 
 from monetio.grids import get_latlon_ioapi, grid_from_dataset
@@ -92,7 +91,9 @@ class CMAQReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CMAQ data."
+        history = (
+            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CMAQ data."
+        )
         if "history" in ds.attrs:
             ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
         else:
@@ -201,13 +202,16 @@ def _get_times(d: xr.Dataset, drop_duplicates: bool) -> xr.Dataset:
     xr.Dataset
         Dataset with time coordinate.
     """
-    idims = len(d.TFLAG.dims)
+    # TFLAG processing is inherently eager as it involves coordinate construction
+    # but we follow the protocol by avoiding explicit .values where possible.
+    tflag = d.TFLAG.compute()  # Explicit compute here as we are building coordinates
+    idims = len(tflag.dims)
     if idims == 2:
-        tflag1 = Series(d["TFLAG"][:, 0]).astype(str).str.zfill(7)
-        tflag2 = Series(d["TFLAG"][:, 1]).astype(str).str.zfill(6)
+        tflag1 = Series(tflag[:, 0]).astype(str).str.zfill(7)
+        tflag2 = Series(tflag[:, 1]).astype(str).str.zfill(6)
     else:
-        tflag1 = Series(d["TFLAG"][:, 0, 0]).astype(str).str.zfill(7)
-        tflag2 = Series(d["TFLAG"][:, 0, 1]).astype(str).str.zfill(6)
+        tflag1 = Series(tflag[:, 0, 0]).astype(str).str.zfill(7)
+        tflag2 = Series(tflag[:, 0, 1]).astype(str).str.zfill(6)
 
     date = to_datetime([i + j for i, j in zip(tflag1, tflag2)], format="%Y%j%H%M%S")
     if drop_duplicates:

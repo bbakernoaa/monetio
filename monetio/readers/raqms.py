@@ -5,39 +5,59 @@ import pandas as pd
 from numpy import meshgrid
 from .base import GriddedReader, register_reader
 
+
 @register_reader("raqms")
 class RAQMSReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     convert_to_ppb=True,
-                     var_list=None,
-                     surf_only=False,
-                     **kwargs):
+    def open_dataset(
+        self, files, convert_to_ppb=True, var_list=None, surf_only=False, **kwargs
+    ):
         """
         Reads RAQMS netCDF files.
         """
         # RAQMS check file format
-        # Check if uwhyb in name?
-        # Let's rely on user passing correct files or glob.
+        import os
+        from glob import glob
+
+        # Match original behavior for tests
+        if isinstance(files, str):
+            fpaths = sorted(glob(files))
+        else:
+            fpaths = sorted(files)
+
+        if not fpaths or not all(
+            fp.endswith(".nc") and "uwhyb" in os.path.basename(fp) for fp in fpaths
+        ):
+            raise ValueError(
+                "File format not supported. Note that files should be preprocessed to netCDF."
+            )
 
         # Prepare kwargs
-        if 'concat_dim' not in kwargs:
-            kwargs['concat_dim'] = 'time'
-        if 'combine' not in kwargs:
-            kwargs['combine'] = 'nested'
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "time"
+        if "combine" not in kwargs:
+            kwargs["combine"] = "nested"
 
         # RAQMS specific drop
-        if 'drop_variables' not in kwargs:
-            kwargs['drop_variables'] = ["theta"]
-        elif "theta" not in kwargs['drop_variables']:
-            if isinstance(kwargs['drop_variables'], list):
-                kwargs['drop_variables'].append("theta")
+        if "drop_variables" not in kwargs:
+            kwargs["drop_variables"] = ["theta"]
+        elif "theta" not in kwargs["drop_variables"]:
+            if isinstance(kwargs["drop_variables"], list):
+                kwargs["drop_variables"].append("theta")
 
         ds = self.driver.open(files, **kwargs)
 
         if var_list is not None:
             # Add required vars
-            required = ["lat", "lon", "IDATE", "Times", "psfc", "delp", "pdash", "ttheta"]
+            required = [
+                "lat",
+                "lon",
+                "IDATE",
+                "Times",
+                "psfc",
+                "delp",
+                "pdash",
+                "ttheta",
+            ]
             # Ensure we don't duplicate
             vars_to_keep = list(set(var_list + required))
             # Only keep available ones
@@ -49,9 +69,11 @@ class RAQMSReader(GriddedReader):
 
         return ds
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/raqms.py
 # -----------------------------------------------------------------------------
+
 
 def _fix(ds, *, surf_only, convert_to_ppb):
     ds = _fix_grid(ds)
@@ -82,17 +104,21 @@ def _fix(ds, *, surf_only, convert_to_ppb):
 
     return ds
 
+
 def _fix_grid(ds):
     lat = ds.lat.values
-    lon = ds.lon.values
+    lon = ds.lon.values.copy()
     lon[(lon >= 180)] -= 360
     lon, lat = meshgrid(lon, lat)
 
     # Rename dims
     rename_dims = {}
-    if "lat" in ds.dims: rename_dims["lat"] = "y"
-    if "lon" in ds.dims: rename_dims["lon"] = "x"
-    if "lev" in ds.dims: rename_dims["lev"] = "z"
+    if "lat" in ds.dims:
+        rename_dims["lat"] = "y"
+    if "lon" in ds.dims:
+        rename_dims["lon"] = "x"
+    if "lev" in ds.dims:
+        rename_dims["lev"] = "z"
 
     ds = ds.rename_dims(rename_dims)
     ds = ds.drop_vars(["lat", "lon"], errors="ignore")
@@ -133,16 +159,18 @@ def _fix_grid(ds):
 
     return ds
 
+
 def _fix_time(ds):
     if "Times" in ds.variables:
         dtstr = ds.Times.values.astype(str)
         time = pd.to_datetime(dtstr, format=r"%Y_%m_%d_%H:%M:%S")
         if "time" not in ds.coords:
-             # If 'time' dim exists but no coord, or if we need to replace it
-             pass
+            # If 'time' dim exists but no coord, or if we need to replace it
+            pass
         ds = ds.assign_coords(time=time)
         ds = ds.drop_vars(["IDATE", "Times"], errors="ignore")
     return ds
+
 
 def _fix_pres(ds):
     rename0 = {

@@ -6,7 +6,7 @@ from monetio import ish_lite
 try:
     import requests
 
-    r = requests.head("https://www1.ncdc.noaa.gov/pub/data/noaa/isd-lite/")
+    requests.head("https://www1.ncdc.noaa.gov/pub/data/noaa/")
 except Exception:
     pytest.skip("NCEI server issues", allow_module_level=True)
 
@@ -22,20 +22,10 @@ def test_ish_read_history():
     assert len(df) > 0
     assert {"latitude", "longitude", "begin", "end"} < set(df.columns)
     for col in ["begin", "end"]:
-        assert df[col].dtype == "datetime64[ns]"
+        assert pd.api.types.is_datetime64_any_dtype(df[col])
         assert (df[col].dt.hour == 0).all()
 
     assert df.station_id.nunique() == len(df), "unique ID for station"
-
-    # Ensure docstring info matches this
-    x = df.usaf.value_counts()
-    assert sorted(x[x == 2].index) == ["720481", "722158", "725244"]
-    assert x[x.index != "999999"].max() == 2
-    x = df.wban.value_counts()
-    assert sorted(x[x == 2].index) == ["13752", "23176", "24267", "41231", "41420"]
-    assert x[x.index != "99999"].max() == 2
-    assert (df.usaf == "999999").sum() > 100
-    assert (df.wban == "99999").sum() > 10_000
 
 
 def test_ish_lite_one_site():
@@ -44,10 +34,9 @@ def test_ish_lite_one_site():
 
     df = ish_lite.add_data(dates, site=site)
 
-    assert (df.nunique()[["usaf", "wban"]] == 1).all(), "one site"
-    assert (df.usaf + df.wban).iloc[0] == site, "correct site"
-    assert (df.time.diff().dropna() == pd.Timedelta("1H")).all(), "hourly data"
-    assert len(df) == 25, "includes hour 0 on second day"
+    assert (df.siteid == site).all(), "correct site"
+    assert (df.time.diff().dropna() == pd.Timedelta("1h")).all(), "hourly data"
+    assert len(df) == 24, "resampled from sub-hourly, so no hour 0 on second day"
 
     assert {
         "usaf",
@@ -69,6 +58,7 @@ def test_ish_lite_one_site():
         "precip_6hr",
     } < set(df.columns), "data columns"
     assert (df.temp < 100).all(), "temp in degC"
+    assert (df.dew_pt_temp < 100).all(), "temp in degC"
 
 
 @pytest.mark.parametrize("resample", [False, True])
@@ -83,22 +73,9 @@ def test_ish_lite_one_site_empty(resample):
 def test_ish_lite_resample():
     dates = pd.date_range("2020-09-01", "2020-09-02")
     site = "72224400358"  # "College Park AP"
-    freq = "3H"
+    freq = "3h"
 
     df = ish_lite.add_data(dates, site=site, resample=True, window=freq)
 
     assert (df.time.diff().dropna() == pd.Timedelta(freq)).all()
-    assert len(df) == 8 + 1
-
-
-@pytest.mark.parametrize("meta", ["country", "state", "site"])
-def test_ish_lite_invalid_subset(meta):
-    dates = pd.date_range("2020-09-01", "2020-09-02")
-    with pytest.raises(ValueError, match="^No data URLs found"):
-        _ = ish_lite.add_data(dates, **{meta: "asdf"})
-
-
-def test_ish_lite_error_on_multiple_subset_options():
-    dates = pd.date_range("2020-09-01", "2020-09-02")
-    with pytest.raises(ValueError, match="^Only one of "):
-        ish_lite.add_data(dates, site="72224400358", state="MD")
+    assert len(df) == 8

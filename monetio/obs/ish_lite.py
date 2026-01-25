@@ -21,7 +21,7 @@ def add_data(
     state=None,
     site=None,
     resample=False,
-    window="H",
+    window="h",
     n_procs=1,
     verbose=False,
 ):
@@ -110,19 +110,25 @@ class ISH:
         self.history.columns = [i.lower() for i in self.history.columns]
 
         if dates is not None:
-            index1 = (self.history.end >= dates.min()) & (self.history.begin <= dates.max())
+            index1 = (self.history.end >= dates.min()) & (
+                self.history.begin <= dates.max()
+            )
             self.history = self.history.loc[index1, :]
         self.history = self.history.dropna(subset=["lat", "lon"])
 
-        self.history.loc[:, "usaf"] = self.history.usaf.astype("str").str.zfill(6)
-        self.history.loc[:, "wban"] = self.history.wban.astype("str").str.zfill(5)
+        self.history["usaf"] = self.history.usaf.astype("str").str.zfill(6)
+        self.history["wban"] = self.history.wban.astype("str").str.zfill(5)
         self.history["station_id"] = self.history.usaf + self.history.wban
-        self.history.rename(columns={"lat": "latitude", "lon": "longitude"}, inplace=True)
+        self.history.rename(
+            columns={"lat": "latitude", "lon": "longitude"}, inplace=True
+        )
 
     def subset_sites(self, latmin=32.65, lonmin=-113.3, latmax=34.5, lonmax=-110.4):
         """find sites within designated region"""
         latindex = (self.history.latitude >= latmin) & (self.history.latitude <= latmax)
-        lonindex = (self.history.longitude >= lonmin) & (self.history.longitude <= lonmax)
+        lonindex = (self.history.longitude >= lonmin) & (
+            self.history.longitude <= lonmax
+        )
         dfloc = self.history.loc[latindex & lonindex, :]
         print("SUBSET")
         print(dfloc.latitude.unique())
@@ -164,7 +170,9 @@ class ISH:
                 if self.verbose:
                     print("Year:", date)
                 year_url = (
-                    pd.read_html(f"{url}/{date}/")[0]["Name"].iloc[2:-1].to_frame(name="name")
+                    pd.read_html(f"{url}/{date}/")[0]["Name"]
+                    .iloc[2:-1]
+                    .to_frame(name="name")
                 )
                 all_urls.append(
                     f"{url}/{date}/" + year_url
@@ -173,13 +181,22 @@ class ISH:
             all_urls = pd.concat(all_urls, ignore_index=True)
         else:
             year = unique_years.strftime("%Y")[0]
-            all_urls = pd.read_html(f"{url}/{year}/")[0]["Name"].iloc[2:-1].to_frame(name="name")
+            all_urls = (
+                pd.read_html(f"{url}/{year}/")[0]["Name"]
+                .iloc[2:-1]
+                .to_frame(name="name")
+            )
             all_urls = f"{url}/{year}/" + all_urls
 
         # Construct expected URLs based on sites and year(s) requested
         for syear in unique_years.strftime("%Y"):
             year_fnames = (
-                sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
+                sites.usaf.astype(str)
+                + "-"
+                + sites.wban.astype(str)
+                + "-"
+                + syear
+                + ".gz"
             )
             for fname in year_fnames:
                 furls.append(f"{url}/{syear}/{fname}")
@@ -211,12 +228,13 @@ class ISH:
         ]
         df = pd.read_csv(
             fname,
-            delim_whitespace=True,
+            sep=r"\s+",
             header=None,
             names=columns,
-            parse_dates={"time": [0, 1, 2, 3]},
-            infer_datetime_format=True,
         )
+        df["time"] = pd.to_datetime(df[["year", "month", "day", "hour"]])
+        df.drop(["year", "month", "day", "hour"], axis=1, inplace=True)
+
         # print(fname)
         filename = fname.split("/")[-1].split("-")
         # print(filename)
@@ -259,7 +277,7 @@ class ISH:
         state=None,
         site=None,
         resample=False,
-        window="H",
+        window="h",
         n_procs=1,
         verbose=False,
     ):
@@ -293,13 +311,27 @@ class ISH:
             self.read_ish_history()
         dfloc = self.history.copy()
 
-        if sum([box is not None, country is not None, state is not None, site is not None]) > 1:
-            raise ValueError("Only one of `box`, `country`, `state`, or `site` can be used")
+        if (
+            sum(
+                [
+                    box is not None,
+                    country is not None,
+                    state is not None,
+                    site is not None,
+                ]
+            )
+            > 1
+        ):
+            raise ValueError(
+                "Only one of `box`, `country`, `state`, or `site` can be used"
+            )
 
         if box is not None:
             if verbose:
                 print("Retrieving Sites in: " + " ".join(map(str, box)))
-            dfloc = self.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
+            dfloc = self.subset_sites(
+                latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3]
+            )
         elif country is not None:
             if verbose:
                 print("Retrieving Country: " + country)
@@ -314,24 +346,31 @@ class ISH:
             dfloc = dfloc.loc[dfloc.station_id == site, :]
         urls = self.build_urls(sites=dfloc)
         if urls.empty:
-            raise ValueError("No data URLs found for the given dates and site selection")
+            raise ValueError(
+                "No data URLs found for the given dates and site selection"
+            )
         if verbose:
             print(f"Aggregating {len(urls.name)} URLs...")
         df = self.aggregrate_files(urls, n_procs=n_procs)
 
         # Narrow in time (each file contains a year)
-        df = df.loc[(df.time >= self.dates.min()) & (df.time <= self.dates.max())]
+        df = df.loc[(df.time >= self.dates.min()) & (df.time < self.dates.max())]
         df = df.replace(-999.9, np.nan)
 
         if resample and not df.empty:
             print("Resampling to every " + window)
-            df = df.set_index("time").groupby("siteid").resample(window).mean().reset_index()
-            # TODO: mean(numeric_only=True)
+            df = (
+                df.set_index("time")
+                .groupby("siteid")
+                .resample(window)
+                .mean(numeric_only=True)
+                .reset_index()
+            )
 
         # Add site metadata
-        df = pd.merge(df, dfloc, how="left", left_on="siteid", right_on="station_id").rename(
-            columns={"ctry": "country"}
-        )
+        df = pd.merge(
+            df, dfloc, how="left", left_on="siteid", right_on="station_id"
+        ).rename(columns={"ctry": "country"})
         return df.drop(["station_id"], axis=1)
 
     def get_url_file_objs(self, fname):
