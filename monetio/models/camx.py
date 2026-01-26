@@ -2,7 +2,20 @@
 CAMx Reader. Redirection to monetio.readers.camx
 """
 
-from ..readers.camx import CAMxReader
+from ..readers.camx import (
+    CAMxReader,
+    add_lazy_nox,
+    add_lazy_noy,
+    add_lazy_pm10,
+    add_lazy_pm25,
+    add_lazy_pm_course,
+    add_multiple_lazy,
+    camx_preprocess,
+    coarse,
+    fine,
+    noy_gas,
+    poc,
+)
 
 
 def open_dataset(fname, **kwargs):

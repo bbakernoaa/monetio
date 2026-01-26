@@ -2,7 +2,15 @@
 UFS-AQM File Reader. Redirection to monetio.readers.ufs
 """
 
-from ..readers.ufs import UFSReader
+from ..readers.ufs import (
+    UFSReader,
+    add_lazy_nox,
+    add_lazy_noy_a,
+    add_lazy_noy_g,
+    add_lazy_pm10,
+    add_lazy_pm25,
+    dict_species_sums,
+)
 
 
 def open_mfdataset(fname, **kwargs):
