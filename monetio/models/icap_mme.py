@@ -82,7 +82,9 @@ def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
     base_url = "https://usgodae.org/ftp/outgoing/nrl/ICAP-MME/"
 
     for dt in dates:
-        fname = "icap_{}_{}_{}.nc".format(dt.strftime(r"%Y%m%d%H"), filetype.upper(), data_var.lower())
+        fname = "icap_{}_{}_{}.nc".format(
+            dt.strftime(r"%Y%m%d%H"), filetype.upper(), data_var.lower()
+        )
         url = base_url + dt.strftime(r"%Y/%Y%m/") + fname
         urls.append(url)
         fnames.append(fname)
@@ -241,10 +243,14 @@ def open_dataset(
         d = date
 
     if product.upper() not in valid_filetypes:
-        raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
+        raise ValueError(
+            f"Invalid input for 'product': Valid values are {valid_filetypes}."
+        )
 
     if data_var.lower() not in valid_data_vars:
-        raise ValueError(f"Invalid input for 'data_var': Valid values are {valid_data_vars}.")
+        raise ValueError(
+            f"Invalid input for 'data_var': Valid values are {valid_data_vars}."
+        )
 
     urls, fnames = build_urls(d, filetype=product, data_var=data_var, verbose=verbose)
     url = urls.values[0]
@@ -301,10 +307,14 @@ def open_mfdataset(
     d = pd.DatetimeIndex(dates)
 
     if product.upper() not in valid_filetypes:
-        raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
+        raise ValueError(
+            f"Invalid input for 'product': Valid values are {valid_filetypes}."
+        )
 
     if data_var.lower() not in valid_data_vars:
-        raise ValueError(f"Invalid input for 'data_var': Valid values are {valid_data_vars}.")
+        raise ValueError(
+            f"Invalid input for 'data_var': Valid values are {valid_data_vars}."
+        )
 
     urls, fnames = build_urls(d, filetype=product, data_var=data_var, verbose=verbose)
 

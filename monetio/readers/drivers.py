@@ -1,8 +1,7 @@
-from typing import List, Union
-
-import fsspec
-import pandas as pd
 import xarray as xr
+import pandas as pd
+import fsspec
+from typing import Union, List
 
 
 class FileUtility:
@@ -51,11 +50,17 @@ class FileUtility:
                 files = sorted(fs.glob(path_input))
                 # fs.glob usually returns paths without the protocol (e.g. 'bucket/file.nc')
                 # We might need to prepend 's3://' again if it was stripped
-                if path_input.startswith("s3://") and files and not files[0].startswith("s3://"):
+                if (
+                    path_input.startswith("s3://")
+                    and files
+                    and not files[0].startswith("s3://")
+                ):
                     files = [f"s3://{f}" for f in files]
 
                 if not files:
-                    raise FileNotFoundError(f"No files found matching pattern: {path_input}")
+                    raise FileNotFoundError(
+                        f"No files found matching pattern: {path_input}"
+                    )
                 return files
             else:
                 # It is a specific single file
@@ -73,7 +78,9 @@ class XarrayDriver:
     Supports S3 via fsspec.
     """
 
-    def open(self, files: Union[str, List[str]], use_dask: bool = True, **kwargs) -> xr.Dataset:
+    def open(
+        self, files: Union[str, List[str]], use_dask: bool = True, **kwargs
+    ) -> xr.Dataset:
         # Expand wildcards (supports S3 globbing now)
         file_list = FileUtility.expand_paths(files)
 
@@ -140,12 +147,14 @@ class XarrayDriver:
                     return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
                 else:
                     try:
-                        return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
+                        return xr.open_mfdataset(
+                            file_list, engine="h5netcdf", **xr_kwargs
+                        )
                     except Exception:
                         return xr.open_mfdataset(file_list, **xr_kwargs)
 
         except Exception as e:
-            raise OSError(f"XarrayDriver failed to open files. Error: {e}")
+            raise IOError(f"XarrayDriver failed to open files. Error: {e}")
 
 
 class PandasDriver:
@@ -153,7 +162,9 @@ class PandasDriver:
     The unified driver for opening tabular/point data.
     """
 
-    def open(self, files: Union[str, List[str]], read_method: str = "read_csv", **kwargs) -> pd.DataFrame:
+    def open(
+        self, files: Union[str, List[str]], read_method: str = "read_csv", **kwargs
+    ) -> pd.DataFrame:
         file_list = FileUtility.expand_paths(files)
 
         # Get the actual pandas function
@@ -164,8 +175,9 @@ class PandasDriver:
         data_frames = []
 
         # Re-use our filesystem logic
+        fs = None
         if file_list and file_list[0].startswith("s3://"):
-            FileUtility.get_fs(file_list[0])
+            fs = FileUtility.get_fs(file_list[0])
 
         try:
             for f in file_list:
@@ -186,4 +198,4 @@ class PandasDriver:
             return pd.concat(data_frames, ignore_index=True)
 
         except Exception as e:
-            raise OSError(f"PandasDriver failed to open files. Error: {e}")
+            raise IOError(f"PandasDriver failed to open files. Error: {e}")

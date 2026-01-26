@@ -7,9 +7,11 @@ https://docs.openaq.org/aws/about
 
 import logging
 import warnings
+from pathlib import Path
+from time import perf_counter
 
 import pandas as pd
-
+import numpy as np
 from .base import PointReader, register_reader
 
 logger = logging.getLogger(__name__)
@@ -109,7 +111,9 @@ def get_paths(dates, *, siteid=None, country=None, provider=None):
 
     if location_ids is not None:
         tpl = (
-            "openaq-data-archive/records/csv.gz/locationid={loc}/year={date:%Y}/month={date:%m}/location-{loc}-{date:%Y%m%d}.csv.gz"
+            "openaq-data-archive/records/csv.gz/"
+            "locationid={loc}/year={date:%Y}/month={date:%m}/"
+            "location-{loc}-{date:%Y%m%d}.csv.gz"
         )
         for date in unique_dates:
             for loc in location_ids:
@@ -174,7 +178,6 @@ def get_provider_countries(provider):
 def get_locations(*, provider=None, country=None):
     """Get location IDs corresponding to provider(s) and/or country(ies)."""
     import re
-
     import s3fs
 
     fs = s3fs.S3FileSystem(anon=True)
@@ -192,7 +195,10 @@ def get_locations(*, provider=None, country=None):
             countries = country
 
         for cntry in countries:
-            glb = f"openaq-data-archive/records/csv.gz/provider={prvdr.lower()}/country={cntry.lower()}/"
+            glb = (
+                "openaq-data-archive/records/csv.gz/"
+                f"provider={prvdr.lower()}/country={cntry.lower()}/"
+            )
             prvdr_cntry_paths = fs.find(glb, withdirs=True, maxdepth=1)
             paths.extend(prvdr_cntry_paths)
 
@@ -227,7 +233,9 @@ def _build_urls(dates, sites, *, protocol="s3"):
     for site in sites:
         for date in dates.floor("D").unique():
             urls.append(
-                f"{pref}/records/csv.gz/locationid={site}/year={date:%Y}/month={date:%m}/location-{site}-{date:%Y%m%d}.csv.gz"
+                f"{pref}/records/csv.gz/"
+                f"locationid={site}/year={date:%Y}/month={date:%m}/"
+                f"location-{site}-{date:%Y%m%d}.csv.gz"
             )
 
     return urls

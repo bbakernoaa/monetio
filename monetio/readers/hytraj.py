@@ -1,22 +1,24 @@
 """HYTRAJ Reader"""
 
 import re
-
 import numpy as np
 import pandas as pd
-
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
 
 @register_reader("hytraj")
 class HYTRAJReader(PointReader):
-    def open_dataset(self, files, taglist=None, renumber=False, verbose=False, **kwargs):
+    def open_dataset(
+        self, files, taglist=None, renumber=False, verbose=False, **kwargs
+    ):
         """
         Reads HYTRAJ tdump files.
         """
         file_list = FileUtility.expand_paths(files)
-        return combine_dataset(file_list, taglist=taglist, renumber=renumber, verbose=verbose)
+        return combine_dataset(
+            file_list, taglist=taglist, renumber=renumber, verbose=verbose
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -101,7 +103,9 @@ def get_startlocs(tdump):
     heads = ["year", "month", "day", "hour", "latitude", "longitude", "altitude"]
     stlocs = pd.DataFrame(np.array(start_locs), columns=heads)
     cols = ["year", "month", "day", "hour"]
-    stlocs["time"] = stlocs[cols].apply(lambda row: " ".join(row.values.astype(str)), axis=1)
+    stlocs["time"] = stlocs[cols].apply(
+        lambda row: " ".join(row.values.astype(str)), axis=1
+    )
     stlocs = stlocs.drop(cols, axis=1)
     stlocs = stlocs[["time", "latitude", "longitude", "altitude"]]
     stlocs["time"] = stlocs.apply(lambda row: time_str_fixer(row["time"]), axis=1)

@@ -1,11 +1,9 @@
 """NESDIS FRP Reader"""
 
 import os
-
+import xarray as xr
 import numpy as np
 import pandas as pd
-import xarray as xr
-
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 

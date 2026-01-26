@@ -221,7 +221,9 @@ class Pardump:
                     par_frame = pd.DataFrame.from_records(ndata)  # create data frame
                     # drop the fields which were padding
                     par_frame.drop(["p1", "p2", "p3", "p4"], inplace=True, axis=1)
-                    par_frame.drop(["su", "sv", "sx", "mgrid"], inplace=True, axis=1)  # drop other fields
+                    par_frame.drop(
+                        ["su", "sv", "sx", "mgrid"], inplace=True, axis=1
+                    )  # drop other fields
                     # drop where the lat field is 0. because
                     par_frame = par_frame.loc[par_frame["lat"] != 0]
                     # in pardump file particles which have not been
@@ -237,7 +239,9 @@ class Pardump:
                         parframe_all = par_frame.copy()
                     else:
                         parframe_all = pd.concat([parframe_all, par_frame], axis=0)
-                    par_frame = pd.concat([par_frame], keys=[self.fname])  # add a filename key
+                    par_frame = pd.concat(
+                        [par_frame], keys=[self.fname]
+                    )  # add a filename key
 
                 iii += 1
 
@@ -252,7 +256,13 @@ class Pardump:
                     #   if verbose:
                     #      print "Before date. Closing file"
                 if iii > imax:
-                    print("Read pardump. Limited to" + str(imax) + "  iterations. Stopping")
+                    print(
+                        "Read pardump. Limited to"
+                        + str(imax)
+                        + "  iterations. Stopping"
+                    )
                     testf = False
-        parframe_all = pd.concat([parframe_all], keys=[self.fname])  # add a filename key
+        parframe_all = pd.concat(
+            [parframe_all], keys=[self.fname]
+        )  # add a filename key
         return parframe_all

@@ -179,7 +179,11 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
             time.sleep(ratelimit_reset + 0.1 * rand())
 
         this_data = r.json()
-        found = this_data["meta"]["found"] if this_data and "meta" in this_data and "found" in this_data["meta"] else 0
+        found = (
+            this_data["meta"]["found"]
+            if this_data and "meta" in this_data and "found" in this_data["meta"]
+            else 0
+        )
         n = len(this_data["results"])
         logger.info(f"page={page} found={found!r} n={n}")
         if n == 0:
@@ -192,7 +196,9 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
     if isinstance(found, str) and found.startswith(">"):
         print(f"warning: some query results not fetched ('found' is {found!r})")
     elif isinstance(found, int) and len(data) < found:
-        print(f"warning: some query results not fetched (found={found}, got {len(data)} results)")
+        print(
+            f"warning: some query results not fetched (found={found}, got {len(data)} results)"
+        )
 
     return data
 
@@ -219,7 +225,9 @@ def get_locations(**kwargs):
         if p.is_file():
             now = pd.Timestamp.now(tz="UTC")
             mtime = pd.Timestamp.fromtimestamp(p.stat().st_mtime, tz="UTC")
-            logger.info(f"locations cache file exists, mtime {mtime:%Y-%m-%d %H:%M:%SZ}")
+            logger.info(
+                f"locations cache file exists, mtime {mtime:%Y-%m-%d %H:%M:%SZ}"
+            )
             if now - mtime < pd.Timedelta(days=7):
                 return True
             else:
@@ -333,7 +341,9 @@ def get_locations(**kwargs):
     df["siteid"] = df.siteid.astype(str)
     maybe_dupe_rows = df[df.siteid.duplicated(keep=False)].sort_values("siteid")
     if not maybe_dupe_rows.empty:
-        logger.info(f"note: found {len(maybe_dupe_rows)} rows with duplicate site IDs:\n{maybe_dupe_rows}")
+        logger.info(
+            f"note: found {len(maybe_dupe_rows)} rows with duplicate site IDs:\n{maybe_dupe_rows}"
+        )
     df = df.drop_duplicates("siteid", keep="first").reset_index(drop=True)
 
     return df
@@ -407,7 +417,12 @@ def get_latlonbox_sites(latlonbox, **kwargs):
     lat1, lon1, lat2, lon2 = latlonbox
     sites = get_locations(**kwargs)
 
-    in_box = (sites.latitude >= lat1) & (sites.latitude <= lat2) & (sites.longitude >= lon1) & (sites.longitude <= lon2)
+    in_box = (
+        (sites.latitude >= lat1)
+        & (sites.latitude <= lat2)
+        & (sites.longitude >= lon1)
+        & (sites.longitude <= lon2)
+    )
     # TODO: need to account for case of box crossing antimeridian
 
     return sites[in_box].reset_index(drop=True)
@@ -435,7 +450,10 @@ def _to_wide_fmt(df):
         unique = site_col.apply(len).eq(1)
         if not unique.all():
             site_col_non_unique = site_col[~unique]
-            warnings.warn(f"non-unique {col!r} among site IDs:\n{site_col_non_unique}\nUsing first.")
+            warnings.warn(
+                f"non-unique {col!r} among site IDs:\n{site_col_non_unique}"
+                "\nUsing first."
+            )
             df = df.drop(columns=[col]).merge(
                 site_col.str.get(0),
                 left_on="siteid",
@@ -616,7 +634,9 @@ def add_data(
     date_min, date_max = dates.min(), dates.max()
     if query_dt is not None:
         if query_dt <= pd.Timedelta(0):
-            raise ValueError(f"query_time_split must be positive, got {query_dt} from {query_time_split!r}")
+            raise ValueError(
+                f"query_time_split must be positive, got {query_dt} from {query_time_split!r}"
+            )
         if date_min == date_max:
             raise ValueError(
                 "must provide at least two unique datetimes to use query_time_split. "
@@ -660,7 +680,10 @@ def add_data(
             )
         )
         meta = meta.query("sensor_type == @sensor_type")
-    meta = meta[(meta.first_time <= date_max.tz_localize(None)) & (meta.last_time >= date_min.tz_localize(None))]
+    meta = meta[
+        (meta.first_time <= date_max.tz_localize(None))
+        & (meta.last_time >= date_min.tz_localize(None))
+    ]
 
     # Pick sensors that have the desired parameters
     sensors = meta.explode(["sensor_ids", "parameters"], ignore_index=True).rename(
@@ -672,7 +695,10 @@ def add_data(
         sensors = sensors.iloc[:sensor_limit]
     if sensor_ids is not None:
         sensors = sensors.query("sensor_id == @sensor_ids")
-    print(f"requesting data from {len(sensors)} sensor(s) at {sensors.siteid.nunique()} unique location(s)")
+    print(
+        f"requesting data from {len(sensors)} sensor(s) "
+        f"at {sensors.siteid.nunique()} unique location(s)"
+    )
 
     def iter_queries():
         for sensor_id in sensors["sensor_id"]:

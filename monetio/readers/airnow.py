@@ -4,15 +4,14 @@ import os
 from datetime import datetime
 from functools import lru_cache
 
+import pandas as pd
 import dask
 import dask.dataframe as dd
-import pandas as pd
 from numpy import nan
 
-from monetio.obs.epa_util import read_monitor_file
 from monetio.readers.base import PointReader, register_reader
+from monetio.obs.epa_util import read_monitor_file
 from monetio.util import long_to_wide
-
 from .drivers import FileUtility
 
 
@@ -65,7 +64,9 @@ class AirNowReader(PointReader):
         if daily:
             df["time"] = pd.to_datetime(df.date, format=r"%m/%d/%y", exact=True)
         else:
-            df["time"] = pd.to_datetime(df.date + " " + df.time, format=r"%m/%d/%y %H:%M", exact=True)
+            df["time"] = pd.to_datetime(
+                df.date + " " + df.time, format=r"%m/%d/%y %H:%M", exact=True
+            )
             df["time_local"] = df.time + pd.to_timedelta(df.utcoffset, unit="h")
 
         df.drop(["date"], axis=1, inplace=True)
@@ -102,7 +103,11 @@ class AirNowReader(PointReader):
         df = df.reset_index(drop=True)
 
         if wide_fmt:
-            df = long_to_wide(df).drop_duplicates(subset=["time", "latitude", "longitude", "siteid"]).reset_index(drop=True)
+            df = (
+                long_to_wide(df)
+                .drop_duplicates(subset=["time", "latitude", "longitude", "siteid"])
+                .reset_index(drop=True)
+            )
 
         return self.harmonize(df)
 
@@ -232,7 +237,10 @@ def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
         elif bad_utcoffset == "fix":
             # TimezoneFinder is slow, so only call it for unique locations
             unique_locs = bad_rows.drop_duplicates(subset=["latitude", "longitude"])
-            tz_map = {(lat, lon): get_utcoffset(lat, lon) for lat, lon in zip(unique_locs.latitude, unique_locs.longitude)}
+            tz_map = {
+                (lat, lon): get_utcoffset(lat, lon)
+                for lat, lon in zip(unique_locs.latitude, unique_locs.longitude)
+            }
             s_offset = bad_rows.apply(
                 lambda row: tz_map.get((row.latitude, row.longitude)),
                 axis="columns",
@@ -241,7 +249,9 @@ def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
         elif bad_utcoffset == "leave":
             pass
         else:
-            raise ValueError("`bad_utcoffset` must be one of: 'null', 'drop', 'fix', 'leave'")
+            raise ValueError(
+                "`bad_utcoffset` must be one of: 'null', 'drop', 'fix', 'leave'"
+            )
 
     return df
 
@@ -260,7 +270,7 @@ def get_utcoffset(lat, lon):
     try:
         import pytz
     except ImportError:
-        warnings.warn("pytz not installed, guessing UTC offset based on longitude", stacklevel=2)
+        warnings.warn("pytz not installed, guessing UTC offset based on longitude")
         do_guess = True
     else:
         do_guess = False

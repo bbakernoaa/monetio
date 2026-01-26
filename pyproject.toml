@@ -1,19 +1,12 @@
-[tool.ruff]
-line-length = 132
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "C4"]
-ignore = ["E402", "E501"]
-
-[tool.ruff.lint.per-file-ignores]
-"monetio/obs/*.py" = ["F401"]
-"monetio/models/*.py" = ["F401"]
-"monetio/sat/*.py" = ["F401"]
-"monetio/profile/*.py" = ["F401"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["monetio"]
-
+[tool.flake8]
+max-line-length = 100
+ignore = [
+    "E203",  # whitespace before ':' - doesn't work well with black
+    "E402",  # module level import not at top of file
+    "E501",  # line too long - let black worry about that
+    "W503",  # line break before binary operator
+    "E226",  # missing whitespace around arithmetic operator
+]
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -59,7 +52,24 @@ dev = [
     "pytest-print",
     "pytest-xdist",
     "filelock",
-    "ruff"
+    "black",
+    "isort",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-jupyter",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "mkdocs-section-index"
+]
+
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-jupyter",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "mkdocs-section-index"
 ]
 
 test = [
@@ -75,6 +85,13 @@ packages = ["monetio", "monetio.models", "monetio.obs", "monetio.profile", "mone
 package-data = {"monetio" = ["data/*.csv", "data/*.tsv", "data/*.txt", "data/*.png"]}
 
 
+[tool.black]
+line-length = 100
+
+[tool.isort]
+known_first_party = "monetio"
+profile = "black"
+line_length = 100
 
 [tool.pytest.ini_options]
 filterwarnings = [

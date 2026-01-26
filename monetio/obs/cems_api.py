@@ -509,7 +509,9 @@ class EmissionsCall(EpaApiObject):
             estr = "emissions/hourlyData/csv"
         else:
             estr = "emissions/hourlyData/csv"
-        getstr = quote("/".join([estr, str(self.oris), str(self.mid), self.year, self.quarter]))
+        getstr = quote(
+            "/".join([estr, str(self.oris), str(self.mid), self.year, self.quarter])
+        )
         return getstr
 
     def load(self):
@@ -703,7 +705,9 @@ class EmissionsCall(EpaApiObject):
                     return -10
 
         df["SO2MODC"] = df.apply(
-            lambda row: checkmodc(row["SO2CEMSO2FormulaCode"], row["SO2MODC"], row["so2_lbs"]),
+            lambda row: checkmodc(
+                row["SO2CEMSO2FormulaCode"], row["SO2MODC"], row["so2_lbs"]
+            ),
             axis=1,
         )
         return df
@@ -774,7 +778,9 @@ class EmissionsCall(EpaApiObject):
         if self.calltype == "LME":
             df["so2_lbs"] = df.apply(lambda row: lme_getmass(row[cname]), axis=1)
         else:
-            df["so2_lbs"] = df.apply(lambda row: getmass(row[optime], row[cname]), axis=1)
+            df["so2_lbs"] = df.apply(
+                lambda row: getmass(row[optime], row[cname]), axis=1
+            )
         temp = df[["time local", "so2_lbs", cname, optime]]
         temp = df[df["OperatingTime"] > 1.0]
         if not temp.empty:
@@ -1032,7 +1038,9 @@ class MonitoringPlan(EpaApiObject):
         if temp.empty:
             return None
 
-        temp["testdate"] = temp.apply(lambda row: test_end(row["endDateHour"], edate), axis=1)
+        temp["testdate"] = temp.apply(
+            lambda row: test_end(row["endDateHour"], edate), axis=1
+        )
         temp = temp[temp["testdate"]]
         method = temp["methodCode"].unique()
 
@@ -1195,8 +1203,12 @@ class MonitoringPlan(EpaApiObject):
                     print("SO2 data")
                     dhash["parameterCode"] = method["parameterCode"]
                     dhash["methodCode"] = method["methodCode"]
-                    dhash["beginDateHour"] = pd.to_datetime(method["beginDateHour"], format=self.dfmt)
-                    dhash["endDateHour"] = pd.to_datetime(method["endDateHour"], format=self.dfmt)
+                    dhash["beginDateHour"] = pd.to_datetime(
+                        method["beginDateHour"], format=self.dfmt
+                    )
+                    dhash["endDateHour"] = pd.to_datetime(
+                        method["endDateHour"], format=self.dfmt
+                    )
                     dhash["oris"] = self.oris
                     dhash["mid"] = self.mid
                     dhash["request_date"] = self.date
@@ -1243,7 +1255,9 @@ class MonitoringPlan(EpaApiObject):
                         stackht = nhash[sid]
             return stackht
 
-        df["stackht"] = df.apply(lambda row: find_stackht(row["name"], row["stackht"], shash, nhash), axis=1)
+        df["stackht"] = df.apply(
+            lambda row: find_stackht(row["name"], row["stackht"], shash, nhash), axis=1
+        )
         df["stackht_unit"] = "m"
         print("DF2 ------------------")
         print(df)
@@ -1365,8 +1379,12 @@ class FacilitiesData(EpaApiObject):
                 dt = datetime.datetime(year, 10, 1)
             return dt
 
-        df["begin time"] = df.apply(lambda row: process_unit_time(row["begin time"]), axis=1)
-        df["end time"] = df.apply(lambda row: process_unit_time(row["end time"]), axis=1)
+        df["begin time"] = df.apply(
+            lambda row: process_unit_time(row["begin time"]), axis=1
+        )
+        df["end time"] = df.apply(
+            lambda row: process_unit_time(row["end time"]), axis=1
+        )
         return df
 
     def __str__(self):
@@ -1448,7 +1466,9 @@ class FacilitiesData(EpaApiObject):
         temp = temp[temp["begin time"] <= sdate]
         if temp.empty:
             return None
-        temp["testdate"] = temp.apply(lambda row: test_end(row["end time"], sdate), axis=1)
+        temp["testdate"] = temp.apply(
+            lambda row: test_end(row["end time"], sdate), axis=1
+        )
         print("--------------------------------------------")
         print("Monitoring Plans available")
         klist = ["testdate", "begin time", "end time", "unit", "oris", "request_string"]
@@ -1561,7 +1581,9 @@ class FacilitiesData(EpaApiObject):
                 dlist.extend(blist)
 
         df = pd.DataFrame(dlist)
-        df = pd.merge(df, unitdf, how="left", left_on=["unit", "oris"], right_on=["unit", "oris"])
+        df = pd.merge(
+            df, unitdf, how="left", left_on=["unit", "oris"], right_on=["unit", "oris"]
+        )
         return df
 
 
@@ -1714,13 +1736,17 @@ class CEMS:
         statuslist = []
         for ndate in datelist:
             quarter = findquarter(ndate)
-            print(str(oris) + " " + str(mid) + " Loading data for quarter " + str(quarter))
+            print(
+                str(oris) + " " + str(mid) + " Loading data for quarter " + str(quarter)
+            )
             status = self.emit.add(oris, mid, ndate.year, quarter, method)
             if status == 200:
                 self.orislist.append((oris, mid))
                 write_status_message(status, oris, mid, quarter, "log.txt")
             else:
-                write_status_message(status, oris, "no mp " + str(mid), quarter, "log.txt")
+                write_status_message(
+                    status, oris, "no mp " + str(mid), quarter, "log.txt"
+                )
             statuslist.append(status)
         return statuslist
 
@@ -1819,7 +1845,9 @@ class CEMS:
                         fid.write("\n")
 
                     # update dflist from the monitoring plan.
-                    dflist, method = get_monitoring_plan(oris, mid, mrequest, udate, dflist)
+                    dflist, method = get_monitoring_plan(
+                        oris, mid, mrequest, udate, dflist
+                    )
                     if not method:
                         method = []
                     # add emissions for each quarter list.
