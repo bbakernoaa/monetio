@@ -45,8 +45,7 @@ def test_add_data_daily():
     df = airnow.add_data(dates, daily=True)
     _check_df(df)
     assert all(
-        col in df.columns
-        for col in ["OZONE-1HR", "OZONE-8HR", "OZONE-1HR_unit", "OZONE-8HR_unit"]
+        col in df.columns for col in ["OZONE-1HR", "OZONE-8HR", "OZONE-1HR_unit", "OZONE-8HR_unit"]
     )
     assert df.time.unique().size == 3
 

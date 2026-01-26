@@ -9,9 +9,7 @@ from monetio import geoms
 HERE = Path(__file__).parent
 
 TEST_FP = (HERE / "data/tolnet-hdf4-test-data.hdf").absolute().as_posix()
-TEST_FP_H4TONCCF = (
-    (HERE / "data/tolnet-hdf4-test-data_h4tonccf_nc4.nc").absolute().as_posix()
-)
+TEST_FP_H4TONCCF = (HERE / "data/tolnet-hdf4-test-data_h4tonccf_nc4.nc").absolute().as_posix()
 
 # https://data.pandonia-global-network.org/BoulderCO-NCAR/Pandora204s1/L2_geoms/groundbased_uvvis.doas.directsun.no2_ncar204_rd.rnvs3.1.8_boulder.ncar.co_20231206t145123z_20231206t230013z_001.h5
 TEST_FP_PANDORA_NO2_TOTCOL = (

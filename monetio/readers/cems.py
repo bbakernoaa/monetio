@@ -2,7 +2,9 @@
 
 import datetime
 import os
+
 import pandas as pd
+
 from .base import PointReader, register_reader
 
 
@@ -143,23 +145,11 @@ class CEMS:
                 rcolumn = self.rename(ccc, "orispl_code", rcolumn, verbose)
             elif "facility" in ccc.lower() and "id" in ccc.lower():
                 rcolumn = self.rename(ccc, "fac_id", rcolumn, verbose)
-            elif (
-                "so2" in ccc.lower()
-                and "lbs" in ccc.lower()
-                and "rate" not in ccc.lower()
-            ):
+            elif "so2" in ccc.lower() and "lbs" in ccc.lower() and "rate" not in ccc.lower():
                 rcolumn = self.rename(ccc, "so2_lbs", rcolumn, verbose)
-            elif (
-                "nox" in ccc.lower()
-                and "lbs" in ccc.lower()
-                and "rate" not in ccc.lower()
-            ):
+            elif "nox" in ccc.lower() and "lbs" in ccc.lower() and "rate" not in ccc.lower():
                 rcolumn = self.rename(ccc, "nox_lbs", rcolumn, verbose)
-            elif (
-                "co2" in ccc.lower()
-                and "short" in ccc.lower()
-                and "tons" in ccc.lower()
-            ):
+            elif "co2" in ccc.lower() and "short" in ccc.lower() and "tons" in ccc.lower():
                 rcolumn = self.rename(ccc, "co2_short_tons", rcolumn, verbose)
             elif "date" in ccc.lower():
                 rcolumn = self.rename(ccc, "date", rcolumn, verbose)
@@ -196,9 +186,7 @@ class CEMS:
 
         dfmt = get_date_fmt(dftemp["date"][0], verbose=verbose)
         dftime = dftemp.apply(
-            lambda x: datetime.datetime.strptime(
-                "{} {}".format(x["date"], x["hour"]), dfmt
-            ),
+            lambda x: datetime.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt),
             axis=1,
         )
         dftemp = pd.concat([dftime, dftemp], axis=1)

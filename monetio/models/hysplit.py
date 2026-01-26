@@ -7,7 +7,9 @@ from ..readers.hysplit import (
     add_species,
     check_drange,
     check_grid_continuity,
-    combine_dataset as combine_dataset_reader,
+)
+from ..readers.hysplit import combine_dataset as combine_dataset_reader
+from ..readers.hysplit import (
     fix_grid_continuity,
     get_latlongrid,
     getlatlon,

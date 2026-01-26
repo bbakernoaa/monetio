@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
+
 from .base import GriddedReader, register_reader
 
 try:
@@ -236,9 +237,7 @@ def _get_single_retrieval(
 
 
 def _make_xarray_dataarray(m):
-    da = xr.DataArray(
-        m.data.reshape(m.ncols, m.nrows, order="C")[::-1, :], dims=("x", "y")
-    )
+    da = xr.DataArray(m.data.reshape(m.ncols, m.nrows, order="C")[::-1, :], dims=("x", "y"))
     da.attrs["long_name"] = m.band
     da.attrs["product"] = m.product
     da.attrs["cellsize"] = m.cellsize

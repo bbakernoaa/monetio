@@ -5,6 +5,7 @@ from numpy import array, concatenate
 from pandas import Series, to_datetime
 
 from monetio.grids import get_latlon_ioapi, grid_from_dataset
+
 from .base import GriddedReader, register_reader
 
 

@@ -1,8 +1,10 @@
 """PARDUMP Reader"""
 
 import datetime
+
 import numpy as np
 import pandas as pd
+
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
@@ -138,11 +140,7 @@ class Pardump:
                         if verbose:
                             print("Past date. Closing file.", drange[1], pdate)
                 if iii > imax:
-                    print(
-                        "Read pardump. Limited to"
-                        + str(imax)
-                        + "  iterations. Stopping"
-                    )
+                    print("Read pardump. Limited to" + str(imax) + "  iterations. Stopping")
                     testf = False
 
         if not parframe_all.empty:

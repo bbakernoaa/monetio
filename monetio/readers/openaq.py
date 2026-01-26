@@ -1,10 +1,12 @@
 """OpenAQ Reader"""
 
 import json
-import pandas as pd
-import numpy as np
+
 import dask
 import dask.dataframe as dd
+import numpy as np
+import pandas as pd
+
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
@@ -34,22 +36,29 @@ def read_json(fp_or_url, verbose=False):
         df = pd.read_json(fp_or_url, lines=True)
     except Exception as e:
         # If it's an S3 URL and failed, try s3fs
-        if isinstance(fp_or_url, str) and (fp_or_url.startswith("s3://") or "s3.amazonaws.com" in fp_or_url):
-             try:
-                 import s3fs
-                 # Convert to s3:// if it's HTTP
-                 s3_path = fp_or_url
-                 if "openaq-fetches.s3.amazonaws.com" in s3_path:
-                     s3_path = s3_path.replace("https://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches")
-                     s3_path = s3_path.replace("http://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches")
+        if isinstance(fp_or_url, str) and (
+            fp_or_url.startswith("s3://") or "s3.amazonaws.com" in fp_or_url
+        ):
+            try:
+                import s3fs
 
-                 fs = s3fs.S3FileSystem(anon=True)
-                 with fs.open(s3_path, 'rb') as f:
-                     df = pd.read_json(f, lines=True)
-             except Exception:
-                 raise e
+                # Convert to s3:// if it's HTTP
+                s3_path = fp_or_url
+                if "openaq-fetches.s3.amazonaws.com" in s3_path:
+                    s3_path = s3_path.replace(
+                        "https://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches"
+                    )
+                    s3_path = s3_path.replace(
+                        "http://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches"
+                    )
+
+                fs = s3fs.S3FileSystem(anon=True)
+                with fs.open(s3_path, "rb") as f:
+                    df = pd.read_json(f, lines=True)
+            except Exception:
+                raise e
         else:
-             raise e
+            raise e
 
     if "attribution" in df.columns:
         df = df.drop(columns="attribution")
@@ -72,7 +81,11 @@ def read_json(fp_or_url, verbose=False):
     if "date.local" in new.columns:
         try:
             # Handle possible varied offset formats
-            utcoffset = pd.to_timedelta(new["date.local"].str.slice(-6, None).str.replace(r'(\d{2})(\d{2})$', r'\1:\2', regex=True))
+            utcoffset = pd.to_timedelta(
+                new["date.local"]
+                .str.slice(-6, None)
+                .str.replace(r"(\d{2})(\d{2})$", r"\1:\2", regex=True)
+            )
         except:
             utcoffset = pd.Timedelta(0)
     else:
@@ -110,8 +123,9 @@ def read_json(fp_or_url, verbose=False):
 
 
 def read_json2(fp_or_url, verbose=False):
-    import requests
     import datetime
+
+    import requests
 
     if isinstance(fp_or_url, str) and fp_or_url.startswith("s3"):
         fp_or_url = fp_or_url.replace(
@@ -122,10 +136,21 @@ def read_json2(fp_or_url, verbose=False):
     r.raise_for_status()
 
     names = [
-        "time", "utcoffset", "latitude", "longitude",
-        "parameter", "value", "unit", "averagingPeriod",
-        "location", "city", "country", "attribution",
-        "sourceName", "sourceType", "mobile",
+        "time",
+        "utcoffset",
+        "latitude",
+        "longitude",
+        "parameter",
+        "value",
+        "unit",
+        "averagingPeriod",
+        "location",
+        "city",
+        "country",
+        "attribution",
+        "sourceName",
+        "sourceType",
+        "mobile",
     ]
     rows = []
     for line in r.iter_lines():
@@ -137,7 +162,9 @@ def read_json2(fp_or_url, verbose=False):
 
             # Time
             try:
-                time = datetime.datetime.fromisoformat(data["date"]["utc"].replace("Z", "+00:00")).replace(tzinfo=None)
+                time = datetime.datetime.fromisoformat(
+                    data["date"]["utc"].replace("Z", "+00:00")
+                ).replace(tzinfo=None)
                 time_local_str = data["date"]["local"]
                 # -06:00
                 h = int(time_local_str[-6:-3])
@@ -164,12 +191,25 @@ def read_json2(fp_or_url, verbose=False):
             attrs = data.get("attribution")
             attr_name = attrs[0]["name"] if attrs else None
 
-            rows.append((
-                time, utcoffset, data["coordinates"]["latitude"], data["coordinates"]["longitude"],
-                data["parameter"], data["value"], data["unit"], averagingPeriod,
-                data["location"], data["city"], data["country"],
-                attr_name, data["sourceName"], data["sourceType"], data["mobile"],
-            ))
+            rows.append(
+                (
+                    time,
+                    utcoffset,
+                    data["coordinates"]["latitude"],
+                    data["coordinates"]["longitude"],
+                    data["parameter"],
+                    data["value"],
+                    data["unit"],
+                    averagingPeriod,
+                    data["location"],
+                    data["city"],
+                    data["country"],
+                    attr_name,
+                    data["sourceName"],
+                    data["sourceType"],
+                    data["mobile"],
+                )
+            )
 
     df = pd.DataFrame(rows, columns=names)
     df["time_local"] = df["time"] + df["utcoffset"]
@@ -179,12 +219,19 @@ def read_json2(fp_or_url, verbose=False):
 class OPENAQ:
     NON_MOLEC_PARAMS = ["pm1", "pm25", "pm4", "pm10", "bc"]
     PPM_TO_UGM3 = {
-        "o3": 1990, "co": 1160, "no2": 1900, "no": 1240, "so2": 2650, "ch4": 664, "co2": 1820,
+        "o3": 1990,
+        "co": 1160,
+        "no2": 1900,
+        "no": 1240,
+        "so2": 2650,
+        "ch4": 664,
+        "co2": 1820,
     }
     PPM_TO_UGM3["nox"] = PPM_TO_UGM3["no2"]
 
     def __init__(self, engine="pandas"):
         import s3fs
+
         self.fs = s3fs.S3FileSystem(anon=True)
         self.s3bucket = "openaq-fetches/realtime"
         self.engine = engine
@@ -221,6 +268,7 @@ class OPENAQ:
 
     def add_data(self, dates, *, num_workers=1, wide_fmt=True):
         import hashlib
+
         dates = pd.to_datetime(dates)
         if isinstance(dates, pd.Timestamp):
             dates = pd.DatetimeIndex([dates])
@@ -250,8 +298,18 @@ class OPENAQ:
                 df.loc[is_ug, "unit"] = "ppm"
 
             index = [
-                "time", "time_local", "latitude", "longitude", "utcoffset",
-                "location", "city", "country", "sourceName", "sourceType", "mobile", "siteid"
+                "time",
+                "time_local",
+                "latitude",
+                "longitude",
+                "utcoffset",
+                "location",
+                "city",
+                "country",
+                "sourceName",
+                "sourceType",
+                "mobile",
+                "siteid",
             ]
             if self.engine != "pandas":
                 index.append("attribution")

@@ -23,9 +23,7 @@ import requests
 # ----------------------------------USER-DEFINED VARIABLES--------------------------------------- #
 # Set up command line arguments
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument(
-    "-dir", "--directory", required=True, help="Specify directory to save files to"
-)
+parser.add_argument("-dir", "--directory", required=True, help="Specify directory to save files to")
 parser.add_argument(
     "-f",
     "--files",

@@ -123,9 +123,7 @@ def test_get_data_near_ncwcp_sensor_type():
     latlon = LATLON_NCWCP
     dates = pd.date_range("2023-08-01", "2023-08-01 03:00", freq="1h")
     with check_error_code():
-        df = openaq.add_data(
-            dates, sensor_type="low-cost sensor", search_radius={latlon: 25_000}
-        )
+        df = openaq.add_data(dates, sensor_type="low-cost sensor", search_radius={latlon: 25_000})
     assert len(df) > 0
     assert df.sensor_type.eq("low-cost sensor").all()
 
@@ -166,6 +164,4 @@ def test_get_data_near_ncwcp_entity(entity):
 )
 def test_get_data_bad_radius(radius):
     with pytest.raises(ValueError, match="invalid radius"):
-        openaq.add_data(
-            ["2023-08-01", "2023-08-02"], search_radius={LATLON_NCWCP: radius}
-        )
+        openaq.add_data(["2023-08-01", "2023-08-02"], search_radius={LATLON_NCWCP: radius})

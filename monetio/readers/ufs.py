@@ -4,6 +4,7 @@ import numpy as np
 import xarray as xr
 from numpy import concatenate
 from pandas import Series
+
 from .base import GriddedReader, register_reader
 
 
@@ -55,11 +56,7 @@ class UFSReader(GriddedReader):
             ]:
                 if var_sum in var_list:
                     if var_sum == "PM25" or var_sum == "PM10":
-                        comps = (
-                            dict_sum["aitken"]
-                            + dict_sum["accumulation"]
-                            + dict_sum["coarse"]
-                        )
+                        comps = dict_sum["aitken"] + dict_sum["accumulation"] + dict_sum["coarse"]
                         var_list.extend(comps)
                         list_remove_extra.extend(comps)
                     else:
@@ -165,9 +162,7 @@ class UFSReader(GriddedReader):
         }
         # Only rename what exists
         rename_dict = {
-            k: v
-            for k, v in rename_dict.items()
-            if k in dset.variables or k in dset.dims
+            k: v for k, v in rename_dict.items() if k in dset.variables or k in dset.dims
         }
         dset = dset.rename(rename_dict)
 
@@ -215,12 +210,7 @@ class UFSReader(GriddedReader):
         for i in dset.variables:
             if "units" in dset[i].attrs and "ug/kg" in dset[i].attrs["units"]:
                 if "pres_pa_mid" in dset and "temperature_k" in dset:
-                    dset[i] = (
-                        dset[i]
-                        * dset["pres_pa_mid"]
-                        / dset["temperature_k"]
-                        / 287.05535
-                    )
+                    dset[i] = dset[i] * dset["pres_pa_mid"] / dset["temperature_k"] / 287.05535
                     dset[i].attrs["units"] = r"$\mu g m^{-3}$"
 
         # Lazy diagnostics
@@ -359,9 +349,7 @@ def dict_species_sums(mech):
         )
         sum_dict.update({"noy_aer": ["ano3i", "ano3j", "ano3k"]})
         sum_dict.update({"nox": ["no", "no2"]})
-        sum_dict.update(
-            {"pm25_cl": ["acli", "aclj", "aclk"], "pm25_cl_weight": [1, 1, 0.2]}
-        )
+        sum_dict.update({"pm25_cl": ["acli", "aclj", "aclk"], "pm25_cl_weight": [1, 1, 0.2]})
         sum_dict.update({"pm25_ec": ["aeci", "aecj"], "pm25_ec_weight": [1, 1]})
         sum_dict.update(
             {
@@ -375,15 +363,9 @@ def dict_species_sums(mech):
                 "pm25_ca_weight": [1, 0.2 * 0.0320, 0.2 * 0.0838, 0.2 * 0.0562],
             }
         )
-        sum_dict.update(
-            {"pm25_nh4": ["anh4i", "anh4j", "anh4k"], "pm25_nh4_weight": [1, 1, 0.2]}
-        )
-        sum_dict.update(
-            {"pm25_no3": ["ano3i", "ano3j", "ano3k"], "pm25_no3_weight": [1, 1, 0.2]}
-        )
-        sum_dict.update(
-            {"pm25_so4": ["aso4i", "aso4j", "aso4k"], "pm25_so4_weight": [1, 1, 0.2]}
-        )
+        sum_dict.update({"pm25_nh4": ["anh4i", "anh4j", "anh4k"], "pm25_nh4_weight": [1, 1, 0.2]})
+        sum_dict.update({"pm25_no3": ["ano3i", "ano3j", "ano3k"], "pm25_no3_weight": [1, 1, 0.2]})
+        sum_dict.update({"pm25_so4": ["aso4i", "aso4j", "aso4k"], "pm25_so4_weight": [1, 1, 0.2]})
         sum_dict.update(
             {
                 "pm25_om": [
@@ -505,9 +487,7 @@ def add_lazy_pm25(d, dict_sum):
         newkeys = allvars.loc[index]
         newweights = weights.loc[index]
         d["PM25"] = add_multiple_lazy2(d, newkeys, weights=newweights)
-        d["PM25"] = d["PM25"].assign_attrs(
-            {"name": "PM2.5", "units": r"$\mu g m^{-3}$"}
-        )
+        d["PM25"] = d["PM25"].assign_attrs({"name": "PM2.5", "units": r"$\mu g m^{-3}$"})
     return d
 
 
