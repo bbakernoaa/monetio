@@ -1,13 +1,10 @@
-
-NOAA NESDIS AOD
-===============
+# NOAA NESDIS AOD
 
 NOAA NESDIS has an operational data product for the aerosol optical
 depth from the VIIRS satellite. There are two products, the viirs edr
-and viirs eps available from ftp://ftp.star.nesdis.noaa.gov/pub/smcd/.
+and viirs eps available from <ftp://ftp.star.nesdis.noaa.gov/pub/smcd/>.
 
-VIIRS EDR
----------
+## VIIRS EDR
 
 The VIIRS EDR data is an aerosol optical depth product available at 0.1
 and 0.25 degree resolution. This VIIRS EDR product also does not include
@@ -15,15 +12,13 @@ the Blue Sky algorithm to retrieve over bright surfaces such as the
 Sahara. Lets open the data on a single day at first, in this case
 '2018-07-05'.
 
-.. code-block:: python
+```python
+import monetio as mio
+edr = mio.nesdis_edr_viirs.open_dataset('2018-07-05')
+print(edr)
+```
 
-    import monetio as mio
-    edr = mio.nesdis_edr_viirs.open_dataset('2018-07-05')
-    print(edr)
-
-
-.. parsed-literal::
-
+``````text
     <xarray.DataArray 'VIIRS EDR AOD' (time: 1, y: 1800, x: 3600)>
     array([[[nan, nan, ..., nan, nan],
             [nan, nan, ..., nan, nan],
@@ -40,43 +35,40 @@ Sahara. Lets open the data on a single day at first, in this case
         units:
         long_name:  Aerosol Optical Depth
         source:     ftp://ftp.star.nesdis.noaa.gov/pub/smcd/jhuang/npp.viirs.aero...
+```
 
+```
 
-``edr`` is now a ``xarray.DataArray`` for that day. The
-``nesdis_edr_viirs`` module downloads data to the current directory. To
+`edr` is now a `xarray.DataArray` for that day. The
+`nesdis_edr_viirs` module downloads data to the current directory. To
 download this into a different directory you can supply the
-``datapath=`` keyword if needed. To quickly view this you can use the
-``monet`` accessor.
+`datapath=` keyword if needed. To quickly view this you can use the
+`monet` accessor.
 
-.. code-block:: python
+```python
+edr.monet.quick_map(robust=True)
+```
 
-    edr.monet.quick_map(robust=True)
-
-
-
-
-.. parsed-literal::
-
+``````text
     <cartopy.mpl.geoaxes.GeoAxesSubplot at 0x1022a77470>
+```
 
 
 
+```
 
-.. image:: nesdis_viirs_aod_1.png
+![](nesdis_viirs_aod_1.png)
 
-
-The EDR data is available in two resolutions. By default ``monet`` will
+The EDR data is available in two resolutions. By default `monet` will
 download the 0.1 degree dataset. If you would like the 0.25 degree
-dataset you can pass the kwarg ``resolution='low'``.
+dataset you can pass the kwarg `resolution='low'`.
 
-.. code-block:: python
+```python
+edr = mio.nesdis_edr_viirs.open_dataset('2018-07-05', resolution='low')
+print(edr)
+```
 
-    edr = mio.nesdis_edr_viirs.open_dataset('2018-07-05', resolution='low')
-    print(edr)
-
-
-.. parsed-literal::
-
+``````text
     <xarray.DataArray 'VIIRS EDR AOD' (time: 1, y: 720, x: 1440)>
     array([[[nan, nan, ..., nan, nan],
             [nan, nan, ..., nan, nan],
@@ -93,35 +85,35 @@ dataset you can pass the kwarg ``resolution='low'``.
         units:
         long_name:  Aerosol Optical Depth
         source:     ftp://ftp.star.nesdis.noaa.gov/pub/smcd/jhuang/npp.viirs.aero...
+```
 
+```
 
 Notice that the dimensions changed from 1800x3600 to 720x1440.
 
-Open Multiple Days
-~~~~~~~~~~~~~~~~~~
+### Open Multiple Days
 
 If you want to open multiple days in a single call you could use the
-open\_mfdataset. Lets grab the first nine days of July 2018.
+open_mfdataset. Lets grab the first nine days of July 2018.
 
-.. code-block:: python
+```python
+import pandas as pd
+dates = pd.date_range(start='2018-07-01',end='2018-07-09')
+edr = mio.nesdis_edr_viirs.open_mfdataset(dates)
+```
 
-    import pandas as pd
-    dates = pd.date_range(start='2018-07-01',end='2018-07-09')
-    edr = mio.nesdis_edr_viirs.open_mfdataset(dates)
+```python
+print(edr)
+```
 
-.. code-block:: python
-
-    print(edr)
-
-
-.. parsed-literal::
-
+``````text
     <xarray.DataArray 'VIIRS EDR AOD' (time: 9, y: 1800, x: 3600)>
     array([[[nan, nan, ..., nan, nan],
             [nan, nan, ..., nan, nan],
             ...,
             [nan, nan, ..., nan, nan],
             [nan, nan, ..., nan, nan]],
+```
 
            [[nan, nan, ..., nan, nan],
             [nan, nan, ..., nan, nan],
@@ -153,41 +145,36 @@ open\_mfdataset. Lets grab the first nine days of July 2018.
         long_name:  Aerosol Optical Depth
         source:     ftp://ftp.star.nesdis.noaa.gov/pub/smcd/jhuang/npp.viirs.aero...
 
+```
 
 We can visualize these in a seaborn FacetGrid through xarray. For more
-information on FacetGrid in ``xarray`` plotting please look here:
-https://xarray.pydata.org/en/stable/user-guide/plotting.html#faceting
+information on FacetGrid in `xarray` plotting please look here:
+<https://xarray.pydata.org/en/stable/user-guide/plotting.html#faceting>
 
-.. code-block:: python
+```python
+import cartopy.crs as ccrs # map projections and coastlines
+cbar_kwargs=dict(orientation='horizontal',pad=0.1, aspect=30)
+d = mio.edr.plot.pcolormesh(x='longitude',y='latitude',col='time',col_wrap=3,
+                        figsize=(12,12),robust=True,cbar_kwargs=cbar_kwargs,
+                       subplot_kws={'projection':ccrs.PlateCarree()})
+for ax in d.axes.flat:
+    ax.coastlines()
+```
 
-    import cartopy.crs as ccrs # map projections and coastlines
-    cbar_kwargs=dict(orientation='horizontal',pad=0.1, aspect=30)
-    d = mio.edr.plot.pcolormesh(x='longitude',y='latitude',col='time',col_wrap=3,
-                            figsize=(12,12),robust=True,cbar_kwargs=cbar_kwargs,
-                           subplot_kws={'projection':ccrs.PlateCarree()})
-    for ax in d.axes.flat:
-        ax.coastlines()
+![](nesdis_viirs_aod_0.png)
 
-
-
-.. image:: nesdis_viirs_aod_0.png
-
-
-VIIRS EPS
----------
+## VIIRS EPS
 
 The VIIRS EPS data includes the Blue Sky algorithm in the AOD
 calculation. The same methods are available as with the
-``nesdis_edr_viirs`` methods.
+`nesdis_edr_viirs` methods.
 
-.. code-block:: python
+```python
+eps = mio.nesdis_eps_viirs.open_dataset('2018-07-05')
+print(eps)
+```
 
-    eps = mio.nesdis_eps_viirs.open_dataset('2018-07-05')
-    print(eps)
-
-
-.. parsed-literal::
-
+``````text
     <xarray.DataArray 'VIIRS EPS AOT' (time: 1, y: 720, x: 1440)>
     array([[[nan, nan, ..., nan, nan],
             [nan, nan, ..., nan, nan],
@@ -203,24 +190,23 @@ calculation. The same methods are available as with the
         units:
         long_name:  Aerosol Optical Thickness
         source:     ftp://ftp.star.nesdis.noaa.gov/pub/smcd/VIIRS_Aerosol/npp.vii...
+```
 
+```
 
-.. code-block:: python
+```python
+eps.monet.quick_map(robust=True)
+```
 
-    eps.monet.quick_map(robust=True)
-
-
-
-
-.. parsed-literal::
-
+``````text
     <cartopy.mpl.geoaxes.GeoAxesSubplot at 0x1c3406d080>
+```
 
 
 
+```
 
-.. image:: nesdis_viirs_aod_2.png
-
+![](nesdis_viirs_aod_2.png)
 
 Notice that there are AOD values over deserts such as the Sahara,
 Australia, northern China, Mongolia and the Middle East
