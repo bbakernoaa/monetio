@@ -20,7 +20,7 @@ repo_url: https://github.com/noaa-oar-arl/monetio
 nav:
   - Home: index.md
   - Getting Started:
-    - Why MONETIO?: why-monet.md
+    - Why MONETIO?: why-monetio.md
     - Installing: installing.md
     - Observations: observations.md
     - Models: models.md

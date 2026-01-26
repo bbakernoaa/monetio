@@ -69,13 +69,15 @@ jobs:
       - name: Set up Python (micromamba)
         uses: mamba-org/setup-micromamba@v2
         with:
-          environment-file: docs/environment-docs.yml
-          environment-name: monetio-docs
+          environment-file: environment-dev.yml
+          environment-name: monetio-dev
           cache-environment: true
+          create-args: >-
+            python=3.12
 
-      - name: linkcheck
-        continue-on-error: true
-        run: sphinx-build -b linkcheck docs docs/_build/linkcheck
+      - name: Install docs dependencies
+        run: |
+          pip install .[docs]
 
-      - name: sphinx-build -W
-        run: sphinx-build -b html -W docs docs/_build/html
+      - name: mkdocs build
+        run: mkdocs build
