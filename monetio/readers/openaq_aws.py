@@ -10,8 +10,9 @@ import warnings
 from pathlib import Path
 from time import perf_counter
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from .base import PointReader, register_reader
 
 logger = logging.getLogger(__name__)
@@ -178,6 +179,7 @@ def get_provider_countries(provider):
 def get_locations(*, provider=None, country=None):
     """Get location IDs corresponding to provider(s) and/or country(ies)."""
     import re
+
     import s3fs
 
     fs = s3fs.S3FileSystem(anon=True)
@@ -307,7 +309,9 @@ class OpenAQAWSReader(PointReader):
         df = dd.from_map(func, urls, meta=meta).compute(num_workers=n_procs)
 
         ds = df.reset_index(drop=True)
-        ds.attrs["history"] = f"Read OpenAQ AWS Archive data for dates {dates.min()} to {dates.max()}"
+        ds.attrs["history"] = (
+            f"Read OpenAQ AWS Archive data for dates {dates.min()} to {dates.max()}"
+        )
         return ds
 
 

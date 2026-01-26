@@ -62,8 +62,6 @@ def _ensure_mfdataset_filenames(fname):
         fpaths = sorted(fname)
 
     # Check file name is of the expected format
-    good = len(fpaths) > 0 and all(
-        fp.endswith(".nc") and "uwhyb" in basename(fp) for fp in fpaths
-    )
+    good = len(fpaths) > 0 and all(fp.endswith(".nc") and "uwhyb" in basename(fp) for fp in fpaths)
 
     return fpaths, good

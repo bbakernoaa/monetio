@@ -1,16 +1,15 @@
 """RAQMS Reader"""
 
-import xarray as xr
 import pandas as pd
+import xarray as xr
 from numpy import meshgrid
+
 from .base import GriddedReader, register_reader
 
 
 @register_reader("raqms")
 class RAQMSReader(GriddedReader):
-    def open_dataset(
-        self, files, convert_to_ppb=True, var_list=None, surf_only=False, **kwargs
-    ):
+    def open_dataset(self, files, convert_to_ppb=True, var_list=None, surf_only=False, **kwargs):
         """
         Reads RAQMS netCDF files.
         """

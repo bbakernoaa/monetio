@@ -243,14 +243,10 @@ def open_dataset(
         d = date
 
     if product.upper() not in valid_filetypes:
-        raise ValueError(
-            f"Invalid input for 'product': Valid values are {valid_filetypes}."
-        )
+        raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
 
     if data_var.lower() not in valid_data_vars:
-        raise ValueError(
-            f"Invalid input for 'data_var': Valid values are {valid_data_vars}."
-        )
+        raise ValueError(f"Invalid input for 'data_var': Valid values are {valid_data_vars}.")
 
     urls, fnames = build_urls(d, filetype=product, data_var=data_var, verbose=verbose)
     url = urls.values[0]
@@ -307,14 +303,10 @@ def open_mfdataset(
     d = pd.DatetimeIndex(dates)
 
     if product.upper() not in valid_filetypes:
-        raise ValueError(
-            f"Invalid input for 'product': Valid values are {valid_filetypes}."
-        )
+        raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
 
     if data_var.lower() not in valid_data_vars:
-        raise ValueError(
-            f"Invalid input for 'data_var': Valid values are {valid_data_vars}."
-        )
+        raise ValueError(f"Invalid input for 'data_var': Valid values are {valid_data_vars}.")
 
     urls, fnames = build_urls(d, filetype=product, data_var=data_var, verbose=verbose)
 

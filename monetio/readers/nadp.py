@@ -2,6 +2,7 @@
 
 import pandas as pd
 from numpy import nan
+
 from .base import PointReader, register_reader
 
 
@@ -40,21 +41,11 @@ class NADP:
         else:
             if self.weekly:
                 url = (
-                    baseurl
-                    + network.lower()
-                    + "/weekly/"
-                    + siteid
-                    + network.upper()
-                    + "-All-w.csv"
+                    baseurl + network.lower() + "/weekly/" + siteid + network.upper() + "-All-w.csv"
                 )
             else:
                 url = (
-                    baseurl
-                    + network.lower()
-                    + "/annual/"
-                    + siteid
-                    + network.upper()
-                    + "-All-a.csv"
+                    baseurl + network.lower() + "/annual/" + siteid + network.upper() + "-All-a.csv"
                 )
         return url
 
@@ -184,7 +175,5 @@ class NADP:
 
         self.df = df
         if "time" in self.df.columns and "time_off" in self.df.columns:
-            self.df = self.df.loc[
-                (self.df.time >= dates.min()) & (self.df.time_off <= dates.max())
-            ]
+            self.df = self.df.loc[(self.df.time >= dates.min()) & (self.df.time_off <= dates.max())]
         return self.df

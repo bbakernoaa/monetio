@@ -2,6 +2,7 @@
 
 import pandas as pd
 import xarray as xr
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -141,18 +142,12 @@ def open_mfdataset_icap(
 ):
 
     if product.upper() not in valid_filetypes:
-        raise ValueError(
-            f"Invalid input for 'product': Valid values are {valid_filetypes}."
-        )
+        raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
 
     if data_var.lower() not in valid_data_vars:
-        raise ValueError(
-            f"Invalid input for 'data_var': Valid values are {valid_data_vars}."
-        )
+        raise ValueError(f"Invalid input for 'data_var': Valid values are {valid_data_vars}.")
 
-    urls, fnames = build_urls(
-        dates, filetype=product, data_var=data_var, verbose=verbose
-    )
+    urls, fnames = build_urls(dates, filetype=product, data_var=data_var, verbose=verbose)
 
     if download is True:
         paths = []

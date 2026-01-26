@@ -1,9 +1,11 @@
 """GEOMS Reader"""
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import xarray as xr
-from pathlib import Path
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -123,9 +125,7 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
                 ds[vn] = da.squeeze(dim=da.dims[-1])
 
     remaining_vns = [
-        vn
-        for vn, da in ds.variables.items()
-        if any(dim.startswith("fakeDim") for dim in da.dims)
+        vn for vn, da in ds.variables.items() if any(dim.startswith("fakeDim") for dim in da.dims)
     ]
     for vn in remaining_vns:
         da = ds[vn]

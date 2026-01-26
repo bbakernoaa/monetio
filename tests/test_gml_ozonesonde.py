@@ -59,9 +59,7 @@ def test_read_100m_bad_header_line():
     # Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp  O3 # DN O3 Res   Ftemp   Water
     #  Num     hPa      km     K      C       C       %    mPa    ppmv   atmcm    C   10^11/cc   DU       C      ppmv
 
-    with pytest.raises(
-        ValueError, match="Data block does not start with expected header"
-    ):
+    with pytest.raises(ValueError, match="Data block does not start with expected header"):
         _ = gml_ozonesonde.read_100m(url)
 
 
@@ -74,9 +72,7 @@ def test_add_data():
     assert df.attrs["var_attrs"]["o3"]["units"] == "ppmv"
 
     latlon = df["latitude"].astype(str) + "," + df["longitude"].astype(str)
-    assert 1 < latlon.nunique() <= 10, (
-        "multiple sites; lat/lon doesn't change in profile"
-    )
+    assert 1 < latlon.nunique() <= 10, "multiple sites; lat/lon doesn't change in profile"
 
     # NOTE: Similar to the place folder names, but not all the same
     assert df["siteid"].nunique() == latlon.nunique()

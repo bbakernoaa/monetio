@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+
 from monetio.sat import goes
 
 
@@ -35,9 +36,7 @@ def test_add_goes_bands_custom_names():
     dset = xr.Dataset({"b1": blue_band, "b2": red_band, "b3": veggie_band})
 
     # Call the function with custom band names
-    dset_tci = goes.add_goes_bands(
-        dset, blue_band="b1", red_band="b2", veggie_band="b3"
-    )
+    dset_tci = goes.add_goes_bands(dset, blue_band="b1", red_band="b2", veggie_band="b3")
 
     # Check that the tci variable was added
     assert "tci" in dset_tci.variables

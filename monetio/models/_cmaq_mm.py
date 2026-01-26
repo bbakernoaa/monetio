@@ -448,9 +448,7 @@ def add_lazy_caf(d):
     """
     keys = _get_keys(d)
     allvars = Series(["ACAI", "ACAJ", "ASEACAT", "ASOIL", "ACORS"])
-    weights = Series(
-        [1, 1, 0.2 * 32.0 / 1000.0, 0.2 * 83.8 / 1000.0, 0.2 * 56.2 / 1000.0]
-    )
+    weights = Series([1, 1, 0.2 * 32.0 / 1000.0, 0.2 * 83.8 / 1000.0, 0.2 * 56.2 / 1000.0])
     index = allvars.isin(keys)
     if can_do(index):
         newkeys = allvars.loc[index]
@@ -482,9 +480,7 @@ def add_lazy_naf(d):
     """
     keys = _get_keys(d)
     allvars = Series(["ANAI", "ANAJ", "ASEACAT", "ASOIL", "ACORS"])
-    weights = Series(
-        [1, 1, 0.2 * 837.3 / 1000.0, 0.2 * 62.6 / 1000.0, 0.2 * 2.3 / 1000.0]
-    )
+    weights = Series([1, 1, 0.2 * 837.3 / 1000.0, 0.2 * 62.6 / 1000.0, 0.2 * 2.3 / 1000.0])
     index = allvars.isin(keys)
     if can_do(index):
         newkeys = allvars.loc[index]
@@ -909,6 +905,4 @@ poc = array(
         "AORGBJ",
     ]
 )
-minerals = array(
-    ["AALJ", "ACAJ", "AFEJ", "AKJ", "AMGJ", "AMNJ", "ANAJ", "ATIJ", "ASIJ"]
-)
+minerals = array(["AALJ", "ACAJ", "AFEJ", "AKJ", "AMGJ", "AMNJ", "ANAJ", "ATIJ", "ASIJ"])

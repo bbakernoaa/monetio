@@ -41,9 +41,7 @@ def find_near(df, latlon, distance=100, sid="site_num", drange=None):
     return lhash
 
 
-def write_datem(
-    df, obscolumn="obs", dname="datemfile.txt", sitename="1", info=None, drange=None
-):
+def write_datem(df, obscolumn="obs", dname="datemfile.txt", sitename="1", info=None, drange=None):
     """returns string in datem format (See NOAA ARL).
     datem format has the following columns:
     Year, Month, Day, Hour, Duration, lat, lon, Concentration (units), site
