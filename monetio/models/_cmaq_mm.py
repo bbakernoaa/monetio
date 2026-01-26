@@ -331,9 +331,7 @@ def add_lazy_pm25(d):
             newkeys = allvars.loc[index]
             newweights = weights.loc[index]
             d["PM25"] = add_multiple_lazy(d, newkeys, weights=newweights)
-            d["PM25"] = d["PM25"].assign_attrs(
-                {"units": r"$\mu g m^{-3}$", "name": "PM2.5", "long_name": "PM2.5"}
-            )
+            d["PM25"] = d["PM25"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "PM2.5", "long_name": "PM2.5"})
     return d
 
 
@@ -448,9 +446,7 @@ def add_lazy_caf(d):
     """
     keys = _get_keys(d)
     allvars = Series(["ACAI", "ACAJ", "ASEACAT", "ASOIL", "ACORS"])
-    weights = Series(
-        [1, 1, 0.2 * 32.0 / 1000.0, 0.2 * 83.8 / 1000.0, 0.2 * 56.2 / 1000.0]
-    )
+    weights = Series([1, 1, 0.2 * 32.0 / 1000.0, 0.2 * 83.8 / 1000.0, 0.2 * 56.2 / 1000.0])
     index = allvars.isin(keys)
     if can_do(index):
         newkeys = allvars.loc[index]
@@ -482,17 +478,13 @@ def add_lazy_naf(d):
     """
     keys = _get_keys(d)
     allvars = Series(["ANAI", "ANAJ", "ASEACAT", "ASOIL", "ACORS"])
-    weights = Series(
-        [1, 1, 0.2 * 837.3 / 1000.0, 0.2 * 62.6 / 1000.0, 0.2 * 2.3 / 1000.0]
-    )
+    weights = Series([1, 1, 0.2 * 837.3 / 1000.0, 0.2 * 62.6 / 1000.0, 0.2 * 2.3 / 1000.0])
     index = allvars.isin(keys)
     if can_do(index):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["NAf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NAf"] = d["NAf"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NAf", "long_name": "NAf"}
-        )
+        d["NAf"] = d["NAf"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "NAf", "long_name": "NAf"})
     return d
 
 
@@ -518,9 +510,7 @@ def add_lazy_so4f(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["SO4f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["SO4f"] = d["SO4f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "SO4f", "long_name": "SO4f"}
-        )
+        d["SO4f"] = d["SO4f"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "SO4f", "long_name": "SO4f"})
     return d
 
 
@@ -546,9 +536,7 @@ def add_lazy_nh4f(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["NH4f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NH4f"] = d["NH4f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NH4f", "long_name": "NH4f"}
-        )
+        d["NH4f"] = d["NH4f"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "NH4f", "long_name": "NH4f"})
     return d
 
 
@@ -574,9 +562,7 @@ def add_lazy_no3f(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["NO3f"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["NO3f"] = d["NO3f"].assign_attrs(
-            {"units": r"$\mu g m^{-3}$", "name": "NO3f", "long_name": "NO3f"}
-        )
+        d["NO3f"] = d["NO3f"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "NO3f", "long_name": "NO3f"})
     return d
 
 
@@ -909,6 +895,4 @@ poc = array(
         "AORGBJ",
     ]
 )
-minerals = array(
-    ["AALJ", "ACAJ", "AFEJ", "AKJ", "AMGJ", "AMNJ", "ANAJ", "ATIJ", "ASIJ"]
-)
+minerals = array(["AALJ", "ACAJ", "AFEJ", "AKJ", "AMGJ", "AMNJ", "ANAJ", "ATIJ", "ASIJ"])

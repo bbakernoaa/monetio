@@ -4,7 +4,7 @@ import dask
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
-import warnings
+
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
@@ -114,16 +114,13 @@ class ISH:
     @staticmethod
     def _clean(frame):
         if frame.empty:
-             for name, _, _ in ISH._VAR_INFO:
-                 if name not in frame.columns:
-                     frame[name] = pd.Series(dtype=object)
-             frame["time"] = pd.Series(dtype="datetime64[ns]")
-             return frame
+            for name, _, _ in ISH._VAR_INFO:
+                if name not in frame.columns:
+                    frame[name] = pd.Series(dtype=object)
+            frame["time"] = pd.Series(dtype="datetime64[ns]")
+            return frame
 
-        frame["time"] = [
-            pd.Timestamp(f"{date:08}{htime:04}")
-            for date, htime in zip(frame["date"], frame["htime"])
-        ]
+        frame["time"] = [pd.Timestamp(f"{date:08}{htime:04}") for date, htime in zip(frame["date"], frame["htime"])]
         frame.drop(["date", "htime"], axis=1, inplace=True)
         frame.set_index("time", drop=True, inplace=True)
         frame = ISH._clean_column_by_name(frame, "wdir", missing=999)
@@ -155,7 +152,7 @@ class ISH:
 
     def read_data_frame(self, url_or_file, *, request_timeout=10, request_retries=4):
         if not request_retries >= 0:
-             raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
+            raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
 
         if isinstance(url_or_file, str) and url_or_file.startswith("http"):
             url_or_file = url_or_file.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
@@ -163,6 +160,7 @@ class ISH:
 
             import gzip
             import io
+
             import requests
 
             tries = 0
@@ -190,7 +188,7 @@ class ISH:
 
         frame = pd.DataFrame.from_records(np.atleast_1d(frame_as_array))
         df = self._clean(frame)
-        df.drop(["latitude", "longitude"], axis=1, inplace=True, errors='ignore')
+        df.drop(["latitude", "longitude"], axis=1, inplace=True, errors="ignore")
 
         if self.dates is not None and not df.empty:
             index = (df.index >= self.dates.min()) & (df.index <= self.dates.max())
@@ -201,7 +199,7 @@ class ISH:
 
         # Ensure all non-numeric columns are object for dask consistency
         for col in df.columns:
-            if not pd.api.types.is_numeric_dtype(df[col].dtype) and col != 'time':
+            if not pd.api.types.is_numeric_dtype(df[col].dtype) and col != "time":
                 df[col] = df[col].astype(object)
 
         return df
@@ -267,8 +265,8 @@ class ISH:
                 try:
                     year_url_df = pd.read_html(f"{url}/{syear}/")[0]
                     if "Name" in year_url_df.columns:
-                         names = year_url_df["Name"].iloc[2:-1].to_frame(name="name")
-                         all_urls_list.append(f"{url}/{syear}/" + names)
+                        names = year_url_df["Name"].iloc[2:-1].to_frame(name="name")
+                        all_urls_list.append(f"{url}/{syear}/" + names)
                 except:
                     pass
             if all_urls_list:
@@ -288,7 +286,9 @@ class ISH:
     def get_url_file_objs(self, fname):
         import gzip
         import shutil
+
         import requests
+
         objs = []
         for iii in fname:
             try:
@@ -323,7 +323,7 @@ class ISH:
         if sum([box is not None, country is not None, state is not None, site is not None]) > 1:
             raise ValueError("Only one of `box`, `country`, `state`, or `site` can be used")
         if not request_retries >= 0:
-             raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
+            raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
 
         self.dates = pd.to_datetime(dates)
         self.verbose = verbose
@@ -349,31 +349,39 @@ class ISH:
         # Robust meta for dask
         meta = None
         for u in urls.name:
-             try:
-                  sample_df = self.read_data_frame(u, request_timeout=request_timeout, request_retries=request_retries)
-                  if not sample_df.empty:
-                       meta = sample_df.iloc[:0].copy()
-                       break
-             except:
-                  continue
+            try:
+                sample_df = self.read_data_frame(u, request_timeout=request_timeout, request_retries=request_retries)
+                if not sample_df.empty:
+                    meta = sample_df.iloc[:0].copy()
+                    break
+            except:
+                continue
 
         if meta is None:
-             try:
-                  sample_df = self.read_data_frame(urls.name.iloc[0], request_timeout=request_timeout, request_retries=request_retries)
-                  meta = sample_df.iloc[:0].copy()
-             except:
-                  meta = None
+            try:
+                sample_df = self.read_data_frame(
+                    urls.name.iloc[0],
+                    request_timeout=request_timeout,
+                    request_retries=request_retries,
+                )
+                meta = sample_df.iloc[:0].copy()
+            except:
+                meta = None
 
         if download:
             objs = self.get_url_file_objs(urls.name)
+
             def func(fname):
                 return self.read_data_frame(fname, request_timeout=request_timeout, request_retries=request_retries)
+
             dfs = [dask.delayed(func)(f) for f in objs]
             dff = dd.from_delayed(dfs, meta=meta)
             self.df = dff.compute(num_workers=n_procs)
         else:
+
             def func(url):
                 return self.read_data_frame(url, request_timeout=request_timeout, request_retries=request_retries)
+
             dfs = [dask.delayed(func)(f) for f in urls.name]
             dff = dd.from_delayed(dfs, meta=meta)
             self.df = dff.compute(num_workers=n_procs)
@@ -382,13 +390,7 @@ class ISH:
             self.df.index = self.df.time
             numeric_cols = self.df.select_dtypes(include=["number"]).columns
             group_cols = ["station_id"]
-            self.df = (
-                self.df[group_cols + list(numeric_cols)]
-                .groupby("station_id")
-                .resample(window)
-                .mean()
-                .reset_index()
-            )
+            self.df = self.df[group_cols + list(numeric_cols)].groupby("station_id").resample(window).mean().reset_index()
 
         self.df = self.df.merge(dfloc, on="station_id", how="left")
         self.df = self.df.rename(columns={"station_id": "siteid", "ctry": "country"})

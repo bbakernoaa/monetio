@@ -23,9 +23,7 @@ import requests
 # ----------------------------------USER-DEFINED VARIABLES--------------------------------------- #
 # Set up command line arguments
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument(
-    "-dir", "--directory", required=True, help="Specify directory to save files to"
-)
+parser.add_argument("-dir", "--directory", required=True, help="Specify directory to save files to")
 parser.add_argument(
     "-f",
     "--files",
@@ -64,9 +62,7 @@ try:
 except FileNotFoundError:
     homeDir = os.path.expanduser("~")
     Popen(
-        "touch {0}.netrc | chmod og-rw {0}.netrc | echo machine {1} >> {0}.netrc".format(
-            homeDir + os.sep, urs
-        ),
+        f"touch {homeDir + os.sep}.netrc | chmod og-rw {homeDir + os.sep}.netrc | echo machine {urs} >> {homeDir + os.sep}.netrc",
         shell=True,
     )
     Popen(

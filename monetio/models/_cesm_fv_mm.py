@@ -52,9 +52,7 @@ def open_mfdataset(
     # open the dataset using xarray
     try:
         if netcdf:
-            dset_load = xr.open_mfdataset(
-                fname, combine="nested", concat_dim="time", **kwargs
-            )
+            dset_load = xr.open_mfdataset(fname, combine="nested", concat_dim="time", **kwargs)
         else:
             raise ValueError
     except ValueError:
@@ -71,16 +69,12 @@ def open_mfdataset(
         if "PMID" not in dset_load.keys():
             dset_load["PMID"] = _calc_pressure(dset_load)
         if "Z3" not in dset_load.keys():
-            warnings.warn(
-                "Geopotential height Z3 is not in model keys. Assuming hydrostatic runs"
-            )
+            warnings.warn("Geopotential height Z3 is not in model keys. Assuming hydrostatic runs")
             dset_load["Z3"] = _calc_hydrostatic_height(dset_load)
         if "PS" in dset_load.keys():
             dset_load["PS"].rename("surfpres_pa")
         else:
-            warnings.warn(
-                "Surface pressure (PS) is not in model keys. Continuing without it."
-            )
+            warnings.warn("Surface pressure (PS) is not in model keys. Continuing without it.")
         if "PHIS" in dset_load.keys():
             # calc height agl. PHIS in m2/s2, where Z3 already in m
             dset_load["alt_agl_m_mid"] = dset_load["Z3"] - dset_load["PHIS"] / 9.80665
@@ -235,10 +229,7 @@ def _calc_pressure(dset):
         dset["hybm"] = dset["hybm"].isel(time=0)
 
     for nlev in range(n_vert):
-        pressure[:, nlev, :, :] = (
-            dset["hyam"][nlev].values * p0
-            + dset["hybm"][nlev].values * dset["PS"][:, :, :].values
-        )
+        pressure[:, nlev, :, :] = dset["hyam"][nlev].values * p0 + dset["hybm"][nlev].values * dset["PS"][:, :, :].values
     P = xr.DataArray(
         data=pressure,
         dims=["time", "lev", "lat", "lon"],
@@ -290,10 +281,7 @@ def _calc_pressure_i(dset):
         dset["hybi"] = dset["hybi"].isel(time=0)
 
     for nlev in range(n_vert):
-        pressure_i[:, nlev, :, :] = (
-            dset["hyai"][nlev].values * p0
-            + dset["hybi"][nlev].values * dset["PS"][:, :, :].values
-        )
+        pressure_i[:, nlev, :, :] = dset["hyai"][nlev].values * p0 + dset["hybi"][nlev].values * dset["PS"][:, :, :].values
     P_int = xr.DataArray(
         data=pressure_i,
         dims=["time", "ilev", "lat", "lon"],
@@ -331,10 +319,7 @@ def _calc_hydrostatic_height(dset):
     # pressure levels should be increasing.
     _height_decreasing = np.all(vert[:-1] < vert[1:])
     if not _height_decreasing:
-        raise Exception(
-            "Expected default CESM behaviour:"
-            + "pressure levels should be in decreasing order"
-        )
+        raise Exception("Expected default CESM behaviour:" + "pressure levels should be in decreasing order")
     height = np.zeros((n_time, n_vert, n_lat, n_lon))
     height[:, n_vert, :, :] = dset["PHIS"].values / GRAVITY
     for nlev in range(n_vert - 1, -1, -1):
@@ -342,9 +327,7 @@ def _calc_hydrostatic_height(dset):
         temp_b = dset["T"].isel(lev=nlev + 1).values
         press_b = dset["PMID"].isel(lev=nlev + 1)
         press = dset["PMID"].isel(lev=nlev)
-        height[:, nlev, :, :] = height_b - R * temp_b * np.ln(press / press_b) / (
-            GRAVITY * M_AIR
-        )
+        height[:, nlev, :, :] = height_b - R * temp_b * np.ln(press / press_b) / (GRAVITY * M_AIR)
 
     z = xr.DataArray(
         data=height,
@@ -381,8 +364,7 @@ def _calc_hydrostatic_height_i(dset):
     _height_decreasing = np.all(ilev[:-1] < ilev[1:])
     if not _height_decreasing:
         raise ValueError(
-            "Expected default CESM behaviour "
-            "(pressure levels should be in increasing order, height in decreasing order)"
+            "Expected default CESM behaviour (pressure levels should be in increasing order, height in decreasing order)"
         )
     # surface geopotential height (PHIS / g)
     height = np.zeros((len(time), len(ilev), len(lat), len(lon)))
@@ -393,9 +375,7 @@ def _calc_hydrostatic_height_i(dset):
         pressure_top = dset["pres_pa_int"].isel(ilev=nlev + 1)
         pressure = dset["pres_pa_int"].isel(ilev=nlev)
 
-        height[:, nlev, :, :] = height[:, nlev + 1, :, :] - (
-            R * temp / (GRAVITY * M_AIR)
-        ) * np.log(pressure / pressure_top)
+        height[:, nlev, :, :] = height[:, nlev + 1, :, :] - (R * temp / (GRAVITY * M_AIR)) * np.log(pressure / pressure_top)
 
     z = xr.DataArray(
         data=height,
@@ -467,9 +447,7 @@ def _calc_layer_thickness_mid(dset):
     # # compute layer thickness
     dz_m = np.zeros((len(dset.time), len(dset.lev), len(dset.lat), len(dset.lon)))
     for nlev in range(len(dset.lev)):
-        dp = (
-            dset["PDELDRY"].isel(lev=nlev).values
-        )  # Dry pressure difference between levels [Pa]
+        dp = dset["PDELDRY"].isel(lev=nlev).values  # Dry pressure difference between levels [Pa]
         temp = dset["T"].isel(lev=nlev).values  # midlayer temp approx
         pmid = dset["PMID"].isel(lev=nlev)
         rho = pmid / RGAS / temp

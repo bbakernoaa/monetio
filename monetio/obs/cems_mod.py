@@ -323,9 +323,7 @@ class CEMS:
         """
         if "latitude" in list(self.df.columns.values):
             dftemp = self.df.copy()
-            pairs = zip(
-                dftemp["orispl_code"], zip(dftemp["latitude"], dftemp["longitude"])
-            )
+            pairs = zip(dftemp["orispl_code"], zip(dftemp["latitude"], dftemp["longitude"]))
             pairs = list(set(pairs))
             lhash = dict(pairs)  # key is facility id and value is name.
             if verbose:
@@ -368,21 +366,11 @@ class CEMS:
                 rcolumn = self.rename(ccc, "orispl_code", rcolumn, verbose)
             elif "facility" in ccc.lower() and "id" in ccc.lower():
                 rcolumn = self.rename(ccc, "fac_id", rcolumn, verbose)
-            elif (
-                "so2" in ccc.lower()
-                and ("lbs" in ccc.lower() or "pounds" in ccc.lower())
-                and ("rate" not in ccc.lower())
-            ):
+            elif "so2" in ccc.lower() and ("lbs" in ccc.lower() or "pounds" in ccc.lower()) and ("rate" not in ccc.lower()):
                 rcolumn = self.rename(ccc, "so2_lbs", rcolumn, verbose)
-            elif (
-                "nox" in ccc.lower()
-                and ("lbs" in ccc.lower() or "pounds" in ccc.lower())
-                and ("rate" not in ccc.lower())
-            ):
+            elif "nox" in ccc.lower() and ("lbs" in ccc.lower() or "pounds" in ccc.lower()) and ("rate" not in ccc.lower()):
                 rcolumn = self.rename(ccc, "nox_lbs", rcolumn, verbose)
-            elif "co2" in ccc.lower() and (
-                "short" in ccc.lower() and "tons" in ccc.lower()
-            ):
+            elif "co2" in ccc.lower() and ("short" in ccc.lower() and "tons" in ccc.lower()):
                 rcolumn = self.rename(ccc, "co2_short_tons", rcolumn, verbose)
             elif "date" in ccc.lower():
                 rcolumn = self.rename(ccc, "date", rcolumn, verbose)
@@ -471,9 +459,7 @@ class CEMS:
             elif method == 2:
                 # this runs ok but fails pytest
                 def utc(x):
-                    return pd.Timestamp(x["time local"]) + datetime.timedelta(
-                        hours=x["time_offset"]
-                    )
+                    return pd.Timestamp(x["time local"]) + datetime.timedelta(hours=x["time_offset"])
 
                 dfnew["time"] = dfnew.apply(utc, axis=1)
             elif method == 3:
@@ -481,9 +467,7 @@ class CEMS:
                 def utc(x, y):
                     return x + datetime.timedelta(hours=y)
 
-                dfnew["time"] = dfnew.apply(
-                    lambda row: utc(row["time local"], row["time_offset"]), axis=1
-                )
+                dfnew["time"] = dfnew.apply(lambda row: utc(row["time local"], row["time_offset"]), axis=1)
             # remove the time_offset column.
             dfnew.drop(["time_offset"], axis=1, inplace=True)
             mlist = dftemp.columns.values.tolist()

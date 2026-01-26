@@ -91,9 +91,7 @@ class CMAQReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CMAQ data."
-        )
+        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CMAQ data."
         if "history" in ds.attrs:
             ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
         else:
@@ -180,9 +178,7 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: any) -> xr.Dataset:
     for i in range(1, len(available_vars)):
         new_var = new_var + ds[available_vars[i]] * weights[i]
 
-    ds[name] = new_var.assign_attrs(
-        {"units": spec.units, "name": spec.name, "long_name": spec.long_name}
-    )
+    ds[name] = new_var.assign_attrs({"units": spec.units, "name": spec.name, "long_name": spec.long_name})
     return ds
 
 

@@ -1,9 +1,10 @@
 """ISH Lite Reader"""
 
-import numpy as np
-import pandas as pd
 import dask
 import dask.dataframe as dd
+import numpy as np
+import pandas as pd
+
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
@@ -73,23 +74,17 @@ class ISH:
 
         self.history.columns = [i.lower() for i in self.history.columns]
         if dates is not None:
-            index1 = (self.history.end >= dates.min()) & (
-                self.history.begin <= dates.max()
-            )
+            index1 = (self.history.end >= dates.min()) & (self.history.begin <= dates.max())
             self.history = self.history.loc[index1, :]
         self.history = self.history.dropna(subset=["lat", "lon"])
         self.history.loc[:, "usaf"] = self.history.usaf.astype("str").str.zfill(6)
         self.history.loc[:, "wban"] = self.history.wban.astype("str").str.zfill(5)
         self.history["station_id"] = self.history.usaf + self.history.wban
-        self.history.rename(
-            columns={"lat": "latitude", "lon": "longitude"}, inplace=True
-        )
+        self.history.rename(columns={"lat": "latitude", "lon": "longitude"}, inplace=True)
 
     def subset_sites(self, latmin=32.65, lonmin=-113.3, latmax=34.5, lonmax=-110.4):
         latindex = (self.history.latitude >= latmin) & (self.history.latitude <= latmax)
-        lonindex = (self.history.longitude >= lonmin) & (
-            self.history.longitude <= lonmax
-        )
+        lonindex = (self.history.longitude >= lonmin) & (self.history.longitude <= lonmax)
         dfloc = self.history.loc[latindex & lonindex, :]
         return dfloc
 
@@ -105,14 +100,7 @@ class ISH:
 
         # Assume availability
         for syear in unique_years.strftime("%Y"):
-            year_fnames = (
-                sites.usaf.astype(str)
-                + "-"
-                + sites.wban.astype(str)
-                + "-"
-                + syear
-                + ".gz"
-            )
+            year_fnames = sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
             for fname in year_fnames:
                 furls.append(f"{url}/{syear}/{fname}")
 
@@ -184,9 +172,7 @@ class ISH:
         dfloc = self.history.copy()
 
         if box is not None:
-            dfloc = self.subset_sites(
-                latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3]
-            )
+            dfloc = self.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
         elif country is not None:
             dfloc = dfloc.loc[dfloc.ctry == country, :]
         elif state is not None:
@@ -205,15 +191,7 @@ class ISH:
         df = df.replace(-999.9, np.nan)
 
         if resample and not df.empty:
-            df = (
-                df.set_index("time")
-                .groupby("siteid")
-                .resample(window)
-                .mean()
-                .reset_index()
-            )
+            df = df.set_index("time").groupby("siteid").resample(window).mean().reset_index()
 
-        df = pd.merge(
-            df, dfloc, how="left", left_on="siteid", right_on="station_id"
-        ).rename(columns={"ctry": "country"})
+        df = pd.merge(df, dfloc, how="left", left_on="siteid", right_on="station_id").rename(columns={"ctry": "country"})
         return df.drop(["station_id"], axis=1)

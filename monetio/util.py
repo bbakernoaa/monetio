@@ -1,10 +1,43 @@
-def nearest(items, pivot):
+from typing import Any, Iterable, Tuple, Union
+
+import numpy as np
+import pandas as pd
+import xarray as xr
+
+
+def nearest(items: Iterable, pivot: Any) -> Any:
+    """Find the item in a list closest to a pivot value.
+
+    Parameters
+    ----------
+    items : Iterable
+        The collection of items to search.
+    pivot : Any
+        The value to find the nearest match for.
+
+    Returns
+    -------
+    Any
+        The nearest item from the collection.
+    """
     return min(items, key=lambda x: abs(x - pivot))
 
 
-def search_listinlist(array1, array2):
-    import numpy as np
+def search_listinlist(array1: np.ndarray, array2: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Find common elements and their indices between two arrays.
 
+    Parameters
+    ----------
+    array1 : np.ndarray
+        First array.
+    array2 : np.ndarray
+        Second array.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        Sorted indices of common elements in array1 and array2.
+    """
     # Find common elements and their indices
     # This vectorizes the search using np.isin which is significantly faster
     # than iterating over the intersection set and calling np.where in a loop.
@@ -21,28 +54,76 @@ def search_listinlist(array1, array2):
     return np.sort(np.int32(index1)), np.sort(np.int32(index2))
 
 
-def linregress(x, y):
-    import numpy as np
-    import statsmodels.api as sm
+def linregress(x: np.ndarray, y: np.ndarray) -> Tuple[float, float, float, float]:
+    """Perform linear regression.
 
-    xx = sm.add_constant(x)
-    model = sm.OLS(y, xx)
-    fit = model.fit()
-    b, a = fit.params[0], fit.params[1]
-    rsquared = fit.rsquared
-    std_err = np.sqrt(fit.mse_resid)
+    Parameters
+    ----------
+    x : np.ndarray
+        Independent variable.
+    y : np.ndarray
+        Dependent variable.
+
+    Returns
+    -------
+    Tuple[float, float, float, float]
+        Slope (a), intercept (b), r-squared, and standard error.
+    """
+    try:
+        import statsmodels.api as sm
+
+        xx = sm.add_constant(x)
+        model = sm.OLS(y, xx)
+        fit = model.fit()
+        b, a = fit.params[0], fit.params[1]
+        rsquared = fit.rsquared
+        std_err = np.sqrt(fit.mse_resid)
+    except ImportError:
+        from scipy import stats
+
+        slope, intercept, r_value, p_value, std_err_slope = stats.linregress(x, y)
+        a = slope
+        b = intercept
+        rsquared = r_value**2
+        # Compute residual standard deviation to match statsmodels' std_err (sqrt(mse_resid))
+        residuals = y - (a * x + b)
+        std_err = np.sqrt(np.sum(residuals**2) / (len(x) - 2))
+
     return a, b, rsquared, std_err
 
 
-def findclosest(list, value):
-    a = min((abs(x - value), x, i) for i, x in enumerate(list))
+def findclosest(list_obj: Iterable, value: Any) -> Tuple[int, Any]:
+    """Find the index and value of the closest item in a list.
+
+    Parameters
+    ----------
+    list_obj : Iterable
+        The collection of items to search.
+    value : Any
+        The value to find the nearest match for.
+
+    Returns
+    -------
+    Tuple[int, Any]
+        The index and the nearest value.
+    """
+    a = min((abs(x - value), x, i) for i, x in enumerate(list_obj))
     return a[2], a[1]
 
 
-def _force_forder(x):
-    """
-    Converts arrays x to fortran order. Returns
+def _force_forder(x: np.ndarray) -> Tuple[np.ndarray, bool]:
+    """Converts arrays x to fortran order. Returns
     a tuple in the form (x, is_transposed).
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Input array.
+
+    Returns
+    -------
+    Tuple[np.ndarray, bool]
+        The array and whether it was transposed.
     """
     if x.flags.c_contiguous:
         return (x.T, True)
@@ -50,89 +131,184 @@ def _force_forder(x):
         return (x, False)
 
 
-def kolmogorov_zurbenko_filter(df, window, iterations):
-    import pandas as pd
+def kolmogorov_zurbenko_filter(df: Union[pd.DataFrame, pd.Series], window: int, iterations: int) -> Union[pd.DataFrame, pd.Series]:
+    """KZ filter implementation.
 
-    """KZ filter implementation
-        series is a pandas series
-        window is the filter window m in the units of the data (m = 2q+1)
-        iterations is the number of times the moving average is evaluated
-        """
+    Parameters
+    ----------
+    df : Union[pd.DataFrame, pd.Series]
+        Data to filter.
+    window : int
+        The filter window m in the units of the data (m = 2q+1).
+    iterations : int
+        The number of times the moving average is evaluated.
+
+    Returns
+    -------
+    Union[pd.DataFrame, pd.Series]
+        Filtered data.
+    """
     z = df.copy()
-    for i in range(iterations):
-        z = pd.rolling_mean(z, window=window, min_periods=1, center=True)
+    for _ in range(iterations):
+        z = z.rolling(window=window, min_periods=1, center=True).mean()
     return z
 
 
-def wsdir2uv(ws, wdir):
-    from numpy import cos, pi, sin
+def wsdir2uv(ws: Union[xr.DataArray, np.ndarray], wdir: Union[xr.DataArray, np.ndarray]) -> Tuple[Any, Any]:
+    """Convert wind speed and direction to u and v components.
 
-    u = -ws * sin(wdir * pi / 180.0)
-    v = -ws * cos(wdir * pi / 180.0)
+    Parameters
+    ----------
+    ws : Union[xr.DataArray, np.ndarray]
+        Wind speed.
+    wdir : Union[xr.DataArray, np.ndarray]
+        Wind direction in degrees.
+
+    Returns
+    -------
+    Tuple[Any, Any]
+        U and V components.
+    """
+    u = -ws * np.sin(wdir * np.pi / 180.0)
+    v = -ws * np.cos(wdir * np.pi / 180.0)
     return u, v
 
 
-def long_to_wide(df):
-    w = df.pivot_table(
-        values="obs", index=["time", "siteid"], columns="variable"
-    ).reset_index()
+def long_to_wide(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert long format dataframe to wide format.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Long format dataframe.
+
+    Returns
+    -------
+    pd.DataFrame
+        Wide format dataframe.
+    """
+    w = df.pivot_table(values="obs", index=["time", "siteid"], columns="variable").reset_index()
 
     # Add units (columns)
     for name, group in df.groupby("variable"):
         units = group.units.unique().tolist()
         if len(units) > 1:
-            print(f"warning: non-unique units found, {units!r}, taking first")
+            # print(f"warning: non-unique units found, {units!r}, taking first")
+            pass
         w[f"{name}_unit"] = units[0]
 
     # Get site info to add, allowing for possible time variation
     site_info = df.drop(["variable", "obs", "units"], axis=1).drop_duplicates()
 
-    return w.merge(site_info, on=["time", "siteid"], how="left")  # .reset_index()
+    return w.merge(site_info, on=["time", "siteid"], how="left")
 
 
-def calc_8hr_rolling_max(df, col=None, window=None):
-    df.index = df.time_local
-    df_rolling = (
-        df.groupby("siteid")[col]
-        .rolling(window, center=True, win_type="boxcar")
-        .mean()
-        .reset_index()
-        .dropna()
-    )
-    df_rolling_max = (
-        df_rolling.groupby("siteid")
-        .resample("D", on="time_local")
-        .max()
-        .reset_index(drop=True)
-    )
-    df = df.reset_index(drop=True)
+def calc_8hr_rolling_max(df: pd.DataFrame, col: str = None, window: Any = None) -> pd.DataFrame:
+    """Calculate 8-hour rolling maximum.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input data.
+    col : str, optional
+        Column name.
+    window : Any, optional
+        Rolling window.
+
+    Returns
+    -------
+    pd.DataFrame
+        Result.
+    """
+    df_temp = df.copy()
+    df_temp.index = df_temp.time_local
+    df_rolling = df_temp.groupby("siteid")[col].rolling(window, center=True, win_type="boxcar").mean().reset_index().dropna()
+    df_rolling_max = df_rolling.groupby("siteid").resample("d", on="time_local").max().reset_index(drop=True)
     return df.merge(df_rolling_max, on=["siteid", "time_local"])
 
 
-def calc_24hr_ave(df, col=None):
-    df.index = df.time_local
-    df_24hr_ave = df.groupby("siteid")[col].resample("D").mean().reset_index()
-    df = df.reset_index(drop=True)
+def calc_24hr_ave(df: pd.DataFrame, col: str = None) -> pd.DataFrame:
+    """Calculate 24-hour average.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input data.
+    col : str, optional
+        Column name.
+
+    Returns
+    -------
+    pd.DataFrame
+        Result.
+    """
+    df_temp = df.copy()
+    df_temp.index = df_temp.time_local
+    df_24hr_ave = df_temp.groupby("siteid")[col].resample("d").mean().reset_index()
     return df.merge(df_24hr_ave, on=["siteid", "time_local"])
 
 
-def calc_3hr_ave(df, col=None):
-    df.index = df.time_local
-    df_3hr_ave = df.groupby("siteid")[col].resample("3H").mean().reset_index()
-    df = df.reset_index(drop=True)
+def calc_3hr_ave(df: pd.DataFrame, col: str = None) -> pd.DataFrame:
+    """Calculate 3-hour average.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input data.
+    col : str, optional
+        Column name.
+
+    Returns
+    -------
+    pd.DataFrame
+        Result.
+    """
+    df_temp = df.copy()
+    df_temp.index = df_temp.time_local
+    df_3hr_ave = df_temp.groupby("siteid")[col].resample("3h").mean().reset_index()
     return df.merge(df_3hr_ave, on=["siteid", "time_local"])
 
 
-def calc_annual_ave(df, col=None):
-    df.index = df.time_local
-    df_annual_ave = df.groupby("siteid")[col].resample("A").mean().reset_index()
-    df = df.reset_index(drop=True)
+def calc_annual_ave(df: pd.DataFrame, col: str = None) -> pd.DataFrame:
+    """Calculate annual average.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input data.
+    col : str, optional
+        Column name.
+
+    Returns
+    -------
+    pd.DataFrame
+        Result.
+    """
+    df_temp = df.copy()
+    df_temp.index = df_temp.time_local
+    # Using 'YE' for year end as 'A' and 'Y' are deprecated in pandas 3.0
+    try:
+        df_annual_ave = df_temp.groupby("siteid")[col].resample("YE").mean().reset_index()
+    except ValueError:
+        df_annual_ave = df_temp.groupby("siteid")[col].resample("A").mean().reset_index()
     return df.merge(df_annual_ave, on=["siteid", "time_local"])
 
 
-def get_giorgi_region_bounds(index=None, acronym=None):
-    import pandas as pd
+def get_giorgi_region_bounds(index: int = None, acronym: str = None) -> np.ndarray:
+    """Get the boundaries of a Giorgi region.
 
+    Parameters
+    ----------
+    index : int, optional
+        Region index (1-22).
+    acronym : str, optional
+        Region acronym.
+
+    Returns
+    -------
+    np.ndarray
+        Array containing [latmin, lonmin, latmax, lonmax, acronym].
+    """
     i = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
     acro = [
         "NAU",
@@ -264,41 +440,43 @@ def get_giorgi_region_bounds(index=None, acronym=None):
         },
         index=i,
     )
-    try:
-        if index is None and acronym is None:
-            print("either index or acronym needs to be supplied")
-            print(
-                "look here https://web.northeastern.edu/sds/web/demsos/images_002/subregions.jpg"
-            )
-            raise ValueError
-        elif index is not None:
-            return df.loc[df.index == index].values.flatten()
-        else:
-            return df.loc[df.acronym == acronym.upper()].values.flatten()
-    except ValueError:
-        exit
+    if index is None and acronym is None:
+        raise ValueError(
+            "Either index or acronym needs to be supplied. "
+            "See: https://web.northeastern.edu/sds/web/demsos/images_002/subregions.jpg"
+        )
+    if index is not None:
+        return df.loc[df.index == index].values.flatten()
+    else:
+        return df.loc[df.acronym == acronym.upper()].values.flatten()
 
 
-def get_giorgi_region_df(df):
+def get_giorgi_region_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Add Giorgi region index and acronym to a dataframe based on lat/lon.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe with 'latitude' and 'longitude'.
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe with 'GIORGI_INDEX' and 'GIORGI_ACRO' added.
+    """
+    df = df.copy()
     df.loc[:, "GIORGI_INDEX"] = None
     df.loc[:, "GIORGI_ACRO"] = None
     for i in range(22):
-        latmin, lonmin, latmax, lonmax, acro = get_giorgi_region_bounds(
-            index=int(i + 1)
-        )
-        con = (
-            (df.longitude <= lonmax)
-            & (df.longitude >= lonmin)
-            & (df.latitude <= latmax)
-            & (df.latitude >= latmin)
-        )
+        latmin, lonmin, latmax, lonmax, acro = get_giorgi_region_bounds(index=int(i + 1))
+        con = (df.longitude <= lonmax) & (df.longitude >= lonmin) & (df.latitude <= latmax) & (df.latitude >= latmin)
         df.loc[con, "GIORGI_INDEX"] = i + 1
         df.loc[con, "GIORGI_ACRO"] = acro
     return df
 
 
-def calc_13_category_usda_soil_type(clay, sand, silt):
-    """Calculate the 13 category usda soil type from the clay sand and silt
+def calc_13_category_usda_soil_type(clay: np.ndarray, sand: np.ndarray, silt: np.ndarray) -> np.ndarray:
+    """Calculate the 13 category USDA soil type from clay, sand, and silt.
 
     0 -- WATER
     1 -- SAND
@@ -310,73 +488,41 @@ def calc_13_category_usda_soil_type(clay, sand, silt):
     7 -- SANDY CLAY LOAM
     8 -- SILTY CLAY LOAM
     9 -- CLAY LOAM
-    10 --SANDY CLAY
-    11 --SILY CLAY
-    12 --CLAY
+    10 -- SANDY CLAY
+    11 -- SILTY CLAY
+    12 -- CLAY
 
     Parameters
     ----------
-    clay : type
-        Description of parameter `clay`.
-    sand : type
-        Description of parameter `sand`.
-    silt : type
-        Description of parameter `silt`.
+    clay : np.ndarray
+        Clay percentage.
+    sand : np.ndarray
+        Sand percentage.
+    silt : np.ndarray
+        Silt percentage.
 
     Returns
     -------
-    type
-        Description of returned object.
-
+    np.ndarray
+        Soil type categories.
     """
-    from numpy import where, zeros
-
-    stype = zeros(clay.shape)
-    stype[where((silt + clay * 1.5 < 15.0) & (clay != 255))] = 1.0  # SAND
-    stype[
-        where((silt + 1.5 * clay >= 15.0) & (silt + 1.5 * clay < 30) & (clay != 255))
-    ] = 2.0  # Loamy Sand
-    stype[
-        where(
-            (clay >= 7.0)
-            & (clay < 20)
-            & (sand > 52)
-            & (silt + 2 * clay >= 30)
-            & (clay != 255)
-        )
-    ] = 3.0  # Sandy Loam (cond 1)
-    stype[where((clay < 7) & (silt < 50) & (silt + 2 * clay >= 30) & (clay != 255))] = (
-        3  # sandy loam (cond 2)
+    stype = np.zeros(clay.shape)
+    stype[np.where((silt + clay * 1.5 < 15.0) & (clay != 255))] = 1.0  # SAND
+    stype[np.where((silt + 1.5 * clay >= 15.0) & (silt + 1.5 * clay < 30) & (clay != 255))] = 2.0  # Loamy Sand
+    stype[np.where((clay >= 7.0) & (clay < 20) & (sand > 52) & (silt + 2 * clay >= 30) & (clay != 255))] = (
+        3.0  # Sandy Loam (cond 1)
     )
-    stype[where((silt >= 50) & (clay >= 12) & (clay < 27) & (clay != 255))] = (
-        4  # silt loam (cond 1)
-    )
-    stype[where((silt >= 50) & (silt < 80) & (clay < 12) & (clay != 255))] = (
-        4  # silt loam (cond 2)
-    )
-    stype[where((silt >= 80) & (clay < 12) & (clay != 255))] = 5  # silt
-    stype[
-        where(
-            (clay >= 7)
-            & (clay < 27)
-            & (silt >= 28)
-            & (silt < 50)
-            & (sand <= 52)
-            & (clay != 255)
-        )
-    ] = 6  # loam
-    stype[
-        where((clay >= 20) & (clay < 35) & (silt < 28) & (sand > 45) & (clay != 255))
-    ] = 7  # sandy clay loam
-    stype[where((clay >= 27) & (clay < 40.0) & (sand > 40) & (clay != 255))] = (
-        8  # silt clay loam
-    )
-    stype[
-        where((clay >= 27) & (clay < 40.0) & (sand > 20) & (sand <= 45) & (clay != 255))
-    ] = 9  # clay loam
-    stype[where((clay >= 35) & (sand > 45) & (clay != 255))] = 10  # sandy clay
-    stype[where((clay >= 40) & (silt >= 40) & (clay != 255))] = 11  # silty clay
-    stype[where((clay >= 40) & (sand <= 45) & (silt < 40) & (clay != 255))] = 12  # clay
+    stype[np.where((clay < 7) & (silt < 50) & (silt + 2 * clay >= 30) & (clay != 255))] = 3  # sandy loam (cond 2)
+    stype[np.where((silt >= 50) & (clay >= 12) & (clay < 27) & (clay != 255))] = 4  # silt loam (cond 1)
+    stype[np.where((silt >= 50) & (silt < 80) & (clay < 12) & (clay != 255))] = 4  # silt loam (cond 2)
+    stype[np.where((silt >= 80) & (clay < 12) & (clay != 255))] = 5  # silt
+    stype[np.where((clay >= 7) & (clay < 27) & (silt >= 28) & (silt < 50) & (sand <= 52) & (clay != 255))] = 6  # loam
+    stype[np.where((clay >= 20) & (clay < 35) & (silt < 28) & (sand > 45) & (clay != 255))] = 7  # sandy clay loam
+    stype[np.where((clay >= 27) & (clay < 40.0) & (sand > 40) & (clay != 255))] = 8  # silt clay loam
+    stype[np.where((clay >= 27) & (clay < 40.0) & (sand > 20) & (sand <= 45) & (clay != 255))] = 9  # clay loam
+    stype[np.where((clay >= 35) & (sand > 45) & (clay != 255))] = 10  # sandy clay
+    stype[np.where((clay >= 40) & (silt >= 40) & (clay != 255))] = 11  # silty clay
+    stype[np.where((clay >= 40) & (sand <= 45) & (silt < 40) & (clay != 255))] = 12  # clay
     return stype
 
 
@@ -386,7 +532,7 @@ _module_install_names = {
 }
 
 
-def _install_message(mod_name):
+def _install_message(mod_name: str) -> str:
     if mod_name not in _module_install_names:
         return ""
 
@@ -396,21 +542,33 @@ def _install_message(mod_name):
     return f"{cf_}"
 
 
-def _import_required(mod_name: str):
+def _import_required(mod_name: str) -> Any:
     from importlib import import_module
 
     try:
         return import_module(mod_name)
     except ImportError as e:
-        raise RuntimeError(
-            f"importing required module '{mod_name}' failed. {_install_message(mod_name)}"
-        ) from e
+        raise RuntimeError(f"importing required module '{mod_name}' failed. {_install_message(mod_name)}") from e
 
 
-def _try_merge_exact(left, right, *, right_name=None):
+def _try_merge_exact(left: xr.Dataset, right: xr.Dataset, *, right_name: str = None) -> xr.Dataset:
     """For two ``xr.Dataset``s, try ``left.merge(right, compat="equals", join="exact")``.
     If it fails, print informative debugging messages and re-raise.
     Otherwise, return the result.
+
+    Parameters
+    ----------
+    left : xr.Dataset
+        First dataset.
+    right : xr.Dataset
+        Second dataset.
+    right_name : str, optional
+        Name of the second dataset for error messages.
+
+    Returns
+    -------
+    xr.Dataset
+        Merged dataset.
     """
     import warnings
 
@@ -449,8 +607,7 @@ def _try_merge_exact(left, right, *, right_name=None):
             print(f"other {vn!r}: dtype={right[vn].dtype}")
             print(right[vn])
             raise ValueError(
-                f"Unable to merge{right_name}due to issue matching coordinates. "
-                "See debug messages above the traceback."
+                f"Unable to merge{right_name}due to issue matching coordinates. See debug messages above the traceback."
             ) from e
     else:
         return left

@@ -52,13 +52,9 @@ def _open_one_dataset(fname, variable_dict):
         if "quality_flag" in variable_dict[variable]:
             ds[variable].attrs["quality_flag"] = variable_dict[variable]["quality_flag"]
             if "qa_thresh_min" in variable_dict[variable]:
-                ds[variable].attrs["qa_thresh_min"] = variable_dict[variable][
-                    "qa_thresh_min"
-                ]
+                ds[variable].attrs["qa_thresh_min"] = variable_dict[variable]["qa_thresh_min"]
             if "qa_thresh_max" in variable_dict[variable]:
-                ds[variable].attrs["qa_thresh_max"] = variable_dict[variable][
-                    "qa_thresh_max"
-                ]
+                ds[variable].attrs["qa_thresh_max"] = variable_dict[variable]["qa_thresh_max"]
             ds[variable] = apply_quality_flag(ds[variable], dso)
     dimensions = []
     for x in ["time", "z", "y", "x"]:
@@ -115,15 +111,11 @@ def ensure_increasing_altitude(ds):
         Dataset with corrected pressure
     """
     if ("pres_pa_mid" not in ds) and ("pres_pa_int" not in ds):
-        warnings.warn(
-            "Missing pressure information. Ignoring vertical directionality check"
-        )
+        warnings.warn("Missing pressure information. Ignoring vertical directionality check")
         return ds
     vertical_dim = {"pres_pa_mid": "z", "pres_pa_int": "z_stagg"}
     for pres_var, vert_dim in vertical_dim.items():
-        if (
-            ds[pres_var].isel(time=0).isel(**{vert_dim: slice(0, 10)}).diff(dim="z") > 0
-        ).any():
+        if (ds[pres_var].isel(time=0).isel(**{vert_dim: slice(0, 10)}).diff(dim="z") > 0).any():
             ds = ds.sel(**{vert_dim: slice(None, None, -1)})
     return ds
 
@@ -145,21 +137,13 @@ def _add_time_granule(time, dtime):
     """
     _time_granule = time[:] + dtime[:] * MILISECONDS_TO_SECONDS
     if len(_time_granule.shape) == 2:
-        time_granule = xr.DataArray(
-            data=_time_granule, dims=("time", "y"), attrs=time.__dict__
-        )
+        time_granule = xr.DataArray(data=_time_granule, dims=("time", "y"), attrs=time.__dict__)
     elif len(_time_granule.shape) == 3:
-        time_granule = xr.DataArray(
-            data=_time_granule, dims=("time", "y", "x"), attrs=time.__dict__
-        )
+        time_granule = xr.DataArray(data=_time_granule, dims=("time", "y", "x"), attrs=time.__dict__)
     else:
-        raise ValueError(
-            "Could not assign the time of each granule. Check data dimensions."
-        )
+        raise ValueError("Could not assign the time of each granule. Check data dimensions.")
 
-    time_granule = xr.conventions.decode_cf_variable(
-        "time_granule", time_granule.variable
-    )
+    time_granule = xr.conventions.decode_cf_variable("time_granule", time_granule.variable)
     return time_granule
 
 
@@ -219,13 +203,9 @@ def _add_variable(variable, netcdf_dataset):
     dtype = var[:].dtype
     if np.issubdtype(dtype, np.integer):
         var_values = var[:].filled(np.iinfo(dtype).min)
-        da = xr.DataArray(data=var_values, dims=dimensions, attrs=var.__dict__).astype(
-            dtype
-        )
+        da = xr.DataArray(data=var_values, dims=dimensions, attrs=var.__dict__).astype(dtype)
     else:
-        da = xr.DataArray(data=var[:], dims=dimensions, attrs=var.__dict__).astype(
-            dtype
-        )
+        da = xr.DataArray(data=var[:], dims=dimensions, attrs=var.__dict__).astype(dtype)
     return da
 
 
@@ -271,13 +251,9 @@ def _calc_pressure_levels(netcdf_tropomi, product="check"):
 
     dims = tm5_constant_a.dims
     if "vertices" in dims or product == "no2":
-        return _calc_pressure_tropomi_no2(
-            tm5_constant_a, tm5_constant_b, surface_pressure
-        )
+        return _calc_pressure_tropomi_no2(tm5_constant_a, tm5_constant_b, surface_pressure)
     if "time" in dims or product == "hcho":
-        return _calc_pressure_tropomi_hcho(
-            tm5_constant_a, tm5_constant_b, surface_pressure
-        )
+        return _calc_pressure_tropomi_hcho(tm5_constant_a, tm5_constant_b, surface_pressure)
     raise ValueError(f"Dims in tm5_constant_a {dims=} do not match expectations.")
 
 
@@ -318,9 +294,7 @@ def _calc_pressure_tropomi_no2(tm5_constant_a, tm5_constant_b, surface_pressure)
     )
     interface_pressure[:, 0, :, :] = surface_pressure[:]
     for i in range(0, num_layers):
-        interface_pressure[:, i + 1, :, :] = (
-            tm5_constant_a[i, 1] + tm5_constant_b[i, 1] * surface_pressure[:]
-        )
+        interface_pressure[:, i + 1, :, :] = tm5_constant_a[i, 1] + tm5_constant_b[i, 1] * surface_pressure[:]
     return midlayer_pressure, interface_pressure
 
 
@@ -349,19 +323,13 @@ def _calc_pressure_tropomi_hcho(tm5_constant_a, tm5_constant_b, surface_pressure
     )
     interface_pressure[:, 0, :, :] = surface_pressure[:]
     for i in range(0, num_layers):
-        interface_pressure[:, i + 1, :, :] = (
-            tm5_constant_a[0, i].values
-            + tm5_constant_b[0, i].values * surface_pressure[:]
-        )
+        interface_pressure[:, i + 1, :, :] = tm5_constant_a[0, i].values + tm5_constant_b[0, i].values * surface_pressure[:]
     midlayer_pressure = xr.DataArray(
         data=np.zeros((num_times, num_layers, num_y, num_x), dtype=np.float64),
         dims=("time", "z", "y", "x"),
     )
     for i in range(num_layers):
-        midlayer_pressure[:, i, :, :] = (
-            interface_pressure[:, i, :, :].values
-            + interface_pressure[:, i + 1, :, :].values
-        ) / 2
+        midlayer_pressure[:, i, :, :] = (interface_pressure[:, i, :, :].values + interface_pressure[:, i + 1, :, :].values) / 2
     midlayer_pressure.attrs = {"units": "Pa", "long_name": "midlayer_pressure_in_pa"}
     return midlayer_pressure, interface_pressure
 
@@ -379,9 +347,7 @@ def _calc_pressure_tropomi_co(pressure_level_bottom):
     xr.DataArray, xr.DataArray
         DataArrays containing the pressure at the interface and at midlevel
     """
-    pressure_level_bottom_transpose = pressure_level_bottom.transpose(
-        "time", "z", "y", "x"
-    )
+    pressure_level_bottom_transpose = pressure_level_bottom.transpose("time", "z", "y", "x")
     num_times, num_layers, num_y, num_x = pressure_level_bottom_transpose.shape
     interface_pressure = xr.DataArray(
         data=np.zeros((num_times, num_layers + 1, num_y, num_x), dtype=np.float64),
@@ -394,9 +360,7 @@ def _calc_pressure_tropomi_co(pressure_level_bottom):
         dims=("time", "z", "y", "x"),
         attrs={"long_name": "pressure_midlayer", "units": "Pa"},
     )
-    midlayer_pressure[:, :, :, :] = (
-        interface_pressure[:, :-1, :, :].values + interface_pressure[:, 1:, :, :].values
-    ) / 2
+    midlayer_pressure[:, :, :, :] = (interface_pressure[:, :-1, :, :].values + interface_pressure[:, 1:, :, :].values) / 2
     return midlayer_pressure, interface_pressure
 
 
@@ -416,16 +380,12 @@ def _calc_tm5_tropopause_pressure(processed_data, netcdf_tropomi):
     xr.DataArray
         DataArray with the tropopause pressure.
     """
-    tm5_tropopause_pressure_idx = _add_variable(
-        "tm5_tropopause_layer_index", netcdf_tropomi
-    )
+    tm5_tropopause_pressure_idx = _add_variable("tm5_tropopause_layer_index", netcdf_tropomi)
     tm5_tropopause_pressure_idx = tm5_tropopause_pressure_idx.where(
         (tm5_tropopause_pressure_idx > 0) & (tm5_tropopause_pressure_idx < 10000),
         other=-1,
     )
-    tropopause_pressure = processed_data["pres_pa_mid"].isel(
-        z=tm5_tropopause_pressure_idx
-    )
+    tropopause_pressure = processed_data["pres_pa_mid"].isel(z=tm5_tropopause_pressure_idx)
     return tropopause_pressure
 
 

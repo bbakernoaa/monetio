@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
+
 from .base import GriddedReader, register_reader
 
 try:
@@ -31,9 +32,7 @@ class MODISORNLReader(GriddedReader):
         Reads MODIS data from ORNL web service.
         """
         if not has_suds:
-            raise ImportError(
-                "Please install a suds client (pip install suds-jurko or suds-community)"
-            )
+            raise ImportError("Please install a suds client (pip install suds-jurko or suds-community)")
 
         date = pd.to_datetime(date)
         m = _get_single_retrieval(
@@ -162,9 +161,7 @@ def modisClient(
         requestEnd = dateList[i + j - 1]
         i = i + j - 1
 
-        data = client.service.getsubset(
-            lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight
-        )
+        data = client.service.getsubset(lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight)
 
         if n == 0:
             m.nrows = int(data.nrows)
@@ -192,9 +189,7 @@ def _nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
 
-def _get_single_retrieval(
-    date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight
-):
+def _get_single_retrieval(date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight):
     client = setClient()
     dateList = modisClient(client, product=product, band=band, lat=lat, lon=lon)
     dates = pd.to_datetime(dateList, format="A%Y%j")
@@ -236,9 +231,7 @@ def _get_single_retrieval(
 
 
 def _make_xarray_dataarray(m):
-    da = xr.DataArray(
-        m.data.reshape(m.ncols, m.nrows, order="C")[::-1, :], dims=("x", "y")
-    )
+    da = xr.DataArray(m.data.reshape(m.ncols, m.nrows, order="C")[::-1, :], dims=("x", "y"))
     da.attrs["long_name"] = m.band
     da.attrs["product"] = m.product
     da.attrs["cellsize"] = m.cellsize

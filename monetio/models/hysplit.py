@@ -7,13 +7,13 @@ from ..readers.hysplit import (
     add_species,
     check_drange,
     check_grid_continuity,
-    combine_dataset as combine_dataset_reader,
     fix_grid_continuity,
     get_latlongrid,
     getlatlon,
     open_dataset_hysplit,
     reset_latlon_coords,
 )
+from ..readers.hysplit import combine_dataset as combine_dataset_reader
 
 
 def open_dataset(fname, **kwargs):

@@ -19,7 +19,9 @@ def chimere_test_file():
     raise FileNotFoundError(f"File {TEST_FP} not found. Download first.")
 
 
-def _test_ds(xrds, var_list: list[str] = []):
+def _test_ds(xrds, var_list: list[str] = None):
+    if var_list is None:
+        var_list = []
     assert isinstance(xrds, xr.Dataset)
     assert all(coord in xrds.coords for coord in ["longitude", "latitude"])
     assert all(dim in list(xrds.dims.keys()) for dim in ["time", "z", "x", "y"])

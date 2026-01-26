@@ -75,9 +75,7 @@ def open_mfdataset(
             if "temperature_k" in dset.variables:
                 var_list = var_list + ["temperature_k"]
         else:
-            warnings.warn(
-                "Filename for meteorological input not provided. Adding only altitude."
-            )
+            warnings.warn("Filename for meteorological input not provided. Adding only altitude.")
         if (landuse_file is not None) and ("alt_agl_m_mid" in dset.variables):
             file_keywords = _choose_xarray_engine_and_keywords(landuse_file)
             with xr.open_dataset(**file_keywords) as dset_lu:
@@ -185,10 +183,7 @@ def add_met_data_3D(d_chem, d_met):
         Dataset containing all of the added parameters
     """
     if d_chem.sizes["LAY"] != d_met.sizes["LAY"]:
-        raise IndexError(
-            "Different layer number in meteorological and chemical datasets."
-            + " Maybe one of the is 2D?"
-        )
+        raise IndexError("Different layer number in meteorological and chemical datasets." + " Maybe one of the is 2D?")
 
     # d_met has a final TSTEP not present in d_chem
     d_met = d_met.isel(TSTEP=slice(0, len(d_met.TSTEP) - 1))
@@ -215,9 +210,7 @@ def add_met_data_3D(d_chem, d_met):
     elif "TEMP_K" in d_met.variables:
         d_chem["temperature_k"] = d_met["TEMP_K"]
     else:
-        warnings.warn(
-            "No temperature variable found. TEMP_K and temperature were tested."
-        )
+        warnings.warn("No temperature variable found. TEMP_K and temperature were tested.")
     if "temperature_k" in d_chem.variables:
         d_chem["temperature_k"].attrs["var_desc"] = "Temperature of layer in K."
 
@@ -297,9 +290,7 @@ def add_lazy_pm10(d):
         if can_do(index):
             newkeys = allvars.loc[index]
             d["PM10"] = add_multiple_lazy(d, newkeys)
-            d["PM10"] = d["PM10"].assign_attrs(
-                {"name": "PM10", "long_name": "Particulate Matter < 10 microns"}
-            )
+            d["PM10"] = d["PM10"].assign_attrs({"name": "PM10", "long_name": "Particulate Matter < 10 microns"})
     return d
 
 
@@ -323,9 +314,7 @@ def add_lazy_pm_course(d):
     if can_do(index):
         newkeys = allvars.loc[index]
         d["PM_COURSE"] = add_multiple_lazy(d, newkeys)
-        d["PM_COURSE"] = d["PM_COURSE"].assign_attrs(
-            {"name": "PM_COURSE", "long_name": "Course Mode Particulate Matter"}
-        )
+        d["PM_COURSE"] = d["PM_COURSE"].assign_attrs({"name": "PM_COURSE", "long_name": "Course Mode Particulate Matter"})
     return d
 
 
@@ -351,9 +340,7 @@ def add_lazy_clf(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["CLf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["CLf"] = d["CLf"].assign_attrs(
-            {"name": "CLf", "long_name": "Fine Mode particulate Cl"}
-        )
+        d["CLf"] = d["CLf"].assign_attrs({"name": "CLf", "long_name": "Fine Mode particulate Cl"})
     return d
 
 
@@ -450,15 +437,11 @@ def _calc_midlayer_height_agl(dset):
         height = "ZGRID_M"
     else:
         raise "No height variable found, but _calc_midlayer_height_agl was called."
-    mid_layer_height = np.array(
-        dset[height]
-    )  # height in the layer upper interface of each layer
+    mid_layer_height = np.array(dset[height])  # height in the layer upper interface of each layer
     layer_height_agl = dset[height]
     layer_height_agl.attrs["long_name"] = "Height AGL at top"
     layer_height_agl.attrs["var_desc"] = "Layer height above ground level at top"
-    mid_layer_height[:, 1:, :, :] = (
-        mid_layer_height[:, :-1, :, :] + mid_layer_height[:, 1:, :, :]
-    ) / 2
+    mid_layer_height[:, 1:, :, :] = (mid_layer_height[:, :-1, :, :] + mid_layer_height[:, 1:, :, :]) / 2
     mid_layer_height[0, 0, :, :] = mid_layer_height[0, 0, :, :] / 2
     alt_agl_m_mid = xr.zeros_like(dset[height])
     alt_agl_m_mid[:, :, :, :] = mid_layer_height
@@ -467,9 +450,7 @@ def _calc_midlayer_height_agl(dset):
 
     dz_m = xr.zeros_like(layer_height_agl)
     dz_m[:, 0, :, :] = layer_height_agl[:, 0, :, :].values
-    dz_m[:, 1:, :, :] = (
-        layer_height_agl[:, 1:, :, :].values - layer_height_agl[:, :-1, :, :].values
-    )
+    dz_m[:, 1:, :, :] = layer_height_agl[:, 1:, :, :].values - layer_height_agl[:, :-1, :, :].values
     dz_m.attrs["long_name"] = "dz in meters"
     dz_m.attrs["var_desc"] = "Layer thickness in meters"
     return alt_agl_m_mid, dz_m
@@ -500,9 +481,7 @@ def _calc_midlayer_height_msl(dset, dset_lu):
         topo = "topo"
     else:
         topo = "TOPO_M"
-    alt_msl_m_mid = dset["alt_agl_m_mid"] + np.tile(
-        dset[topo].values, (ntsteps, nlayers, 1, 1)
-    )
+    alt_msl_m_mid = dset["alt_agl_m_mid"] + np.tile(dset[topo].values, (ntsteps, nlayers, 1, 1))
     alt_msl_m_mid.attrs = alt_agl_m_mid.attrs
     alt_msl_m_mid.attrs["var_desc"] = "Layer height above sea level"
     return alt_msl_m_mid
