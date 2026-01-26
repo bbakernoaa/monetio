@@ -1,11 +1,9 @@
 """CRN Reader"""
 
 import os
-
+import pandas as pd
 import dask
 import dask.dataframe as dd
-import pandas as pd
-
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
@@ -208,7 +206,9 @@ class CRN:
                 state = monitors.iloc[i].STATE
                 site = monitors.iloc[i].LOCATION.replace(" ", "_")
                 vector = monitors.iloc[i].VECTOR.replace(" ", "_")
-                url, fname = self.build_url(y, state, site, vector, daily=daily, sub_hourly=sub_hourly)
+                url, fname = self.build_url(
+                    y, state, site, vector, daily=daily, sub_hourly=sub_hourly
+                )
                 if self.check_url(url):
                     urls.append(url)
                     fnames.append(fname)
@@ -227,7 +227,9 @@ class CRN:
         try:
             import monetio
 
-            path = os.path.join(os.path.dirname(monetio.__file__), "data", "stations.tsv")
+            path = os.path.join(
+                os.path.dirname(monetio.__file__), "data", "stations.tsv"
+            )
             self.monitor_df = pd.read_csv(path, delimiter="\t")
         except:
             print("Could not load stations.tsv")
@@ -242,7 +244,9 @@ class CRN:
                 ]
             )
 
-    def add_data(self, dates, daily=False, sub_hourly=False, download=False, latlonbox=None):
+    def add_data(
+        self, dates, daily=False, sub_hourly=False, download=False, latlonbox=None
+    ):
         if self.monitor_df is None:
             self.get_monitor_df()
 
@@ -258,7 +262,9 @@ class CRN:
         else:
             monitors = self.monitor_df.copy()
 
-        urls, fnames = self.build_urls(monitors, dates, daily=daily, sub_hourly=sub_hourly)
+        urls, fnames = self.build_urls(
+            monitors, dates, daily=daily, sub_hourly=sub_hourly
+        )
 
         if download:
             for url, fname in zip(urls, fnames):
@@ -273,11 +279,15 @@ class CRN:
         dff = dd.from_delayed(dfs)
         self.df = dff.compute()
 
-        self.df = pd.merge(self.df, monitors, how="left", on=["WBANNO", "LATITUDE", "LONGITUDE"])
+        self.df = pd.merge(
+            self.df, monitors, how="left", on=["WBANNO", "LATITUDE", "LONGITUDE"]
+        )
 
         if not self.df.columns.isin(["time"]).max():
             if "time_local" in self.df.columns and "GMT_OFFSET" in self.df.columns:
-                self.df["time"] = self.df.time_local + pd.to_timedelta(self.df.GMT_OFFSET, unit="h")
+                self.df["time"] = self.df.time_local + pd.to_timedelta(
+                    self.df.GMT_OFFSET, unit="h"
+                )
 
         self.df.rename(columns={"WBANNO": "siteid"}, inplace=True)
         self.df.columns = [i.lower() for i in self.df.columns]

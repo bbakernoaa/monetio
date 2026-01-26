@@ -1,9 +1,7 @@
 """PAMS Reader"""
 
 import json
-
 import pandas as pd
-
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
@@ -52,7 +50,9 @@ def add_data_pams(filename):
         + data.site_number.astype(str).str.zfill(4)
     )
 
-    data["datetime_local"] = pd.to_datetime(data["date_local"] + " " + data["time_local"])
+    data["datetime_local"] = pd.to_datetime(
+        data["date_local"] + " " + data["time_local"]
+    )
     data["datetime_utc"] = pd.to_datetime(data["date_gmt"] + " " + data["time_gmt"])
 
     data = data.rename(

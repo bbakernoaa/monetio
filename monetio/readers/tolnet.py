@@ -1,10 +1,8 @@
 """TOLNet Reader"""
 
 import os
-
 import pandas as pd
 import xarray as xr
-
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -47,7 +45,6 @@ class TOLNet:
 
     def add_data(self, fname):
         from h5py import File
-
         # FileUtility logic for HDF5?
         # h5py can take a file-like object (bytes)
 

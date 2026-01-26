@@ -28,11 +28,15 @@ def test_open_dataset_invalid_param():
     ],
 )
 def test_open_dataset(tmp_path, monkeypatch, date, product, data_var):
-    ds = open_dataset(date, product=product, data_var=data_var, download=False, verify=False)
+    ds = open_dataset(
+        date, product=product, data_var=data_var, download=False, verify=False
+    )
     assert set(ds.dims) == {"time", "lat", "lon"}
 
     monkeypatch.chdir(tmp_path)
-    ds_dl = open_dataset(date, product=product, data_var=data_var, download=True, verify=False)
+    ds_dl = open_dataset(
+        date, product=product, data_var=data_var, download=True, verify=False
+    )
     assert len(sorted(tmp_path.glob("*.nc"))) == 1
     assert set(ds_dl.dims) == {"time", "lat", "lon"}
 
@@ -44,13 +48,19 @@ def test_open_mfdataset(tmp_path, monkeypatch):
     product = "C4"
     data_var = "dustaod550"
 
-    ds = open_mfdataset(dates, product=product, data_var=data_var, download=False, verify=False)
+    ds = open_mfdataset(
+        dates, product=product, data_var=data_var, download=False, verify=False
+    )
     assert set(ds.dims) == {"time", "lat", "lon"}
     assert ds["dust_aod_mean"].chunks is None, "not Dask-backed"
-    assert (~ds.time.to_series().duplicated(keep=False)).sum() == 8, "all overlap except first and last day"
+    assert (~ds.time.to_series().duplicated(keep=False)).sum() == 8, (
+        "all overlap except first and last day"
+    )
 
     monkeypatch.chdir(tmp_path)
-    ds_dl = open_mfdataset(dates, product=product, data_var=data_var, download=True, verify=False)
+    ds_dl = open_mfdataset(
+        dates, product=product, data_var=data_var, download=True, verify=False
+    )
     assert len(sorted(tmp_path.glob("*.nc"))) == 2
     assert set(ds_dl.dims) == {"time", "lat", "lon"}
     assert ds_dl["dust_aod_mean"].chunks is not None

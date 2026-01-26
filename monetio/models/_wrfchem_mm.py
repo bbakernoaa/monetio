@@ -101,14 +101,20 @@ def open_mfdataset(
             # These will already be included in the final result
             continue
         if var == "pres":
-            var_wrf = getvar(wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False, units="Pa")
+            var_wrf = getvar(
+                wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False, units="Pa"
+            )
         elif var in {"height", "height_agl", "zstag"}:
-            var_wrf = getvar(wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False, units="m")
+            var_wrf = getvar(
+                wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False, units="m"
+            )
             if var == "zstag":
                 var_wrf = var_wrf.rename("zstag")
         elif var in {"uvmet10", "uvmet"}:
             # These return u and v wind components in one variable
-            var_wrf = getvar(wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False)
+            var_wrf = getvar(
+                wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False
+            )
             var_wrf_list.extend(
                 [
                     var_wrf.isel(u_v=0).drop_vars("u_v").rename(f"{var}_u"),
@@ -119,30 +125,49 @@ def open_mfdataset(
         elif var in {"uvmet10_wspd_wdir", "uvmet_wspd_wdir"}:
             # These return wind speed and wind direction in one variable
             pref = var.split("_")[0]
-            var_wrf = getvar(wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False)
+            var_wrf = getvar(
+                wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False
+            )
             var_wrf_list.extend(
                 [
-                    var_wrf.isel(wspd_wdir=0).drop_vars("wspd_wdir").rename(f"{pref}_wspd"),
-                    (var_wrf.isel(wspd_wdir=1).drop_vars("wspd_wdir").rename(f"{pref}_wdir").assign_attrs(units="deg")),
+                    var_wrf.isel(wspd_wdir=0)
+                    .drop_vars("wspd_wdir")
+                    .rename(f"{pref}_wspd"),
+                    (
+                        var_wrf.isel(wspd_wdir=1)
+                        .drop_vars("wspd_wdir")
+                        .rename(f"{pref}_wdir")
+                        .assign_attrs(units="deg")
+                    ),
                 ]
             )
             continue
         elif var in {"uvmet10_wspd", "uvmet10_wdir", "uvmet_wspd", "uvmet_wdir"}:
             # These return a variable with _wspd_wdir suffix instead of the correct name
-            var_wrf = getvar(wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False)
+            var_wrf = getvar(
+                wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False
+            )
             var_wrf = var_wrf.drop_vars("wspd_wdir").rename(var)
             if var.endswith("_wdir"):
                 var_wrf = var_wrf.assign_attrs(units="deg")
         else:
-            var_wrf = getvar(wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False)
+            var_wrf = getvar(
+                wrflist, var, timeidx=ALL_TIMES, method="cat", squeeze=False
+            )
         var_wrf_list.append(var_wrf)
 
     dset = xr.merge(var_wrf_list)
 
     if not surf_only_nc:
         # Compute layer thickness
-        dset["dz"] = dset["zstag"].diff("bottom_top_stag").swap_dims({"bottom_top_stag": "bottom_top"})
-        dset["dz"] = dset["dz"].assign_attrs({"units": "m", "long_name": "layer thickness"})
+        dset["dz"] = (
+            dset["zstag"]
+            .diff("bottom_top_stag")
+            .swap_dims({"bottom_top_stag": "bottom_top"})
+        )
+        dset["dz"] = dset["dz"].assign_attrs(
+            {"units": "m", "long_name": "layer thickness"}
+        )
 
     # Add global attributes needed
     a_truelat1 = extract_global_attrs(wrflist[0], "TRUELAT1")
@@ -300,7 +325,9 @@ def add_lazy_noy_g(d, dict_sum):
         newkeys = allvars.loc[index]
         newweights = weights.loc[index]
         d["noy_gas"] = add_multiple_lazy(d, newkeys, weights=newweights)
-        d["noy_gas"] = d["noy_gas"].assign_attrs({"name": "noy_gas", "long_name": "NOy gases"})
+        d["noy_gas"] = d["noy_gas"].assign_attrs(
+            {"name": "noy_gas", "long_name": "NOy gases"}
+        )
     return d
 
 
@@ -324,7 +351,9 @@ def add_lazy_noy_a(d, dict_sum):
     if can_do(index):
         newkeys = allvars.loc[index]
         d["noy_aer"] = add_multiple_lazy(d, newkeys)
-        d["noy_aer"] = d["noy_aer"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "noy_aer", "long_name": "NOy aerosol"})
+        d["noy_aer"] = d["noy_aer"].assign_attrs(
+            {"units": r"$\mu g m^{-3}$", "name": "noy_aer", "long_name": "NOy aerosol"}
+        )
     return d
 
 
@@ -564,7 +593,9 @@ def add_lazy_om_pm25(d, dict_sum):
     if can_do(index):
         newkeys = allvars.loc[index]
         d["pm25_om"] = add_multiple_lazy(d, newkeys)
-        d["pm25_om"] = d["pm25_om"].assign_attrs({"units": r"$\mu g m^{-3}$", "name": "pm25_om", "long_name": "PM2.5 OM"})
+        d["pm25_om"] = d["pm25_om"].assign_attrs(
+            {"units": r"$\mu g m^{-3}$", "name": "pm25_om", "long_name": "PM2.5 OM"}
+        )
     return d
 
 
@@ -661,7 +692,9 @@ def dict_species_sums(mech):
             }
         )
         sum_dict.update({"noy_gas_weight": [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1]})
-        sum_dict.update({"noy_aer": ["no3ai", "no3aj"]})  # Need to confirm here if there is a size cutoff for noy obs?
+        sum_dict.update(
+            {"noy_aer": ["no3ai", "no3aj"]}
+        )  # Need to confirm here if there is a size cutoff for noy obs?
         sum_dict.update({"nox": ["no", "no2"]})
         sum_dict.update({"pm25_cl": ["clai", "claj"]})
         sum_dict.update({"pm25_cl_weight": [1, 1]})
@@ -702,9 +735,13 @@ def dict_species_sums(mech):
     elif mech == "redhc":
         sum_dict = {}
         # Arrays for different gasses and pm groupings
-        sum_dict.update({"noy_gas": ["hno3", "no", "no2", "no3", "pan", "ho2no2", "onit", "n2o5"]})
+        sum_dict.update(
+            {"noy_gas": ["hno3", "no", "no2", "no3", "pan", "ho2no2", "onit", "n2o5"]}
+        )
         sum_dict.update({"noy_gas_weight": [1, 1, 1, 1, 1, 1, 1, 2]})
-        sum_dict.update({"noy_aer": ["no3ai", "no3aj"]})  # Need to confirm here if there is a size cutoff for noy obs?
+        sum_dict.update(
+            {"noy_aer": ["no3ai", "no3aj"]}
+        )  # Need to confirm here if there is a size cutoff for noy obs?
         sum_dict.update({"nox": ["no", "no2"]})
         sum_dict.update({"pm25_cl": ["clai", "claj"]})
         sum_dict.update({"pm25_cl_weight": [1, 1]})
@@ -748,6 +785,8 @@ def dict_species_sums(mech):
         )
 
     else:
-        raise NotImplementedError("Mechanism not supported, update _wrfchem_mm.py file in MONETIO")
+        raise NotImplementedError(
+            "Mechanism not supported, update _wrfchem_mm.py file in MONETIO"
+        )
 
     return sum_dict

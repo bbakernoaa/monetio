@@ -1,8 +1,7 @@
 """FV3-CHEM Reader"""
 
-from glob import glob
-
 from numpy import sort
+from glob import glob
 from pandas import Timedelta, to_datetime
 
 from .base import GriddedReader, register_reader
@@ -40,7 +39,9 @@ class FV3ChemReader(GriddedReader):
         if not nemsio and not grib:
             # Fallback or error
             # Original code raises ValueError
-            raise ValueError("File format not recognized. Ensure nemsio or grib2/grb2 in filename.")
+            raise ValueError(
+                "File format not recognized. Ensure nemsio or grib2/grb2 in filename."
+            )
 
         # Prepare kwargs
         if "concat_dim" not in kwargs:
@@ -210,10 +211,15 @@ def _fix_grib2(f):
         "AOTK_chemical_Total_Aerosol_aerosol_size__2e_05_aerosol_wavelength_4_3e_07_4_5e_07_entireatmosphere": "pm25aod440",
         "AOTK_chemical_Total_Aerosol_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "pm25aod550",
         "var0_20_112_chemical_Total_Aerosol_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "tc_pm25aod550",
+        "AOTK_chemical_Dust_Dry_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "dust25aod550",
         "var0_20_112_chemical_Dust_Dry_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "tc_dust25aod550",
+        "AOTK_chemical_Sea_Salt_Dry_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "salt25aod550",
         "var0_20_112_chemical_Sea_Salt_Dry_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "tc_salt25aod550",
+        "AOTK_chemical_Sulphate_Dry_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "sulf25aod550",
         "var0_20_112_chemical_Sulphate_Dry_aerosol_size__7e_07_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "tc_sulf25aod550",
+        "AOTK_chemical_Particulate_Organic_Matter_Dry_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "oc25aod550",
         "var0_20_112_chemical_Particulate_Organic_Matter_Dry_aerosol_size__7e_07_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "tc_sulfaod550",
+        "AOTK_chemical_Black_Carbon_Dry_aerosol_size__2e_05_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "bc25aod550",
         "var0_20_112_chemical_Black_Carbon_Dry_aerosol_size__7e_07_aerosol_wavelength_5_45e_07_5_65e_07_entireatmosphere": "tc_ocaod550",
         "AOTK_chemical_Total_Aerosol_aerosol_size__2e_05_aerosol_wavelength_6_2e_07_6_7e_07_entireatmosphere": "pm25aod640",
         "AOTK_chemical_Total_Aerosol_aerosol_size__2e_05_aerosol_wavelength_8_41e_07_8_76e_07_entireatmosphere": "pm25aod860",
@@ -221,8 +227,11 @@ def _fix_grib2(f):
         "AOTK_chemical_Total_Aerosol_aerosol_size__2e_05_aerosol_wavelength_1_1e_05_1_12e_05_entireatmosphere": "pm25aod11500",
         "COLMD_chemical_Total_Aerosol_aerosol_size__1e_05_aerosol_wavelength_____code_table_4_91_255_entireatmosphere": "tc_pm10",
         "COLMD_chemical_Total_Aerosol_aerosol_size__2_5e_06_aerosol_wavelength_____code_table_4_91_255_entireatmosphere": "tc_pm25",
+        "COLMD_chemical_Dust_Dry_aerosol_size__2_5e_06_aerosol_wavelength_____code_table_4_91_255_entireatmosphere": "tc_dust25",
+        "COLMD_chemical_Sea_Salt_Dry_aerosol_size__2_5e_06_aerosol_wavelength_____code_table_4_91_255_entireatmosphere": "tc_salt25",
         "COLMD_chemical_Black_Carbon_Dry_aerosol_size__2_36e_08_aerosol_wavelength_____code_table_4_91_255_entireatmosphere": "tc_bc036",
         "COLMD_chemical_Particulate_Organic_Matter_Dry_aerosol_size__4_24e_08_aerosol_wavelength_____code_table_4_91_255_entireatmosphere": "tc_oc0428",
+        "COLMD_chemical_Sulphate_Dry_aerosol_size__2_5e_06_aerosol_wavelength_____code_table_4_91_255_entireatmosphere": "tc_sulf25",
         "AOTK_aerosol_EQ_Total_Aerosol_aerosol_size_LT_2eM05_aerosol_wavelength_GE_3D38eM07_LE_3D42eM07_entireatmosphere": "pm25aod340_eq",
         "ASYSFK_aerosol_EQ_Total_Aerosol_aerosol_size_LT_2eM05_aerosol_wavelength_GE_3D38eM07_LE_3D42eM07_entireatmosphere": "AF_pm25aod340",
         "SSALBK_aerosol_EQ_Total_Aerosol_aerosol_size_LT_2eM05_aerosol_wavelength_GE_3D38eM07_LE_3D42eM07_entireatmosphere": "SSA_pm25aod340",
@@ -254,9 +263,9 @@ def _fix_grib2(f):
     # The original code did manual meshgrid logic.
     if f.latitude.ndim == 1 and f.longitude.ndim == 1:
         from numpy import meshgrid
-
         # Original logic implies lat/lon were 1D arrays of unique values?
         # "f['latitude'] = range(len(f.latitude))" -> this suggests original coords were 1D
+
         # NOTE: XarrayDriver typically gives what xarray gives.
         # If we want to replicate exactly:
         lat_vals = f.latitude.values

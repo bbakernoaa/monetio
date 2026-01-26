@@ -25,7 +25,9 @@ def add_data(
     )
 
 
-def aggregate_files(dates, *, download=False, n_procs=1, daily=False, bad_utcoffset="drop"):
+def aggregate_files(
+    dates, *, download=False, n_procs=1, daily=False, bad_utcoffset="drop"
+):
     """Aggregate AirNow files."""
     return AirNowReader().open_dataset(
         dates=dates,

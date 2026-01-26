@@ -2,9 +2,7 @@
 
 import datetime
 import os
-
 import pandas as pd
-
 from .base import PointReader, register_reader
 
 
@@ -13,7 +11,7 @@ class CEMSReader(PointReader):
     def open_dataset(
         self,
         rdate,
-        states=None,
+        states=["md"],
         download=False,
         verbose=True,
         files=None,  # Support local files directly
@@ -22,8 +20,6 @@ class CEMSReader(PointReader):
         """
         Reads CEMS data.
         """
-        if states is None:
-            states = ["md"]
         c = CEMS()
 
         if files:
@@ -89,9 +85,7 @@ class CEMS:
         self.df = pd.DataFrame()
         self.namehash = {}
 
-    def add_data(self, rdate, states=None, download=False, verbose=True):
-        if states is None:
-            states = ["md"]
+    def add_data(self, rdate, states=["md"], download=False, verbose=True):
         if isinstance(states, str):
             states = [states]
         if isinstance(rdate, list):
@@ -149,11 +143,23 @@ class CEMS:
                 rcolumn = self.rename(ccc, "orispl_code", rcolumn, verbose)
             elif "facility" in ccc.lower() and "id" in ccc.lower():
                 rcolumn = self.rename(ccc, "fac_id", rcolumn, verbose)
-            elif "so2" in ccc.lower() and "lbs" in ccc.lower() and "rate" not in ccc.lower():
+            elif (
+                "so2" in ccc.lower()
+                and "lbs" in ccc.lower()
+                and "rate" not in ccc.lower()
+            ):
                 rcolumn = self.rename(ccc, "so2_lbs", rcolumn, verbose)
-            elif "nox" in ccc.lower() and "lbs" in ccc.lower() and "rate" not in ccc.lower():
+            elif (
+                "nox" in ccc.lower()
+                and "lbs" in ccc.lower()
+                and "rate" not in ccc.lower()
+            ):
                 rcolumn = self.rename(ccc, "nox_lbs", rcolumn, verbose)
-            elif "co2" in ccc.lower() and "short" in ccc.lower() and "tons" in ccc.lower():
+            elif (
+                "co2" in ccc.lower()
+                and "short" in ccc.lower()
+                and "tons" in ccc.lower()
+            ):
                 rcolumn = self.rename(ccc, "co2_short_tons", rcolumn, verbose)
             elif "date" in ccc.lower():
                 rcolumn = self.rename(ccc, "date", rcolumn, verbose)
@@ -190,7 +196,9 @@ class CEMS:
 
         dfmt = get_date_fmt(dftemp["date"][0], verbose=verbose)
         dftime = dftemp.apply(
-            lambda x: datetime.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt),
+            lambda x: datetime.datetime.strptime(
+                "{} {}".format(x["date"], x["hour"]), dfmt
+            ),
             axis=1,
         )
         dftemp = pd.concat([dftime, dftemp], axis=1)

@@ -1,11 +1,9 @@
 """HYSPLIT Reader"""
 
 import datetime
-
 import numpy as np
 import pandas as pd
 import xarray as xr
-
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -108,7 +106,9 @@ class ModelBin:
         if readwrite == "r":
             if verbose:
                 print("reading " + filename)
-            self.dataflag = self.readfile(filename, drange, verbose=verbose, century=century)
+            self.dataflag = self.readfile(
+                filename, drange, verbose=verbose, century=century
+            )
 
     @staticmethod
     def define_struct():
@@ -207,7 +207,9 @@ class ModelBin:
 
     def parse_header(self, hdata1):
         if len(hdata1["start_loc"]) != 1:
-            print("WARNING in ModelBin _readfile - number of starting locations incorrect")
+            print(
+                "WARNING in ModelBin _readfile - number of starting locations incorrect"
+            )
         nstartloc = hdata1["start_loc"][0]
         self.atthash["Meteorological Model ID"] = hdata1["model_id"][0].decode("UTF-8")
         self.atthash["Number Start Locations"] = nstartloc
@@ -228,7 +230,9 @@ class ModelBin:
                     century = 2000
                 else:
                     century = 1900
-                print("WARNING: Guessing Century for HYSPLIT concentration file", century)
+                print(
+                    "WARNING: Guessing Century for HYSPLIT concentration file", century
+                )
 
             sourcedate = datetime.datetime(
                 century + hdata2["r_year"][nnn],
@@ -351,7 +355,9 @@ class ModelBin:
                 for _ in range(self.atthash["Number of Species"]):
                     hdata8a = np.fromfile(fid, dtype=rec8a, count=1)
                     if hdata8a["ne"] >= 1:
-                        self.atthash["Species ID"].append(hdata8a["poll"][0].decode("UTF-8"))
+                        self.atthash["Species ID"].append(
+                            hdata8a["poll"][0].decode("UTF-8")
+                        )
                         hdata8b = np.fromfile(fid, dtype=rec8b, count=hdata8a["ne"][0])
                         self.nonzeroconcdates.append(pdate1)
                     else:
@@ -387,13 +393,17 @@ class ModelBin:
             return False
         if self.dset.variables:
             self.dset.attrs = self.atthash
-            mgrid = get_latlongrid(self.gridhash, self.dset.coords["x"], self.dset.coords["y"])
+            mgrid = get_latlongrid(
+                self.gridhash, self.dset.coords["x"], self.dset.coords["y"]
+            )
             self.dset = self.dset.assign_coords(longitude=(("y", "x"), mgrid[0]))
             self.dset = self.dset.assign_coords(latitude=(("y", "x"), mgrid[1]))
             self.dset = self.dset.reset_coords()
             self.dset = self.dset.set_coords(["time", "latitude", "longitude"])
         if iii == 0 and verbose:
-            print("Warning: ModelBin class _readfile method: no data in the date range found")
+            print(
+                "Warning: ModelBin class _readfile method: no data in the date range found"
+            )
             return False
         return True
 

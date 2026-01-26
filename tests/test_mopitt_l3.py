@@ -17,7 +17,7 @@ def retrieve_test_file():
     # Download to tests/data if not already present
     p = HERE / "data" / fn
     if not p.is_file():
-        warnings.warn(f"Downloading test file {fn} for MOPITT L3 test", stacklevel=2)
+        warnings.warn(f"Downloading test file {fn} for MOPITT L3 test")
         import time
 
         import requests
@@ -28,7 +28,9 @@ def retrieve_test_file():
             "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/example_observation_data/satellite/MOP03JM-201701-L3V95.9.3.he5"
         )
         max_retries = 5
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; MonetioTest/1.0; +https://github.com/noaa-oar-arl/monetio)"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; MonetioTest/1.0; +https://github.com/noaa-oar-arl/monetio)"
+        }
         success = False
         for attempt in range(max_retries):
             try:
@@ -45,28 +47,40 @@ def retrieve_test_file():
             import subprocess
 
             try:
-                subprocess.run(["wget", "-O", str(p), url], check=True, capture_output=True)
+                subprocess.run(
+                    ["wget", "-O", str(p), url], check=True, capture_output=True
+                )
                 success = True
             except Exception as e:
-                pytest.skip(f"Could not download test file {fn} from CSL using requests or wget: {e}")
+                pytest.skip(
+                    f"Could not download test file {fn} from CSL using requests or wget: {e}"
+                )
 
         # Post-download: check file size and HDF5 signature
         min_size_mb = 10
         if p.stat().st_size < min_size_mb * 1024 * 1024:
-            pytest.skip(f"Downloaded file {fn} is too small (likely incomplete): {p.stat().st_size} bytes")
+            pytest.skip(
+                f"Downloaded file {fn} is too small (likely incomplete): {p.stat().st_size} bytes"
+            )
         with open(p, "rb") as f:
             sig = f.read(8)
         if sig != b"\x89HDF\r\n\x1a\n":
-            pytest.skip(f"Downloaded file {fn} does not have a valid HDF5 signature; got: {sig}")
+            pytest.skip(
+                f"Downloaded file {fn} does not have a valid HDF5 signature; got: {sig}"
+            )
 
         # Post-download: check file size and HDF5 signature
         min_size_mb = 10
         if p.stat().st_size < min_size_mb * 1024 * 1024:
-            pytest.skip(f"Downloaded file {fn} is too small (likely incomplete): {p.stat().st_size} bytes")
+            pytest.skip(
+                f"Downloaded file {fn} is too small (likely incomplete): {p.stat().st_size} bytes"
+            )
         with open(p, "rb") as f:
             sig = f.read(8)
         if sig != b"\x89HDF\r\n\x1a\n":
-            pytest.skip(f"Downloaded file {fn} does not have a valid HDF5 signature; got: {sig}")
+            pytest.skip(
+                f"Downloaded file {fn} does not have a valid HDF5 signature; got: {sig}"
+            )
 
     return p
 

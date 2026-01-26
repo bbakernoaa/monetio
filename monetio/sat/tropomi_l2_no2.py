@@ -61,7 +61,9 @@ def _open_one_dataset(fname, variable_dict):
     ds["scan_time"] = ds["time"] + dtime
     ds["scan_time"].attrs.update({"long_name": "scan time"})
     ds = ds.set_coords(["lon", "lat", "time", "scan_time"])
-    ds.attrs["reference_time_string"] = ref_time_val.astype(datetime).strftime(r"%Y-%m-%d")
+    ds.attrs["reference_time_string"] = ref_time_val.astype(datetime).strftime(
+        r"%Y-%m-%d"
+    )
 
     def get_extra(varname_, *, dct_=None, default_group="PRODUCT"):
         """Get non-varname variables."""
@@ -83,8 +85,12 @@ def _open_one_dataset(fname, variable_dict):
             itrop_ = get_extra("tm5_tropopause_layer_index", dct_=dct)
             itrop_[itrop_ == 0] = 1  # Avoid trop in surface layer
             itrop = xr.DataArray(itrop_, dims=("y", "x"))
-            a = xr.DataArray(data=get_extra("tm5_constant_a", dct_=dct), dims=("z", "v"))
-            b = xr.DataArray(data=get_extra("tm5_constant_b", dct_=dct), dims=("z", "v"))
+            a = xr.DataArray(
+                data=get_extra("tm5_constant_a", dct_=dct), dims=("z", "v")
+            )
+            b = xr.DataArray(
+                data=get_extra("tm5_constant_b", dct_=dct), dims=("z", "v")
+            )
             psfc = xr.DataArray(
                 data=get_extra(
                     "surface_pressure",
@@ -96,9 +102,13 @@ def _open_one_dataset(fname, variable_dict):
 
             # Mid-layer pressure
             assert a.sizes["v"] == 2, "base and top"
-            p = ((a.isel(v=0) + b.isel(v=0) * psfc) + (a.isel(v=1) + b.isel(v=1) * psfc)) / 2
+            p = (
+                (a.isel(v=0) + b.isel(v=0) * psfc) + (a.isel(v=1) + b.isel(v=1) * psfc)
+            ) / 2
             ds["preslev"] = p
-            ds["preslev"].attrs.update({"long_name": "mid-layer pressure", "units": "Pa"})
+            ds["preslev"].attrs.update(
+                {"long_name": "mid-layer pressure", "units": "Pa"}
+            )
 
             # Tropopause pressure
             ptrop = xr.full_like(itrop, np.nan, dtype=ds["preslev"].dtype)
@@ -107,7 +117,9 @@ def _open_one_dataset(fname, variable_dict):
                     continue
                 ptrop = xr.where(itrop == i, p.isel(z=int(i)), ptrop)
             ds["troppres"] = ptrop
-            ds["troppres"].attrs.update({"long_name": "tropopause pressure", "units": "Pa"})
+            ds["troppres"].attrs.update(
+                {"long_name": "tropopause pressure", "units": "Pa"}
+            )
 
         elif varname in {"latitude_bounds", "longitude_bounds"}:
             group_name = dct.get("group", "PRODUCT/SUPPORT_DATA/GEOLOCATIONS")
@@ -245,7 +257,9 @@ def open_dataset(fnames, variable_dict, debug=False):
             envvar = subpath.replace("$", "")
             envval = os.getenv(envvar)
             if envval is None:
-                raise RuntimeError(f"environment variable {envvar!r} not defined: " + subpath)
+                raise RuntimeError(
+                    f"environment variable {envvar!r} not defined: " + subpath
+                )
             else:
                 fnames = fnames.replace(subpath, envval)
 

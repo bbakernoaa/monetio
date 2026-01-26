@@ -1,0 +1,85 @@
+site_name: MONETIO
+site_description: The Model and Observation Evaluation Toolkit (MONET) I/O package
+site_url: https://noaa-oar-arl.github.io/monetio/
+
+theme:
+  name: material
+  logo: assets/MONETIO_logo.png
+  favicon: assets/MONETIO_logo.png
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+repo_name: noaa-oar-arl/monetio
+repo_url: https://github.com/noaa-oar-arl/monetio
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Why MONETIO?: why-monetio.md
+    - Installing: installing.md
+    - Observations: observations.md
+    - Models: models.md
+    - Tutorial:
+      - Overview: tutorial.md
+      - Loading Data: tutorial/loading.md
+      - AQS & PAMS: tutorial/aqs_pams.md
+      - IMPROVE Trends: tutorial/improve_trends_kmeans.md
+      - CMAQ Hawaii Volcano: tutorial/CMAQ_hi_volcano.md
+      - NESDIS VIIRS AOD: tutorial/NESDIS_VIIRS_AOD.md
+      - FV3-Chem Tutorial: tutorial/fv3chem_tutorial.md
+    - WCOSS: wcoss.md
+  - Contributing:
+    - Adding a Reader: contributing/add_reader.md
+  - Help & Reference:
+    - Architecture: architecture.md
+    - Curated API: api.md
+    - Code Reference: reference/
+    - Get in touch: get-in-touch.md
+
+exclude_docs: |
+  conf.py
+  gen_ref_pages.py
+  **/_*.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: true
+  - mkdocs-jupyter:
+      include_source: true
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:pymdownx.emoji.twemoji
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - pymdownx.magiclink
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - footnotes

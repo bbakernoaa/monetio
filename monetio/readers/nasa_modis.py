@@ -1,8 +1,7 @@
 """NASA MODIS Reader"""
 
-import pandas as pd
 import xarray as xr
-
+import pandas as pd
 from .base import GriddedReader, register_reader
 
 

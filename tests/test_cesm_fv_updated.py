@@ -20,11 +20,12 @@ def retrieve_test_file():
     # Download to tests/data if not already present
     p = HERE / "data" / fn
     if not p.is_file():
-        warnings.warn(f"Downloading test file {fn} for CESM-FV test", stacklevel=2)
+        warnings.warn(f"Downloading test file {fn} for CESM-FV test")
         import requests
 
         r = requests.get(
-            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/" + f"example_model_data/cesmfv_example/{fn}",
+            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
+            + f"example_model_data/cesmfv_example/{fn}",
             stream=True,
         )
         r.raise_for_status()
@@ -66,8 +67,12 @@ def _check_latitude_and_longitude(ds):
     assert "longitude" in ds.coords
     assert np.all(ds.latitude.values[0, :] == ds.latitude.values[0, 0])
     assert np.all(ds.longitude.values[:, 0] == ds.longitude.values[0, 0])
-    assert np.all(ds.latitude.values >= -90) and np.all(ds.latitude.values <= 90), "Latitude values are out of range. "
-    assert np.all(ds.longitude.values >= -180) and np.all(ds.longitude.values <= 180), "Longitude values are out of range. "
+    assert np.all(ds.latitude.values >= -90) and np.all(ds.latitude.values <= 90), (
+        "Latitude values are out of range. "
+    )
+    assert np.all(ds.longitude.values >= -180) and np.all(ds.longitude.values <= 180), (
+        "Longitude values are out of range. "
+    )
 
 
 def _check_time(ds):
@@ -90,7 +95,9 @@ def _check_species_variables(ds):
 
 
 def _check_vertical_levels(ds):
-    assert np.all(np.diff(ds["z"].values) > 0), "Vertical levels are not flipped correctly. "
+    assert np.all(np.diff(ds["z"].values) > 0), (
+        "Vertical levels are not flipped correctly. "
+    )
 
 
 def _check_pressure_vars(ds):
@@ -101,7 +108,9 @@ def _check_pressure_vars(ds):
         "y",
         "x",
     ), "Dimensions for pres_pa_mid are incorrect. "
-    assert ds["pres_pa_mid"].attrs["units"] == "Pa", "Units for pres_pa_mid are incorrect. "
+    assert ds["pres_pa_mid"].attrs["units"] == "Pa", (
+        "Units for pres_pa_mid are incorrect. "
+    )
 
 
 def _check_temperature(ds):
@@ -112,7 +121,9 @@ def _check_temperature(ds):
         "y",
         "x",
     ), "Dimensions for temperature_k are incorrect. "
-    assert ds["temperature_k"].attrs["units"] == "K", "Units for temperature_k are incorrect. "
+    assert ds["temperature_k"].attrs["units"] == "K", (
+        "Units for temperature_k are incorrect. "
+    )
 
 
 def _check_altitude(ds):
@@ -123,7 +134,9 @@ def _check_altitude(ds):
         "y",
         "x",
     ), "Dimensions for alt_msl_m_mid are incorrect. "
-    assert ds["alt_msl_m_mid"].attrs["units"] == "m", "Units for alt_msl_m_mid are incorrect. "
+    assert ds["alt_msl_m_mid"].attrs["units"] == "m", (
+        "Units for alt_msl_m_mid are incorrect. "
+    )
 
 
 @cesm_xdist

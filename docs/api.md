@@ -1,0 +1,93 @@
+# API
+
+```.. module:: monetio
+```
+
+```.. py:currentmodule:: None
+```
+
+```{contents}
+:depth: 3
+:local: true
+```
+
+## Data sources
+
+### Point observations
+
+In general, these modules provide an `add_data` function for retrieving data,
+for example, `monetio.aeronet.add_data`.
+
+#### AERONET
+
+See `observations:AERONET` for more information.
+
+```.. autosummary::
+
+   monetio.aeronet.add_data
+   monetio.aeronet.add_local
+   monetio.aeronet.get_valid_sites
+```
+
+```.. autofunction:: monetio.aeronet.add_data
+```
+
+```.. autofunction:: monetio.aeronet.add_local
+```
+
+```.. autofunction:: monetio.aeronet.get_valid_sites
+```
+
+#### AirNow
+
+See `observations:AirNow` for more information.
+
+```.. autosummary::
+
+   monetio.airnow.add_data
+```
+
+```.. autofunction:: monetio.airnow.add_data
+
+```
+
+### Profile observations
+
+```.. automodule:: monetio.geoms
+```
+
+```.. py:currentmodule:: None
+```
+
+```.. autosummary::
+
+   monetio.geoms.open_dataset
+```
+
+```.. autofunction:: monetio.geoms.open_dataset
+
+```
+
+## Utility functions
+
+There are a few top-level utility functions.
+
+```.. autosummary::
+
+   monetio.rename_latlon
+   monetio.rename_to_monet_latlon
+   monetio.dataset_to_monet
+   monetio.coards_to_netcdf
+```
+
+### Grid tools
+
+```.. autosummary::
+
+   monetio.grids
+
+
+```
+
+- `genindex`
+- `modindex`

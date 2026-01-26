@@ -1,10 +1,9 @@
 import abc
-from typing import List, Union
-
-import pandas as pd
 import xarray as xr
+import pandas as pd
+from typing import Union, List
 
-from .drivers import PandasDriver, XarrayDriver
+from .drivers import XarrayDriver, PandasDriver
 
 # 1. The Registry
 READER_REGISTRY = {}
@@ -27,7 +26,9 @@ class BaseReader(abc.ABC):
     """
 
     @abc.abstractmethod
-    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> Union[xr.Dataset, pd.DataFrame]:
+    def open_dataset(
+        self, files: Union[str, List[str]], **kwargs
+    ) -> Union[xr.Dataset, pd.DataFrame]:
         """
         Main entry point to read data.
 
@@ -73,7 +74,9 @@ class PointReader(BaseReader):
     def __init__(self):
         self.driver = PandasDriver()
 
-    def open_dataset(self, files: Union[str, List[str]], read_method="read_csv", **kwargs) -> pd.DataFrame:
+    def open_dataset(
+        self, files: Union[str, List[str]], read_method="read_csv", **kwargs
+    ) -> pd.DataFrame:
         """
         Uses PandasDriver to open files.
         Readers can override this to add pre/post processing.

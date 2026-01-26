@@ -1,7 +1,6 @@
 import numpy as np
-import pandas as pd
 import xarray as xr
-
+import pandas as pd
 from monetio.readers.cmaq import CMAQReader
 
 
@@ -149,9 +148,8 @@ def test_add_lazy_diagnostic():
 
 def test_get_times():
     """Test time extraction logic."""
-    import numpy as np
-
     from monetio.readers.cmaq import _get_times
+    import numpy as np
 
     # TFLAG: YYYYDDD, HHMMSS
     tflag = np.array([[2023001, 0], [2023001, 10000]], dtype=np.int32).reshape(2, 1, 2)
