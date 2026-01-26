@@ -1,6 +1,7 @@
 """AQS Reader"""
 
 import os
+import warnings
 import pandas as pd
 from .base import PointReader, register_reader
 from monetio.obs.epa_util import read_monitor_file
@@ -121,24 +122,33 @@ class AQS:
                 dtype={0: str, 1: str, 2: str},
                 encoding="ISO-8859-1",
             )
-            df["time_local"] = pd.to_datetime(df["Date Local"])
-            df.drop(["Date Local"], axis=1, inplace=True)
-            # Match the expected order for self.renameddcols
+            # Find column for time_local
+            if "Date Local" in df.columns:
+                df["time_local"] = pd.to_datetime(df["Date Local"])
+                df.drop(["Date Local"], axis=1, inplace=True)
+
+            # Reorder columns to match renameddcols (first column is time_local, now named time in the result)
             cols = df.columns.tolist()
-            cols.insert(0, cols.pop(cols.index("time_local")))
-            df = df[cols]
-            df.columns = self.renameddcols
-            df["pollutant_standard"] = df.pollutant_standard.astype(str)
+            if "time_local" in cols:
+                cols.insert(0, cols.pop(cols.index("time_local")))
+                df = df[cols]
+
+            if len(df.columns) == len(self.renameddcols):
+                df.columns = self.renameddcols
+
+            df["pollutant_standard"] = df.get("pollutant_standard", pd.Series(dtype=str)).astype(str)
             self.daily = True
         else:
             df = pd.read_csv(
                 url,
-                parse_dates={
-                    "time": ["Date GMT", "Time GMT"],
-                    "time_local": ["Date Local", "Time Local"],
-                },
                 low_memory=False,
             )
+            # Handle dates manually to avoid deprecated parse_dates
+            if "Date GMT" in df.columns and "Time GMT" in df.columns:
+                df["time"] = pd.to_datetime(df["Date GMT"] + " " + df["Time GMT"])
+            if "Date Local" in df.columns and "Time Local" in df.columns:
+                df["time_local"] = pd.to_datetime(df["Date Local"] + " " + df["Time Local"])
+
             df.columns = self.columns_rename(df.columns.values)
 
         df["siteid"] = (
@@ -146,13 +156,13 @@ class AQS:
             + df.county_code.astype(str).str.zfill(3)
             + df.site_num.astype(str).str.zfill(4)
         )
-        df.drop(["state_name", "county_name"], axis=1, inplace=True)
+        df.drop(["state_name", "county_name"], axis=1, inplace=True, errors='ignore')
         df.columns = [i.lower() for i in df.columns]
         if "daily" not in url:
-            df.drop(["datum", "qualifier"], axis=1, inplace=True)
+            df.drop(["datum", "qualifier"], axis=1, inplace=True, errors='ignore')
         voc = "VOC" in url
         df = self.get_species(df, voc=voc)
-        return df.drop("date_of_last_change", axis=1)
+        return df.drop("date_of_last_change", axis=1, errors='ignore')
 
     def build_url(self, param, year, daily=False, download=False):
         if daily:
@@ -210,25 +220,27 @@ class AQS:
             for y in years:
                 url, fname = self.build_url(i, y, daily=daily)
                 try:
-                    head = requests.head(url)
-                    if (
-                        head.status_code == 200
-                        and int(head.headers.get("Content-Length", 0)) > 500
-                    ):
-                        urls.append(url)
-                        fnames.append(fname)
-                    else:
-                        print("File is Empty or Not Found. Not Processing", url)
+                    # Using stream=True and Content-Length check to avoid downloading big files just for check
+                    with requests.get(url, stream=True, timeout=10) as r:
+                        if r.status_code == 200:
+                            content_length = int(r.headers.get("Content-Length", 0))
+                            if content_length > 500:
+                                urls.append(url)
+                                fnames.append(fname)
+                            else:
+                                print("File is Empty. Not Processing", url)
                 except:
                     pass
         return urls, fnames
 
     def retrieve(self, url, fname):
-        fs = FileUtility.get_fs(url)
+        import requests
         if not os.path.isfile(fname):
             print("\n Retrieving: " + fname)
             print(url)
-            fs.get(url, fname)
+            r = requests.get(url)
+            with open(fname, "wb") as f:
+                f.write(r.content)
         else:
             print("\n File Exists: " + fname)
 
@@ -279,6 +291,9 @@ class AQS:
         else:
             dfs = [dask.delayed(self.load_aqs_file)(i, network) for i in urls]
 
+        if not dfs:
+             return pd.DataFrame()
+
         dff = dd.from_delayed(dfs)
         dfff = dff.compute(num_workers=n_procs)
         dfff = dfff[dfff.time.between(dates.min(), dates.max())]
@@ -296,7 +311,7 @@ class AQS:
 
         if network is not None:
             monitors = self.monitor_df.loc[
-                self.monitor_df.isin([network])
+                self.monitor_df.isin([network]).any(axis=1)
             ].drop_duplicates(subset=["siteid"])
         else:
             monitors = self.monitor_df.drop_duplicates(subset=["siteid"])
@@ -336,6 +351,61 @@ class AQS:
             88316: "ECf_optical",
             88403: "SO4f",
             88312: "TCf",
+            88104: "Alf",
+            88107: "Baf",
+            88313: "BCf",
+            88109: "Brf",
+            88110: "Cdf",
+            88111: "Caf",
+            88117: "Cef",
+            88118: "Csf",
+            88203: "Cl-f",
+            88115: "Clf",
+            88112: "Crf",
+            88113: "Cof",
+            88114: "Cuf",
+            88121: "Euf",
+            88143: "Auf",
+            88127: "Hff",
+            88131: "Inf",
+            88126: "Fef",
+            88146: "Laf",
+            88128: "Pbf",
+            88140: "Mgf",
+            88132: "Mnf",
+            88142: "Hgf",
+            88134: "Mof",
+            88136: "Nif",
+            88147: "Nbf",
+            88310: "NO3f",
+            88152: "Pf",
+            88303: "K+f",
+            88176: "Rbf",
+            88162: "Smf",
+            88163: "Scf",
+            88154: "Sef",
+            88165: "Sif",
+            88166: "Agf",
+            88302: "Na+f",
+            88184: "Naf",
+            88168: "Srf",
+            88169: "Sf",
+            88170: "Taf",
+            88172: "Tbf",
+            88160: "Snf",
+            88161: "Tif",
+            88186: "Wf",
+            88314: "C_370nmf",
+            88179: "Uf",
+            88164: "Vf",
+            88183: "Yf",
+            88167: "Znf",
+            88185: "Zrf",
+            88103: "Asf",
+            88105: "Bef",
+            88124: "Gaf",
+            88180: "Kf",
+            88301: "NH4+f",
             42600: "NOY",
             42601: "NO",
             42603: "NOX",
@@ -349,11 +419,22 @@ class AQS:
 
         for i in pc:
             con = df.parameter_code == i
-            if i in mapping:
-                df.loc[con, "variable"] = mapping[i]
+            try:
+                # Try both int and string match
+                val = mapping.get(i) or mapping.get(int(i))
+                if val:
+                    df.loc[con, "variable"] = val
+            except:
+                pass
 
         con = df.variable == ""
         if con.sum() > 0:
+            _tbl = (
+                df[con][["parameter_name", "parameter_code"]]
+                .drop_duplicates("parameter_name")
+                .to_string(index=False)
+            )
+            warnings.warn(f"Short names not available for these variables:\n{_tbl}")
             df.loc[con, "variable"] = df.parameter_name
 
         return df

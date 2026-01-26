@@ -26,7 +26,7 @@ class ISHLiteReader(PointReader):
         """
         Reads ISH Lite data.
         """
-        ish = ISHLite()
+        ish = ISH()
         return ish.add_data(
             dates,
             box=box,
@@ -45,9 +45,9 @@ class ISHLiteReader(PointReader):
 # -----------------------------------------------------------------------------
 
 
-class ISHLite:
+class ISH:
     def __init__(self):
-        self.history_file = "https://www1.ncdc.noaa.gov/pub/data/noaa/isd-history.csv"
+        self.history_file = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
         self.history = None
         self.dates = None
         self.verbose = False
@@ -58,8 +58,18 @@ class ISHLite:
         fname = self.history_file
 
         fs = FileUtility.get_fs(fname)
-        with fs.open(fname, "r") as f:
-            self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"])
+        try:
+            with fs.open(fname, "r") as f:
+                self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str})
+        except Exception:
+            alt = fname.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
+            if alt != fname:
+                fs_alt = FileUtility.get_fs(alt)
+                with fs_alt.open(alt, "r") as f:
+                    self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str})
+                self.history_file = alt
+            else:
+                raise
 
         self.history.columns = [i.lower() for i in self.history.columns]
         if dates is not None:
@@ -68,8 +78,8 @@ class ISHLite:
             )
             self.history = self.history.loc[index1, :]
         self.history = self.history.dropna(subset=["lat", "lon"])
-        self.history["usaf"] = self.history.usaf.astype("str").str.zfill(6)
-        self.history["wban"] = self.history.wban.astype("str").str.zfill(5)
+        self.history.loc[:, "usaf"] = self.history.usaf.astype("str").str.zfill(6)
+        self.history.loc[:, "wban"] = self.history.wban.astype("str").str.zfill(5)
         self.history["station_id"] = self.history.usaf + self.history.wban
         self.history.rename(
             columns={"lat": "latitude", "lon": "longitude"}, inplace=True
@@ -91,9 +101,9 @@ class ISHLite:
 
         unique_years = pd.to_datetime(dates.year.unique(), format="%Y")
         furls = []
-        url = "https://www1.ncdc.noaa.gov/pub/data/noaa/isd-lite"
+        url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite"
 
-        # Assume availability (skipping HTML parsing for speed/robustness)
+        # Assume availability
         for syear in unique_years.strftime("%Y"):
             year_fnames = (
                 sites.usaf.astype(str)
@@ -137,6 +147,7 @@ class ISHLite:
                 header=None,
                 names=columns,
             )
+        # Create time column manually
         df["time"] = pd.to_datetime(df[["year", "month", "day", "hour"]])
         df.drop(["year", "month", "day", "hour"], axis=1, inplace=True)
 
@@ -189,7 +200,8 @@ class ISHLite:
 
         df = self.aggregrate_files(urls, n_procs=n_procs)
 
-        df = df.loc[(df.time >= self.dates.min()) & (df.time < self.dates.max())]
+        # Re-applying inclusive filter as per code review feedback
+        df = df.loc[(df.time >= self.dates.min()) & (df.time <= self.dates.max())]
         df = df.replace(-999.9, np.nan)
 
         if resample and not df.empty:

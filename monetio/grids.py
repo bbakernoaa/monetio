@@ -21,9 +21,22 @@ class MockArea:
         return p(xv, yv, inverse=True)
 
     def get_lonlats_dask(self):
-        # For now, return numpy arrays.
-        # Truly supporting dask would require dask.array.meshgrid etc.
-        return self.get_lonlats()
+        try:
+            import dask.array as da
+
+            x = da.linspace(self.area_extent[0], self.area_extent[2], self.nx)
+            y = da.linspace(self.area_extent[1], self.area_extent[3], self.ny)
+            xv, yv = da.meshgrid(x, y)
+
+            def _proj_inv(x_val, y_val):
+                p = Proj(self.proj_dict)
+                return np.stack(p(x_val, y_val, inverse=True))
+
+            # Use map_blocks to keep it lazy
+            combined = da.map_blocks(_proj_inv, xv, yv, dtype=float, chunks=(2, *xv.chunks))
+            return combined[0], combined[1]
+        except ImportError:
+            return self.get_lonlats()
 
     def to_cartopy_crs(self):
         try:

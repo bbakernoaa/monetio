@@ -2,7 +2,16 @@
 OpenAQ AWS Reader. Redirection to monetio.readers.openaq_aws
 """
 
-from ..readers.openaq_aws import OpenAQAWSReader, read
+from ..readers.openaq_aws import (
+    OpenAQAWSReader,
+    _build_urls,
+    add_data,
+    get_locations,
+    get_paths,
+    get_provider_countries,
+    get_providers,
+    read,
+)
 
 
 def add_data(

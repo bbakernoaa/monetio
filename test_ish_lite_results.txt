@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.12, pytest-9.0.2, pluggy-1.6.0
+rootdir: /app
+configfile: pyproject.toml
+plugins: cov-7.0.0, xdist-3.8.0
+collected 5 items
+
+tests/test_ish_lite.py .....                                             [100%]
+
+=============================== warnings summary ===============================
+monetio/models/_rrfs_cmaq_mm.py:5
+  /app/monetio/models/_rrfs_cmaq_mm.py:5: DeprecationWarning: _rrfs_cmaq_mm module is deprecated. Use ufs instead.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 5 passed, 1 warning in 8.82s =========================

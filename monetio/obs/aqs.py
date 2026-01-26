@@ -1,5 +1,5 @@
 """
-AQS Reader. Redirection to monetio.readers.aqs
+AQS Reader Redirection
 """
 
 from ..readers.aqs import AQS, AQSReader
@@ -16,9 +16,9 @@ def add_data(
     n_procs=1,
     meta=False,
 ):
-    """Retrieve and load AQS data as a DataFrame."""
+    """Retrieve and load AQS data."""
     return AQSReader().open_dataset(
-        dates=dates,
+        dates,
         param=param,
         daily=daily,
         network=network,

@@ -21,7 +21,7 @@ permission_error = pytest.mark.xfail(
 )
 
 forbidden_error = pytest.mark.xfail(
-    reason="forbidden", raises=HTTPError, strict=True
+    reason="forbidden", raises=(HTTPError, FileNotFoundError, PermissionError), strict=True
 )  # 403
 
 

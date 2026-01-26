@@ -1,8 +1,8 @@
 """
-NOAA Integrated Surface Hourly (ISH; also known as ISD, Integrated Surface Data) lite version. Redirection to monetio.readers.ish_lite
+ISH Lite Reader Redirection
 """
 
-from ..readers.ish_lite import ISHLite, ISHLiteReader
+from ..readers.ish_lite import ISH, ISHLiteReader
 
 
 def add_data(

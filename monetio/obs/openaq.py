@@ -1,10 +1,14 @@
 """
-OpenAQ Reader. Redirection to monetio.readers.openaq
+OpenAQ Reader Redirection
 """
 
-from ..readers.openaq import OPENAQ, OpenAQReader, read_json
+from ..readers.openaq import OPENAQ, OpenAQReader, read_json, read_json2
 
 
 def add_data(dates, *, n_procs=1, wide_fmt=True):
-    """Retrieve and load OpenAQ data as a DataFrame."""
-    return OpenAQReader().open_dataset(dates=dates, n_procs=n_procs, wide_fmt=wide_fmt)
+    """Add OpenAQ data from the OpenAQ S3 bucket."""
+    return OpenAQReader().open_dataset(
+        dates,
+        n_procs=n_procs,
+        wide_fmt=wide_fmt,
+    )

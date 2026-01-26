@@ -1,5 +1,5 @@
 """
-NOAA Integrated Surface Hourly (ISH; also known as ISD, Integrated Surface Data). Redirection to monetio.readers.ish
+ISH Reader Redirection
 """
 
 from ..readers.ish import ISH, ISHReader
