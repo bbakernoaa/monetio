@@ -111,12 +111,8 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
             del rename_main_dims[ref]
             continue
         n = ds[ref].size
-        time_dims = [
-            dim_name
-            for dim_name, dim_size in ds.sizes.items()
-            if dim_name.startswith("fakeDim") and dim_size == n
-        ]
-        ds = ds.rename_dims({dim_name: new_dim for dim_name in time_dims})
+        time_dims = [dim_name for dim_name, dim_size in ds.sizes.items() if dim_name.startswith("fakeDim") and dim_size == n]
+        ds = ds.rename_dims(dict.fromkeys(time_dims, new_dim))
 
     for vn, da in ds.variables.items():
         if da.ndim >= 1 and da.dims[-1].startswith("fakeDim") and da.dtype.kind == "f":
@@ -124,9 +120,7 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
             if n == 1:
                 ds[vn] = da.squeeze(dim=da.dims[-1])
 
-    remaining_vns = [
-        vn for vn, da in ds.variables.items() if any(dim.startswith("fakeDim") for dim in da.dims)
-    ]
+    remaining_vns = [vn for vn, da in ds.variables.items() if any(dim.startswith("fakeDim") for dim in da.dims)]
     for vn in remaining_vns:
         da = ds[vn]
         if not da.dtype.kind == "S":
@@ -169,7 +163,7 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
     ds = ds.set_coords(list(rename_main_dims))
 
     if "DATA_START_DATE" in attrs:
-        tstart_from_attr = pd.Timestamp(attrs["DATA_START_DATE"])
+        pd.Timestamp(attrs["DATA_START_DATE"])
         if "DATETIME" in ds:
             t = _dti_from_mjd2000(ds.DATETIME)
             ds["DATETIME"].values = t

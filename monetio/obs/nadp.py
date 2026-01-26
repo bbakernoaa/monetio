@@ -32,13 +32,9 @@ class NADP:
             url = "http://nadp.slh.wisc.edu/datalib/AIRMoN/AIRMoN-ALL.csv"
         else:
             if self.weekly:
-                url = (
-                    baseurl + network.lower() + "/weekly/" + siteid + network.upper() + "-All-w.csv"
-                )
+                url = baseurl + network.lower() + "/weekly/" + siteid + network.upper() + "-All-w.csv"
             else:
-                url = (
-                    baseurl + network.lower() + "/annual/" + siteid + network.upper() + "-All-a.csv"
-                )
+                url = baseurl + network.lower() + "/annual/" + siteid + network.upper() + "-All-a.csv"
         return url
 
     def network_names(self):

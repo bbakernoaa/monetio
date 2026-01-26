@@ -38,9 +38,7 @@ def retry(func):
                 requests.exceptions.TooManyRedirects,
             ) as e:
                 if i == RETRIES - 1:
-                    raise RuntimeError(
-                        f"{func.__name__} failed after {RETRIES} tries. Last error: {e}"
-                    )
+                    raise RuntimeError(f"{func.__name__} failed after {RETRIES} tries. Last error: {e}")
                 time.sleep(0.5 * i**1.5 + rand() * 0.1)
 
         raise RuntimeError(f"{func.__name__} failed after {RETRIES} tries.")
@@ -127,9 +125,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
                     r.raise_for_status()
                     content = r.text
                 except Exception as fallback_error:
-                    warnings.warn(
-                        f"Fallback to requests also failed for {location}: {fallback_error}"
-                    )
+                    warnings.warn(f"Fallback to requests also failed for {location}: {fallback_error}")
                     if USE_CACHE_FOR_TESTING:
                         warnings.warn(f"Using cached data for {location} due to network failure")
                         return []
@@ -162,9 +158,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
 
     if cache:
         for location in locations:
-            _FILES_L100_CACHE[location] = list(
-                df[df["location"] == location].itertuples(index=False, name=None)
-            )
+            _FILES_L100_CACHE[location] = list(df[df["location"] == location].itertuples(index=False, name=None))
 
     return df
 
@@ -203,9 +197,7 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise"):
     urls = df_urls[df_urls["time"].between(dates_min, dates_max, inclusive="both")]["url"].tolist()
 
     if not urls:
-        raise RuntimeError(
-            f"No files found for dates {dates_min} to {dates_max}, location={location!r}."
-        )
+        raise RuntimeError(f"No files found for dates {dates_min} to {dates_max}, location={location!r}.")
 
     def func(fp_or_url):
         try:
@@ -387,9 +379,7 @@ def read_100m(fp_or_url):
                         return f.read()
                 except Exception as fsspec_error:
                     # Fallback to requests if fsspec fails
-                    warnings.warn(
-                        f"fsspec failed for {fp_or_url}, falling back to requests: {fsspec_error}"
-                    )
+                    warnings.warn(f"fsspec failed for {fp_or_url}, falling back to requests: {fsspec_error}")
                     with requests.Session() as session:
                         session.headers.update(
                             {
@@ -490,10 +480,7 @@ def read_100m(fp_or_url):
     data_block_first_ncol = len(data_block[:400].splitlines()[2].split())
     if not data_block_first_ncol == ncol_expected:
         head = "\n".join(data_block.splitlines()[:4] + ["..."])
-        raise ValueError(
-            f"Expected {ncol_expected} columns in data block, "
-            f"got {data_block_first_ncol} in first data line:\n{head}"
-        )
+        raise ValueError(f"Expected {ncol_expected} columns in data block, got {data_block_first_ncol} in first data line:\n{head}")
         # TODO: allow pandas to skip bad lines with `on_bad_lines='skip'`?
 
     names = [c.name for c in col_info]
@@ -514,9 +501,7 @@ def read_100m(fp_or_url):
             if c.name != "lev":
                 df[c.name] = pd.to_numeric(df[c.name], errors="coerce")
             else:
-                df[c.name] = pd.to_numeric(df[c.name], errors="coerce").astype(
-                    "Int64"
-                )  # nullable integer
+                df[c.name] = pd.to_numeric(df[c.name], errors="coerce").astype("Int64")  # nullable integer
 
     # Add some variables from header as columns (these don't change in the profile)
     time = pd.Timestamp(f"{meta['Launch Date']} {meta['Launch Time']}")

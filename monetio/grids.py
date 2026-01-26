@@ -211,15 +211,11 @@ def _get_sinu_latlon(x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarr
         (longitude, latitude) meshgrid.
     """
     xv, yv = np.meshgrid(x, y)
-    sinu = Proj(
-        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +R=6371007.181"
-    )
+    sinu = Proj("+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +R=6371007.181")
     return sinu(xv, yv, inverse=True)
 
 
-def get_sinu_area_extent(
-    lonmin: float, latmin: float, lonmax: float, latmax: float
-) -> Tuple[float, float, float, float]:
+def get_sinu_area_extent(lonmin: float, latmin: float, lonmax: float, latmax: float) -> Tuple[float, float, float, float]:
     """Get sinusoidal area extent from lat/lon bounds.
 
     Parameters
@@ -269,9 +265,7 @@ def get_modis_latlon_from_swath_hv(h: int, v: int, dset: xr.Dataset) -> xr.Datas
     dset.coords["longitude"] = (("x", "y"), lon)
     dset.coords["latitude"] = (("x", "y"), lat)
     dset.attrs["area_extent"] = (x.min(), y.min(), x.max(), y.max())
-    dset.attrs["proj4_srs"] = (
-        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m"
-    )
+    dset.attrs["proj4_srs"] = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m"
     return dset
 
 
@@ -380,7 +374,7 @@ def _ioapi_grid_from_dataset(ds: xr.Dataset, earth_radius: float = 6370000) -> s
     str
         PROJ4 string.
     """
-    pargs = dict()
+    pargs = {}
     pargs["lat_1"] = ds.P_ALP
     pargs["lat_2"] = ds.P_BET
     pargs["lat_0"] = ds.YCENT

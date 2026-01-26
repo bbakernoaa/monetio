@@ -105,9 +105,7 @@ def test_ish_one_state_partially_empty():
     df = ish.add_data(dates, state=state, n_procs=2)
     assert len(df) >= 1
     sites = sorted(df.siteid.unique())
-    assert set(all_sites) - set(sites) == {
-        "99816999999"
-    }, "one empty site not included in state results"  # "Delaware Reserve"
+    assert set(all_sites) - set(sites) == {"99816999999"}, "one empty site not included in state results"  # "Delaware Reserve"
 
 
 @pytest.mark.parametrize("resample", [False, True])

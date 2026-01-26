@@ -170,29 +170,24 @@ class Dataset:
         self.NVOL = int(dmp[1])
         dmp = self.__readline()
         self.dateValid = datetime.datetime.strptime("".join([f"{x:s}" for x in dmp[0:3]]), "%Y%m%d")
-        self.dateRevised = datetime.datetime.strptime(
-            "".join([f"{x:s}" for x in dmp[3:6]]), "%Y%m%d"
-        )
+        self.dateRevised = datetime.datetime.strptime("".join([f"{x:s}" for x in dmp[3:6]]), "%Y%m%d")
         self.dataInterval = float(self.__readline()[0])
         dmp = self.__readline()
         self.IVAR = Variable(dmp[0], dmp[1])
         ndvar = int(self.__readline()[0])
         dvscale = [float(x) for x in self.__readline()]
-        dvmiss = [x for x in self.__readline()]
+        dvmiss = list(self.__readline())
 
         dmp = self.__readline()
         dvname = [dmp[0]]
         dvunits = [dmp[1]]
 
-        for i in range(1, ndvar):
+        for _i in range(1, ndvar):
             dmp = self.__readline()
             dvname += [dmp[0]]
             dvunits += [dmp[1]]
 
-        self.DVAR = [
-            Variable(name, unit, scale, miss)
-            for name, unit, scale, miss in zip(dvname, dvunits, dvscale, dvmiss)
-        ]
+        self.DVAR = [Variable(name, unit, scale, miss) for name, unit, scale, miss in zip(dvname, dvunits, dvscale, dvmiss)]
 
         nscom = int(self.__readline()[0])
         self.SCOM = [self.__readline(do_split=False) for i in range(0, nscom)]
@@ -213,9 +208,7 @@ class Dataset:
         if self.input_fhandle.closed:
             self.input_fhandle = open(self.input_fhandle.name)
         _ = [self.input_fhandle.readline() for _ in range(self.nheader)]
-        self.data = [
-            self.__nan_miss_float(line.split(self.splitChar)) for line in self.input_fhandle
-        ]
+        self.data = [self.__nan_miss_float(line.split(self.splitChar)) for line in self.input_fhandle]
         self.input_fhandle.close()
 
     def read(self):

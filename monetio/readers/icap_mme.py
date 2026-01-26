@@ -79,9 +79,7 @@ def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
     base_url = "https://usgodae.org/ftp/outgoing/nrl/ICAP-MME/"
 
     for dt in dates:
-        fname = "icap_{}_{}_{}.nc".format(
-            dt.strftime(r"%Y%m%d%H"), filetype.upper(), data_var.lower()
-        )
+        fname = "icap_{}_{}_{}.nc".format(dt.strftime(r"%Y%m%d%H"), filetype.upper(), data_var.lower())
         url = base_url + dt.strftime(r"%Y/%Y%m/") + fname
         urls.append(url)
         fnames.append(fname)
@@ -140,7 +138,6 @@ def open_mfdataset_icap(
     verbose=True,
     **kwargs,
 ):
-
     if product.upper() not in valid_filetypes:
         raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
 

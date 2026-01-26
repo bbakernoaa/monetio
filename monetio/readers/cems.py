@@ -13,7 +13,7 @@ class CEMSReader(PointReader):
     def open_dataset(
         self,
         rdate,
-        states=["md"],
+        states=None,
         download=False,
         verbose=True,
         files=None,  # Support local files directly
@@ -22,6 +22,8 @@ class CEMSReader(PointReader):
         """
         Reads CEMS data.
         """
+        if states is None:
+            states = ["md"]
         c = CEMS()
 
         if files:
@@ -87,7 +89,9 @@ class CEMS:
         self.df = pd.DataFrame()
         self.namehash = {}
 
-    def add_data(self, rdate, states=["md"], download=False, verbose=True):
+    def add_data(self, rdate, states=None, download=False, verbose=True):
+        if states is None:
+            states = ["md"]
         if isinstance(states, str):
             states = [states]
         if isinstance(rdate, list):

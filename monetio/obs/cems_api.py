@@ -1195,9 +1195,7 @@ class MonitoringPlan(EpaApiObject):
                     print("SO2 data")
                     dhash["parameterCode"] = method["parameterCode"]
                     dhash["methodCode"] = method["methodCode"]
-                    dhash["beginDateHour"] = pd.to_datetime(
-                        method["beginDateHour"], format=self.dfmt
-                    )
+                    dhash["beginDateHour"] = pd.to_datetime(method["beginDateHour"], format=self.dfmt)
                     dhash["endDateHour"] = pd.to_datetime(method["endDateHour"], format=self.dfmt)
                     dhash["oris"] = self.oris
                     dhash["mid"] = self.mid
@@ -1245,9 +1243,7 @@ class MonitoringPlan(EpaApiObject):
                         stackht = nhash[sid]
             return stackht
 
-        df["stackht"] = df.apply(
-            lambda row: find_stackht(row["name"], row["stackht"], shash, nhash), axis=1
-        )
+        df["stackht"] = df.apply(lambda row: find_stackht(row["name"], row["stackht"], shash, nhash), axis=1)
         df["stackht_unit"] = "m"
         print("DF2 ------------------")
         print(df)

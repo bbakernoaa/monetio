@@ -23,12 +23,8 @@ class RAQMSReader(GriddedReader):
         else:
             fpaths = sorted(files)
 
-        if not fpaths or not all(
-            fp.endswith(".nc") and "uwhyb" in os.path.basename(fp) for fp in fpaths
-        ):
-            raise ValueError(
-                "File format not supported. Note that files should be preprocessed to netCDF."
-            )
+        if not fpaths or not all(fp.endswith(".nc") and "uwhyb" in os.path.basename(fp) for fp in fpaths):
+            raise ValueError("File format not supported. Note that files should be preprocessed to netCDF.")
 
         # Prepare kwargs
         if "concat_dim" not in kwargs:

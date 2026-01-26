@@ -208,9 +208,7 @@ class CRN:
                 state = monitors.iloc[i].STATE
                 site = monitors.iloc[i].LOCATION.replace(" ", "_")
                 vector = monitors.iloc[i].VECTOR.replace(" ", "_")
-                url, fname = self.build_url(
-                    y, state, site, vector, daily=daily, sub_hourly=sub_hourly
-                )
+                url, fname = self.build_url(y, state, site, vector, daily=daily, sub_hourly=sub_hourly)
                 if self.check_url(url):
                     urls.append(url)
                     fnames.append(fname)

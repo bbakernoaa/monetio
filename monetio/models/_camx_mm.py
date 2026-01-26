@@ -183,10 +183,7 @@ def add_met_data_3D(d_chem, d_met):
         Dataset containing all of the added parameters
     """
     if d_chem.sizes["LAY"] != d_met.sizes["LAY"]:
-        raise IndexError(
-            "Different layer number in meteorological and chemical datasets."
-            + " Maybe one of the is 2D?"
-        )
+        raise IndexError("Different layer number in meteorological and chemical datasets." + " Maybe one of the is 2D?")
 
     # d_met has a final TSTEP not present in d_chem
     d_met = d_met.isel(TSTEP=slice(0, len(d_met.TSTEP) - 1))
@@ -293,9 +290,7 @@ def add_lazy_pm10(d):
         if can_do(index):
             newkeys = allvars.loc[index]
             d["PM10"] = add_multiple_lazy(d, newkeys)
-            d["PM10"] = d["PM10"].assign_attrs(
-                {"name": "PM10", "long_name": "Particulate Matter < 10 microns"}
-            )
+            d["PM10"] = d["PM10"].assign_attrs({"name": "PM10", "long_name": "Particulate Matter < 10 microns"})
     return d
 
 
@@ -319,9 +314,7 @@ def add_lazy_pm_course(d):
     if can_do(index):
         newkeys = allvars.loc[index]
         d["PM_COURSE"] = add_multiple_lazy(d, newkeys)
-        d["PM_COURSE"] = d["PM_COURSE"].assign_attrs(
-            {"name": "PM_COURSE", "long_name": "Course Mode Particulate Matter"}
-        )
+        d["PM_COURSE"] = d["PM_COURSE"].assign_attrs({"name": "PM_COURSE", "long_name": "Course Mode Particulate Matter"})
     return d
 
 
@@ -448,9 +441,7 @@ def _calc_midlayer_height_agl(dset):
     layer_height_agl = dset[height]
     layer_height_agl.attrs["long_name"] = "Height AGL at top"
     layer_height_agl.attrs["var_desc"] = "Layer height above ground level at top"
-    mid_layer_height[:, 1:, :, :] = (
-        mid_layer_height[:, :-1, :, :] + mid_layer_height[:, 1:, :, :]
-    ) / 2
+    mid_layer_height[:, 1:, :, :] = (mid_layer_height[:, :-1, :, :] + mid_layer_height[:, 1:, :, :]) / 2
     mid_layer_height[0, 0, :, :] = mid_layer_height[0, 0, :, :] / 2
     alt_agl_m_mid = xr.zeros_like(dset[height])
     alt_agl_m_mid[:, :, :, :] = mid_layer_height

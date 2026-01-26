@@ -299,9 +299,7 @@ def modisClient(
 
         # print >> sys.stderr, requestStart, requestEnd
 
-        data = client.service.getsubset(
-            lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight
-        )
+        data = client.service.getsubset(lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight)
 
         # print(data)
         # now fill up the data structure with the returned data...

@@ -1,7 +1,5 @@
 """ISH Reader"""
 
-import warnings
-
 import dask
 import dask.dataframe as dd
 import numpy as np
@@ -122,10 +120,7 @@ class ISH:
             frame["time"] = pd.Series(dtype="datetime64[ns]")
             return frame
 
-        frame["time"] = [
-            pd.Timestamp(f"{date:08}{htime:04}")
-            for date, htime in zip(frame["date"], frame["htime"])
-        ]
+        frame["time"] = [pd.Timestamp(f"{date:08}{htime:04}") for date, htime in zip(frame["date"], frame["htime"])]
         frame.drop(["date", "htime"], axis=1, inplace=True)
         frame.set_index("time", drop=True, inplace=True)
         frame = ISH._clean_column_by_name(frame, "wdir", missing=999)
@@ -220,17 +215,13 @@ class ISH:
         fs = FileUtility.get_fs(fname)
         try:
             with fs.open(fname, "r") as f:
-                self.history = pd.read_csv(
-                    f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str}
-                )
+                self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str})
         except Exception:
             alt = fname.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
             if alt != fname:
                 fs_alt = FileUtility.get_fs(alt)
                 with fs_alt.open(alt, "r") as f:
-                    self.history = pd.read_csv(
-                        f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str}
-                    )
+                    self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str})
                 self.history_file = alt
             else:
                 raise
@@ -263,9 +254,7 @@ class ISH:
         if self.source == "aws":
             url = "s3://noaa-isd-pds/data"
             for syear in unique_years.strftime("%Y"):
-                year_fnames = (
-                    sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-                )
+                year_fnames = sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
                 for fname in year_fnames:
                     furls.append(f"{url}/{syear}/{fname}")
             return pd.Series(furls, name="name").to_frame()
@@ -286,9 +275,7 @@ class ISH:
                 all_urls = pd.DataFrame(columns=["name"])
 
             for syear in unique_years.strftime("%Y"):
-                year_fnames = (
-                    sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-                )
+                year_fnames = sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
                 for fname in year_fnames:
                     furls.append(f"{url}/{syear}/{fname}")
 
@@ -363,9 +350,7 @@ class ISH:
         meta = None
         for u in urls.name:
             try:
-                sample_df = self.read_data_frame(
-                    u, request_timeout=request_timeout, request_retries=request_retries
-                )
+                sample_df = self.read_data_frame(u, request_timeout=request_timeout, request_retries=request_retries)
                 if not sample_df.empty:
                     meta = sample_df.iloc[:0].copy()
                     break
@@ -387,9 +372,7 @@ class ISH:
             objs = self.get_url_file_objs(urls.name)
 
             def func(fname):
-                return self.read_data_frame(
-                    fname, request_timeout=request_timeout, request_retries=request_retries
-                )
+                return self.read_data_frame(fname, request_timeout=request_timeout, request_retries=request_retries)
 
             dfs = [dask.delayed(func)(f) for f in objs]
             dff = dd.from_delayed(dfs, meta=meta)
@@ -397,9 +380,7 @@ class ISH:
         else:
 
             def func(url):
-                return self.read_data_frame(
-                    url, request_timeout=request_timeout, request_retries=request_retries
-                )
+                return self.read_data_frame(url, request_timeout=request_timeout, request_retries=request_retries)
 
             dfs = [dask.delayed(func)(f) for f in urls.name]
             dff = dd.from_delayed(dfs, meta=meta)
@@ -409,13 +390,7 @@ class ISH:
             self.df.index = self.df.time
             numeric_cols = self.df.select_dtypes(include=["number"]).columns
             group_cols = ["station_id"]
-            self.df = (
-                self.df[group_cols + list(numeric_cols)]
-                .groupby("station_id")
-                .resample(window)
-                .mean()
-                .reset_index()
-            )
+            self.df = self.df[group_cols + list(numeric_cols)].groupby("station_id").resample(window).mean().reset_index()
 
         self.df = self.df.merge(dfloc, on="station_id", how="left")
         self.df = self.df.rename(columns={"station_id": "siteid", "ctry": "country"})

@@ -61,17 +61,13 @@ class ISH:
         fs = FileUtility.get_fs(fname)
         try:
             with fs.open(fname, "r") as f:
-                self.history = pd.read_csv(
-                    f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str}
-                )
+                self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str})
         except Exception:
             alt = fname.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
             if alt != fname:
                 fs_alt = FileUtility.get_fs(alt)
                 with fs_alt.open(alt, "r") as f:
-                    self.history = pd.read_csv(
-                        f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str}
-                    )
+                    self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str})
                 self.history_file = alt
             else:
                 raise
@@ -104,9 +100,7 @@ class ISH:
 
         # Assume availability
         for syear in unique_years.strftime("%Y"):
-            year_fnames = (
-                sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-            )
+            year_fnames = sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
             for fname in year_fnames:
                 furls.append(f"{url}/{syear}/{fname}")
 
@@ -199,7 +193,5 @@ class ISH:
         if resample and not df.empty:
             df = df.set_index("time").groupby("siteid").resample(window).mean().reset_index()
 
-        df = pd.merge(df, dfloc, how="left", left_on="siteid", right_on="station_id").rename(
-            columns={"ctry": "country"}
-        )
+        df = pd.merge(df, dfloc, how="left", left_on="siteid", right_on="station_id").rename(columns={"ctry": "country"})
         return df.drop(["station_id"], axis=1)

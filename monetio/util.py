@@ -131,9 +131,7 @@ def _force_forder(x: np.ndarray) -> Tuple[np.ndarray, bool]:
         return (x, False)
 
 
-def kolmogorov_zurbenko_filter(
-    df: Union[pd.DataFrame, pd.Series], window: int, iterations: int
-) -> Union[pd.DataFrame, pd.Series]:
+def kolmogorov_zurbenko_filter(df: Union[pd.DataFrame, pd.Series], window: int, iterations: int) -> Union[pd.DataFrame, pd.Series]:
     """KZ filter implementation.
 
     Parameters
@@ -156,9 +154,7 @@ def kolmogorov_zurbenko_filter(
     return z
 
 
-def wsdir2uv(
-    ws: Union[xr.DataArray, np.ndarray], wdir: Union[xr.DataArray, np.ndarray]
-) -> Tuple[Any, Any]:
+def wsdir2uv(ws: Union[xr.DataArray, np.ndarray], wdir: Union[xr.DataArray, np.ndarray]) -> Tuple[Any, Any]:
     """Convert wind speed and direction to u and v components.
 
     Parameters
@@ -226,16 +222,8 @@ def calc_8hr_rolling_max(df: pd.DataFrame, col: str = None, window: Any = None) 
     """
     df_temp = df.copy()
     df_temp.index = df_temp.time_local
-    df_rolling = (
-        df_temp.groupby("siteid")[col]
-        .rolling(window, center=True, win_type="boxcar")
-        .mean()
-        .reset_index()
-        .dropna()
-    )
-    df_rolling_max = (
-        df_rolling.groupby("siteid").resample("d", on="time_local").max().reset_index(drop=True)
-    )
+    df_rolling = df_temp.groupby("siteid")[col].rolling(window, center=True, win_type="boxcar").mean().reset_index().dropna()
+    df_rolling_max = df_rolling.groupby("siteid").resample("d", on="time_local").max().reset_index(drop=True)
     return df.merge(df_rolling_max, on=["siteid", "time_local"])
 
 
@@ -481,20 +469,13 @@ def get_giorgi_region_df(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[:, "GIORGI_ACRO"] = None
     for i in range(22):
         latmin, lonmin, latmax, lonmax, acro = get_giorgi_region_bounds(index=int(i + 1))
-        con = (
-            (df.longitude <= lonmax)
-            & (df.longitude >= lonmin)
-            & (df.latitude <= latmax)
-            & (df.latitude >= latmin)
-        )
+        con = (df.longitude <= lonmax) & (df.longitude >= lonmin) & (df.latitude <= latmax) & (df.latitude >= latmin)
         df.loc[con, "GIORGI_INDEX"] = i + 1
         df.loc[con, "GIORGI_ACRO"] = acro
     return df
 
 
-def calc_13_category_usda_soil_type(
-    clay: np.ndarray, sand: np.ndarray, silt: np.ndarray
-) -> np.ndarray:
+def calc_13_category_usda_soil_type(clay: np.ndarray, sand: np.ndarray, silt: np.ndarray) -> np.ndarray:
     """Calculate the 13 category USDA soil type from clay, sand, and silt.
 
     0 -- WATER
@@ -527,38 +508,18 @@ def calc_13_category_usda_soil_type(
     """
     stype = np.zeros(clay.shape)
     stype[np.where((silt + clay * 1.5 < 15.0) & (clay != 255))] = 1.0  # SAND
-    stype[np.where((silt + 1.5 * clay >= 15.0) & (silt + 1.5 * clay < 30) & (clay != 255))] = (
-        2.0  # Loamy Sand
+    stype[np.where((silt + 1.5 * clay >= 15.0) & (silt + 1.5 * clay < 30) & (clay != 255))] = 2.0  # Loamy Sand
+    stype[np.where((clay >= 7.0) & (clay < 20) & (sand > 52) & (silt + 2 * clay >= 30) & (clay != 255))] = (
+        3.0  # Sandy Loam (cond 1)
     )
-    stype[
-        np.where(
-            (clay >= 7.0) & (clay < 20) & (sand > 52) & (silt + 2 * clay >= 30) & (clay != 255)
-        )
-    ] = 3.0  # Sandy Loam (cond 1)
-    stype[np.where((clay < 7) & (silt < 50) & (silt + 2 * clay >= 30) & (clay != 255))] = (
-        3  # sandy loam (cond 2)
-    )
-    stype[np.where((silt >= 50) & (clay >= 12) & (clay < 27) & (clay != 255))] = (
-        4  # silt loam (cond 1)
-    )
-    stype[np.where((silt >= 50) & (silt < 80) & (clay < 12) & (clay != 255))] = (
-        4  # silt loam (cond 2)
-    )
+    stype[np.where((clay < 7) & (silt < 50) & (silt + 2 * clay >= 30) & (clay != 255))] = 3  # sandy loam (cond 2)
+    stype[np.where((silt >= 50) & (clay >= 12) & (clay < 27) & (clay != 255))] = 4  # silt loam (cond 1)
+    stype[np.where((silt >= 50) & (silt < 80) & (clay < 12) & (clay != 255))] = 4  # silt loam (cond 2)
     stype[np.where((silt >= 80) & (clay < 12) & (clay != 255))] = 5  # silt
-    stype[
-        np.where(
-            (clay >= 7) & (clay < 27) & (silt >= 28) & (silt < 50) & (sand <= 52) & (clay != 255)
-        )
-    ] = 6  # loam
-    stype[np.where((clay >= 20) & (clay < 35) & (silt < 28) & (sand > 45) & (clay != 255))] = (
-        7  # sandy clay loam
-    )
-    stype[np.where((clay >= 27) & (clay < 40.0) & (sand > 40) & (clay != 255))] = (
-        8  # silt clay loam
-    )
-    stype[np.where((clay >= 27) & (clay < 40.0) & (sand > 20) & (sand <= 45) & (clay != 255))] = (
-        9  # clay loam
-    )
+    stype[np.where((clay >= 7) & (clay < 27) & (silt >= 28) & (silt < 50) & (sand <= 52) & (clay != 255))] = 6  # loam
+    stype[np.where((clay >= 20) & (clay < 35) & (silt < 28) & (sand > 45) & (clay != 255))] = 7  # sandy clay loam
+    stype[np.where((clay >= 27) & (clay < 40.0) & (sand > 40) & (clay != 255))] = 8  # silt clay loam
+    stype[np.where((clay >= 27) & (clay < 40.0) & (sand > 20) & (sand <= 45) & (clay != 255))] = 9  # clay loam
     stype[np.where((clay >= 35) & (sand > 45) & (clay != 255))] = 10  # sandy clay
     stype[np.where((clay >= 40) & (silt >= 40) & (clay != 255))] = 11  # silty clay
     stype[np.where((clay >= 40) & (sand <= 45) & (silt < 40) & (clay != 255))] = 12  # clay
@@ -587,9 +548,7 @@ def _import_required(mod_name: str) -> Any:
     try:
         return import_module(mod_name)
     except ImportError as e:
-        raise RuntimeError(
-            f"importing required module '{mod_name}' failed. {_install_message(mod_name)}"
-        ) from e
+        raise RuntimeError(f"importing required module '{mod_name}' failed. {_install_message(mod_name)}") from e
 
 
 def _try_merge_exact(left: xr.Dataset, right: xr.Dataset, *, right_name: str = None) -> xr.Dataset:
@@ -648,8 +607,7 @@ def _try_merge_exact(left: xr.Dataset, right: xr.Dataset, *, right_name: str = N
             print(f"other {vn!r}: dtype={right[vn].dtype}")
             print(right[vn])
             raise ValueError(
-                f"Unable to merge{right_name}due to issue matching coordinates. "
-                "See debug messages above the traceback."
+                f"Unable to merge{right_name}due to issue matching coordinates. See debug messages above the traceback."
             ) from e
     else:
         return left

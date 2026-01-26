@@ -68,11 +68,7 @@ def _compare_with_baseline_(actual: xr.Dataset, baseline_path: Path) -> None:
                 # Skip z comparison if it's just indices vs pressure values
                 continue
             try:
-                if (
-                    hasattr(var, "values")
-                    and hasattr(baseline[var_name], "values")
-                    and np.issubdtype(var.dtype, np.floating)
-                ):
+                if hasattr(var, "values") and hasattr(baseline[var_name], "values") and np.issubdtype(var.dtype, np.floating):
                     assert np.allclose(
                         var.values,
                         baseline[var_name].values,

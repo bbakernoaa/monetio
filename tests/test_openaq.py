@@ -1,13 +1,9 @@
-import sys
 from urllib.error import HTTPError
 
 import pandas as pd
 import pytest
 
 from monetio import openaq
-
-if sys.version_info < (3, 7):
-    pytest.skip("requires Python 3.7+", allow_module_level=True)
 
 # openaq._URL_CAP_RANDOM_SAMPLE = True
 openaq._URL_CAP = 4
@@ -18,9 +14,7 @@ FIRST_DAY = pd.date_range(start="2013-11-26", end="2013-11-27", freq="h")[:-1]
 
 permission_error = pytest.mark.xfail(reason="private", raises=PermissionError, strict=True)
 
-forbidden_error = pytest.mark.xfail(
-    reason="forbidden", raises=(HTTPError, FileNotFoundError, PermissionError), strict=True
-)  # 403
+forbidden_error = pytest.mark.xfail(reason="forbidden", raises=(HTTPError, FileNotFoundError, PermissionError), strict=True)  # 403
 
 
 @permission_error
@@ -116,6 +110,4 @@ def test_parameter_coverage():
         "co2",
     ]
     assert len(params) == 13
-    assert sorted(openaq.OPENAQ.NON_MOLEC_PARAMS + list(openaq.OPENAQ.PPM_TO_UGM3)) == sorted(
-        params
-    )
+    assert sorted(openaq.OPENAQ.NON_MOLEC_PARAMS + list(openaq.OPENAQ.PPM_TO_UGM3)) == sorted(params)
