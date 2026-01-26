@@ -7,13 +7,10 @@ import pandas as pd
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("nesdis_frp")
 class NESDISFRPReader(GriddedReader):
-    def open_dataset(self,
-                     date,
-                     ftype="meanFRP",
-                     datapath=".",
-                     **kwargs):
+    def open_dataset(self, date, ftype="meanFRP", datapath=".", **kwargs):
         """
         Reads NESDIS FRP data (Download + Binary Read).
         """
@@ -47,11 +44,13 @@ class NESDISFRPReader(GriddedReader):
 
         return ds
 
+
 # -----------------------------------------------------------------------------
 # Helper functions
 # -----------------------------------------------------------------------------
 
 base_dir = "https://gsce-dtn.sdstate.edu/index.php/s/e8wPYPOL1bGXk5z/download?path=%2F"
+
 
 def download_data(date, ftype="meanFRP"):
     if isinstance(date, pd.Timestamp):
@@ -79,14 +78,19 @@ def download_data(date, ftype="meanFRP"):
 
     return files
 
+
 def read_tile(fname, tile=1, res="C384", dtype="f4"):
     from scipy.io import FortranFile
+
     try:
         import fv3grid as fg
+
         has_fv3grid = True
     except ImportError:
         has_fv3grid = False
-    from pyresample.utils import wrap_longitudes
+
+    def wrap_longitudes(lon):
+        return (lon + 180) % 360 - 180
 
     with open(fname, "rb") as f:
         w = FortranFile(f)

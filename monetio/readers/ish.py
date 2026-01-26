@@ -4,26 +4,30 @@ import dask
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
+import warnings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("ish")
 class ISHReader(PointReader):
-    def open_dataset(self,
-                     dates,
-                     box=None,
-                     country=None,
-                     state=None,
-                     site=None,
-                     resample=True,
-                     window="H",
-                     download=False,
-                     n_procs=1,
-                     request_timeout=10,
-                     request_retries=4,
-                     verbose=False,
-                     source="ncdc",
-                     **kwargs):
+    def open_dataset(
+        self,
+        dates,
+        box=None,
+        country=None,
+        state=None,
+        site=None,
+        resample=True,
+        window="h",
+        download=False,
+        n_procs=1,
+        request_timeout=10,
+        request_retries=4,
+        verbose=False,
+        source="ncdc",
+        **kwargs,
+    ):
         """
         Reads ISH data.
 
@@ -46,9 +50,11 @@ class ISHReader(PointReader):
             source=source,
         )
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/ish.py
 # -----------------------------------------------------------------------------
+
 
 class ISH:
     _VAR_INFO = [
@@ -87,7 +93,7 @@ class ISH:
     WIDTHS = [width for _, _, width in _VAR_INFO]
 
     def __init__(self):
-        self.history_file = "https://www1.ncdc.noaa.gov/pub/data/noaa/isd-history.csv"
+        self.history_file = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
         self.history = None
         self.df = None
         self.dates = None
@@ -107,6 +113,13 @@ class ISH:
 
     @staticmethod
     def _clean(frame):
+        if frame.empty:
+             for name, _, _ in ISH._VAR_INFO:
+                 if name not in frame.columns:
+                     frame[name] = pd.Series(dtype=object)
+             frame["time"] = pd.Series(dtype="datetime64[ns]")
+             return frame
+
         frame["time"] = [
             pd.Timestamp(f"{date:08}{htime:04}")
             for date, htime in zip(frame["date"], frame["htime"])
@@ -127,75 +140,99 @@ class ISH:
     def _decode_bytes(df):
         if df.empty:
             return df
-        bytes_cols = [col for col in df.columns if type(df[col][0]) is bytes]
-        with pd.option_context("mode.chained_assignment", None):
-            df.loc[:, bytes_cols] = df[bytes_cols].apply(
-                lambda x: x.str.decode("utf-8"),
-                axis="columns",
-            )
+        bytes_cols = []
+        for col in df.columns:
+            if df[col].dtype == object:
+                non_null = df[col].dropna()
+                if not non_null.empty and isinstance(non_null.iloc[0], (bytes, np.bytes_)):
+                    bytes_cols.append(col)
+
+        if bytes_cols:
+            with pd.option_context("mode.chained_assignment", None):
+                for col in bytes_cols:
+                    df[col] = df[col].str.decode("utf-8")
         return df
 
     def read_data_frame(self, url_or_file, *, request_timeout=10, request_retries=4):
-        # Use FileUtility to support S3, HTTP, and Local transparently
-        fs = FileUtility.get_fs(url_or_file)
+        if not request_retries >= 0:
+             raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
 
-        if url_or_file.startswith("http"):
-             # Fallback to requests logic for robust HTTP if needed,
-             # or trust fsspec http filesystem (simple read).
-             # Original code had retries.
-             # If source="ncdc" (http), we keep retries?
-             # For now, use FileUtility (fsspec) which handles S3/Local well.
-             # For HTTP, fsspec doesn't retry by default as aggressively as the original logic.
-             # But let's try to use fsspec for everything.
-             pass
+        if isinstance(url_or_file, str) and url_or_file.startswith("http"):
+            url_or_file = url_or_file.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
+            url_or_file = url_or_file.replace("/pub/pub/", "/pub/")
 
-        # Open file object
-        # gzip handling: if .gz, fsspec usually handles it if compression is inferred,
-        # OR we pass it to gzip.open.
-        # fsspec open(..., compression='gzip') works.
+            import gzip
+            import io
+            import requests
 
-        compression = "gzip" if url_or_file.endswith(".gz") else None
+            tries = 0
+            while tries - 1 < request_retries:
+                try:
+                    r = requests.get(url_or_file, timeout=request_timeout, stream=True)
+                    r.raise_for_status()
+                except requests.exceptions.RequestException as e:
+                    tries += 1
+                    if tries - 1 == request_retries:
+                        raise RuntimeError(
+                            f"Failed to connect to server for URL {url_or_file}. "
+                            f"timeout={request_timeout}, retries={request_retries}."
+                        ) from e
+                else:
+                    break
 
-        with fs.open(url_or_file, "rb", compression=compression) as f:
-            # numpy genfromtxt expects byte stream or text?
-            # np.genfromtxt handles gzip file objects if they are seekable?
-            # fsspec files are seekable.
-            # If compression='gzip' in fs.open, f is uncompressed stream.
-
-            frame_as_array = np.genfromtxt(f, delimiter=self.WIDTHS, dtype=self.DTYPES)
+            with gzip.open(io.BytesIO(r.content), "rb") as f:
+                frame_as_array = np.genfromtxt(f, delimiter=self.WIDTHS, dtype=self.DTYPES)
+        else:
+            fs = FileUtility.get_fs(url_or_file)
+            compression = "gzip" if url_or_file.endswith(".gz") else None
+            with fs.open(url_or_file, "rb", compression=compression) as f:
+                frame_as_array = np.genfromtxt(f, delimiter=self.WIDTHS, dtype=self.DTYPES)
 
         frame = pd.DataFrame.from_records(np.atleast_1d(frame_as_array))
         df = self._clean(frame)
-        df.drop(["latitude", "longitude"], axis=1, inplace=True)
+        df.drop(["latitude", "longitude"], axis=1, inplace=True, errors='ignore')
 
-        if self.dates is not None:
+        if self.dates is not None and not df.empty:
             index = (df.index >= self.dates.min()) & (df.index <= self.dates.max())
             df = df.loc[index, :]
 
         df = ISH._decode_bytes(df)
-        return df.reset_index()
+        df = df.reset_index()
+
+        # Ensure all non-numeric columns are object for dask consistency
+        for col in df.columns:
+            if not pd.api.types.is_numeric_dtype(df[col].dtype) and col != 'time':
+                df[col] = df[col].astype(object)
+
+        return df
 
     def read_ish_history(self, dates=None):
         if dates is None:
             dates = self.dates
         fname = self.history_file
 
-        # Support S3 for history if source is aws
         if self.source == "aws":
             fname = "s3://noaa-isd-pds/isd-history.csv"
 
-        # Use FileUtility for history file too
         fs = FileUtility.get_fs(fname)
-        with fs.open(fname, "r") as f:
-            self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], infer_datetime_format=True)
+        try:
+            with fs.open(fname, "r") as f:
+                self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str})
+        except Exception:
+            alt = fname.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
+            if alt != fname:
+                fs_alt = FileUtility.get_fs(alt)
+                with fs_alt.open(alt, "r") as f:
+                    self.history = pd.read_csv(f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str})
+                self.history_file = alt
+            else:
+                raise
 
         self.history.columns = [i.lower() for i in self.history.columns]
-
         if dates is not None:
             index1 = (self.history.end >= dates.min()) & (self.history.begin <= dates.max())
             self.history = self.history.loc[index1, :]
         self.history = self.history.dropna(subset=["lat", "lon"])
-
         self.history.loc[:, "usaf"] = self.history.usaf.astype("str").str.zfill(6)
         self.history.loc[:, "wban"] = self.history.wban.astype("str").str.zfill(5)
         self.history["station_id"] = self.history.usaf + self.history.wban
@@ -208,37 +245,86 @@ class ISH:
         return dfloc
 
     def build_urls(self, dates=None, sites=None):
-        if dates is None: dates = self.dates
-        if sites is None: sites = self.history
+        if dates is None:
+            dates = self.dates
+        if sites is None:
+            sites = self.history
 
         unique_years = pd.to_datetime(dates.year.unique(), format="%Y")
         furls = []
 
         if self.source == "aws":
-             url = "s3://noaa-isd-pds/data"
+            url = "s3://noaa-isd-pds/data"
+            for syear in unique_years.strftime("%Y"):
+                year_fnames = sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
+                for fname in year_fnames:
+                    furls.append(f"{url}/{syear}/{fname}")
+            return pd.Series(furls, name="name").to_frame()
         else:
-             url = "https://www1.ncdc.noaa.gov/pub/data/noaa"
+            url = "https://www.ncei.noaa.gov/pub/data/noaa"
+            all_urls_list = []
+            for syear in unique_years.strftime("%Y"):
+                try:
+                    year_url_df = pd.read_html(f"{url}/{syear}/")[0]
+                    if "Name" in year_url_df.columns:
+                         names = year_url_df["Name"].iloc[2:-1].to_frame(name="name")
+                         all_urls_list.append(f"{url}/{syear}/" + names)
+                except:
+                    pass
+            if all_urls_list:
+                all_urls = pd.concat(all_urls_list, ignore_index=True)
+            else:
+                all_urls = pd.DataFrame(columns=["name"])
 
-        # For AWS, we assume availability based on standard naming.
-        # AWS structure: s3://noaa-isd-pds/data/<year>/<usaf>-<wban>-<year>.gz (Need to confirm)
-        # Actually, registry says: data/<year>/<station ID>.
-        # Assuming standard station ID = USAF-WBAN.
+            for syear in unique_years.strftime("%Y"):
+                year_fnames = sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
+                for fname in year_fnames:
+                    furls.append(f"{url}/{syear}/{fname}")
 
-        # Note: AWS S3 listing is faster than NCDC html parsing if we used s3fs glob/ls.
-        # But here we construct URLs.
+            url_series = pd.Series(furls, name="name")
+            final_urls = pd.merge(url_series.to_frame(name="name"), all_urls, how="inner")
+            return final_urls
 
-        for syear in unique_years.strftime("%Y"):
-            year_fnames = (
-                sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-            )
-            for fname in year_fnames:
-                furls.append(f"{url}/{syear}/{fname}")
+    def get_url_file_objs(self, fname):
+        import gzip
+        import shutil
+        import requests
+        objs = []
+        for iii in fname:
+            try:
+                r2 = requests.get(iii, stream=True)
+                if r2.status_code != 404:
+                    temp = iii.split("/")[-1]
+                    out_name = "isd." + temp.replace(".gz", "")
+                    objs.append(out_name)
+                    with open(out_name, "wb") as fid:
+                        gzip_file = gzip.GzipFile(fileobj=r2.raw)
+                        shutil.copyfileobj(gzip_file, fid)
+            except:
+                pass
+        return objs
 
-        return pd.Series(furls, name="name").to_frame()
+    def add_data(
+        self,
+        dates,
+        box=None,
+        country=None,
+        state=None,
+        site=None,
+        resample=True,
+        window="h",
+        download=False,
+        n_procs=1,
+        request_timeout=10,
+        request_retries=4,
+        verbose=False,
+        source="ncdc",
+    ):
+        if sum([box is not None, country is not None, state is not None, site is not None]) > 1:
+            raise ValueError("Only one of `box`, `country`, `state`, or `site` can be used")
+        if not request_retries >= 0:
+             raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
 
-    def add_data(self, dates, box=None, country=None, state=None, site=None,
-                 resample=True, window="H", download=False, n_procs=1,
-                 request_timeout=10, request_retries=4, verbose=False, source="ncdc"):
         self.dates = pd.to_datetime(dates)
         self.verbose = verbose
         self.source = source
@@ -260,14 +346,37 @@ class ISH:
         if urls.empty:
             raise ValueError("No data URLs found")
 
-        # Parallel read logic
-        def func(fname):
-            return self.read_data_frame(fname, request_timeout=request_timeout, request_retries=request_retries)
+        # Robust meta for dask
+        meta = None
+        for u in urls.name:
+             try:
+                  sample_df = self.read_data_frame(u, request_timeout=request_timeout, request_retries=request_retries)
+                  if not sample_df.empty:
+                       meta = sample_df.iloc[:0].copy()
+                       break
+             except:
+                  continue
 
-        # Using name column
-        dfs = [dask.delayed(func)(f) for f in urls.name]
-        dff = dd.from_delayed(dfs)
-        self.df = dff.compute(num_workers=n_procs)
+        if meta is None:
+             try:
+                  sample_df = self.read_data_frame(urls.name.iloc[0], request_timeout=request_timeout, request_retries=request_retries)
+                  meta = sample_df.iloc[:0].copy()
+             except:
+                  meta = None
+
+        if download:
+            objs = self.get_url_file_objs(urls.name)
+            def func(fname):
+                return self.read_data_frame(fname, request_timeout=request_timeout, request_retries=request_retries)
+            dfs = [dask.delayed(func)(f) for f in objs]
+            dff = dd.from_delayed(dfs, meta=meta)
+            self.df = dff.compute(num_workers=n_procs)
+        else:
+            def func(url):
+                return self.read_data_frame(url, request_timeout=request_timeout, request_retries=request_retries)
+            dfs = [dask.delayed(func)(f) for f in urls.name]
+            dff = dd.from_delayed(dfs, meta=meta)
+            self.df = dff.compute(num_workers=n_procs)
 
         if resample and not self.df.empty:
             self.df.index = self.df.time
@@ -283,5 +392,4 @@ class ISH:
 
         self.df = self.df.merge(dfloc, on="station_id", how="left")
         self.df = self.df.rename(columns={"station_id": "siteid", "ctry": "country"})
-
         return self.df

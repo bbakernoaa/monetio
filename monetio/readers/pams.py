@@ -5,11 +5,10 @@ import pandas as pd
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("pams")
 class PAMSReader(PointReader):
-    def open_dataset(self,
-                     files,
-                     **kwargs):
+    def open_dataset(self, files, **kwargs):
         """
         Reads PAMS JSON files.
         """
@@ -24,15 +23,18 @@ class PAMSReader(PointReader):
             return pd.DataFrame()
         return pd.concat(dfs)
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/pams.py
 # -----------------------------------------------------------------------------
+
 
 def open_json(filename):
     fs = FileUtility.get_fs(filename)
     with fs.open(filename, "r") as f:
         jsonf = json.load(f)
     return jsonf
+
 
 def add_data_pams(filename):
     jsonf = open_json(filename)
@@ -48,7 +50,9 @@ def add_data_pams(filename):
         + data.site_number.astype(str).str.zfill(4)
     )
 
-    data["datetime_local"] = pd.to_datetime(data["date_local"] + " " + data["time_local"])
+    data["datetime_local"] = pd.to_datetime(
+        data["date_local"] + " " + data["time_local"]
+    )
     data["datetime_utc"] = pd.to_datetime(data["date_gmt"] + " " + data["time_gmt"])
 
     data = data.rename(
@@ -60,9 +64,23 @@ def add_data_pams(filename):
     )
 
     cols_to_drop = [
-        "state_code", "county_code", "site_number", "datum", "qualifier", "uncertainty",
-        "county", "state", "date_of_last_change", "date_local", "time_local",
-        "date_gmt", "time_gmt", "poc", "unit_code", "sample_duration_code", "method_code",
+        "state_code",
+        "county_code",
+        "site_number",
+        "datum",
+        "qualifier",
+        "uncertainty",
+        "county",
+        "state",
+        "date_of_last_change",
+        "date_local",
+        "time_local",
+        "date_gmt",
+        "time_gmt",
+        "poc",
+        "unit_code",
+        "sample_duration_code",
+        "method_code",
     ]
     data = data.drop(columns=[c for c in cols_to_drop if c in data.columns])
 

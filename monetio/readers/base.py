@@ -1,19 +1,23 @@
 import abc
 import xarray as xr
 import pandas as pd
-from typing import Union, List, Optional
+from typing import Union, List
 
 from .drivers import XarrayDriver, PandasDriver
 
 # 1. The Registry
 READER_REGISTRY = {}
 
+
 def register_reader(name):
     """Decorator to register a reader class."""
+
     def _register(cls):
         READER_REGISTRY[name] = cls
         return cls
+
     return _register
+
 
 # 2. The Abstract Base Class
 class BaseReader(abc.ABC):
@@ -22,9 +26,9 @@ class BaseReader(abc.ABC):
     """
 
     @abc.abstractmethod
-    def open_dataset(self,
-                     files: Union[str, List[str]],
-                     **kwargs) -> Union[xr.Dataset, pd.DataFrame]:
+    def open_dataset(
+        self, files: Union[str, List[str]], **kwargs
+    ) -> Union[xr.Dataset, pd.DataFrame]:
         """
         Main entry point to read data.
 
@@ -44,10 +48,12 @@ class BaseReader(abc.ABC):
         """
         return ds
 
+
 class GriddedReader(BaseReader):
     """
     Base class for gridded data (Models, Satellites) that utilizes XarrayDriver.
     """
+
     def __init__(self):
         self.driver = XarrayDriver()
 
@@ -59,14 +65,18 @@ class GriddedReader(BaseReader):
         ds = self.driver.open(files, **kwargs)
         return self.harmonize(ds)
 
+
 class PointReader(BaseReader):
     """
     Base class for point/tabular data (Observations) that utilizes PandasDriver.
     """
+
     def __init__(self):
         self.driver = PandasDriver()
 
-    def open_dataset(self, files: Union[str, List[str]], read_method='read_csv', **kwargs) -> pd.DataFrame:
+    def open_dataset(
+        self, files: Union[str, List[str]], read_method="read_csv", **kwargs
+    ) -> pd.DataFrame:
         """
         Uses PandasDriver to open files.
         Readers can override this to add pre/post processing.

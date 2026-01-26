@@ -1,25 +1,54 @@
 import os
+import numpy as np
+from pyproj import Proj, CRS
 
 path = os.path.abspath(__file__)
 
 
+class MockArea:
+    def __init__(self, proj_dict, area_extent, nx, ny):
+        self.proj_dict = proj_dict
+        self.area_extent = area_extent
+        self.nx = nx
+        self.ny = ny
+        self.proj_str = Proj(proj_dict).srs
+
+    def get_lonlats(self):
+        x = np.linspace(self.area_extent[0], self.area_extent[2], self.nx)
+        y = np.linspace(self.area_extent[1], self.area_extent[3], self.ny)
+        xv, yv = np.meshgrid(x, y)
+        p = Proj(self.proj_dict)
+        return p(xv, yv, inverse=True)
+
+    def get_lonlats_dask(self):
+        try:
+            import dask.array as da
+
+            x = da.linspace(self.area_extent[0], self.area_extent[2], self.nx)
+            y = da.linspace(self.area_extent[1], self.area_extent[3], self.ny)
+            xv, yv = da.meshgrid(x, y)
+
+            def _proj_inv(x_val, y_val):
+                p = Proj(self.proj_dict)
+                return np.stack(p(x_val, y_val, inverse=True))
+
+            # Use map_blocks to keep it lazy
+            combined = da.map_blocks(_proj_inv, xv, yv, dtype=float, chunks=(2, *xv.chunks))
+            return combined[0], combined[1]
+        except ImportError:
+            return self.get_lonlats()
+
+    def to_cartopy_crs(self):
+        try:
+            import cartopy.crs as ccrs
+
+            # Use ccrs.Proj to wrap a Proj string, which is a concrete class.
+            return ccrs.Proj(CRS.from_user_input(self.proj_dict).to_proj4())
+        except ImportError:
+            return None
+
+
 def _geos_16_grid(dset):
-    """Short summary.
-
-    Parameters
-    ----------
-    dset : type
-        Description of parameter `dset`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    from numpy import asarray
-    from pyresample import geometry
-
     projection = dset.goes_imager_projection
     h = projection.perspective_point_height
     a = projection.semi_major_axis
@@ -28,12 +57,12 @@ def _geos_16_grid(dset):
     sweep = projection.sweep_angle_axis
     x = dset.x * h
     y = dset.y * h
-    x_ll = x[0]  # lower left corner
-    x_ur = x[-1]  # upper right corner
-    y_ll = y[0]  # lower left corner
-    y_ur = y[-1]  # upper right corner
-    x_h = (x_ur - x_ll) / (len(x) - 1.0) / 2.0  # 1/2 grid size
-    y_h = (y_ur - y_ll) / (len(y) - 1.0) / 2.0  # 1/2 grid size
+    x_ll = x[0]
+    x_ur = x[-1]
+    y_ll = y[0]
+    y_ur = y[-1]
+    x_h = (x_ur - x_ll) / (len(x) - 1.0) / 2.0
+    y_h = (y_ur - y_ll) / (len(y) - 1.0) / 2.0
     area_extent = (x_ll - x_h, y_ll - y_h, x_ur + x_h, y_ur + y_h)
 
     proj_dict = {
@@ -45,31 +74,17 @@ def _geos_16_grid(dset):
         "units": "m",
         "sweep": sweep,
     }
-
-    area = geometry.AreaDefinition(
-        "GEOS_ABI", "ABI", "GOES_ABI", proj_dict, len(x), len(y), asarray(area_extent)
-    )
-    return area
+    return MockArea(proj_dict, area_extent, len(dset.x), len(dset.y))
 
 
 def _get_sinu_grid_df():
-    """Short summary.
-
-    Parameters
-    ----------
-
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
     from pandas import read_csv
 
-    f = path[:-8] + "data/sn_bound_10deg.txt"
-    td = read_csv(f, skiprows=4, delim_whitespace=True)
-    td = td.assign(ihiv="h" + td.ih.astype(str).str.zfill(2) + "v" + td.iv.astype(str).str.zfill(2))
+    f = os.path.join(os.path.dirname(path), "data/sn_bound_10deg.txt")
+    td = read_csv(f, skiprows=4, sep=r"\s+")
+    td = td.assign(
+        ihiv="h" + td.ih.astype(str).str.zfill(2) + "v" + td.iv.astype(str).str.zfill(2)
+    )
     return td
 
 
@@ -84,19 +99,16 @@ def _sinu_grid_latlon_boundary(h, v):
 
 
 def _get_sinu_xy(lon, lat):
-    from pyproj import Proj
-
-    sinu = Proj("+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m")
+    sinu = Proj(
+        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m"
+    )
     return sinu(lon, lat)
 
 
 def _get_sinu_latlon(x, y):
-    from numpy import meshgrid
-    from pyproj import Proj
-
-    xv, yv = meshgrid(x, y)
+    xv, yv = np.meshgrid(x, y)
     sinu = Proj(
-        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m, +R=6371007.181"
+        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +R=6371007.181"
     )
     return sinu(xv, yv, inverse=True)
 
@@ -108,125 +120,54 @@ def get_sinu_area_extent(lonmin, latmin, lonmax, latmax):
 
 
 def get_modis_latlon_from_swath_hv(h, v, dset):
-    from numpy import linspace
-
     lonmin, latmin, lonmax, latmax = _sinu_grid_latlon_boundary(h, v)
     xmin, ymin = _get_sinu_xy(lonmin, latmin)
     xmax, ymax = _get_sinu_xy(lonmax, latmax)
-    x = linspace(xmin, xmax, len(dset.x))
-    y = linspace(ymin, ymax, len(dset.y))
+    x = np.linspace(xmin, xmax, len(dset.x))
+    y = np.linspace(ymin, ymax, len(dset.y))
     lon, lat = _get_sinu_latlon(x, y)
     dset.coords["longitude"] = (("x", "y"), lon)
     dset.coords["latitude"] = (("x", "y"), lat)
     dset.attrs["area_extent"] = (x.min(), y.min(), x.max(), y.max())
     dset.attrs["proj4_srs"] = (
-        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 " "+b=6371007.181 +units=m"
+        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m"
     )
     return dset
 
 
 def get_sinu_area_def(dset):
-    from pyproj import Proj
-    from pyresample import utils
-
-    p = Proj(dset.attrs["proj4_srs"])
-    proj4_args = p.srs
-    area_name = "MODIS Grid Def"
-    area_id = "modis"
-    proj_id = area_id
+    proj4_srs = dset.attrs["proj4_srs"]
     area_extent = dset.attrs["area_extent"]
     nx, ny = dset.longitude.shape
-    return utils.get_area_def(area_id, area_name, proj_id, proj4_args, nx, ny, area_extent)
+    return MockArea(proj4_srs, area_extent, nx, ny)
 
 
 def get_ioapi_pyresample_area_def(ds, proj4_srs):
-    from pyresample import geometry, utils
-
-    y_size = ds.NROWS
-    x_size = ds.NCOLS
-    projection = utils.proj4_str_to_dict(proj4_srs)
-    proj_id = "IOAPI_Dataset"
-    description = "IOAPI area_def for pyresample"
-    area_id = "MONET_Object_Grid"
     x_ll, y_ll = ds.XORIG + ds.XCELL * 0.5, ds.YORIG + ds.YCELL * 0.5
     x_ur, y_ur = (
         ds.XORIG + (ds.NCOLS * ds.XCELL) + 0.5 * ds.XCELL,
         ds.YORIG + (ds.YCELL * ds.NROWS) + 0.5 * ds.YCELL,
     )
     area_extent = (x_ll, y_ll, x_ur, y_ur)
-    area_def = geometry.AreaDefinition(
-        area_id, description, proj_id, projection, x_size, y_size, area_extent
-    )
-    return area_def
+    return MockArea(proj4_srs, area_extent, ds.NCOLS, ds.NROWS)
 
 
 def get_generic_projection_from_proj4(lat, lon, proj4_srs):
-    """Short summary.
-
-    Parameters
-    ----------
-    lat : type
-        Description of parameter `lat`.
-    lon : type
-        Description of parameter `lon`.
-    proj4_srs : type
-        Description of parameter `proj4_srs`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    try:
-        from pyresample.geometry import SwathDefinition
-        from pyresample.utils import proj4_str_to_dict
-    except ImportError:
-        print("please install pyresample to use this functionality")
-    swath = SwathDefinition(lats=lat, lons=lon)
-    area = swath.compute_optimal_bb_area(proj4_str_to_dict(proj4_srs))
-    return area
+    # This used to compute optimal BB area. Without pyresample, we just return CRS.
+    return CRS.from_user_input(proj4_srs)
 
 
 def get_optimal_cartopy_proj(lat, lon, proj4_srs):
-    """Short summary.
+    try:
+        import cartopy.crs as ccrs
 
-    Parameters
-    ----------
-    lat : type
-        Description of parameter `lat`.
-    lon : type
-        Description of parameter `lon`.
-    proj4_srs : type
-        Description of parameter `proj4_srs`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    area = get_generic_projection_from_proj4(lat, lon, proj4_srs)
-    return area.to_cartopy_crs()
+        # Use ccrs.Proj to wrap a Proj string, which is a concrete class.
+        return ccrs.Proj(CRS.from_user_input(proj4_srs).to_proj4())
+    except ImportError:
+        return None
 
 
 def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
-    """SGet the IOAPI projection out of the file into proj4.
-
-    Parameters
-    ----------
-    ds : type
-        Description of parameter `ds`.
-    earth_radius : type
-        Description of parameter `earth_radius`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-
     pargs = dict()
     pargs["lat_1"] = ds.P_ALP
     pargs["lat_2"] = ds.P_BET
@@ -238,50 +179,37 @@ def _ioapi_grid_from_dataset(ds, earth_radius=6370000):
     pargs["r"] = earth_radius
     proj_id = ds.GDTYP
     if proj_id == 2:
-        # Lambert
-        p4 = (
-            "+proj=lcc +lat_1={lat_1} +lat_2={lat_2} "
-            "+lat_0={lat_0} +lon_0={lon_0} "
-            "+x_0=0 +y_0=0 +datum=WGS84 +units=m +a={r} +b={r}"
-        )
+        p4 = "+proj=lcc +lat_1={lat_1} +lat_2={lat_2} +lat_0={lat_0} +lon_0={lon_0} +x_0=0 +y_0=0 +datum=WGS84 +units=m +a={r} +b={r}"
         p4 = p4.format(**pargs)
     elif proj_id == 4:
-        # Polar stereo
-        p4 = "+proj=stere +lat_ts={lat_1} +lon_0={lon_0} +lat_0=90.0" "+x_0=0 +y_0=0 +a={r} +b={r}"
+        p4 = "+proj=stere +lat_ts={lat_1} +lon_0={lon_0} +lat_0=90.0 +x_0=0 +y_0=0 +a={r} +b={r}"
         p4 = p4.format(**pargs)
     elif proj_id == 3:
-        # Mercator
-        p4 = (
-            "+proj=merc +lat_ts={lat_1} " "+lon_0={center_lon} " "+x_0={x0} +y_0={y0} +a={r} +b={r}"
-        )
+        p4 = "+proj=merc +lat_ts={lat_1} +lon_0={center_lon} +x_0={x0} +y_0={y0} +a={r} +b={r}"
         p4 = p4.format(**pargs)
     else:
-        raise NotImplementedError("IOAPI proj not implemented yet: " "{}".format(proj_id))
-    # area_def = _get_ioapi_pyresample_area_def(ds)
-    return p4  # , area_def
+        raise NotImplementedError(f"IOAPI proj not implemented yet: {proj_id}")
+    return p4
+
+
+def get_latlon_ioapi(dset, proj4_srs):
+    x = np.linspace(
+        dset.XORIG + dset.XCELL * 0.5,
+        dset.XORIG + (dset.NCOLS - 0.5) * dset.XCELL,
+        dset.NCOLS,
+    )
+    y = np.linspace(
+        dset.YORIG + dset.YCELL * 0.5,
+        dset.YORIG + (dset.NROWS - 0.5) * dset.YCELL,
+        dset.NROWS,
+    )
+    xv, yv = np.meshgrid(x, y)
+    p = Proj(proj4_srs)
+    lon, lat = p(xv, yv, inverse=True)
+    return lon, lat
 
 
 def grid_from_dataset(ds, earth_radius=6370000):
-    """Short summary.
-
-    Parameters
-    ----------
-    ds : type
-        Description of parameter `ds`.
-    earth_radius : type
-        Description of parameter `earth_radius`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    # maybe its an IOAPI file
     if hasattr(ds, "IOAPI_VERSION") or hasattr(ds, "P_ALP"):
-        # IOAPI_VERSION
         return _ioapi_grid_from_dataset(ds, earth_radius=earth_radius)
-
-    # Try out platte carree
-
-    # return _lonlat_grid_from_dataset(ds)
+    return None

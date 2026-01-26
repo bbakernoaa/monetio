@@ -73,8 +73,16 @@ def _open_one_dataset(fname):
             ),
         },
         coords={
-            "longitude": (("y", "x"), lon_2d, {"long_name": "longitude", "units": "degree_east"}),
-            "latitude": (("y", "x"), lat_2d, {"long_name": "latitude", "units": "degree_north"}),
+            "longitude": (
+                ("y", "x"),
+                lon_2d,
+                {"long_name": "longitude", "units": "degree_east"},
+            ),
+            "latitude": (
+                ("y", "x"),
+                lat_2d,
+                {"long_name": "latitude", "units": "degree_north"},
+            ),
             "time": ((), time),
         },
     )

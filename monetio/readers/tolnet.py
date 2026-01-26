@@ -3,16 +3,13 @@
 import os
 import pandas as pd
 import xarray as xr
-from numpy import sort
-from glob import glob
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("tolnet")
 class TOLNetReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     **kwargs):
+    def open_dataset(self, files, **kwargs):
         """
         Reads TOLNet HDF5 files.
         """
@@ -32,15 +29,17 @@ class TOLNetReader(GriddedReader):
         else:
             return xr.concat(dsets, dim="time")
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/profile/tolnet.py
 # -----------------------------------------------------------------------------
+
 
 class TOLNet:
     def __init__(self):
         self.objtype = "TOLNET"
         self.cwd = os.getcwd()
-        self.dates = pd.date_range(start="2017-09-25", end="2017-09-26", freq="H")
+        self.dates = pd.date_range(start="2017-09-25", end="2017-09-26", freq="h")
         self.dset = None
         self.daily = False
 
@@ -68,7 +67,15 @@ class TOLNet:
         from numpy import array, ndarray
 
         alt = data["ALT"][:].squeeze()
-        altvars = ["AirND", "AirNDUncert", "ChRange", "Press", "Temp", "TempUncert", "PressUncert"]
+        altvars = [
+            "AirND",
+            "AirNDUncert",
+            "ChRange",
+            "Press",
+            "Temp",
+            "TempUncert",
+            "PressUncert",
+        ]
         tseries = pd.Series(data["TIME_MID_UT_UNIX"][:].squeeze())
         time = pd.Series(pd.to_datetime(tseries, unit="ms"), name="time")
         ovars = ["O3MR", "O3ND", "O3NDUncert", "O3MRUncert", "O3NDResol", "Precision"]
@@ -101,12 +108,16 @@ class TOLNet:
 
         try:
             a, b = dataset.Location_Latitude.decode("ascii").split()
-            if b == "S": latitude = -1 * float(a)
-            else: latitude = float(a)
+            if b == "S":
+                latitude = -1 * float(a)
+            else:
+                latitude = float(a)
 
             a, b = dataset.Location_Longitude.decode("ascii").split()
-            if b == "W": longitude = -1 * float(a)
-            else: longitude = float(a)
+            if b == "W":
+                longitude = -1 * float(a)
+            else:
+                longitude = float(a)
 
             dataset.coords["latitude"] = (("y", "x"), array(latitude).reshape(1, 1))
             dataset.coords["longitude"] = (("y", "x"), array(longitude).reshape(1, 1))

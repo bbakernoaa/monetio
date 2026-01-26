@@ -33,7 +33,9 @@ def add_data(filename):
     )
 
     # Combining date and time into one column
-    data["datetime_local"] = pd.to_datetime(data["date_local"] + " " + data["time_local"])
+    data["datetime_local"] = pd.to_datetime(
+        data["date_local"] + " " + data["time_local"]
+    )
     data["datetime_utc"] = pd.to_datetime(data["date_gmt"] + " " + data["time_gmt"])
 
     # Renaming columns

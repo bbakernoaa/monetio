@@ -129,7 +129,9 @@ def load_variable(filename, varname):
             },
         )
     else:
-        raise AssertionError(f"Variable {varname!r} in variable dict but not accounted for.")
+        raise AssertionError(
+            f"Variable {varname!r} in variable dict but not accounted for."
+        )
 
     # missing value -> nan
     ds[varname] = ds[varname].where(ds[varname] != -9999.0)
@@ -161,13 +163,16 @@ def _add_pressure_variables(dataset):
     diff = xr.full_like(dataset["pressure"], np.nan)
     diff[:, :, :, 0] = 1000
     diff[:, :, :, 1:] = (
-        dataset["pressure_surf"].values[:, :, :, None] - dataset["pressure"][:, :, :, :9].values
+        dataset["pressure_surf"].values[:, :, :, None]
+        - dataset["pressure"][:, :, :, :9].values
     )
     # add fill values below true surface
     dataset["pressure"] = dataset["pressure"].where(diff > 0)
     # replace lowest pressure with surface pressure; broadcast happens in background
     dataset["pressure"].values = (
-        dataset["pressure_surf"].where((diff > 0) & (diff < 100), dataset["pressure"]).values
+        dataset["pressure_surf"]
+        .where((diff > 0) & (diff < 100), dataset["pressure"])
+        .values
     )
 
     # Center Pressure
@@ -176,7 +181,8 @@ def _add_pressure_variables(dataset):
     for z in range(1, 10):
         dummy[:, :, :, z] = (
             dataset["pressure"][:, :, :, z]
-            - (dataset["pressure"][:, :, :, z] - dataset["pressure"][:, :, :, z - 1]) / 2
+            - (dataset["pressure"][:, :, :, z] - dataset["pressure"][:, :, :, z - 1])
+            / 2
         )
     dataset["pressure"] = dummy
 
@@ -204,13 +210,16 @@ def _combine_apriori(dataset):
     diff = xr.full_like(dataset["pressure"], np.nan)
     diff[:, :, :, 0] = 1000
     diff[:, :, :, 1:] = (
-        dataset["pressure_surf"].values[:, :, :, None] - dataset["pressure"][:, :, :, :9].values
+        dataset["pressure_surf"].values[:, :, :, None]
+        - dataset["pressure"][:, :, :, :9].values
     )
     # add fill values below true surface
     dataset["apriori_prof"] = dataset["apriori_prof"].where(diff > 0)
     # replace lowest pressure with surface pressure; broadcast happens in background
     dataset["apriori_prof"].values = (
-        dataset["apriori_surf"].where((diff > 0) & (diff < 100), dataset["apriori_prof"]).values
+        dataset["apriori_surf"]
+        .where((diff > 0) & (diff < 100), dataset["apriori_prof"])
+        .values
     )
 
     return dataset

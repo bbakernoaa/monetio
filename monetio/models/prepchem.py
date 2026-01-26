@@ -28,8 +28,10 @@ def open_dataset(fname, dtype="f4", res="C384", tile=1):
         Description of returned object.
 
     """
-    from pyresample.utils import wrap_longitudes
     from scipy.io import FortranFile
+
+    def wrap_longitudes(lon):
+        return (lon + 180) % 360 - 180
 
     w = FortranFile(fname)
     a = w.read_reals(dtype=dtype)

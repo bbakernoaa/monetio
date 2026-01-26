@@ -7,16 +7,19 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("hysplit")
 class HYSPLITReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     drange=None,
-                     century=None,
-                     verbose=False,
-                     sample_time_stamp="start",
-                     check_grid=True,
-                     **kwargs):
+    def open_dataset(
+        self,
+        files,
+        drange=None,
+        century=None,
+        verbose=False,
+        sample_time_stamp="start",
+        check_grid=True,
+        **kwargs,
+    ):
         """
         Reads HYSPLIT binary concentration (cdump) files.
         """
@@ -29,25 +32,27 @@ class HYSPLITReader(GriddedReader):
                 century=century,
                 verbose=verbose,
                 sample_time_stamp=sample_time_stamp,
-                check_grid=check_grid
+                check_grid=check_grid,
             )
         else:
-            blist = [(f, f, 'met') for f in file_list]
+            blist = [(f, f, "met") for f in file_list]
             return combine_dataset(
                 blist,
                 drange=drange,
                 century=century,
                 verbose=verbose,
                 sample_time_stamp=sample_time_stamp,
-                check_grid=check_grid
+                check_grid=check_grid,
             )
 
     def harmonize(self, ds):
         return ds
 
+
 # -----------------------------------------------------------------------------
 # HYSPLIT Core Logic Ported
 # -----------------------------------------------------------------------------
+
 
 def open_dataset_hysplit(
     fname,
@@ -70,6 +75,7 @@ def open_dataset_hysplit(
         return fix_grid_continuity(dset)
     else:
         return dset
+
 
 class ModelBin:
     def __init__(
@@ -100,7 +106,9 @@ class ModelBin:
         if readwrite == "r":
             if verbose:
                 print("reading " + filename)
-            self.dataflag = self.readfile(filename, drange, verbose=verbose, century=century)
+            self.dataflag = self.readfile(
+                filename, drange, verbose=verbose, century=century
+            )
 
     @staticmethod
     def define_struct():
@@ -182,11 +190,26 @@ class ModelBin:
         rec8b = dtype([("indx", int2), ("jndx", int2), ("conc", real4)])
         rec8c = dtype([("pad2", int4)])
 
-        return (rec1, rec2, rec3, rec4a, rec4b, rec5a, rec5b, rec5c, rec6, rec8a, rec8b, rec8c)
+        return (
+            rec1,
+            rec2,
+            rec3,
+            rec4a,
+            rec4b,
+            rec5a,
+            rec5b,
+            rec5c,
+            rec6,
+            rec8a,
+            rec8b,
+            rec8c,
+        )
 
     def parse_header(self, hdata1):
         if len(hdata1["start_loc"]) != 1:
-            print("WARNING in ModelBin _readfile - number of starting locations incorrect")
+            print(
+                "WARNING in ModelBin _readfile - number of starting locations incorrect"
+            )
         nstartloc = hdata1["start_loc"][0]
         self.atthash["Meteorological Model ID"] = hdata1["model_id"][0].decode("UTF-8")
         self.atthash["Number Start Locations"] = nstartloc
@@ -207,7 +230,9 @@ class ModelBin:
                     century = 2000
                 else:
                     century = 1900
-                print("WARNING: Guessing Century for HYSPLIT concentration file", century)
+                print(
+                    "WARNING: Guessing Century for HYSPLIT concentration file", century
+                )
 
             sourcedate = datetime.datetime(
                 century + hdata2["r_year"][nnn],
@@ -330,7 +355,9 @@ class ModelBin:
                 for _ in range(self.atthash["Number of Species"]):
                     hdata8a = np.fromfile(fid, dtype=rec8a, count=1)
                     if hdata8a["ne"] >= 1:
-                        self.atthash["Species ID"].append(hdata8a["poll"][0].decode("UTF-8"))
+                        self.atthash["Species ID"].append(
+                            hdata8a["poll"][0].decode("UTF-8")
+                        )
                         hdata8b = np.fromfile(fid, dtype=rec8b, count=hdata8a["ne"][0])
                         self.nonzeroconcdates.append(pdate1)
                     else:
@@ -366,15 +393,20 @@ class ModelBin:
             return False
         if self.dset.variables:
             self.dset.attrs = self.atthash
-            mgrid = get_latlongrid(self.gridhash, self.dset.coords["x"], self.dset.coords["y"])
+            mgrid = get_latlongrid(
+                self.gridhash, self.dset.coords["x"], self.dset.coords["y"]
+            )
             self.dset = self.dset.assign_coords(longitude=(("y", "x"), mgrid[0]))
             self.dset = self.dset.assign_coords(latitude=(("y", "x"), mgrid[1]))
             self.dset = self.dset.reset_coords()
             self.dset = self.dset.set_coords(["time", "latitude", "longitude"])
         if iii == 0 and verbose:
-            print("Warning: ModelBin class _readfile method: no data in the date range found")
+            print(
+                "Warning: ModelBin class _readfile method: no data in the date range found"
+            )
             return False
         return True
+
 
 def check_drange(drange, pdate1, pdate2):
     savedata = True
@@ -389,6 +421,7 @@ def check_drange(drange, pdate1, pdate2):
     else:
         savedata = False
     return testf, savedata
+
 
 def fix_grid_continuity(dset):
     if not dset.any():
@@ -413,6 +446,7 @@ def fix_grid_continuity(dset):
     cdset = cdset.assign_coords(longitude=(("y", "x"), mgrid[0]))
     return cdset.fillna(0)
 
+
 def check_grid_continuity(dset):
     xvv = dset.x.values
     yvv = dset.y.values
@@ -423,6 +457,7 @@ def check_grid_continuity(dset):
     if np.any(tt2 != 1):
         return False
     return True
+
 
 def get_latlongrid(attrs, xindx, yindx):
     xindx = np.array(xindx)
@@ -435,16 +470,17 @@ def get_latlongrid(attrs, xindx, yindx):
     success = True
     try:
         lonlist = [lon[x - 1] for x in xindx]
-    except Exception as eee:
+    except Exception:
         success = False
     try:
         latlist = [lat[x - 1] for x in yindx]
-    except Exception as eee:
+    except Exception:
         success = False
     if not success:
         return None
     mgrid = np.meshgrid(lonlist, latlist)
     return mgrid
+
 
 def getlatlon(attrs):
     lon_tolerance = 0.001
@@ -461,6 +497,7 @@ def getlatlon(attrs):
     lon = np.array([x - 360 if x >= 180 + lon_tolerance else x for x in lon])
     return lat, lon
 
+
 def combine_dataset(
     blist,
     drange=None,
@@ -471,6 +508,7 @@ def combine_dataset(
     check_grid=True,
 ):
     import sys
+
     mlat_p = mlon_p = None
     ylist = []
     dtlist = []
@@ -567,6 +605,7 @@ def combine_dataset(
         rval = newhxr
     return rval
 
+
 def add_species(dset, species=None):
     sflist = []
     splist = dset.attrs["Species ID"]
@@ -590,6 +629,7 @@ def add_species(dset, species=None):
     atthash["Species ID"] = sflist
     total_par = total_par.assign_attrs(atthash)
     return total_par
+
 
 def reset_latlon_coords(hxr):
     mgrid = get_latlongrid(hxr.attrs, hxr.x.values, hxr.y.values)

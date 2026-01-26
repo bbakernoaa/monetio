@@ -23,7 +23,9 @@ import requests
 # ----------------------------------USER-DEFINED VARIABLES--------------------------------------- #
 # Set up command line arguments
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("-dir", "--directory", required=True, help="Specify directory to save files to")
+parser.add_argument(
+    "-dir", "--directory", required=True, help="Specify directory to save files to"
+)
 parser.add_argument(
     "-f",
     "--files",
@@ -67,7 +69,10 @@ except FileNotFoundError:
         ),
         shell=True,
     )
-    Popen(f"echo login {getpass(prompt=prompts[0])} >> {homeDir + os.sep}.netrc", shell=True)
+    Popen(
+        f"echo login {getpass(prompt=prompts[0])} >> {homeDir + os.sep}.netrc",
+        shell=True,
+    )
     Popen(
         f"echo password {getpass(prompt=prompts[1])} >> {homeDir + os.sep}.netrc",
         shell=True,
@@ -77,7 +82,10 @@ except FileNotFoundError:
 except TypeError:
     homeDir = os.path.expanduser("~")
     Popen(f"echo machine {urs} >> {homeDir + os.sep}.netrc", shell=True)
-    Popen(f"echo login {getpass(prompt=prompts[0])} >> {homeDir + os.sep}.netrc", shell=True)
+    Popen(
+        f"echo login {getpass(prompt=prompts[0])} >> {homeDir + os.sep}.netrc",
+        shell=True,
+    )
     Popen(
         f"echo password {getpass(prompt=prompts[1])} >> {homeDir + os.sep}.netrc",
         shell=True,
@@ -103,7 +111,10 @@ for f in fileList:
     with requests.get(
         f.strip(),
         stream=True,
-        auth=(netrc(netrcDir).authenticators(urs)[0], netrc(netrcDir).authenticators(urs)[2]),
+        auth=(
+            netrc(netrcDir).authenticators(urs)[0],
+            netrc(netrcDir).authenticators(urs)[2],
+        ),
     ) as response:
         if response.status_code != 200:
             print(

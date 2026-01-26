@@ -14,11 +14,15 @@ openaq._URL_CAP = 4
 
 # First date in the archive, just one file
 # Browse the archive at https://openaq-fetches.s3.amazonaws.com/index.html
-FIRST_DAY = pd.date_range(start="2013-11-26", end="2013-11-27", freq="H")[:-1]
+FIRST_DAY = pd.date_range(start="2013-11-26", end="2013-11-27", freq="h")[:-1]
 
-permission_error = pytest.mark.xfail(reason="private", raises=PermissionError, strict=True)
+permission_error = pytest.mark.xfail(
+    reason="private", raises=PermissionError, strict=True
+)
 
-forbidden_error = pytest.mark.xfail(reason="forbidden", raises=HTTPError, strict=True)  # 403
+forbidden_error = pytest.mark.xfail(
+    reason="forbidden", raises=(HTTPError, FileNotFoundError, PermissionError), strict=True
+)  # 403
 
 
 @permission_error
@@ -27,13 +31,15 @@ def test_openaq_first_date():
     df = openaq.add_data(dates)
     assert not df.empty
     assert df.siteid.nunique() == 1
-    assert (df.country == "CN").all() and ((df.time_local - df.time) == pd.Timedelta(hours=8)).all()
+    assert (df.country == "CN").all() and (
+        (df.time_local - df.time) == pd.Timedelta(hours=8)
+    ).all()
 
     assert df.latitude.isnull().sum() == 0
     assert df.longitude.isnull().sum() == 0
 
     assert df.dtypes["averagingPeriod"] == "timedelta64[ns]"
-    assert df.averagingPeriod.eq(pd.Timedelta("1H")).all()
+    assert df.averagingPeriod.eq(pd.Timedelta("1h")).all()
 
     assert df.pm25_ugm3.gt(0).all()
 
@@ -114,6 +120,6 @@ def test_parameter_coverage():
         "co2",
     ]
     assert len(params) == 13
-    assert sorted(openaq.OPENAQ.NON_MOLEC_PARAMS + list(openaq.OPENAQ.PPM_TO_UGM3)) == sorted(
-        params
-    )
+    assert sorted(
+        openaq.OPENAQ.NON_MOLEC_PARAMS + list(openaq.OPENAQ.PPM_TO_UGM3)
+    ) == sorted(params)

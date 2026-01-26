@@ -178,7 +178,7 @@ class TOLNet:
     def __init__(self):
         self.objtype = "TOLNET"
         self.cwd = os.getcwd()
-        self.dates = pd.date_range(start="2017-09-25", end="2017-09-26", freq="H")
+        self.dates = pd.date_range(start="2017-09-25", end="2017-09-26", freq="h")
         self.dset = None
         self.daily = False
 
@@ -225,7 +225,15 @@ class TOLNet:
 
         # altitude variables
         alt = data["ALT"][:].squeeze()
-        altvars = ["AirND", "AirNDUncert", "ChRange", "Press", "Temp", "TempUncert", "PressUncert"]
+        altvars = [
+            "AirND",
+            "AirNDUncert",
+            "ChRange",
+            "Press",
+            "Temp",
+            "TempUncert",
+            "PressUncert",
+        ]
         # time variables
         tseries = pd.Series(data["TIME_MID_UT_UNIX"][:].squeeze())
         time = pd.Series(pd.to_datetime(tseries, unit="ms"), name="time")

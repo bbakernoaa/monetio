@@ -156,24 +156,31 @@ def add_data(
     requested_parallel = n_procs != 1
 
     # Split up by day
-    dates = pd.to_datetime(dates)
     if dates is not None:
+        dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
         min_date = dates.min()
         max_date = dates.max()
-        time_bounds = pd.date_range(start=min_date, end=max_date, freq="D")
+        time_bounds = pd.date_range(start=min_date, end=max_date, freq="d")
         if max_date not in time_bounds:
             time_bounds = time_bounds.append(pd.DatetimeIndex([max_date]))
 
     if has_dask and requested_parallel and dates is not None and len(time_bounds) > 2:
         tasks = [
-            dask.delayed(_parallel_aeronet_call)(pd.DatetimeIndex([t1, t2]), **kwargs, freq=None)
+            dask.delayed(_parallel_aeronet_call)(
+                pd.DatetimeIndex([t1, t2]), **kwargs, freq=None
+            )
             for t1, t2 in zip(time_bounds[:-1], time_bounds[1:])
         ]
         dfs = dask.compute(*tasks, scheduler="processes", num_workers=n_procs)
         df = pd.concat(dfs, ignore_index=True).drop_duplicates()
         if freq is not None:
             df.index = df.time
-            df = df.groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
+            df = (
+                df.groupby("siteid")
+                .resample(freq)
+                .mean(numeric_only=True)
+                .reset_index()
+            )
         return df.reset_index(drop=True)
     else:
         if not has_dask and requested_parallel:
@@ -340,7 +347,9 @@ class AERONET:
             # https://aeronet.gsfc.nasa.gov/print_web_data_help_v3_inv_new.html
 
             if self.prod in self._valid_prod_inv:
-                base_url = "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_inv_v3?"
+                base_url = (
+                    "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_inv_v3?"
+                )
             else:
                 raise ValueError(f"invalid product {self.prod!r}")
             inv_type_ = f"&{self.inv_type}=1"
@@ -378,7 +387,9 @@ class AERONET:
             lon2 = str(float(self.latlonbox[3]))
             loc_ = f"&lat1={lat1}&lat2={lat2}&lon1={lon1}&lon2={lon2}"
 
-        self.url = f"{base_url}{dates_}{product_}{avg_}{lunar_}{inv_type_}{loc_}&if_no_html=1"
+        self.url = (
+            f"{base_url}{dates_}{product_}{avg_}{lunar_}{inv_type_}{loc_}&if_no_html=1"
+        )
 
     def _lines_from_url(self, *, n=10):
         """Read the first `n` lines from the URL using `requests`,
@@ -422,7 +433,7 @@ class AERONET:
             parse_dates={"time": [1, 2]},
             usecols=None,
             # ^ SDA header is missing one column (80 vs 81 in data) and we lose one making 'time'
-            date_parser=lambda x: datetime.strptime(x, r"%d:%m:%Y %H:%M:%S"),
+            date_format=r"%d:%m:%Y %H:%M:%S",
             na_values=-999,
         )
         df.rename(columns=str.lower, inplace=True)
@@ -472,7 +483,7 @@ class AERONET:
         self.siteid = siteid
         if dates is None:  # get the current day
             now = datetime.utcnow()
-            self.dates = pd.date_range(start=now.date(), end=now, freq="H")
+            self.dates = pd.date_range(start=now.date(), end=now, freq="h")
         else:
             self.dates = pd.DatetimeIndex(dates)
         if product is not None:
@@ -529,7 +540,9 @@ class AERONET:
         )
 
     def calc_new_aod_values(self):
-        def _tspack_aod_interp(row, new_wv=[440.0, 470.0, 550.0, 670.0, 870.0, 1020.0, 1240.0]):
+        def _tspack_aod_interp(
+            row, new_wv=[440.0, 470.0, 550.0, 670.0, 870.0, 1020.0, 1240.0]
+        ):
             import numpy as np
 
             try:
@@ -543,7 +556,9 @@ class AERONET:
             new_wv = np.asarray(new_wv)
 
             # df_aod_nu = self._aeronet_aod_and_nu(row)
-            aod_columns = [aod_column for aod_column in row.index if aod_column.startswith("aod_")]
+            aod_columns = [
+                aod_column for aod_column in row.index if aod_column.startswith("aod_")
+            ]
             aods = row[aod_columns]
             wv = [
                 float(aod_column.replace("aod_", "").replace("nm", ""))
@@ -591,7 +606,10 @@ class AERONET:
 
         # print(row)
         aod_columns = [aod_column for aod_column in row.index if "aod_" in aod_column]
-        wv = [float(aod_column.replace("aod_", "").replace("nm", "")) for aod_column in aod_columns]
+        wv = [
+            float(aod_column.replace("aod_", "").replace("nm", ""))
+            for aod_column in aod_columns
+        ]
         aods = row[aod_columns]
         a = pd.DataFrame({"aod": aods}).reset_index()
         # print(a.index,wv)
@@ -612,5 +630,9 @@ class AERONET:
         )
 
     def set_daterange(self, begin="", end=""):
-        dates = pd.date_range(start=begin, end=end, freq="H").values.astype("M8[s]").astype("O")
+        dates = (
+            pd.date_range(start=begin, end=end, freq="h")
+            .values.astype("M8[s]")
+            .astype("O")
+        )
         self.dates = dates

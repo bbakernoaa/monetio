@@ -170,7 +170,9 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
     if isinstance(found, str) and found.startswith(">"):
         print(f"warning: some query results not fetched ('found' is {found!r})")
     elif isinstance(found, int) and len(data) < found:
-        print(f"warning: some query results not fetched (found={found}, got {len(data)} results)")
+        print(
+            f"warning: some query results not fetched (found={found}, got {len(data)} results)"
+        )
 
     return data
 
@@ -237,7 +239,9 @@ def get_locations(**kwargs):
         logger.info(
             f"note: found {len(maybe_dupe_rows)} rows with duplicate site IDs:\n{maybe_dupe_rows}"
         )
-    df = df.drop_duplicates("siteid", keep="first").reset_index(drop=True)  # seem to be some dupes
+    df = df.drop_duplicates("siteid", keep="first").reset_index(
+        drop=True
+    )  # seem to be some dupes
 
     return df
 
@@ -433,7 +437,9 @@ def add_data(
         with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
             data = chain.from_iterable(
                 executor.map(
-                    lambda params: _consume(_ENDPOINTS["measurements"], params=params, **kwargs),
+                    lambda params: _consume(
+                        _ENDPOINTS["measurements"], params=params, **kwargs
+                    ),
                     iter_queries(),
                 )
             )
@@ -560,7 +566,8 @@ def add_data(
             if not unique.all():
                 site_col_non_unique = site_col[~unique]
                 warnings.warn(
-                    f"non-unique {col!r} among site IDs:\n{site_col_non_unique}" "\nUsing first."
+                    f"non-unique {col!r} among site IDs:\n{site_col_non_unique}"
+                    "\nUsing first."
                 )
                 df = df.drop(columns=[col]).merge(
                     site_col.str.get(0),
@@ -605,7 +612,9 @@ def add_data(
         )
 
         # Rename so that units are clear
-        df = df.rename(columns={p: f"{p}_ugm3" for p in _NON_MOLEC_PARAMS}, errors="ignore")
+        df = df.rename(
+            columns={p: f"{p}_ugm3" for p in _NON_MOLEC_PARAMS}, errors="ignore"
+        )
         df = df.rename(columns={p: f"{p}_ppm" for p in _PPM_TO_UGM3}, errors="ignore")
 
     return df

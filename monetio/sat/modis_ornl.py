@@ -396,7 +396,11 @@ def _get_single_retrieval(
         )
     if quality_control is not None:
         modisGetQA(
-            m, quality_control, client=client, kmAboveBelow=kmAboveBelow, kmLeftRight=kmLeftRight
+            m,
+            quality_control,
+            client=client,
+            kmAboveBelow=kmAboveBelow,
+            kmLeftRight=kmLeftRight,
         )
 
     m.applyScale()
@@ -424,7 +428,9 @@ def _make_xarray_dataarray(m):
     import xarray as xr
     from pandas import to_datetime
 
-    da = xr.DataArray(m.data.reshape(m.ncols, m.nrows, order="C")[::-1, :], dims=("x", "y"))
+    da = xr.DataArray(
+        m.data.reshape(m.ncols, m.nrows, order="C")[::-1, :], dims=("x", "y")
+    )
     da.attrs["long_name"] = m.band
     da.attrs["product"] = m.product
     da.attrs["cellsize"] = m.cellsize

@@ -59,20 +59,24 @@ def test_read_100m_bad_header_line():
     # Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp  O3 # DN O3 Res   Ftemp   Water
     #  Num     hPa      km     K      C       C       %    mPa    ppmv   atmcm    C   10^11/cc   DU       C      ppmv
 
-    with pytest.raises(ValueError, match="Data block does not start with expected header"):
+    with pytest.raises(
+        ValueError, match="Data block does not start with expected header"
+    ):
         _ = gml_ozonesonde.read_100m(url)
 
 
 @uses_get_files
 def test_add_data():
-    dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="H")
+    dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="h")
     df = gml_ozonesonde.add_data(dates, n_procs=2)
     assert len(df) > 0
 
     assert df.attrs["var_attrs"]["o3"]["units"] == "ppmv"
 
     latlon = df["latitude"].astype(str) + "," + df["longitude"].astype(str)
-    assert 1 < latlon.nunique() <= 10, "multiple sites; lat/lon doesn't change in profile"
+    assert 1 < latlon.nunique() <= 10, (
+        "multiple sites; lat/lon doesn't change in profile"
+    )
 
     # NOTE: Similar to the place folder names, but not all the same
     assert df["siteid"].nunique() == latlon.nunique()
@@ -80,7 +84,7 @@ def test_add_data():
 
 @uses_get_files
 def test_add_data_location_sel():
-    dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="H")
+    dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="h")
     df = gml_ozonesonde.add_data(
         dates,
         location=["Boulder, Colorado", "South Pole, Antarctica"],
@@ -97,7 +101,7 @@ def test_add_data_location_sel():
     ["asdf", ["asdf", "blah"], ("asdf", "blah")],
 )
 def test_add_data_invalid_location(location):
-    dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="H")
+    dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="h")
     with pytest.raises(ValueError, match="Invalid location"):
         _ = gml_ozonesonde.add_data(dates, location=location)
 

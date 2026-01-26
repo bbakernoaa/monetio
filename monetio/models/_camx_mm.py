@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 from pandas import Series, to_datetime
 
-from ..grids import get_ioapi_pyresample_area_def, grid_from_dataset
+from ..grids import get_latlon_ioapi, grid_from_dataset
 
 
 def can_do(index):
@@ -75,7 +75,9 @@ def open_mfdataset(
             if "temperature_k" in dset.variables:
                 var_list = var_list + ["temperature_k"]
         else:
-            warnings.warn("Filename for meteorological input not provided. Adding only altitude.")
+            warnings.warn(
+                "Filename for meteorological input not provided. Adding only altitude."
+            )
         if (landuse_file is not None) and ("alt_agl_m_mid" in dset.variables):
             file_keywords = _choose_xarray_engine_and_keywords(landuse_file)
             with xr.open_dataset(**file_keywords) as dset_lu:
@@ -84,15 +86,13 @@ def open_mfdataset(
 
     # get the grid information
     grid = grid_from_dataset(dset, earth_radius=earth_radius)
-    area_def = get_ioapi_pyresample_area_def(dset, grid)
+
     # assign attributes for dataset and all DataArrays
     dset = dset.assign_attrs({"proj4_srs": grid})
     for i in dset.variables:
         dset[i] = dset[i].assign_attrs({"proj4_srs": grid})
         for j in dset[i].attrs:
             dset[i].attrs[j] = dset[i].attrs[j].strip()
-        dset[i] = dset[i].assign_attrs({"area": area_def})
-    dset = dset.assign_attrs(area=area_def)
 
     # add lazy diagnostic variables
     if "PM25" in var_list:
@@ -110,7 +110,7 @@ def open_mfdataset(
     dset = _get_times(dset)
 
     # get the lat lon
-    dset = _get_latlon(dset)
+    dset = _get_latlon(dset, grid)
 
     # get Predefined mapping tables for observations
     dset = _predefined_mapping_tables(dset)
@@ -148,8 +148,8 @@ def _get_times(d):
     return d.rename({"TSTEP": "time"})
 
 
-def _get_latlon(dset):
-    """gets the lat and lons from the pyreample.geometry.AreaDefinition
+def _get_latlon(dset, proj4_srs):
+    """gets the lat and lons using pyproj.
 
     Parameters
     ----------
@@ -162,9 +162,9 @@ def _get_latlon(dset):
         Description of returned object.
 
     """
-    lon, lat = dset.area.get_lonlats()
-    dset["longitude"] = xr.DataArray(lon[::-1, :], dims=["ROW", "COL"])
-    dset["latitude"] = xr.DataArray(lat[::-1, :], dims=["ROW", "COL"])
+    lon, lat = get_latlon_ioapi(dset, proj4_srs)
+    dset["longitude"] = xr.DataArray(lon, dims=["ROW", "COL"])
+    dset["latitude"] = xr.DataArray(lat, dims=["ROW", "COL"])
     dset = dset.assign_coords(longitude=dset.longitude, latitude=dset.latitude)
     return dset
 
@@ -215,7 +215,9 @@ def add_met_data_3D(d_chem, d_met):
     elif "TEMP_K" in d_met.variables:
         d_chem["temperature_k"] = d_met["TEMP_K"]
     else:
-        warnings.warn("No temperature variable found. TEMP_K and temperature were tested.")
+        warnings.warn(
+            "No temperature variable found. TEMP_K and temperature were tested."
+        )
     if "temperature_k" in d_chem.variables:
         d_chem["temperature_k"].attrs["var_desc"] = "Temperature of layer in K."
 
@@ -349,7 +351,9 @@ def add_lazy_clf(d):
         newkeys = allvars.loc[index]
         neww = weights.loc[index]
         d["CLf"] = add_multiple_lazy(d, newkeys, weights=neww)
-        d["CLf"] = d["CLf"].assign_attrs({"name": "CLf", "long_name": "Fine Mode particulate Cl"})
+        d["CLf"] = d["CLf"].assign_attrs(
+            {"name": "CLf", "long_name": "Fine Mode particulate Cl"}
+        )
     return d
 
 
@@ -446,7 +450,9 @@ def _calc_midlayer_height_agl(dset):
         height = "ZGRID_M"
     else:
         raise "No height variable found, but _calc_midlayer_height_agl was called."
-    mid_layer_height = np.array(dset[height])  # height in the layer upper interface of each layer
+    mid_layer_height = np.array(
+        dset[height]
+    )  # height in the layer upper interface of each layer
     layer_height_agl = dset[height]
     layer_height_agl.attrs["long_name"] = "Height AGL at top"
     layer_height_agl.attrs["var_desc"] = "Layer height above ground level at top"
@@ -461,7 +467,9 @@ def _calc_midlayer_height_agl(dset):
 
     dz_m = xr.zeros_like(layer_height_agl)
     dz_m[:, 0, :, :] = layer_height_agl[:, 0, :, :].values
-    dz_m[:, 1:, :, :] = layer_height_agl[:, 1:, :, :].values - layer_height_agl[:, :-1, :, :].values
+    dz_m[:, 1:, :, :] = (
+        layer_height_agl[:, 1:, :, :].values - layer_height_agl[:, :-1, :, :].values
+    )
     dz_m.attrs["long_name"] = "dz in meters"
     dz_m.attrs["var_desc"] = "Layer thickness in meters"
     return alt_agl_m_mid, dz_m
@@ -492,7 +500,9 @@ def _calc_midlayer_height_msl(dset, dset_lu):
         topo = "topo"
     else:
         topo = "TOPO_M"
-    alt_msl_m_mid = dset["alt_agl_m_mid"] + np.tile(dset[topo].values, (ntsteps, nlayers, 1, 1))
+    alt_msl_m_mid = dset["alt_agl_m_mid"] + np.tile(
+        dset[topo].values, (ntsteps, nlayers, 1, 1)
+    )
     alt_msl_m_mid.attrs = alt_agl_m_mid.attrs
     alt_msl_m_mid.attrs["var_desc"] = "Layer height above sea level"
     return alt_msl_m_mid

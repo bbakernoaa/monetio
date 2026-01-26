@@ -4,18 +4,20 @@ import xarray as xr
 from numpy import array, concatenate
 from pandas import Series, to_datetime
 
-from monetio.grids import get_ioapi_pyresample_area_def, grid_from_dataset
+from monetio.grids import get_latlon_ioapi, grid_from_dataset
 from .base import GriddedReader, register_reader
 
 
 @register_reader("camx")
 class CAMxReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     earth_radius=6370000,
-                     convert_to_ppb=True,
-                     drop_duplicates=False,
-                     **kwargs):
+    def open_dataset(
+        self,
+        files,
+        earth_radius=6370000,
+        convert_to_ppb=True,
+        drop_duplicates=False,
+        **kwargs,
+    ):
         """
         Reads CAMx files using pseudonetcdf.
         """
@@ -27,7 +29,7 @@ class CAMxReader(GriddedReader):
             kwargs["backend_kwargs"] = {"format": "uamiv"}
 
         # Pass preprocess to driver
-        kwargs['preprocess'] = camx_preprocess
+        kwargs["preprocess"] = camx_preprocess
 
         ds = self.driver.open(files, **kwargs)
 
@@ -35,7 +37,6 @@ class CAMxReader(GriddedReader):
 
         # get the grid information
         grid = grid_from_dataset(ds, earth_radius=earth_radius)
-        area_def = get_ioapi_pyresample_area_def(ds, grid)
 
         # assign attributes for dataset and all DataArrays
         ds = ds.assign_attrs({"proj4_srs": grid})
@@ -53,9 +54,7 @@ class CAMxReader(GriddedReader):
         ds = _get_times(ds)
 
         # get the lat lon
-        # The original code relied on dset.area which isn't standard xarray.
-        # But we calculated area_def above.
-        ds = _get_latlon(ds, area_def)
+        ds = _get_latlon(ds, grid)
 
         # get Predefined mapping tables for observations
         ds = _predefined_mapping_tables(ds)
@@ -65,9 +64,11 @@ class CAMxReader(GriddedReader):
 
         return ds
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/camx.py
 # -----------------------------------------------------------------------------
+
 
 def camx_preprocess(dset):
     dset = add_lazy_pm25(dset)
@@ -77,9 +78,10 @@ def camx_preprocess(dset):
     dset = add_lazy_nox(dset)
     return dset
 
+
 def _get_times(d):
     # Check dimensions exist before accessing
-    if 'TFLAG' not in d.variables:
+    if "TFLAG" not in d.variables:
         return d
 
     idims = len(d.TFLAG.dims)
@@ -95,18 +97,21 @@ def _get_times(d):
     d["TSTEP"] = date[indexdates]
     return d.rename({"TSTEP": "time"})
 
-def _get_latlon(dset, area_def):
-    lon, lat = area_def.get_lonlats()
-    dset["longitude"] = xr.DataArray(lon[::-1, :], dims=["ROW", "COL"])
-    dset["latitude"] = xr.DataArray(lat[::-1, :], dims=["ROW", "COL"])
+
+def _get_latlon(dset, proj4_srs):
+    lon, lat = get_latlon_ioapi(dset, proj4_srs)
+
+    dset["longitude"] = xr.DataArray(lon, dims=["ROW", "COL"])
+    dset["latitude"] = xr.DataArray(lat, dims=["ROW", "COL"])
     dset = dset.assign_coords(longitude=dset.longitude, latitude=dset.latitude)
     return dset
+
 
 def add_lazy_pm25(d):
     keys = Series([i for i in d.variables])
     allvars = Series(fine)
     if "PM25_TOT" in keys.values:
-        d["PM25"] = d["PM25_TOT"] # Removed .chunk() as standard open handles chunks
+        d["PM25"] = d["PM25_TOT"]  # Removed .chunk() as standard open handles chunks
     else:
         index = allvars.isin(keys)
         newkeys = allvars.loc[index]
@@ -114,11 +119,13 @@ def add_lazy_pm25(d):
         d["PM25"] = d["PM25"].assign_attrs({"name": "PM2.5", "long_name": "PM2.5"})
     return d
 
+
 def can_do(index):
     if index.max():
         return True
     else:
         return False
+
 
 def add_lazy_pm10(d):
     keys = Series([i for i in d.variables])
@@ -135,6 +142,7 @@ def add_lazy_pm10(d):
             )
     return d
 
+
 def add_lazy_pm_course(d):
     keys = Series([i for i in d.variables])
     allvars = Series(coarse)
@@ -147,6 +155,7 @@ def add_lazy_pm_course(d):
         )
     return d
 
+
 def add_lazy_noy(d):
     keys = Series([i for i in d.variables])
     allvars = Series(noy_gas)
@@ -156,6 +165,7 @@ def add_lazy_noy(d):
         d["NOy"] = add_multiple_lazy(d, newkeys)
         d["NOy"] = d["NOy"].assign_attrs({"name": "NOy", "long_name": "NOy"})
     return d
+
 
 def add_lazy_nox(d):
     keys = Series([i for i in d.variables])
@@ -167,8 +177,10 @@ def add_lazy_nox(d):
         d["NOx"] = d["NOx"].assign_attrs({"name": "NOx", "long_name": "NOx"})
     return d
 
+
 def add_multiple_lazy(dset, variables, weights=None):
     from numpy import ones
+
     if weights is None:
         weights = ones(len(variables))
     variables = variables.values
@@ -176,6 +188,7 @@ def add_multiple_lazy(dset, variables, weights=None):
     for i, j in zip(variables[1:], weights[1:]):
         new = new + dset[i] * j
     return new
+
 
 def _predefined_mapping_tables(dset):
     to_improve = {}
@@ -185,8 +198,21 @@ def _predefined_mapping_tables(dset):
         "PM2.5": ["PM25"],
         "CO": ["CO"],
         "NOY": [
-            "NO", "NO2", "NO3", "N2O5", "HONO", "HNO3", "PAN", "PANX", "PNA", "NTR", "CRON",
-            "CRN2", "CRNO", "CRPX", "OPAN",
+            "NO",
+            "NO2",
+            "NO3",
+            "N2O5",
+            "HONO",
+            "HNO3",
+            "PAN",
+            "PANX",
+            "PNA",
+            "NTR",
+            "CRON",
+            "CRN2",
+            "CRNO",
+            "CRPX",
+            "OPAN",
         ],
         "NOX": ["NO", "NO2"],
         "SO2": ["SO2"],
@@ -213,8 +239,21 @@ def _predefined_mapping_tables(dset):
         "PM2.5": ["PM25"],
         "CO": ["CO"],
         "NOY": [
-            "NO", "NO2", "NO3", "N2O5", "HONO", "HNO3", "PAN", "PANX", "PNA", "NTR", "CRON",
-            "CRN2", "CRNO", "CRPX", "OPAN",
+            "NO",
+            "NO2",
+            "NO3",
+            "N2O5",
+            "HONO",
+            "HNO3",
+            "PAN",
+            "PANX",
+            "PNA",
+            "NTR",
+            "CRON",
+            "CRN2",
+            "CRNO",
+            "CRPX",
+            "OPAN",
         ],
         "NOX": ["NO", "NO2"],
         "SO2": ["SO2"],
@@ -251,18 +290,43 @@ def _predefined_mapping_tables(dset):
     dset = dset.assign_attrs({"mapping_tables": mapping_tables})
     return dset
 
+
 # Arrays
 coarse = array(["CPRM", "CCRS"])
 fine = array(
     [
-        "NA", "PSO4", "PNO3", "PNH4", "PH2O", "PCL", "PEC", "FPRM", "FCRS", "SOA1", "SOA2",
-        "SOA3", "SOA4",
+        "NA",
+        "PSO4",
+        "PNO3",
+        "PNH4",
+        "PH2O",
+        "PCL",
+        "PEC",
+        "FPRM",
+        "FCRS",
+        "SOA1",
+        "SOA2",
+        "SOA3",
+        "SOA4",
     ]
 )
 noy_gas = array(
     [
-        "NO", "NO2", "NO3", "N2O5", "HONO", "HNO3", "PAN", "PANX", "PNA", "NTR", "CRON",
-        "CRN2", "CRNO", "CRPX", "OPAN",
+        "NO",
+        "NO2",
+        "NO3",
+        "N2O5",
+        "HONO",
+        "HNO3",
+        "PAN",
+        "PANX",
+        "PNA",
+        "NTR",
+        "CRON",
+        "CRN2",
+        "CRNO",
+        "CRPX",
+        "OPAN",
     ]
 )
 poc = array(["SOA1", "SOA2", "SOA3", "SOA4"])

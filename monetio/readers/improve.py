@@ -1,18 +1,14 @@
 """IMPROVE Reader"""
 
 import pandas as pd
-from numpy import nan
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from monetio.obs.epa_util import read_monitor_file
 
+
 @register_reader("improve")
 class IMPROVEReader(PointReader):
-    def open_dataset(self,
-                     files,
-                     add_meta=False,
-                     delimiter="\t",
-                     **kwargs):
+    def open_dataset(self, files, add_meta=False, delimiter="\t", **kwargs):
         """
         Reads IMPROVE data files.
         """
@@ -28,9 +24,11 @@ class IMPROVEReader(PointReader):
             return pd.DataFrame()
         return pd.concat(dfs)
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/obs/improve_mod.py
 # -----------------------------------------------------------------------------
+
 
 class IMPROVE:
     def __init__(self):
@@ -47,7 +45,9 @@ class IMPROVE:
         skiprows = 0
         skip = False
         for i, line in enumerate(lines):
-            if line.strip() == "Data": # Use strip to handle potential whitespace/newlines
+            if (
+                line.strip() == "Data"
+            ):  # Use strip to handle potential whitespace/newlines
                 skip = True
                 skiprows = i + 1
                 break
@@ -55,31 +55,38 @@ class IMPROVE:
         # Determine storage options for pandas if S3
         storage_options = None
         if fname.startswith("s3://"):
-            storage_options = {'anon': True}
+            storage_options = {"anon": True}
 
         if skip:
             df = pd.read_csv(
                 fname,
                 delimiter=delimiter,
                 parse_dates=[2],
-                infer_datetime_format=True,
                 dtype={"EPACode": str},
                 skiprows=skiprows,
-                storage_options=storage_options
+                storage_options=storage_options,
             )
         else:
             df = pd.read_csv(
                 fname,
                 delimiter=delimiter,
                 parse_dates=[2],
-                infer_datetime_format=True,
                 dtype={"EPACode": str},
-                storage_options=storage_options
+                storage_options=storage_options,
             )
 
-        df.rename(columns={"EPACode": "epaid", "Val": "Obs", "State": "state_name",
-                           "ParamCode": "variable", "SiteCode": "siteid", "Unit": "Units",
-                           "Date": "time"}, inplace=True)
+        df.rename(
+            columns={
+                "EPACode": "epaid",
+                "Val": "Obs",
+                "State": "state_name",
+                "ParamCode": "variable",
+                "SiteCode": "siteid",
+                "Unit": "Units",
+                "Date": "time",
+            },
+            inplace=True,
+        )
         if "Dataset" in df.columns:
             df.drop("Dataset", axis=1, inplace=True)
 
@@ -92,7 +99,10 @@ class IMPROVE:
             monitor_df = read_monitor_file(network="IMPROVE")
             df = df.merge(monitor_df, how="left", left_on="epaid", right_on="siteid")
             df.drop(["siteid_y", "state_name_y"], inplace=True, axis=1)
-            df.rename(columns={"siteid_x": "siteid", "state_name_x": "state_name"}, inplace=True)
+            df.rename(
+                columns={"siteid_x": "siteid", "state_name_x": "state_name"},
+                inplace=True,
+            )
 
         try:
             pass

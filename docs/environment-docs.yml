@@ -15,7 +15,9 @@ dependencies:
   - xarray
   #
   # optional
+  - h5netcdf
   - joblib
+  - pyproj
   - requests
   #
   # docs

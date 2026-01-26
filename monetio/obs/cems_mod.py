@@ -222,7 +222,11 @@ class CEMS:
             # returns data frame where rows are date and columns are the values
             # of cmatch for orispl
             pivot = pd.pivot_table(
-                temp, values=varname, index=["time"], columns=["orispl_code"], aggfunc=np.sum
+                temp,
+                values=varname,
+                index=["time"],
+                columns=["orispl_code"],
+                aggfunc=np.sum,
             )
         return pivot
 
@@ -319,7 +323,9 @@ class CEMS:
         """
         if "latitude" in list(self.df.columns.values):
             dftemp = self.df.copy()
-            pairs = zip(dftemp["orispl_code"], zip(dftemp["latitude"], dftemp["longitude"]))
+            pairs = zip(
+                dftemp["orispl_code"], zip(dftemp["latitude"], dftemp["longitude"])
+            )
             pairs = list(set(pairs))
             lhash = dict(pairs)  # key is facility id and value is name.
             if verbose:
@@ -374,7 +380,9 @@ class CEMS:
                 and ("rate" not in ccc.lower())
             ):
                 rcolumn = self.rename(ccc, "nox_lbs", rcolumn, verbose)
-            elif "co2" in ccc.lower() and ("short" in ccc.lower() and "tons" in ccc.lower()):
+            elif "co2" in ccc.lower() and (
+                "short" in ccc.lower() and "tons" in ccc.lower()
+            ):
                 rcolumn = self.rename(ccc, "co2_short_tons", rcolumn, verbose)
             elif "date" in ccc.lower():
                 rcolumn = self.rename(ccc, "date", rcolumn, verbose)
@@ -443,7 +451,11 @@ class CEMS:
             except Exception:
                 pass
             dfnew = pd.merge(
-                dftemp, sinfo, how="left", left_on=["orispl_code"], right_on=["orispl_code"]
+                dftemp,
+                sinfo,
+                how="left",
+                left_on=["orispl_code"],
+                right_on=["orispl_code"],
             )
             # print('---------z-----------')
             # print(dfnew.columns.values)
@@ -504,7 +516,8 @@ class CEMS:
         # create column with datetime information
         # from column with month-day-year and column with hour.
         dftime = dftemp.apply(
-            lambda x: pd.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt), axis=1
+            lambda x: pd.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt),
+            axis=1,
         )
         dftemp = pd.concat([dftime, dftemp], axis=1)
         dftemp.rename(columns={0: "time local"}, inplace=True)

@@ -1,6 +1,5 @@
 """GEOMS Reader"""
 
-import warnings
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -8,13 +7,10 @@ from pathlib import Path
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("geoms")
 class GEOMSReader(GriddedReader):
-    def open_dataset(self,
-                     files,
-                     rename_all=True,
-                     squeeze=True,
-                     **kwargs):
+    def open_dataset(self, files, rename_all=True, squeeze=True, **kwargs):
         """
         Reads GEOMS format files (HDF4/HDF5).
         """
@@ -33,9 +29,11 @@ class GEOMSReader(GriddedReader):
         else:
             return xr.concat(dsets, dim="time")
 
+
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/profile/geoms.py
 # -----------------------------------------------------------------------------
+
 
 def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
     from monetio.util import _import_required
@@ -52,6 +50,7 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
         # If remote, download to temp
         if fp.startswith("s3://"):
             import tempfile
+
             with tempfile.NamedTemporaryFile(suffix=ext, delete=True) as tmp:
                 fs.get(fp, tmp.name)
                 sd = pyhdf_SD.SD(tmp.name)
@@ -65,6 +64,7 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
 
     elif ext in {".h5", ".he5", ".hdf5"}:
         import h5py
+
         # h5py works with file-like object from s3fs
         f_obj = fs.open(fp, "rb")
         f = h5py.File(f_obj, "r")
@@ -88,7 +88,11 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
         attrs=attrs,
     )
 
-    instru_coords = ["LATITUDE.INSTRUMENT", "LONGITUDE.INSTRUMENT", "ALTITUDE.INSTRUMENT"]
+    instru_coords = [
+        "LATITUDE.INSTRUMENT",
+        "LONGITUDE.INSTRUMENT",
+        "ALTITUDE.INSTRUMENT",
+    ]
     for vn in instru_coords:
         if vn in ds:
             da = ds[vn]
@@ -119,7 +123,9 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
                 ds[vn] = da.squeeze(dim=da.dims[-1])
 
     remaining_vns = [
-        vn for vn, da in ds.variables.items() if any(dim.startswith("fakeDim") for dim in da.dims)
+        vn
+        for vn, da in ds.variables.items()
+        if any(dim.startswith("fakeDim") for dim in da.dims)
     ]
     for vn in remaining_vns:
         da = ds[vn]
@@ -144,7 +150,7 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
     unique_dims = set(ds.dims)
     fake_dims = {dim for dim in unique_dims if dim.startswith("fakeDim")}
     if fake_dims:
-        pass # Warning omitted for brevity
+        pass  # Warning omitted for brevity
 
     for vn, da in ds.variables.items():
         if da.dtype.kind == "S":
@@ -192,6 +198,7 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
 
     return ds
 
+
 def _read_hdf4(sd):
     data_vars = {}
     for name, _ in sd.datasets().items():
@@ -204,8 +211,10 @@ def _read_hdf4(sd):
     attrs = sd.attributes()
     return data_vars, attrs
 
+
 def _rename_h5_dim(s):
     import re
+
     s_re = r'<"(.*)" dimension (\d+) of HDF5 dataset at (\d+)>'
     m = re.fullmatch(s_re, s)
     if m is None:
@@ -213,8 +222,10 @@ def _rename_h5_dim(s):
     label, num, _ = m.groups()
     return f"fakeDim{num}{label}"
 
+
 def _rename_var(vn, *, under="_", dot="_"):
     return vn.lower().replace("_", under).replace(".", dot)
+
 
 def _dti_from_mjd2000(x):
     # assert x.VAR_UNITS == "MJD2K" or x.VAR_UNITS == "MJD2000"

@@ -36,7 +36,12 @@ def open_mfdataset(files, var_list=None, surf_only=False, **kwargs):
     xrds = xr.concat(datasets, "time_counter")
 
     xrds = xrds.rename(
-        {"nav_lat": "latitude", "nav_lon": "longitude", "time_counter": "time", "bottom_top": "z"}
+        {
+            "nav_lat": "latitude",
+            "nav_lon": "longitude",
+            "time_counter": "time",
+            "bottom_top": "z",
+        }
     )
 
     if surf_only:

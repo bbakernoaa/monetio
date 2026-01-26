@@ -6,23 +6,25 @@ import pandas as pd
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
+
 @register_reader("hytraj")
 class HYTRAJReader(PointReader):
-    def open_dataset(self,
-                     files,
-                     taglist=None,
-                     renumber=False,
-                     verbose=False,
-                     **kwargs):
+    def open_dataset(
+        self, files, taglist=None, renumber=False, verbose=False, **kwargs
+    ):
         """
         Reads HYTRAJ tdump files.
         """
         file_list = FileUtility.expand_paths(files)
-        return combine_dataset(file_list, taglist=taglist, renumber=renumber, verbose=verbose)
+        return combine_dataset(
+            file_list, taglist=taglist, renumber=renumber, verbose=verbose
+        )
+
 
 # -----------------------------------------------------------------------------
 # Helper functions ported from monetio/models/hytraj.py
 # -----------------------------------------------------------------------------
+
 
 def combine_dataset(flist, taglist=None, renumber=False, verbose=False):
     usepid = False
@@ -55,6 +57,7 @@ def combine_dataset(flist, taglist=None, renumber=False, verbose=False):
         maxtrajnum = np.max(rval.traj_num.unique())
     return rval
 
+
 def open_dataset_hytraj(filename):
     # Use FileUtility to get filesystem and open
     fs = FileUtility.get_fs(filename)
@@ -72,6 +75,7 @@ def open_dataset_hytraj(filename):
     tdump.close()
     return traj
 
+
 def get_metinfo(tdump):
     tdump.seek(0)
     dim1 = tdump.readline().strip().replace(" ", "")
@@ -83,6 +87,7 @@ def get_metinfo(tdump):
         metinfo.append(tmp)
         a += 1
     return metinfo
+
 
 def get_startlocs(tdump):
     tdump.seek(0)
@@ -98,12 +103,15 @@ def get_startlocs(tdump):
     heads = ["year", "month", "day", "hour", "latitude", "longitude", "altitude"]
     stlocs = pd.DataFrame(np.array(start_locs), columns=heads)
     cols = ["year", "month", "day", "hour"]
-    stlocs["time"] = stlocs[cols].apply(lambda row: " ".join(row.values.astype(str)), axis=1)
+    stlocs["time"] = stlocs[cols].apply(
+        lambda row: " ".join(row.values.astype(str)), axis=1
+    )
     stlocs = stlocs.drop(cols, axis=1)
     stlocs = stlocs[["time", "latitude", "longitude", "altitude"]]
     stlocs["time"] = stlocs.apply(lambda row: time_str_fixer(row["time"]), axis=1)
     stlocs["time"] = pd.to_datetime(stlocs["time"], format="%y %m %d %H")
     return stlocs
+
 
 def time_str_fixer(timestr):
     if isinstance(timestr, str):
@@ -116,6 +124,7 @@ def time_str_fixer(timestr):
     else:
         rval = timestr
     return rval
+
 
 def get_traj(tdump):
     tdump.seek(0)

@@ -17,15 +17,17 @@ from .drivers import FileUtility
 
 @register_reader("airnow")
 class AirNowReader(PointReader):
-    def open_dataset(self,
-                     files=None,
-                     dates=None,
-                     download=False,
-                     wide_fmt=True,
-                     n_procs=1,
-                     daily=False,
-                     bad_utcoffset="drop",
-                     **kwargs):
+    def open_dataset(
+        self,
+        files=None,
+        dates=None,
+        download=False,
+        wide_fmt=True,
+        n_procs=1,
+        daily=False,
+        bad_utcoffset="drop",
+        **kwargs,
+    ):
         """
         Retrieve and load AirNow data as a DataFrame.
         """
@@ -42,15 +44,15 @@ class AirNowReader(PointReader):
                 files = urls.tolist()
 
         if not files:
-             raise ValueError("Must provide either 'files' or 'dates'.")
+            raise ValueError("Must provide either 'files' or 'dates'.")
 
         print("Aggregating AIRNOW files...")
 
         # We define a custom read function that matches the old read_csv
         # Pass storage options if S3
-        storage_options = kwargs.get('storage_options', {})
+        storage_options = kwargs.get("storage_options", {})
         if not storage_options and any(f.startswith("s3://") for f in files):
-            storage_options = {'anon': True}
+            storage_options = {"anon": True}
 
         def _read_helper(fn):
             return read_airnow_csv(fn, daily=daily, storage_options=storage_options)
@@ -65,7 +67,7 @@ class AirNowReader(PointReader):
             df["time"] = pd.to_datetime(
                 df.date + " " + df.time, format=r"%m/%d/%y %H:%M", exact=True
             )
-            df["time_local"] = df.time + pd.to_timedelta(df.utcoffset, unit="H")
+            df["time_local"] = df.time + pd.to_timedelta(df.utcoffset, unit="h")
 
         df.drop(["date"], axis=1, inplace=True)
 
@@ -73,9 +75,21 @@ class AirNowReader(PointReader):
         df = get_station_locations(df)
 
         savecols = [
-            "time", "siteid", "site", "utcoffset", "variable", "units", "obs",
-            "time_local", "latitude", "longitude", "cmsa_name", "msa_code",
-            "msa_name", "state_name", "epa_region",
+            "time",
+            "siteid",
+            "site",
+            "utcoffset",
+            "variable",
+            "units",
+            "obs",
+            "time_local",
+            "latitude",
+            "longitude",
+            "cmsa_name",
+            "msa_code",
+            "msa_name",
+            "state_name",
+            "epa_region",
         ]
 
         if daily:
@@ -89,7 +103,7 @@ class AirNowReader(PointReader):
         df = df.reset_index(drop=True)
 
         if wide_fmt:
-             df = (
+            df = (
                 long_to_wide(df)
                 .drop_duplicates(subset=["time", "latitude", "longitude", "siteid"])
                 .reset_index(drop=True)
@@ -102,12 +116,13 @@ class AirNowReader(PointReader):
 # Helper functions ported from monetio/obs/airnow.py
 # -----------------------------------------------------------------------------
 
+
 def build_urls(dates, *, daily=False):
     dates = pd.DatetimeIndex(dates)
     if daily:
         dates = dates.floor("D").unique()
     else:  # hourly
-        dates = dates.floor("H").unique()
+        dates = dates.floor("h").unique()
 
     urls = []
     fnames = []
@@ -136,6 +151,7 @@ def retrieve(url, fname):
             fs.get(url, fname)
         elif url.startswith("http"):
             import requests
+
             r = requests.get(url)
             r.raise_for_status()
             with open(fname, "wb") as f:
@@ -151,9 +167,26 @@ def retrieve(url, fname):
 
 def read_airnow_csv(fn, daily=False, storage_options=None):
     hourly_cols = [
-        "date", "time", "siteid", "site", "utcoffset", "variable", "units", "obs", "source",
+        "date",
+        "time",
+        "siteid",
+        "site",
+        "utcoffset",
+        "variable",
+        "units",
+        "obs",
+        "source",
     ]
-    daily_cols = ["date", "siteid", "site", "variable", "units", "obs", "hours", "source"]
+    daily_cols = [
+        "date",
+        "siteid",
+        "site",
+        "variable",
+        "units",
+        "obs",
+        "hours",
+        "source",
+    ]
 
     try:
         dft = pd.read_csv(
@@ -162,7 +195,7 @@ def read_airnow_csv(fn, daily=False, storage_options=None):
             header=None,
             encoding="ISO-8859-1",
             on_bad_lines="warn",
-            storage_options=storage_options
+            storage_options=storage_options,
         )
     except Exception:
         dft = pd.DataFrame(columns=hourly_cols)
@@ -177,9 +210,9 @@ def read_airnow_csv(fn, daily=False, storage_options=None):
         # Return empty with correct cols if mismatch
         # Or raise
         if daily:
-             return pd.DataFrame(columns=daily_cols)
+            return pd.DataFrame(columns=daily_cols)
         else:
-             return pd.DataFrame(columns=hourly_cols)
+            return pd.DataFrame(columns=hourly_cols)
 
     dft["obs"] = dft.obs.astype(float)
     dft["siteid"] = dft.siteid.str.zfill(9)
@@ -216,7 +249,9 @@ def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
         elif bad_utcoffset == "leave":
             pass
         else:
-            raise ValueError("`bad_utcoffset` must be one of: 'null', 'drop', 'fix', 'leave'")
+            raise ValueError(
+                "`bad_utcoffset` must be one of: 'null', 'drop', 'fix', 'leave'"
+            )
 
     return df
 
