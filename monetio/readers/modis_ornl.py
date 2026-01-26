@@ -32,9 +32,7 @@ class MODISORNLReader(GriddedReader):
         Reads MODIS data from ORNL web service.
         """
         if not has_suds:
-            raise ImportError(
-                "Please install a suds client (pip install suds-jurko or suds-community)"
-            )
+            raise ImportError("Please install a suds client (pip install suds-jurko or suds-community)")
 
         date = pd.to_datetime(date)
         m = _get_single_retrieval(
@@ -163,9 +161,7 @@ def modisClient(
         requestEnd = dateList[i + j - 1]
         i = i + j - 1
 
-        data = client.service.getsubset(
-            lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight
-        )
+        data = client.service.getsubset(lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight)
 
         if n == 0:
             m.nrows = int(data.nrows)
@@ -193,9 +189,7 @@ def _nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
 
-def _get_single_retrieval(
-    date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight
-):
+def _get_single_retrieval(date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight):
     client = setClient()
     dateList = modisClient(client, product=product, band=band, lat=lat, lon=lon)
     dates = pd.to_datetime(dateList, format="A%Y%j")

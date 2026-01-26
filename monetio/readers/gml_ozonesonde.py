@@ -43,7 +43,7 @@ LOCATIONS = [
     "Trinidad Head, California",
 ]
 
-_FILES_L100_CACHE = {location: None for location in LOCATIONS}
+_FILES_L100_CACHE = dict.fromkeys(LOCATIONS)
 
 
 def retry(func):
@@ -115,9 +115,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
     df = pd.DataFrame(data, columns=["location", "time", "fn", "url"])
     if cache:
         for location in locations:
-            _FILES_L100_CACHE[location] = list(
-                df[df["location"] == location].itertuples(index=False, name=None)
-            )
+            _FILES_L100_CACHE[location] = list(df[df["location"] == location].itertuples(index=False, name=None))
     return df
 
 
@@ -136,7 +134,7 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise"):
             if errors == "raise":
                 raise RuntimeError(f"Failed to read {fp_or_url}") from e
             elif errors == "warn":
-                warnings.warn(f"Failed to read {fp_or_url}: {e}")
+                warnings.warn(f"Failed to read {fp_or_url}: {e}", stacklevel=2)
             return pd.DataFrame()
 
     dfs = [dask.delayed(func)(url) for url in urls]

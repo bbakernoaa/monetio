@@ -9,7 +9,6 @@ from monetio.obs.epa_util import read_monitor_file
 from monetio.util import long_to_wide
 
 from .base import PointReader, register_reader
-from .drivers import FileUtility
 
 
 @register_reader("aqs")
@@ -139,9 +138,7 @@ class AQS:
             if len(df.columns) == len(self.renameddcols):
                 df.columns = self.renameddcols
 
-            df["pollutant_standard"] = df.get("pollutant_standard", pd.Series(dtype=str)).astype(
-                str
-            )
+            df["pollutant_standard"] = df.get("pollutant_standard", pd.Series(dtype=str)).astype(str)
             self.daily = True
         else:
             df = pd.read_csv(
@@ -157,9 +154,7 @@ class AQS:
             df.columns = self.columns_rename(df.columns.values)
 
         df["siteid"] = (
-            df.state_code.astype(str).str.zfill(2)
-            + df.county_code.astype(str).str.zfill(3)
-            + df.site_num.astype(str).str.zfill(4)
+            df.state_code.astype(str).str.zfill(2) + df.county_code.astype(str).str.zfill(3) + df.site_num.astype(str).str.zfill(4)
         )
         df.drop(["state_name", "county_name"], axis=1, inplace=True, errors="ignore")
         df.columns = [i.lower() for i in df.columns]
@@ -316,9 +311,7 @@ class AQS:
             self.monitor_df = read_monitor_file()
 
         if network is not None:
-            monitors = self.monitor_df.loc[
-                self.monitor_df.isin([network]).any(axis=1)
-            ].drop_duplicates(subset=["siteid"])
+            monitors = self.monitor_df.loc[self.monitor_df.isin([network]).any(axis=1)].drop_duplicates(subset=["siteid"])
         else:
             monitors = self.monitor_df.drop_duplicates(subset=["siteid"])
 
@@ -433,12 +426,8 @@ class AQS:
 
         con = df.variable == ""
         if con.sum() > 0:
-            _tbl = (
-                df[con][["parameter_name", "parameter_code"]]
-                .drop_duplicates("parameter_name")
-                .to_string(index=False)
-            )
-            warnings.warn(f"Short names not available for these variables:\n{_tbl}")
+            _tbl = df[con][["parameter_name", "parameter_code"]].drop_duplicates("parameter_name").to_string(index=False)
+            warnings.warn(f"Short names not available for these variables:\n{_tbl}", stacklevel=2)
             df.loc[con, "variable"] = df.parameter_name
 
         return df

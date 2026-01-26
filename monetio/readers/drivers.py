@@ -153,9 +153,7 @@ class PandasDriver:
     The unified driver for opening tabular/point data.
     """
 
-    def open(
-        self, files: Union[str, List[str]], read_method: str = "read_csv", **kwargs
-    ) -> pd.DataFrame:
+    def open(self, files: Union[str, List[str]], read_method: str = "read_csv", **kwargs) -> pd.DataFrame:
         file_list = FileUtility.expand_paths(files)
 
         # Get the actual pandas function
@@ -166,9 +164,8 @@ class PandasDriver:
         data_frames = []
 
         # Re-use our filesystem logic
-        fs = None
         if file_list and file_list[0].startswith("s3://"):
-            fs = FileUtility.get_fs(file_list[0])
+            FileUtility.get_fs(file_list[0])
 
         try:
             for f in file_list:

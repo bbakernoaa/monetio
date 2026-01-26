@@ -160,23 +160,18 @@ def _add_pressure_variables(dataset):
     # difference between layer pressure and surface pressure
     diff = xr.full_like(dataset["pressure"], np.nan)
     diff[:, :, :, 0] = 1000
-    diff[:, :, :, 1:] = (
-        dataset["pressure_surf"].values[:, :, :, None] - dataset["pressure"][:, :, :, :9].values
-    )
+    diff[:, :, :, 1:] = dataset["pressure_surf"].values[:, :, :, None] - dataset["pressure"][:, :, :, :9].values
     # add fill values below true surface
     dataset["pressure"] = dataset["pressure"].where(diff > 0)
     # replace lowest pressure with surface pressure; broadcast happens in background
-    dataset["pressure"].values = (
-        dataset["pressure_surf"].where((diff > 0) & (diff < 100), dataset["pressure"]).values
-    )
+    dataset["pressure"].values = dataset["pressure_surf"].where((diff > 0) & (diff < 100), dataset["pressure"]).values
 
     # Center Pressure
     dummy = dataset["pressure"].copy()
     dummy[:, :, :, 0] = 87.0
     for z in range(1, 10):
         dummy[:, :, :, z] = (
-            dataset["pressure"][:, :, :, z]
-            - (dataset["pressure"][:, :, :, z] - dataset["pressure"][:, :, :, z - 1]) / 2
+            dataset["pressure"][:, :, :, z] - (dataset["pressure"][:, :, :, z] - dataset["pressure"][:, :, :, z - 1]) / 2
         )
     dataset["pressure"] = dummy
 
@@ -203,15 +198,11 @@ def _combine_apriori(dataset):
     # difference between layer pressure and surface pressure
     diff = xr.full_like(dataset["pressure"], np.nan)
     diff[:, :, :, 0] = 1000
-    diff[:, :, :, 1:] = (
-        dataset["pressure_surf"].values[:, :, :, None] - dataset["pressure"][:, :, :, :9].values
-    )
+    diff[:, :, :, 1:] = dataset["pressure_surf"].values[:, :, :, None] - dataset["pressure"][:, :, :, :9].values
     # add fill values below true surface
     dataset["apriori_prof"] = dataset["apriori_prof"].where(diff > 0)
     # replace lowest pressure with surface pressure; broadcast happens in background
-    dataset["apriori_prof"].values = (
-        dataset["apriori_surf"].where((diff > 0) & (diff < 100), dataset["apriori_prof"]).values
-    )
+    dataset["apriori_prof"].values = dataset["apriori_surf"].where((diff > 0) & (diff < 100), dataset["apriori_prof"]).values
 
     return dataset
 

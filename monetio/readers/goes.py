@@ -17,9 +17,7 @@ class GOESReader(GriddedReader):
         if filename is None:
             # S3 mode
             if date is None or product is None:
-                raise ValueError(
-                    "Please provide a date and product to be able to retrieve data from Amazon S3"
-                )
+                raise ValueError("Please provide a date and product to be able to retrieve data from Amazon S3")
             ds = g.open_amazon_file(date=date, satellite=satellite, product=product)
         else:
             # Local mode
@@ -69,7 +67,9 @@ class GOES:
             print("Files not available for product and date")
             return []
 
-    def _get_closest_date(self, files=[]):
+    def _get_closest_date(self, files=None):
+        if files is None:
+            files = []
         if not files:
             return None
         file_dates = [pd.to_datetime(f.split("_")[-1][:-4], format="c%Y%j%H%M%S") for f in files]

@@ -145,9 +145,7 @@ def load(source: str, files=None, **kwargs):
             # Lazy import
             importlib.import_module(_READER_MODULES[source], package="monetio")
         else:
-            raise ValueError(
-                f"Unknown source '{source}'. Available: {list(_READER_MODULES.keys())}"
-            )
+            raise ValueError(f"Unknown source '{source}'. Available: {list(_READER_MODULES.keys())}")
 
     if source not in READER_REGISTRY:
         # Should be registered by now if module was valid

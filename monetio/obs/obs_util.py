@@ -83,11 +83,7 @@ def write_datem(df, obscolumn="obs", dname="datemfile.txt", sitename="1", info=N
         runstring += info + "\n"
     else:
         runstring += "\n"
-    runstring += (
-        "Year, Month, Day, Hour:Minute (UTC), Dur(hhmm) ,  LAT, LON, Concentration ("
-        + ustr
-        + "), sid, height\n"
-    )
+    runstring += "Year, Month, Day, Hour:Minute (UTC), Dur(hhmm) ,  LAT, LON, Concentration (" + ustr + "), sid, height\n"
     lat = df["latitude"]
     lon = df["longitude"]
     cval = df[obscolumn]

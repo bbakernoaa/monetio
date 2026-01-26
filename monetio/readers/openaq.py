@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 from .base import PointReader, register_reader
-from .drivers import FileUtility
 
 
 @register_reader("openaq")
@@ -36,21 +35,15 @@ def read_json(fp_or_url, verbose=False):
         df = pd.read_json(fp_or_url, lines=True)
     except Exception as e:
         # If it's an S3 URL and failed, try s3fs
-        if isinstance(fp_or_url, str) and (
-            fp_or_url.startswith("s3://") or "s3.amazonaws.com" in fp_or_url
-        ):
+        if isinstance(fp_or_url, str) and (fp_or_url.startswith("s3://") or "s3.amazonaws.com" in fp_or_url):
             try:
                 import s3fs
 
                 # Convert to s3:// if it's HTTP
                 s3_path = fp_or_url
                 if "openaq-fetches.s3.amazonaws.com" in s3_path:
-                    s3_path = s3_path.replace(
-                        "https://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches"
-                    )
-                    s3_path = s3_path.replace(
-                        "http://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches"
-                    )
+                    s3_path = s3_path.replace("https://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches")
+                    s3_path = s3_path.replace("http://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches")
 
                 fs = s3fs.S3FileSystem(anon=True)
                 with fs.open(s3_path, "rb") as f:
@@ -81,11 +74,7 @@ def read_json(fp_or_url, verbose=False):
     if "date.local" in new.columns:
         try:
             # Handle possible varied offset formats
-            utcoffset = pd.to_timedelta(
-                new["date.local"]
-                .str.slice(-6, None)
-                .str.replace(r"(\d{2})(\d{2})$", r"\1:\2", regex=True)
-            )
+            utcoffset = pd.to_timedelta(new["date.local"].str.slice(-6, None).str.replace(r"(\d{2})(\d{2})$", r"\1:\2", regex=True))
         except:
             utcoffset = pd.Timedelta(0)
     else:
@@ -128,9 +117,7 @@ def read_json2(fp_or_url, verbose=False):
     import requests
 
     if isinstance(fp_or_url, str) and fp_or_url.startswith("s3"):
-        fp_or_url = fp_or_url.replace(
-            "s3://openaq-fetches/", "https://openaq-fetches.s3.amazonaws.com/"
-        )
+        fp_or_url = fp_or_url.replace("s3://openaq-fetches/", "https://openaq-fetches.s3.amazonaws.com/")
 
     r = requests.get(fp_or_url, stream=True, timeout=10)
     r.raise_for_status()
@@ -162,9 +149,7 @@ def read_json2(fp_or_url, verbose=False):
 
             # Time
             try:
-                time = datetime.datetime.fromisoformat(
-                    data["date"]["utc"].replace("Z", "+00:00")
-                ).replace(tzinfo=None)
+                time = datetime.datetime.fromisoformat(data["date"]["utc"].replace("Z", "+00:00")).replace(tzinfo=None)
                 time_local_str = data["date"]["local"]
                 # -06:00
                 h = int(time_local_str[-6:-3])
@@ -243,12 +228,8 @@ class OPENAQ:
     def _get_available_days(self, dates):
         folders = self.fs.ls(self.s3bucket)
         days = [folder.split("/")[2] for folder in folders]
-        dates_available = pd.Series(
-            pd.to_datetime(days, format=r"%Y-%m-%d", errors="coerce"), name="dates"
-        )
-        dates_requested = pd.Series(
-            pd.to_datetime(dates).floor(freq="D"), name="dates"
-        ).drop_duplicates()
+        dates_available = pd.Series(pd.to_datetime(days, format=r"%Y-%m-%d", errors="coerce"), name="dates")
+        dates_requested = pd.Series(pd.to_datetime(dates).floor(freq="D"), name="dates").drop_duplicates()
         dates_have = pd.merge(dates_available, dates_requested, how="inner")["dates"]
         if dates_have.empty:
             raise ValueError(f"No data available for requested dates: {dates_requested}.")

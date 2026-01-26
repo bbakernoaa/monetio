@@ -64,8 +64,7 @@ def _open_one_dataset(fname, variable_dict):
 
     if ("pressure" in variable_dict) and "surface_pressure" not in variable_dict:
         warnings.warn(
-            "Calculating pressure in TEMPO data requires surface_pressure. "
-            + "Adding surface_pressure to output variables"
+            "Calculating pressure in TEMPO data requires surface_pressure. " + "Adding surface_pressure to output variables"
         )
         variable_dict["surface_pressure"] = {}
 

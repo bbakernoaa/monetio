@@ -59,13 +59,7 @@ class AERONETReader(PointReader):
                 a.read_aeronet()
 
                 if freq is not None and not a.df.empty:
-                    a.df = (
-                        a.df.set_index("time")
-                        .groupby("siteid")
-                        .resample(freq)
-                        .mean(numeric_only=True)
-                        .reset_index()
-                    )
+                    a.df = a.df.set_index("time").groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
                 if detect_dust:
                     a.dust_detect()
                 if a.new_aod_values is not None:
@@ -82,16 +76,16 @@ class AERONETReader(PointReader):
             if interp_to_aod_values is not None:
                 interp_to_aod_values = np.asarray(interp_to_aod_values)
 
-            kwargs_inner = dict(
-                product=product,
-                inv_type=inv_type,
-                latlonbox=latlonbox,
-                siteid=siteid,
-                daily=daily,
-                lunar=lunar,
-                detect_dust=detect_dust,
-                interp_to_aod_values=interp_to_aod_values,
-            )
+            kwargs_inner = {
+                "product": product,
+                "inv_type": inv_type,
+                "latlonbox": latlonbox,
+                "siteid": siteid,
+                "daily": daily,
+                "lunar": lunar,
+                "detect_dust": detect_dust,
+                "interp_to_aod_values": interp_to_aod_values,
+            }
 
             requested_parallel = n_procs != 1
 
@@ -107,9 +101,7 @@ class AERONETReader(PointReader):
 
             if has_dask and requested_parallel and dates is not None and len(time_bounds) > 2:
                 tasks = [
-                    dask.delayed(_parallel_aeronet_call)(
-                        pd.DatetimeIndex([t1, t2]), **kwargs_inner, freq=None
-                    )
+                    dask.delayed(_parallel_aeronet_call)(pd.DatetimeIndex([t1, t2]), **kwargs_inner, freq=None)
                     for t1, t2 in zip(time_bounds[:-1], time_bounds[1:])
                 ]
                 dfs = dask.compute(*tasks, scheduler="processes", num_workers=n_procs)
@@ -213,10 +205,7 @@ class AERONET:
             d2.strftime(r"%d"),
             d2.strftime(r"%H"),
         )
-        dates_ = (
-            f"year={sy}&month={sm}&day={sd}&hour={sh}"
-            f"&year2={ey}&month2={em}&day2={ed}&hour2={eh}"
-        )
+        dates_ = f"year={sy}&month={sm}&day={sd}&hour={sh}&year2={ey}&month2={em}&day2={ed}&hour2={eh}"
 
         assert self.prod is not None, "required parameter"
 
@@ -401,13 +390,7 @@ class AERONET:
             raise Exception(f"loading from URL {self.url!r} failed.") from e
 
         if freq is not None:
-            self.df = (
-                self.df.set_index("time")
-                .groupby("siteid")
-                .resample(freq)
-                .mean(numeric_only=True)
-                .reset_index()
-            )
+            self.df = self.df.set_index("time").groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
 
         if detect_dust:
             self.dust_detect()
@@ -418,14 +401,14 @@ class AERONET:
         return self.df
 
     def dust_detect(self):
-        self.df["dust"] = (self.df["aod_1020nm"] > 0.3) & (
-            self.df["440-870_angstrom_exponent"] < 0.6
-        )
+        self.df["dust"] = (self.df["aod_1020nm"] > 0.3) & (self.df["440-870_angstrom_exponent"] < 0.6)
 
     def calc_new_aod_values(self):
-        def _tspack_aod_interp(row, new_wv=[440.0, 470.0, 550.0, 670.0, 870.0, 1020.0, 1240.0]):
+        def _tspack_aod_interp(row, new_wv=None):
             import numpy as np
 
+            if new_wv is None:
+                new_wv = [440.0, 470.0, 550.0, 670.0, 870.0, 1020.0, 1240.0]
             try:
                 import pytspack
             except ImportError as e:
@@ -443,15 +426,11 @@ class AERONET:
             if len(df_aod_nu_sorted) < 2:
                 return new_wv * np.nan
             else:
-                x, y, yp, sigma = pytspack.tspsi(
-                    df_aod_nu_sorted.wv.values, df_aod_nu_sorted.aod.values
-                )
+                x, y, yp, sigma = pytspack.tspsi(df_aod_nu_sorted.wv.values, df_aod_nu_sorted.aod.values)
                 yi = pytspack.hval(self.new_aod_values, x, y, yp, sigma)
                 return yi
 
-        out = self.df.apply(
-            _tspack_aod_interp, axis=1, result_type="expand", new_wv=self.new_aod_values
-        )
+        out = self.df.apply(_tspack_aod_interp, axis=1, result_type="expand", new_wv=self.new_aod_values)
         names = "aod_" + pd.Series(self.new_aod_values.astype(int).astype(str)) + "nm"
         out.columns = names.values
         dup_names = list(set(self.df) & set(out))

@@ -22,12 +22,11 @@ def retrieve_test_file(i):
     # Download to tests/data if not already present
     p = HERE / "data" / fn
     if not p.is_file():
-        warnings.warn(f"Downloading test file {fn} for OMPS L3 test")
+        warnings.warn(f"Downloading test file {fn} for OMPS L3 test", stacklevel=2)
         import requests
 
         r = requests.get(
-            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
-            f"example_observation_data/satellite/{fn}",
+            f"https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/example_observation_data/satellite/{fn}",
             stream=True,
         )
         r.raise_for_status()

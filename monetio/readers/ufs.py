@@ -161,9 +161,7 @@ class UFSReader(GriddedReader):
             "delz": "dz_m",
         }
         # Only rename what exists
-        rename_dict = {
-            k: v for k, v in rename_dict.items() if k in dset.variables or k in dset.dims
-        }
+        rename_dict = {k: v for k, v in rename_dict.items() if k in dset.variables or k in dset.dims}
         dset = dset.rename(rename_dict)
 
         # Calculations
@@ -322,9 +320,7 @@ def dict_species_sums(mech):
                 ]
             }
         )
-        sum_dict.update(
-            {"coarse": ["asoil", "acors", "aseacat", "aclk", "aso4k", "ano3k", "anh4k"]}
-        )
+        sum_dict.update({"coarse": ["asoil", "acors", "aseacat", "aclk", "aso4k", "ano3k", "anh4k"]})
         sum_dict.update(
             {
                 "noy_gas": [
@@ -463,16 +459,14 @@ def add_multiple_lazy2(dset, variables, weights=None):
 
 
 def _get_keys(d):
-    keys = Series([i for i in d.data_vars.keys()])
+    keys = Series(list(d.data_vars.keys()))
     return keys
 
 
 # Lazy Adders
 def add_lazy_pm25(d, dict_sum):
     keys = _get_keys(d)
-    allvars = Series(
-        concatenate([dict_sum["aitken"], dict_sum["accumulation"], dict_sum["coarse"]])
-    )
+    allvars = Series(concatenate([dict_sum["aitken"], dict_sum["accumulation"], dict_sum["coarse"]]))
     weights = Series(
         concatenate(
             [
@@ -493,9 +487,7 @@ def add_lazy_pm25(d, dict_sum):
 
 def add_lazy_pm10(d, dict_sum):
     keys = _get_keys(d)
-    allvars = Series(
-        concatenate([dict_sum["aitken"], dict_sum["accumulation"], dict_sum["coarse"]])
-    )
+    allvars = Series(concatenate([dict_sum["aitken"], dict_sum["accumulation"], dict_sum["coarse"]]))
     index = allvars.isin(keys)
     if can_do(index):
         newkeys = allvars.loc[index]

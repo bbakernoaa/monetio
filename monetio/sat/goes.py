@@ -8,9 +8,7 @@ try:
 
     has_s3fs = True
 except ImportError:
-    print(
-        "Please install s3fs if retrieving from the Amazon S3 Servers.  Otherwise continue with local data"
-    )
+    print("Please install s3fs if retrieving from the Amazon S3 Servers.  Otherwise continue with local data")
     has_s3fs = False
 
 try:
@@ -211,9 +209,7 @@ def add_goes_bands(
 
     # Create the true color image DataArray
     # Stack the bands along a new 'rgb' dimension
-    tci = xr.concat([dset[red_band], green, dset[blue_band]], dim="rgb").transpose(
-        *(dims + ("rgb",))
-    )
+    tci = xr.concat([dset[red_band], green, dset[blue_band]], dim="rgb").transpose(*(dims + ("rgb",)))
 
     # add to the dataset
     dset["tci"] = tci

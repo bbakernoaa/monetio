@@ -139,9 +139,7 @@ def _add_time_granule(time, dtime):
     if len(_time_granule.shape) == 2:
         time_granule = xr.DataArray(data=_time_granule, dims=("time", "y"), attrs=time.__dict__)
     elif len(_time_granule.shape) == 3:
-        time_granule = xr.DataArray(
-            data=_time_granule, dims=("time", "y", "x"), attrs=time.__dict__
-        )
+        time_granule = xr.DataArray(data=_time_granule, dims=("time", "y", "x"), attrs=time.__dict__)
     else:
         raise ValueError("Could not assign the time of each granule. Check data dimensions.")
 
@@ -296,9 +294,7 @@ def _calc_pressure_tropomi_no2(tm5_constant_a, tm5_constant_b, surface_pressure)
     )
     interface_pressure[:, 0, :, :] = surface_pressure[:]
     for i in range(0, num_layers):
-        interface_pressure[:, i + 1, :, :] = (
-            tm5_constant_a[i, 1] + tm5_constant_b[i, 1] * surface_pressure[:]
-        )
+        interface_pressure[:, i + 1, :, :] = tm5_constant_a[i, 1] + tm5_constant_b[i, 1] * surface_pressure[:]
     return midlayer_pressure, interface_pressure
 
 
@@ -327,17 +323,13 @@ def _calc_pressure_tropomi_hcho(tm5_constant_a, tm5_constant_b, surface_pressure
     )
     interface_pressure[:, 0, :, :] = surface_pressure[:]
     for i in range(0, num_layers):
-        interface_pressure[:, i + 1, :, :] = (
-            tm5_constant_a[0, i].values + tm5_constant_b[0, i].values * surface_pressure[:]
-        )
+        interface_pressure[:, i + 1, :, :] = tm5_constant_a[0, i].values + tm5_constant_b[0, i].values * surface_pressure[:]
     midlayer_pressure = xr.DataArray(
         data=np.zeros((num_times, num_layers, num_y, num_x), dtype=np.float64),
         dims=("time", "z", "y", "x"),
     )
     for i in range(num_layers):
-        midlayer_pressure[:, i, :, :] = (
-            interface_pressure[:, i, :, :].values + interface_pressure[:, i + 1, :, :].values
-        ) / 2
+        midlayer_pressure[:, i, :, :] = (interface_pressure[:, i, :, :].values + interface_pressure[:, i + 1, :, :].values) / 2
     midlayer_pressure.attrs = {"units": "Pa", "long_name": "midlayer_pressure_in_pa"}
     return midlayer_pressure, interface_pressure
 
@@ -368,9 +360,7 @@ def _calc_pressure_tropomi_co(pressure_level_bottom):
         dims=("time", "z", "y", "x"),
         attrs={"long_name": "pressure_midlayer", "units": "Pa"},
     )
-    midlayer_pressure[:, :, :, :] = (
-        interface_pressure[:, :-1, :, :].values + interface_pressure[:, 1:, :, :].values
-    ) / 2
+    midlayer_pressure[:, :, :, :] = (interface_pressure[:, :-1, :, :].values + interface_pressure[:, 1:, :, :].values) / 2
     return midlayer_pressure, interface_pressure
 
 
@@ -415,9 +405,9 @@ def apply_quality_flag(variable, netcdf_tropomi):
         DataArray with applied quality flag
     """
     assert "quality_flag" in variable.attrs, f"quality_flag not in {variable.name}"
-    assert ("qa_thresh_min" in variable.attrs) or (
-        "qa_thresh_max" in variable.attrs
-    ), f"Neither qa_thresh_min nor qa_thresh_max in {variable.name}"
+    assert ("qa_thresh_min" in variable.attrs) or ("qa_thresh_max" in variable.attrs), (
+        f"Neither qa_thresh_min nor qa_thresh_max in {variable.name}"
+    )
     qa = _add_variable(variable.attrs["quality_flag"], netcdf_tropomi)
     if "qa_thresh_min" in variable.attrs:
         variable = variable.where(qa >= variable.attrs["qa_thresh_min"])
