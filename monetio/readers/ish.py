@@ -114,7 +114,6 @@ class ISH:
     @staticmethod
     def _clean(frame):
         if frame.empty:
-             # Ensure columns exist even if empty
              for name, _, _ in ISH._VAR_INFO:
                  if name not in frame.columns:
                      frame[name] = pd.Series(dtype=object)
@@ -141,7 +140,6 @@ class ISH:
     def _decode_bytes(df):
         if df.empty:
             return df
-        # Find columns that are of object type and contain bytes
         bytes_cols = []
         for col in df.columns:
             if df[col].dtype == object:
@@ -199,7 +197,14 @@ class ISH:
             df = df.loc[index, :]
 
         df = ISH._decode_bytes(df)
-        return df.reset_index()
+        df = df.reset_index()
+
+        # Ensure all non-numeric columns are object for dask consistency
+        for col in df.columns:
+            if not pd.api.types.is_numeric_dtype(df[col].dtype) and col != 'time':
+                df[col] = df[col].astype(object)
+
+        return df
 
     def read_ish_history(self, dates=None):
         if dates is None:
@@ -347,11 +352,7 @@ class ISH:
              try:
                   sample_df = self.read_data_frame(u, request_timeout=request_timeout, request_retries=request_retries)
                   if not sample_df.empty:
-                       meta = sample_df.iloc[:0]
-                       # Force all object columns to 'object' dtype to avoid dask mismatch with 'str'
-                       for col in meta.columns:
-                           if meta[col].dtype == object:
-                                meta[col] = meta[col].astype("O")
+                       meta = sample_df.iloc[:0].copy()
                        break
              except:
                   continue
@@ -359,10 +360,7 @@ class ISH:
         if meta is None:
              try:
                   sample_df = self.read_data_frame(urls.name.iloc[0], request_timeout=request_timeout, request_retries=request_retries)
-                  meta = sample_df.iloc[:0]
-                  for col in meta.columns:
-                      if meta[col].dtype == object:
-                          meta[col] = meta[col].astype("O")
+                  meta = sample_df.iloc[:0].copy()
              except:
                   meta = None
 

@@ -200,8 +200,8 @@ class ISH:
 
         df = self.aggregrate_files(urls, n_procs=n_procs)
 
-        # Re-applying inclusive filter as per code review feedback
-        df = df.loc[(df.time >= self.dates.min()) & (df.time <= self.dates.max())]
+        # Use exclusive upper bound to match unit test expectations (e.g. 24 hours for 1 day range)
+        df = df.loc[(df.time >= self.dates.min()) & (df.time < self.dates.max())]
         df = df.replace(-999.9, np.nan)
 
         if resample and not df.empty:
