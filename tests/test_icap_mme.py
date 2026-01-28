@@ -1,6 +1,13 @@
+import os
+
 import pytest
 
 from monetio.models.icap_mme import open_dataset, open_mfdataset
+
+# Skip on CI because usgodae.org is unreliable
+skip_on_ci = pytest.mark.skipif(
+    os.environ.get("CI", "false").lower() == "true", reason="Skipped on CI"
+)
 
 
 def test_open_dataset_bad_date():
@@ -20,6 +27,7 @@ def test_open_dataset_invalid_param():
         open_mfdataset([date], data_var="asdf", verify=False)
 
 
+@skip_on_ci
 @pytest.mark.parametrize(
     "date,product,data_var",
     [
@@ -39,6 +47,7 @@ def test_open_dataset(tmp_path, monkeypatch, date, product, data_var):
     assert ds_dl.equals(ds)
 
 
+@skip_on_ci
 def test_open_mfdataset(tmp_path, monkeypatch):
     dates = ["2023-08-01", "2023-08-02"]
     product = "C4"
