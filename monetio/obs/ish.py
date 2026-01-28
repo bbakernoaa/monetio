@@ -2,7 +2,7 @@
 ISH Reader Redirection
 """
 
-from ..readers.ish import ISH, ISHReader
+from ..readers.ish import ISH, ISHReader  # noqa: F401
 
 
 def add_data(

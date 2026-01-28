@@ -20,26 +20,26 @@ repo_url: https://github.com/noaa-oar-arl/monetio
 nav:
   - Home: index.md
   - Getting Started:
-    - Why MONETIO?: why-monetio.md
-    - Installing: installing.md
-    - Observations: observations.md
-    - Models: models.md
-    - Tutorial:
-      - Overview: tutorial.md
-      - Loading Data: tutorial/loading.md
-      - AQS & PAMS: tutorial/aqs_pams.md
-      - IMPROVE Trends: tutorial/improve_trends_kmeans.md
-      - CMAQ Hawaii Volcano: tutorial/CMAQ_hi_volcano.md
-      - NESDIS VIIRS AOD: tutorial/NESDIS_VIIRS_AOD.md
-      - FV3-Chem Tutorial: tutorial/fv3chem_tutorial.md
-    - WCOSS: wcoss.md
+      - Why MONETIO?: why-monetio.md
+      - Installing: installing.md
+      - Observations: observations.md
+      - Models: models.md
+      - Tutorial:
+          - Overview: tutorial.md
+          - Loading Data: tutorial/loading.md
+          - AQS & PAMS: tutorial/aqs_pams.md
+          - IMPROVE Trends: tutorial/improve_trends_kmeans.md
+          - CMAQ Hawaii Volcano: tutorial/CMAQ_hi_volcano.md
+          - NESDIS VIIRS AOD: tutorial/NESDIS_VIIRS_AOD.md
+          - FV3-Chem Tutorial: tutorial/fv3chem_tutorial.md
+      - WCOSS: wcoss.md
   - Contributing:
-    - Adding a Reader: contributing/add_reader.md
+      - Adding a Reader: contributing/add_reader.md
   - Help & Reference:
-    - Architecture: architecture.md
-    - Curated API: api.md
-    - Code Reference: reference/
-    - Get in touch: get-in-touch.md
+      - Architecture: architecture.md
+      - Curated API: api.md
+      - Code Reference: reference/
+      - Get in touch: get-in-touch.md
 
 exclude_docs: |
   conf.py

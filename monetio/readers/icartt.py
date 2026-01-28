@@ -1,9 +1,11 @@
 """ICARTT Reader"""
 
 import datetime
+
 import pandas as pd
 import xarray as xr
 from numpy import nan
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -62,9 +64,7 @@ def class_to_xarray(o, time_str="Time_Start"):
             das[i] = var_to_da(o, i, time_index)
     ds = xr.Dataset(das)
     ds.attrs["source"] = o.dataSource
-    ds.attrs["Date Revised"] = pd.to_datetime(o.dateRevised).strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
+    ds.attrs["Date Revised"] = pd.to_datetime(o.dateRevised).strftime("%Y-%m-%d %H:%M:%S")
     ds.attrs["mission"] = o.mission
     ds.attrs["organization"] = o.organization
     ds.attrs["PI"] = o.PI
@@ -130,9 +130,7 @@ class Dataset:
 
     @property
     def times(self):
-        return [
-            self.dateValid + datetime.timedelta(seconds=x) for x in self[self.IVAR.name]
-        ]
+        return [self.dateValid + datetime.timedelta(seconds=x) for x in self[self.IVAR.name]]
 
     def __getitem__(self, name):
         idx = self.index(name)
@@ -171,9 +169,7 @@ class Dataset:
         self.VOL = int(dmp[0])
         self.NVOL = int(dmp[1])
         dmp = self.__readline()
-        self.dateValid = datetime.datetime.strptime(
-            "".join([f"{x:s}" for x in dmp[0:3]]), "%Y%m%d"
-        )
+        self.dateValid = datetime.datetime.strptime("".join([f"{x:s}" for x in dmp[0:3]]), "%Y%m%d")
         self.dateRevised = datetime.datetime.strptime(
             "".join([f"{x:s}" for x in dmp[3:6]]), "%Y%m%d"
         )
@@ -218,8 +214,7 @@ class Dataset:
             self.input_fhandle = open(self.input_fhandle.name)
         _ = [self.input_fhandle.readline() for _ in range(self.nheader)]
         self.data = [
-            self.__nan_miss_float(line.split(self.splitChar))
-            for line in self.input_fhandle
+            self.__nan_miss_float(line.split(self.splitChar)) for line in self.input_fhandle
         ]
         self.input_fhandle.close()
 
@@ -241,9 +236,7 @@ class Dataset:
         self.dateValid = datetime.datetime.today()
         self.dateRevised = datetime.datetime.today()
         self.dataInterval = 0
-        self.IVAR = Variable(
-            "Time_Start", "seconds_from_0_hours_on_valid_date", 1.0, -9999999
-        )
+        self.IVAR = Variable("Time_Start", "seconds_from_0_hours_on_valid_date", 1.0, -9999999)
         self.DVAR = [
             Variable("Time_Stop", "seconds_from_0_hours_on_valid_date", 1.0, -9999999),
             Variable("Some_Variable", "ppbv", 1.0, -9999999),

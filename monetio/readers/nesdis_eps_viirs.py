@@ -1,7 +1,9 @@
 """NESDIS EPS VIIRS Reader"""
 
 import os
+
 import xarray as xr
+
 from .base import GriddedReader, register_reader
 
 
@@ -54,6 +56,7 @@ def _get_latlons(nlat, nlon):
 
 def download_data(date):
     import ftplib
+
     from pandas import Timestamp
 
     date = Timestamp(date)

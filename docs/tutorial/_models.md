@@ -156,7 +156,7 @@ f = mio.fv3chem.open_dataset('/Users/barry/Desktop/temp/gfs.t00z.atmf006.nemsio.
 print(f)
 ```
 
-``````text
+```````text
     /Users/barry/Desktop/temp/gfs.t00z.atmf006.nemsio.nc4
     <xarray.Dataset>
     Dimensions:    (time: 1, x: 384, y: 192, z: 64)
@@ -239,3 +239,4 @@ print(f.pm25)
 
 Here units are not included because it is not stored in the nemsio
 format.
+```````

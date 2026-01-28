@@ -88,6 +88,7 @@ ds.attrs["history"] = ds.attrs.get("history", "") + "\n" + history
 ### Harmonization
 
 Use standard coordinate names:
+
 - Gridded: `time`, `x`, `y`, `z`, `latitude`, `longitude`.
 - Point: `time`, `latitude`, `longitude`, `siteid`.
 

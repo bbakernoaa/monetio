@@ -1,9 +1,11 @@
 """IMPROVE Reader"""
 
 import pandas as pd
+
+from monetio.obs.epa_util import read_monitor_file
+
 from .base import PointReader, register_reader
 from .drivers import FileUtility
-from monetio.obs.epa_util import read_monitor_file
 
 
 @register_reader("improve")
@@ -45,9 +47,7 @@ class IMPROVE:
         skiprows = 0
         skip = False
         for i, line in enumerate(lines):
-            if (
-                line.strip() == "Data"
-            ):  # Use strip to handle potential whitespace/newlines
+            if line.strip() == "Data":  # Use strip to handle potential whitespace/newlines
                 skip = True
                 skiprows = i + 1
                 break
@@ -106,7 +106,7 @@ class IMPROVE:
 
         try:
             pass
-        except:
+        except Exception:
             pass
 
         return df.copy()

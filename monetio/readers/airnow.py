@@ -4,14 +4,15 @@ import os
 from datetime import datetime
 from functools import lru_cache
 
-import pandas as pd
 import dask
 import dask.dataframe as dd
+import pandas as pd
 from numpy import nan
 
-from monetio.readers.base import PointReader, register_reader
 from monetio.obs.epa_util import read_monitor_file
+from monetio.readers.base import PointReader, register_reader
 from monetio.util import long_to_wide
+
 from .drivers import FileUtility
 
 
@@ -249,9 +250,7 @@ def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
         elif bad_utcoffset == "leave":
             pass
         else:
-            raise ValueError(
-                "`bad_utcoffset` must be one of: 'null', 'drop', 'fix', 'leave'"
-            )
+            raise ValueError("`bad_utcoffset` must be one of: 'null', 'drop', 'fix', 'leave'")
 
     return df
 

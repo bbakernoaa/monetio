@@ -84,8 +84,7 @@ def test_build_url_bad_prod():
 
 def test_valid_sites_col_rename():
     assert (
-        aeronet.get_valid_sites().columns
-        == ["siteid", "longitude", "latitude", "elevation"]
+        aeronet.get_valid_sites().columns == ["siteid", "longitude", "latitude", "elevation"]
     ).all()
 
 
@@ -168,9 +167,7 @@ def test_load_local_inv():
 
 def test_add_data_lunar():
     dates = pd.date_range("2021/08/01", "2021/08/02")
-    df = aeronet.add_data(
-        dates, lunar=True, daily=True
-    )  # only daily-average data at this time
+    df = aeronet.add_data(dates, lunar=True, daily=True)  # only daily-average data at this time
     assert df.index.size > 0
 
     dates = pd.date_range("2022/01/20", "2022/01/21")
@@ -203,9 +200,7 @@ def test_interp_with_pytspack():
     dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
     standard_wavelengths = np.array([0.34, 0.44, 0.55, 0.66, 0.86, 1.63, 11.1]) * 1000
     with pytest.warns(UserWarning, match="Renaming duplicate AOD columns"):
-        df = aeronet.add_data(
-            dates, n_procs=1, interp_to_aod_values=standard_wavelengths
-        )
+        df = aeronet.add_data(dates, n_procs=1, interp_to_aod_values=standard_wavelengths)
     # Note: default wls for this period:
     #
     # wls = sorted(df.columns[df.columns.str.startswith("aod")].str.slice(4, -2).astype(int).tolist())
@@ -227,9 +222,7 @@ def test_interp_with_pytspack():
         "aod_440nm_orig",
     }
     assert {
-        c
-        for c in df
-        if c.startswith("exact_wavelengths_of_aod") and c.endswith("nm_orig")
+        c for c in df if c.startswith("exact_wavelengths_of_aod") and c.endswith("nm_orig")
     } == {
         "exact_wavelengths_of_aod(um)_340nm_orig",
         "exact_wavelengths_of_aod(um)_440nm_orig",
@@ -240,9 +233,7 @@ def test_interp_with_pytspack():
 def test_interp_daily_with_pytspack():
     dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
     standard_wavelengths = np.array([0.55]) * 1000
-    df = aeronet.add_data(
-        dates, daily=True, n_procs=1, interp_to_aod_values=standard_wavelengths
-    )
+    df = aeronet.add_data(dates, daily=True, n_procs=1, interp_to_aod_values=standard_wavelengths)
 
     assert {f"aod_{int(wl)}nm" for wl in standard_wavelengths}.issubset(df.columns)
 

@@ -107,9 +107,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
             with http_fs.open(url, "r", encoding="utf-8", timeout=TIMEOUT) as f:
                 content = f.read()
         except Exception as e:
-            warnings.warn(
-                f"Failed to fetch files for {location} using fsspec HTTP: {e}"
-            )
+            warnings.warn(f"Failed to fetch files for {location} using fsspec HTTP: {e}")
 
             # Enhanced fallback with session for better performance
             with requests.Session() as session:
@@ -133,9 +131,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
                         f"Fallback to requests also failed for {location}: {fallback_error}"
                     )
                     if USE_CACHE_FOR_TESTING:
-                        warnings.warn(
-                            f"Using cached data for {location} due to network failure"
-                        )
+                        warnings.warn(f"Using cached data for {location} due to network failure")
                         return []
                     raise
 
@@ -160,9 +156,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
         return data
 
     with ThreadPool(processes=min(n_threads, len(locations))) as pool:
-        data = list(
-            itertools.chain.from_iterable(pool.imap_unordered(get_files, locations))
-        )
+        data = list(itertools.chain.from_iterable(pool.imap_unordered(get_files, locations)))
 
     df = pd.DataFrame(data, columns=["location", "time", "fn", "url"])
 
@@ -206,9 +200,7 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise"):
     df_urls = discover_files(location=location)
     print(f"Discovered {len(df_urls)} 100-m files.")
 
-    urls = df_urls[df_urls["time"].between(dates_min, dates_max, inclusive="both")][
-        "url"
-    ].tolist()
+    urls = df_urls[df_urls["time"].between(dates_min, dates_max, inclusive="both")]["url"].tolist()
 
     if not urls:
         raise RuntimeError(
@@ -390,12 +382,8 @@ def read_100m(fp_or_url):
             def get_remote_content():
                 # Try fsspec first for better performance and features
                 try:
-                    http_fs = fsspec.filesystem(
-                        "http", headers={"User-Agent": "MONETIO-Client"}
-                    )
-                    with http_fs.open(
-                        fp_or_url, "r", encoding="utf-8", timeout=TIMEOUT
-                    ) as f:
+                    http_fs = fsspec.filesystem("http", headers={"User-Agent": "MONETIO-Client"})
+                    with http_fs.open(fp_or_url, "r", encoding="utf-8", timeout=TIMEOUT) as f:
                         return f.read()
                 except Exception as fsspec_error:
                     # Fallback to requests if fsspec fails
@@ -434,9 +422,7 @@ def read_100m(fp_or_url):
             if line.startswith(("Station:", "Station: ", "Station  ")):
                 break
         else:
-            raise ValueError(
-                f"Expected to find metadata to start with Station, got:\n{blocks[0]}"
-            )
+            raise ValueError(f"Expected to find metadata to start with Station, got:\n{blocks[0]}")
         meta_block = "\n".join(block_lines[i:])
         data_block = blocks[1]
     else:
@@ -481,9 +467,7 @@ def read_100m(fp_or_url):
         "Sonde Total O3 (SBUV)",
     ]
     if not set(meta) >= set(meta_keys_expected):
-        raise ValueError(
-            f"Expected metadata keys {meta_keys_expected}, got {list(meta)}."
-        )
+        raise ValueError(f"Expected metadata keys {meta_keys_expected}, got {list(meta)}.")
 
     if data_block.startswith(_DATA_BLOCK_START_L100):
         have_uncert = True

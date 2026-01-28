@@ -1,6 +1,7 @@
 """PREPCHEM Reader"""
 
 import xarray as xr
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -16,10 +17,7 @@ class PrepChemReader(GriddedReader):
         if len(file_list) == 1:
             return open_dataset_prepchem(file_list[0], dtype=dtype, res=res, tile=tile)
         else:
-            das = [
-                open_dataset_prepchem(f, dtype=dtype, res=res, tile=tile)
-                for f in file_list
-            ]
+            das = [open_dataset_prepchem(f, dtype=dtype, res=res, tile=tile) for f in file_list]
             return xr.concat(das, dim="file")
 
 

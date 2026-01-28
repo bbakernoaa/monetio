@@ -2,11 +2,13 @@
 
 import os
 import warnings
+
 import pandas as pd
-from .base import PointReader, register_reader
+
 from monetio.obs.epa_util import read_monitor_file
 from monetio.util import long_to_wide
-from .drivers import FileUtility
+
+from .base import PointReader, register_reader
 
 
 @register_reader("aqs")
@@ -136,7 +138,9 @@ class AQS:
             if len(df.columns) == len(self.renameddcols):
                 df.columns = self.renameddcols
 
-            df["pollutant_standard"] = df.get("pollutant_standard", pd.Series(dtype=str)).astype(str)
+            df["pollutant_standard"] = df.get("pollutant_standard", pd.Series(dtype=str)).astype(
+                str
+            )
             self.daily = True
         else:
             df = pd.read_csv(
@@ -156,13 +160,13 @@ class AQS:
             + df.county_code.astype(str).str.zfill(3)
             + df.site_num.astype(str).str.zfill(4)
         )
-        df.drop(["state_name", "county_name"], axis=1, inplace=True, errors='ignore')
+        df.drop(["state_name", "county_name"], axis=1, inplace=True, errors="ignore")
         df.columns = [i.lower() for i in df.columns]
         if "daily" not in url:
-            df.drop(["datum", "qualifier"], axis=1, inplace=True, errors='ignore')
+            df.drop(["datum", "qualifier"], axis=1, inplace=True, errors="ignore")
         voc = "VOC" in url
         df = self.get_species(df, voc=voc)
-        return df.drop("date_of_last_change", axis=1, errors='ignore')
+        return df.drop("date_of_last_change", axis=1, errors="ignore")
 
     def build_url(self, param, year, daily=False, download=False):
         if daily:
@@ -229,12 +233,13 @@ class AQS:
                                 fnames.append(fname)
                             else:
                                 print("File is Empty. Not Processing", url)
-                except:
+                except Exception:
                     pass
         return urls, fnames
 
     def retrieve(self, url, fname):
         import requests
+
         if not os.path.isfile(fname):
             print("\n Retrieving: " + fname)
             print(url)
@@ -292,7 +297,7 @@ class AQS:
             dfs = [dask.delayed(self.load_aqs_file)(i, network) for i in urls]
 
         if not dfs:
-             return pd.DataFrame()
+            return pd.DataFrame()
 
         dff = dd.from_delayed(dfs)
         dfff = dff.compute(num_workers=n_procs)
@@ -320,9 +325,7 @@ class AQS:
         self.df = pd.merge(self.df, monitors, on=mlist, how="left")
 
         if daily and "gmt_offset" in self.df.columns:
-            self.df["time"] = self.df.time_local - pd.to_timedelta(
-                self.df.gmt_offset, unit="h"
-            )
+            self.df["time"] = self.df.time_local - pd.to_timedelta(self.df.gmt_offset, unit="h")
 
         if "parameter_name" in self.df.columns:
             self.df.drop("parameter_name", axis=1, inplace=True)
@@ -424,7 +427,7 @@ class AQS:
                 val = mapping.get(i) or mapping.get(int(i))
                 if val:
                     df.loc[con, "variable"] = val
-            except:
+            except Exception:
                 pass
 
         con = df.variable == ""

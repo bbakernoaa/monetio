@@ -18,7 +18,7 @@ edr = mio.nesdis_edr_viirs.open_dataset('2018-07-05')
 print(edr)
 ```
 
-``````text
+```````text
     <xarray.DataArray 'VIIRS EDR AOD' (time: 1, y: 1800, x: 3600)>
     array([[[nan, nan, ..., nan, nan],
             [nan, nan, ..., nan, nan],
@@ -210,3 +210,4 @@ eps.monet.quick_map(robust=True)
 
 Notice that there are AOD values over deserts such as the Sahara,
 Australia, northern China, Mongolia and the Middle East
+```````

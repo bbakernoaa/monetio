@@ -91,9 +91,7 @@ class CMAQReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CMAQ data."
-        )
+        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CMAQ data."
         if "history" in ds.attrs:
             ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
         else:

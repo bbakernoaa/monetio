@@ -2,7 +2,7 @@
 ISH Lite Reader Redirection
 """
 
-from ..readers.ish_lite import ISH, ISHLiteReader
+from ..readers.ish_lite import ISH, ISHLiteReader  # noqa: F401
 
 
 def add_data(

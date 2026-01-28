@@ -44,9 +44,7 @@ def read_data(fname, lat, lon, date):
     aot = f.reshape(2, nlat, nlon)[0, :, :].reshape(1, nlat, nlon)
     aot[aot < -999] = nan
     datearr = to_datetime([date])
-    da = xr.DataArray(
-        aot, coords=[datearr, range(nlat), range(nlon)], dims=["time", "y", "x"]
-    )
+    da = xr.DataArray(aot, coords=[datearr, range(nlat), range(nlon)], dims=["time", "y", "x"])
     da["latitude"] = (("y", "x"), lat)
     da["longitude"] = (("y", "x"), lon)
     da.attrs["units"] = ""

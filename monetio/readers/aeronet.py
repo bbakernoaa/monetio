@@ -3,10 +3,12 @@
 import warnings
 from datetime import datetime
 from functools import lru_cache
+from io import BytesIO
+
 import numpy as np
 import pandas as pd
+
 from .base import PointReader, register_reader
-from io import BytesIO
 
 try:
     import dask
@@ -49,7 +51,7 @@ class AERONETReader(PointReader):
                     with open(f) as fid:
                         if "Inversion" in fid.readline():
                             a.inv_type = True
-                except:
+                except Exception:
                     pass
 
                 a.new_aod_values = interp_to_aod_values
@@ -103,12 +105,7 @@ class AERONETReader(PointReader):
             else:
                 time_bounds = []
 
-            if (
-                has_dask
-                and requested_parallel
-                and dates is not None
-                and len(time_bounds) > 2
-            ):
+            if has_dask and requested_parallel and dates is not None and len(time_bounds) > 2:
                 tasks = [
                     dask.delayed(_parallel_aeronet_call)(
                         pd.DatetimeIndex([t1, t2]), **kwargs_inner, freq=None
@@ -119,12 +116,7 @@ class AERONETReader(PointReader):
                 df = pd.concat(dfs, ignore_index=True).drop_duplicates()
                 if freq is not None:
                     df.index = df.time
-                    df = (
-                        df.groupby("siteid")
-                        .resample(freq)
-                        .mean(numeric_only=True)
-                        .reset_index()
-                    )
+                    df = df.groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
                 return df.reset_index(drop=True)
             else:
                 return a.add_data(dates=dates, freq=freq, **kwargs_inner)
@@ -238,9 +230,7 @@ class AERONET:
 
         elif self.inv_type in self._valid_inv_type:
             if self.prod in self._valid_prod_inv:
-                base_url = (
-                    "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_inv_v3?"
-                )
+                base_url = "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_inv_v3?"
             else:
                 raise ValueError(f"invalid product {self.prod!r}")
             inv_type_ = f"&{self.inv_type}=1"
@@ -270,9 +260,7 @@ class AERONET:
             lat1, lon1, lat2, lon2 = map(str, map(float, self.latlonbox))
             loc_ = f"&lat1={lat1}&lat2={lat2}&lon1={lon1}&lon2={lon2}"
 
-        self.url = (
-            f"{base_url}{dates_}{product_}{avg_}{lunar_}{inv_type_}{loc_}&if_no_html=1"
-        )
+        self.url = f"{base_url}{dates_}{product_}{avg_}{lunar_}{inv_type_}{loc_}&if_no_html=1"
 
     def _get_content(self, timeout=60, retries=3):
         """Robustly fetch content from URL."""
@@ -288,9 +276,7 @@ class AERONET:
         from urllib3.util.retry import Retry
 
         session = requests.Session()
-        retry = Retry(
-            total=retries, backoff_factor=1, status_forcelist=[500, 502, 503, 504]
-        )
+        retry = Retry(total=retries, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
         adapter = HTTPAdapter(max_retries=retry)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
@@ -437,17 +423,13 @@ class AERONET:
         )
 
     def calc_new_aod_values(self):
-        def _tspack_aod_interp(
-            row, new_wv=[440.0, 470.0, 550.0, 670.0, 870.0, 1020.0, 1240.0]
-        ):
+        def _tspack_aod_interp(row, new_wv=[440.0, 470.0, 550.0, 670.0, 870.0, 1020.0, 1240.0]):
             import numpy as np
 
             try:
                 import pytspack
             except ImportError as e:
-                raise RuntimeError(
-                    "You must install pytspack before using this function."
-                ) from e
+                raise RuntimeError("You must install pytspack before using this function.") from e
 
             new_wv = np.asarray(new_wv)
             aod_columns = [c for c in row.index if c.startswith("aod_")]

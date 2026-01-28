@@ -115,9 +115,7 @@ def test_open_dataset(test_file_path):
         assert ds2[f"longitude_bounds_{i}"].max() <= 180
 
     assert not ds2["preslev"].isnull().all()
-    assert ds2.preslev.mean(dim=("y", "x")).diff("z").to_series().lt(0).all(), (
-        "surface first"
-    )
+    assert ds2.preslev.mean(dim=("y", "x")).diff("z").to_series().lt(0).all(), "surface first"
     assert not ds2["troppres"].isnull().all()
     assert ds2["troppres"].mean() < ds2["preslev"].mean()
 

@@ -2,7 +2,7 @@
 FV3-Chem Reader. Redirection to monetio.readers.fv3chem
 """
 
-from ..readers.fv3chem import FV3ChemReader
+from ..readers.fv3chem import FV3ChemReader  # noqa: F401
 
 
 def open_dataset(fname, **kwargs):

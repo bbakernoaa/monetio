@@ -5,6 +5,7 @@ from numpy import array, concatenate
 from pandas import Series, to_datetime
 
 from monetio.grids import get_latlon_ioapi, grid_from_dataset
+
 from .base import GriddedReader, register_reader
 
 
@@ -73,7 +74,7 @@ class CAMxReader(GriddedReader):
 def camx_preprocess(dset):
     dset = add_lazy_pm25(dset)
     dset = add_lazy_pm10(dset)
-    dset = add_lazy_pm_course(dset)
+    dset = add_lazy_pm_coarse(dset)
     dset = add_lazy_noy(dset)
     dset = add_lazy_nox(dset)
     return dset
@@ -143,15 +144,15 @@ def add_lazy_pm10(d):
     return d
 
 
-def add_lazy_pm_course(d):
+def add_lazy_pm_coarse(d):
     keys = Series([i for i in d.variables])
     allvars = Series(coarse)
     index = allvars.isin(keys)
     if can_do(index):
         newkeys = allvars.loc[index]
-        d["PM_COURSE"] = add_multiple_lazy(d, newkeys)
-        d["PM_COURSE"] = d["PM_COURSE"].assign_attrs(
-            {"name": "PM_COURSE", "long_name": "Course Mode Particulate Matter"}
+        d["PM_COARSE"] = add_multiple_lazy(d, newkeys)
+        d["PM_COARSE"] = d["PM_COARSE"].assign_attrs(
+            {"name": "PM_COARSE", "long_name": "Coarse Mode Particulate Matter"}
         )
     return d
 

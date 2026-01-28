@@ -1,3 +1,5 @@
+import importlib
+
 from . import grids
 from .models import (
     camx,
@@ -27,10 +29,8 @@ from .obs import (
     pams,
 )
 from .profile import geoms, gml_ozonesonde, icartt, tolnet
-from .sat import goes
-
 from .readers.base import READER_REGISTRY
-import importlib
+from .sat import goes
 
 __version__ = "0.2.7"
 
@@ -151,9 +151,7 @@ def load(source: str, files=None, **kwargs):
 
     if source not in READER_REGISTRY:
         # Should be registered by now if module was valid
-        raise RuntimeError(
-            f"Source '{source}' found in lazy index but failed to register itself."
-        )
+        raise RuntimeError(f"Source '{source}' found in lazy index but failed to register itself.")
 
     # Instantiate the reader class and open data
     reader_cls = READER_REGISTRY[source]
