@@ -20,7 +20,6 @@ data.
 - Select the dates in question
 
 - Fields
-
   - Dataset (required)
   - Site (required)
   - POC (required)
@@ -33,7 +32,6 @@ data.
   - EPACode (optional)
 
 - Options
-
   - skinny format
   - delimited (note you will need to pass this onto the open command,
     ‘,’ by default)
@@ -60,7 +58,7 @@ from numpy import NaN
 df['obs'].loc[df.obs < 0] = NaN
 ```
 
-``````text
+```````text
     /anaconda3/lib/python3.6/site-packages/pandas/core/indexing.py:189: SettingWithCopyWarning:
     A value is trying to be set on a copy of a slice from a DataFrame
 ```
@@ -980,3 +978,4 @@ plt.ylabel('PM10')
 ```
 
 ![](improve_trends_kmeans_files/improve_trends_kmeans_27_1.png)
+```````

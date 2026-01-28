@@ -15,13 +15,13 @@ analysis.
 ## Gallery
 
 ![Time Series](https://raw.githubusercontent.com/noaa-oar-arl/MONET/master/sample_figures/pm2.5_timeseries.jpg)
-*Time Series*
+_Time Series_
 
 ![Time Series of RMSE](https://raw.githubusercontent.com/noaa-oar-arl/MONET/master/sample_figures/pm2.5_timeseries_rmse.jpg)
-*Time Series of RMSE*
+_Time Series of RMSE_
 
 ![Spatial Plots](https://raw.githubusercontent.com/noaa-oar-arl/MONET/master/sample_figures/ozone_spatial.jpg)
-*Spatial Plots*
+_Spatial Plots_
 
 ![Scatter Plots](https://raw.githubusercontent.com/noaa-oar-arl/MONET/master/sample_figures/no2_scatter.jpg)
 ![PDFS Plots](https://raw.githubusercontent.com/noaa-oar-arl/MONET/master/sample_figures/no2_pdf.jpg)

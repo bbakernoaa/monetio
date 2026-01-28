@@ -2,7 +2,7 @@
 UFS-AQM File Reader. Redirection to monetio.readers.ufs
 """
 
-from ..readers.ufs import (
+from ..readers.ufs import (  # noqa: F401
     UFSReader,
     add_lazy_nox,
     add_lazy_noy_a,

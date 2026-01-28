@@ -57,7 +57,8 @@ MONETIO v0.2.7 has been released. MONETIO provides a consistent interface for re
 
 ## Footnotes
 
-[^monetio-split]: The last commit of [MONET v2.1.5](https://github.com/noaa-oar-arl/monet/releases/tag/v2.1.5)
+[^monetio-split]:
+    The last commit of [MONET v2.1.5](https://github.com/noaa-oar-arl/monet/releases/tag/v2.1.5)
     merged [PR#77](https://github.com/noaa-oar-arl/monet/pull/77), which brought the branch testing the split MONET and MONETIO packages into the
     primary branch of the repository.
     The first official split GitHub releases with were [MONET v2.2.0](https://github.com/noaa-oar-arl/monet/releases/tag/v2.2.0)

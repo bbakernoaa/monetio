@@ -47,9 +47,7 @@ def retrieve_test_file():
             import subprocess
 
             try:
-                subprocess.run(
-                    ["wget", "-O", str(p), url], check=True, capture_output=True
-                )
+                subprocess.run(["wget", "-O", str(p), url], check=True, capture_output=True)
                 success = True
             except Exception as e:
                 pytest.skip(
@@ -65,9 +63,7 @@ def retrieve_test_file():
         with open(p, "rb") as f:
             sig = f.read(8)
         if sig != b"\x89HDF\r\n\x1a\n":
-            pytest.skip(
-                f"Downloaded file {fn} does not have a valid HDF5 signature; got: {sig}"
-            )
+            pytest.skip(f"Downloaded file {fn} does not have a valid HDF5 signature; got: {sig}")
 
         # Post-download: check file size and HDF5 signature
         min_size_mb = 10
@@ -78,9 +74,7 @@ def retrieve_test_file():
         with open(p, "rb") as f:
             sig = f.read(8)
         if sig != b"\x89HDF\r\n\x1a\n":
-            pytest.skip(
-                f"Downloaded file {fn} does not have a valid HDF5 signature; got: {sig}"
-            )
+            pytest.skip(f"Downloaded file {fn} does not have a valid HDF5 signature; got: {sig}")
 
     return p
 

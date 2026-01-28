@@ -1,7 +1,10 @@
 """FV3-CHEM Reader"""
 
-from numpy import sort
 from glob import glob
+
+import numpy as np
+import pandas as pd
+from numpy import sort
 from pandas import Timedelta, to_datetime
 
 from .base import GriddedReader, register_reader
@@ -39,9 +42,7 @@ class FV3ChemReader(GriddedReader):
         if not nemsio and not grib:
             # Fallback or error
             # Original code raises ValueError
-            raise ValueError(
-                "File format not recognized. Ensure nemsio or grib2/grb2 in filename."
-            )
+            raise ValueError("File format not recognized. Ensure nemsio or grib2/grb2 in filename.")
 
         # Prepare kwargs
         if "concat_dim" not in kwargs:
@@ -115,7 +116,7 @@ def _fix_time_nemsio(f, fname):
                     hour = int(hour_str)
                     tdelta = Timedelta(hour, unit="h")
                     tarray.append(pd.Timestamp(t) + tdelta)  # Assuming t is base time?
-                except:
+                except Exception:
                     tarray.append(t)
             time = to_datetime(tarray)
             f["time"] = time
@@ -129,7 +130,7 @@ def _fix_time_nemsio(f, fname):
             # f.time might be size > 1 if single file has multiple times?
             # Original: time = f.time.to_index() + tdelta
             f["time"] = f.time.to_index() + tdelta
-        except:
+        except Exception:
             pass
 
     return f
@@ -263,9 +264,9 @@ def _fix_grib2(f):
     # The original code did manual meshgrid logic.
     if f.latitude.ndim == 1 and f.longitude.ndim == 1:
         from numpy import meshgrid
+
         # Original logic implies lat/lon were 1D arrays of unique values?
         # "f['latitude'] = range(len(f.latitude))" -> this suggests original coords were 1D
-
         # NOTE: XarrayDriver typically gives what xarray gives.
         # If we want to replicate exactly:
         lat_vals = f.latitude.values

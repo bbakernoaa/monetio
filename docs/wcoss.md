@@ -1,7 +1,7 @@
 # Installing on WCOSS
 
 !!! note "Legacy System"
-    These instructions were written for the legacy WCOSS system (Dell phase 1/2). For the current WCOSS2 (Cactus/Dogwood) system, some paths and module names may have changed. Use `module spider` to find the correct Python/Intel modules.
+These instructions were written for the legacy WCOSS system (Dell phase 1/2). For the current WCOSS2 (Cactus/Dogwood) system, some paths and module names may have changed. Use `module spider` to find the correct Python/Intel modules.
 
 If you have access to the NOAA WCOSS machines you can create your own python environments very
 easily using intel-python:

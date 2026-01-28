@@ -1,6 +1,7 @@
 import os
+
 import numpy as np
-from pyproj import Proj, CRS
+from pyproj import CRS, Proj
 
 path = os.path.abspath(__file__)
 
@@ -82,9 +83,7 @@ def _get_sinu_grid_df():
 
     f = os.path.join(os.path.dirname(path), "data/sn_bound_10deg.txt")
     td = read_csv(f, skiprows=4, sep=r"\s+")
-    td = td.assign(
-        ihiv="h" + td.ih.astype(str).str.zfill(2) + "v" + td.iv.astype(str).str.zfill(2)
-    )
+    td = td.assign(ihiv="h" + td.ih.astype(str).str.zfill(2) + "v" + td.iv.astype(str).str.zfill(2))
     return td
 
 
@@ -99,9 +98,7 @@ def _sinu_grid_latlon_boundary(h, v):
 
 
 def _get_sinu_xy(lon, lat):
-    sinu = Proj(
-        "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m"
-    )
+    sinu = Proj("+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m")
     return sinu(lon, lat)
 
 

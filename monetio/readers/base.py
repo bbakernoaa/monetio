@@ -1,9 +1,10 @@
 import abc
-import xarray as xr
-import pandas as pd
-from typing import Union, List
+from typing import List, Union
 
-from .drivers import XarrayDriver, PandasDriver
+import pandas as pd
+import xarray as xr
+
+from .drivers import PandasDriver, XarrayDriver
 
 # 1. The Registry
 READER_REGISTRY = {}

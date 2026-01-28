@@ -1,8 +1,10 @@
 """TOLNet Reader"""
 
 import os
+
 import pandas as pd
 import xarray as xr
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -45,6 +47,7 @@ class TOLNet:
 
     def add_data(self, fname):
         from h5py import File
+
         # FileUtility logic for HDF5?
         # h5py can take a file-like object (bytes)
 
@@ -121,7 +124,7 @@ class TOLNet:
 
             dataset.coords["latitude"] = (("y", "x"), array(latitude).reshape(1, 1))
             dataset.coords["longitude"] = (("y", "x"), array(longitude).reshape(1, 1))
-        except:
+        except Exception:
             pass
 
         return dataset

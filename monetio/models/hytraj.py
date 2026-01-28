@@ -166,9 +166,7 @@ def get_startlocs(tdump):
     stlocs = pd.DataFrame(np.array(start_locs), columns=heads)
     cols = ["year", "month", "day", "hour"]
     # Joins cols into one column called time
-    stlocs["time"] = stlocs[cols].apply(
-        lambda row: " ".join(row.values.astype(str)), axis=1
-    )
+    stlocs["time"] = stlocs[cols].apply(lambda row: " ".join(row.values.astype(str)), axis=1)
     # Drops cols
     stlocs = stlocs.drop(cols, axis=1)
     # Reorders columns

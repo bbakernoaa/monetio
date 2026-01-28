@@ -2,10 +2,9 @@
 OpenAQ AWS Reader. Redirection to monetio.readers.openaq_aws
 """
 
-from ..readers.openaq_aws import (
+from ..readers.openaq_aws import (  # noqa: F401
     OpenAQAWSReader,
     _build_urls,
-    add_data,
     get_locations,
     get_paths,
     get_provider_countries,

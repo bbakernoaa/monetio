@@ -2,13 +2,15 @@
 
 import re
 import warnings
-import pandas as pd
-import numpy as np
-import requests
+from io import StringIO
+from typing import NamedTuple, Optional, Tuple, Union
+
 import dask
 import dask.dataframe as dd
-from io import StringIO
-from typing import NamedTuple, Optional, Union, Tuple
+import numpy as np
+import pandas as pd
+import requests
+
 from .base import PointReader, register_reader
 
 
@@ -88,16 +90,12 @@ def discover_files(location=None, *, n_threads=3, cache=True):
         cached = _FILES_L100_CACHE[location]
         if cached is not None:
             return cached
-        url_location = (
-            "South Pole, Antartica"
-            if location == "South Pole, Antarctica"
-            else location
-        )
+        url_location = "South Pole, Antartica" if location == "South Pole, Antarctica" else location
         url = f"{base}/{url_location}/100 Meter Average Files/".replace(" ", "%20")
         try:
             r = requests.get(url, timeout=TIMEOUT)
             r.raise_for_status()
-        except:
+        except Exception:
             return []
 
         data = []
@@ -113,9 +111,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
         return data
 
     with ThreadPool(processes=min(n_threads, len(locations))) as pool:
-        data = list(
-            itertools.chain.from_iterable(pool.imap_unordered(get_files, locations))
-        )
+        data = list(itertools.chain.from_iterable(pool.imap_unordered(get_files, locations)))
     df = pd.DataFrame(data, columns=["location", "time", "fn", "url"])
     if cache:
         for location in locations:
@@ -129,9 +125,7 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise"):
     dates = pd.DatetimeIndex(dates)
     dates_min, dates_max = dates.min(), dates.max()
     df_urls = discover_files(location=location)
-    urls = df_urls[df_urls["time"].between(dates_min, dates_max, inclusive="both")][
-        "url"
-    ].tolist()
+    urls = df_urls[df_urls["time"].between(dates_min, dates_max, inclusive="both")]["url"].tolist()
     if not urls:
         raise RuntimeError(f"No files found for dates {dates_min} to {dates_max}.")
 
@@ -275,9 +269,7 @@ def read_100m(fp_or_url):
         na_values=na_values,
     )
 
-    df["time"] = pd.Timestamp(
-        f"{meta['Launch Date']} {meta['Launch Time']}"
-    ).tz_localize(None)
+    df["time"] = pd.Timestamp(f"{meta['Launch Date']} {meta['Launch Time']}").tz_localize(None)
     df["latitude"] = float(meta["Latitude"])
     df["longitude"] = float(meta["Longitude"])
     df["station"] = meta["Station"]

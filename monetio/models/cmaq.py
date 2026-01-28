@@ -2,7 +2,7 @@
 CMAQ File Reader. Redirection to monetio.readers.cmaq
 """
 
-from ..readers.cmaq import CMAQReader
+from ..readers.cmaq import CMAQReader  # noqa: F401
 
 
 def open_dataset(fname, **kwargs):

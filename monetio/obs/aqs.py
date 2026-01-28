@@ -2,7 +2,7 @@
 AQS Reader Redirection
 """
 
-from ..readers.aqs import AQS, AQSReader
+from ..readers.aqs import AQS, AQSReader  # noqa: F401
 
 
 def add_data(

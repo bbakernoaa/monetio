@@ -1,9 +1,11 @@
 """NESDIS FRP Reader"""
 
 import os
-import xarray as xr
+
 import numpy as np
 import pandas as pd
+import xarray as xr
+
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 
@@ -14,11 +16,6 @@ class NESDISFRPReader(GriddedReader):
         """
         Reads NESDIS FRP data (Download + Binary Read).
         """
-        try:
-            from scipy.io import FortranFile
-        except ImportError:
-            raise ImportError("scipy is required to read NESDIS FRP files")
-
         current = os.getcwd()
         if not os.path.exists(datapath):
             os.makedirs(datapath)

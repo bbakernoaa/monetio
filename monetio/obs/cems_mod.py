@@ -323,9 +323,7 @@ class CEMS:
         """
         if "latitude" in list(self.df.columns.values):
             dftemp = self.df.copy()
-            pairs = zip(
-                dftemp["orispl_code"], zip(dftemp["latitude"], dftemp["longitude"])
-            )
+            pairs = zip(dftemp["orispl_code"], zip(dftemp["latitude"], dftemp["longitude"]))
             pairs = list(set(pairs))
             lhash = dict(pairs)  # key is facility id and value is name.
             if verbose:
@@ -380,9 +378,7 @@ class CEMS:
                 and ("rate" not in ccc.lower())
             ):
                 rcolumn = self.rename(ccc, "nox_lbs", rcolumn, verbose)
-            elif "co2" in ccc.lower() and (
-                "short" in ccc.lower() and "tons" in ccc.lower()
-            ):
+            elif "co2" in ccc.lower() and ("short" in ccc.lower() and "tons" in ccc.lower()):
                 rcolumn = self.rename(ccc, "co2_short_tons", rcolumn, verbose)
             elif "date" in ccc.lower():
                 rcolumn = self.rename(ccc, "date", rcolumn, verbose)

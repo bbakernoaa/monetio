@@ -1,9 +1,11 @@
 # API
 
 ```.. module:: monetio
+
 ```
 
 ```.. py:currentmodule:: None
+
 ```
 
 ```{contents}
@@ -30,12 +32,15 @@ See `observations:AERONET` for more information.
 ```
 
 ```.. autofunction:: monetio.aeronet.add_data
+
 ```
 
 ```.. autofunction:: monetio.aeronet.add_local
+
 ```
 
 ```.. autofunction:: monetio.aeronet.get_valid_sites
+
 ```
 
 #### AirNow
@@ -54,9 +59,11 @@ See `observations:AirNow` for more information.
 ### Profile observations
 
 ```.. automodule:: monetio.geoms
+
 ```
 
 ```.. py:currentmodule:: None
+
 ```
 
 ```.. autosummary::

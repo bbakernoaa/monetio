@@ -1,16 +1,15 @@
 """GOES Reader"""
 
 import pandas as pd
-import xarray as xr
 import s3fs
+import xarray as xr
+
 from .base import GriddedReader, register_reader
 
 
 @register_reader("goes")
 class GOESReader(GriddedReader):
-    def open_dataset(
-        self, date=None, filename=None, satellite="16", product=None, **kwargs
-    ):
+    def open_dataset(self, date=None, filename=None, satellite="16", product=None, **kwargs):
         """
         Reads GOES data (S3 or local).
         """
@@ -73,9 +72,7 @@ class GOES:
     def _get_closest_date(self, files=[]):
         if not files:
             return None
-        file_dates = [
-            pd.to_datetime(f.split("_")[-1][:-4], format="c%Y%j%H%M%S") for f in files
-        ]
+        file_dates = [pd.to_datetime(f.split("_")[-1][:-4], format="c%Y%j%H%M%S") for f in files]
         date = pd.Timestamp(self.date)
         nearest_date = min(file_dates, key=lambda x: abs(x - date))
         nearest_date_str = nearest_date.strftime("c%Y%j%H%M%S")
@@ -133,9 +130,7 @@ class GOES:
         ds.attrs["projection"] = crs.to_wkt()
         proj = Proj(crs)
         satellite_height = ds.goes_imager_projection.perspective_point_height
-        xx, yy = meshgrid(
-            ds.x.values * satellite_height, ds.y.values * satellite_height
-        )
+        xx, yy = meshgrid(ds.x.values * satellite_height, ds.y.values * satellite_height)
         lon, lat = proj(xx, yy, inverse=True)
         ds["latitude"] = (("y", "x"), lat)
         ds["longitude"] = (("y", "x"), lon)
