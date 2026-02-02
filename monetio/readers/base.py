@@ -76,16 +76,23 @@ class PointReader(BaseReader):
         self.driver = PandasDriver()
 
     def open_dataset(
-        self, files: Union[str, List[str]], read_method="read_csv", as_xarray=False, **kwargs
+        self,
+        files: Union[str, List[str]],
+        read_method="read_csv",
+        as_xarray=False,
+        lazy=False,
+        **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset]:
         """
         Uses PandasDriver to open files.
         Readers can override this to add pre/post processing.
         """
-        df = self.driver.open(files, read_method=read_method, **kwargs)
-        df = self.harmonize(df)
-        if as_xarray:
-            return self.to_xarray(df)
+        df = self.driver.open(files, read_method=read_method, lazy=lazy, **kwargs)
+
+        if not lazy:
+            df = self.harmonize(df)
+            if as_xarray:
+                return self.to_xarray(df)
         return df
 
     def harmonize(self, df: pd.DataFrame) -> pd.DataFrame:

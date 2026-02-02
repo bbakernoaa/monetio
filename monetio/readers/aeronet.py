@@ -36,6 +36,7 @@ class AERONETReader(PointReader):
         verbose=10,
         files=None,
         as_xarray=False,
+        lazy=False,
         **kwargs,
     ):
         """
@@ -114,6 +115,10 @@ class AERONETReader(PointReader):
                     )
                     for t1, t2 in zip(time_bounds[:-1], time_bounds[1:])
                 ]
+
+                if lazy:
+                    return dd.from_delayed(tasks)
+
                 dfs = dask.compute(*tasks, scheduler="processes", num_workers=n_procs)
                 df = pd.concat(dfs, ignore_index=True).drop_duplicates()
                 if freq is not None:

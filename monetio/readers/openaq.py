@@ -12,12 +12,15 @@ from .base import PointReader, register_reader
 
 @register_reader("openaq")
 class OpenAQReader(PointReader):
-    def open_dataset(self, dates, n_procs=1, wide_fmt=True, as_xarray=False, **kwargs):
+    def open_dataset(self, dates, n_procs=1, wide_fmt=True, as_xarray=False, lazy=False, **kwargs):
         """
         Reads OpenAQ data from S3.
         """
         a = OPENAQ()
-        df = a.add_data(dates, num_workers=n_procs, wide_fmt=wide_fmt)
+        df = a.add_data(dates, num_workers=n_procs, wide_fmt=wide_fmt, lazy=lazy)
+
+        if lazy:
+            return df
 
         df = self.harmonize(df)
         if as_xarray:
@@ -271,7 +274,7 @@ class OPENAQ:
             urls.extend(f"s3://{f}" for f in files)
         return urls
 
-    def add_data(self, dates, *, num_workers=1, wide_fmt=True):
+    def add_data(self, dates, *, num_workers=1, wide_fmt=True, lazy=False):
         import hashlib
 
         dates = pd.to_datetime(dates)
@@ -285,6 +288,10 @@ class OPENAQ:
             return pd.DataFrame()
 
         df_lazy = dd.from_delayed(dfs)
+
+        if lazy:
+            return df_lazy
+
         df = df_lazy.compute(num_workers=num_workers)
 
         df = df.loc[(df.time >= dates.min()) & (df.time <= dates.max())]

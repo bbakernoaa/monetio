@@ -156,6 +156,7 @@ def load(source: str, files=None, **kwargs):
     # Instantiate the reader class and open data
     reader_cls = READER_REGISTRY[source]
     reader = reader_cls()
+
     return reader.open_dataset(files=files, **kwargs)
 
 

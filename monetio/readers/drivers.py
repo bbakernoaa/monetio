@@ -153,8 +153,12 @@ class PandasDriver:
     """
 
     def open(
-        self, files: Union[str, List[str]], read_method: str = "read_csv", **kwargs
-    ) -> pd.DataFrame:
+        self,
+        files: Union[str, List[str]],
+        read_method: str = "read_csv",
+        lazy: bool = False,
+        **kwargs,
+    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         file_list = FileUtility.expand_paths(files)
 
         # Get the actual pandas function
@@ -162,8 +166,23 @@ class PandasDriver:
             raise ValueError(f"Pandas method '{read_method}' not found.")
         reader_func = getattr(pd, read_method)
 
-        data_frames = []
+        if lazy:
+            import dask
+            import dask.dataframe as dd
 
+            delayed_dfs = []
+            for f in file_list:
+                if f.startswith("s3://"):
+                    if "storage_options" not in kwargs:
+                        kwargs["storage_options"] = {"anon": True}
+                delayed_dfs.append(dask.delayed(reader_func)(f, **kwargs))
+
+            if not delayed_dfs:
+                return dd.from_pandas(pd.DataFrame(), npartitions=1)
+
+            return dd.from_delayed(delayed_dfs)
+
+        data_frames = []
         # Reuse our filesystem logic
         try:
             for f in file_list:

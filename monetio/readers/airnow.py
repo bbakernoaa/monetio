@@ -28,6 +28,7 @@ class AirNowReader(PointReader):
         daily=False,
         bad_utcoffset="drop",
         as_xarray=False,
+        lazy=False,
         **kwargs,
     ):
         """
@@ -60,8 +61,12 @@ class AirNowReader(PointReader):
             return read_airnow_csv(fn, daily=daily, storage_options=storage_options)
 
         dfs = [dask.delayed(_read_helper)(f) for f in files]
-        dff = dd.from_delayed(dfs)
-        df = dff.compute(num_workers=n_procs).reset_index()
+        df_lazy = dd.from_delayed(dfs)
+
+        if lazy:
+            return df_lazy
+
+        df = df_lazy.compute(num_workers=n_procs).reset_index()
 
         if daily:
             df["time"] = pd.to_datetime(df.date, format=r"%m/%d/%y", exact=True)
