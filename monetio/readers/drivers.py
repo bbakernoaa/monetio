@@ -4,6 +4,11 @@ import fsspec
 import pandas as pd
 import xarray as xr
 
+try:
+    import dask.dataframe as dd
+except ImportError:
+    dd = None
+
 
 class FileUtility:
     """

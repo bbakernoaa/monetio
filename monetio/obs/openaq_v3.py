@@ -447,7 +447,7 @@ def _to_wide_fmt(df):
         if not unique.all():
             site_col_non_unique = site_col[~unique]
             warnings.warn(
-                f"non-unique {col!r} among site IDs:\n{site_col_non_unique}" "\nUsing first."
+                f"non-unique {col!r} among site IDs:\n{site_col_non_unique}\nUsing first."
             )
             df = df.drop(columns=[col]).merge(
                 site_col.str.get(0),

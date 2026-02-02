@@ -56,9 +56,9 @@ def test_open_mfdataset(tmp_path, monkeypatch):
     ds = open_mfdataset(dates, product=product, data_var=data_var, download=False, verify=False)
     assert set(ds.dims) == {"time", "lat", "lon"}
     assert ds["dust_aod_mean"].chunks is None, "not Dask-backed"
-    assert (
-        ~ds.time.to_series().duplicated(keep=False)
-    ).sum() == 8, "all overlap except first and last day"
+    assert (~ds.time.to_series().duplicated(keep=False)).sum() == 8, (
+        "all overlap except first and last day"
+    )
 
     monkeypatch.chdir(tmp_path)
     ds_dl = open_mfdataset(dates, product=product, data_var=data_var, download=True, verify=False)

@@ -112,7 +112,7 @@ def __getDummyDateList():
     D = []
     for y in range(2001, 2010):
         for d in range(1, 365, 1):
-            D.append("A%04d%03d" % (y, d))
+            D.append(f"A{y:04d}{d:03d}")
 
     return D
 
@@ -288,9 +288,9 @@ def modisClient(
 
         requestStart = dateList[i]
 
-        j = min(chunkSize, dateList.__len__() - i)
+        j = min(chunkSize, len(dateList) - i)
 
-        __debugPrint("i=%d, j=%d, dateList__len__()=%d" % (i, j, dateList.__len__()))
+        __debugPrint(f"i={i}, j={j}, dateList__len__()={len(dateList)}")
         while mkIntDate(dateList[i + j - 1]) > endDate:
             j = j - 1
 

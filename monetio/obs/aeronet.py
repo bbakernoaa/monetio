@@ -318,8 +318,7 @@ class AERONET:
         ed = d2.strftime(r"%d")
         eh = d2.strftime(r"%H")
         dates_ = (
-            f"year={sy}&month={sm}&day={sd}&hour={sh}"
-            f"&year2={ey}&month2={em}&day2={ed}&hour2={eh}"
+            f"year={sy}&month={sm}&day={sd}&hour={sh}&year2={ey}&month2={em}&day2={ed}&hour2={eh}"
         )
 
         assert self.prod is not None, "required parameter"

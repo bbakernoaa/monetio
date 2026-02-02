@@ -2,20 +2,18 @@
 HYSPLIT Reader. Redirection to monetio.readers.hysplit
 """
 
-from ..readers.hysplit import (  # noqa: F401
+from ..readers.hysplit import (  # noqa: F401  # noqa: F401
     HYSPLITReader,
     add_species,
     check_drange,
     check_grid_continuity,
-)
-from ..readers.hysplit import combine_dataset as combine_dataset_reader  # noqa: F401
-from ..readers.hysplit import (  # noqa: F401
     fix_grid_continuity,
     get_latlongrid,
     getlatlon,
     open_dataset_hysplit,
     reset_latlon_coords,
 )
+from ..readers.hysplit import combine_dataset as combine_dataset_reader  # noqa: F401
 
 
 def open_dataset(fname, **kwargs):

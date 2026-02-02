@@ -1,12 +1,14 @@
-[tool.flake8]
-max-line-length = 100
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
 ignore = [
-    "E203",  # whitespace before ':' - doesn't work well with black
     "E402",  # module level import not at top of file
-    "E501",  # line too long - let black worry about that
-    "W503",  # line break before binary operator
-    "E226",  # missing whitespace around arithmetic operator
+    "E501",  # line too long
+    "E722",  # do not use bare 'except'
 ]
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -52,8 +54,7 @@ dev = [
     "pytest-print",
     "pytest-xdist",
     "filelock",
-    "black",
-    "isort",
+    "ruff",
     "mkdocs-material",
     "mkdocstrings[python]",
     "mkdocs-jupyter",
@@ -84,14 +85,6 @@ test = [
 packages = ["monetio", "monetio.models", "monetio.obs", "monetio.profile", "monetio.sat"]
 package-data = {"monetio" = ["data/*.csv", "data/*.tsv", "data/*.txt", "data/*.png"]}
 
-
-[tool.black]
-line-length = 100
-
-[tool.isort]
-known_first_party = "monetio"
-profile = "black"
-line_length = 100
 
 [tool.pytest.ini_options]
 filterwarnings = [

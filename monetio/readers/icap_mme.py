@@ -140,7 +140,6 @@ def open_mfdataset_icap(
     verbose=True,
     **kwargs,
 ):
-
     if product.upper() not in valid_filetypes:
         raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
 

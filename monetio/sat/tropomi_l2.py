@@ -415,9 +415,9 @@ def apply_quality_flag(variable, netcdf_tropomi):
         DataArray with applied quality flag
     """
     assert "quality_flag" in variable.attrs, f"quality_flag not in {variable.name}"
-    assert ("qa_thresh_min" in variable.attrs) or (
-        "qa_thresh_max" in variable.attrs
-    ), f"Neither qa_thresh_min nor qa_thresh_max in {variable.name}"
+    assert ("qa_thresh_min" in variable.attrs) or ("qa_thresh_max" in variable.attrs), (
+        f"Neither qa_thresh_min nor qa_thresh_max in {variable.name}"
+    )
     qa = _add_variable(variable.attrs["quality_flag"], netcdf_tropomi)
     if "qa_thresh_min" in variable.attrs:
         variable = variable.where(qa >= variable.attrs["qa_thresh_min"])

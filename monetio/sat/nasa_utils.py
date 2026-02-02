@@ -74,7 +74,7 @@ def get_filenames_http(archive_url, ext):
     r = requests.get(archive_url)
     soup = BeautifulSoup(r.content, "html.parser")
     links = soup.findAll("a")
-    return [archive_url + link["href"] for link in links if link["href"].endswith("%s" % ext)]
+    return [archive_url + link["href"] for link in links if link["href"].endswith(ext)]
 
 
 def get_available_satellites(archive_url="https://e4ftl01.cr.usgs.gov"):
