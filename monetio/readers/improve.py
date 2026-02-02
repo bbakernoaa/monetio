@@ -10,7 +10,7 @@ from .drivers import FileUtility
 
 @register_reader("improve")
 class IMPROVEReader(PointReader):
-    def open_dataset(self, files, add_meta=False, delimiter="\t", **kwargs):
+    def open_dataset(self, files, add_meta=False, delimiter="\t", as_xarray=False, **kwargs):
         """
         Reads IMPROVE data files.
         """
@@ -23,8 +23,15 @@ class IMPROVEReader(PointReader):
             dfs.append(df)
 
         if not dfs:
-            return pd.DataFrame()
-        return pd.concat(dfs)
+            df = pd.DataFrame()
+        else:
+            df = pd.concat(dfs)
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

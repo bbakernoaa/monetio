@@ -27,10 +27,11 @@ class AirNowReader(PointReader):
         n_procs=1,
         daily=False,
         bad_utcoffset="drop",
+        as_xarray=False,
         **kwargs,
     ):
         """
-        Retrieve and load AirNow data as a DataFrame.
+        Retrieve and load AirNow data as a DataFrame or xarray Dataset.
         """
 
         if files is None and dates is not None:
@@ -110,7 +111,11 @@ class AirNowReader(PointReader):
                 .reset_index(drop=True)
             )
 
-        return self.harmonize(df)
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

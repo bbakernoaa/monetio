@@ -26,6 +26,7 @@ class ISHReader(PointReader):
         request_retries=4,
         verbose=False,
         source="ncdc",
+        as_xarray=False,
         **kwargs,
     ):
         """
@@ -34,7 +35,7 @@ class ISHReader(PointReader):
         source: "ncdc" (default) or "aws".
         """
         ish = ISH()
-        return ish.add_data(
+        df = ish.add_data(
             dates,
             box=box,
             country=country,
@@ -49,6 +50,12 @@ class ISHReader(PointReader):
             verbose=verbose,
             source=source,
         )
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

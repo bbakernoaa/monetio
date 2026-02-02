@@ -12,12 +12,18 @@ from .base import PointReader, register_reader
 
 @register_reader("openaq")
 class OpenAQReader(PointReader):
-    def open_dataset(self, dates, n_procs=1, wide_fmt=True, **kwargs):
+    def open_dataset(self, dates, n_procs=1, wide_fmt=True, as_xarray=False, **kwargs):
         """
         Reads OpenAQ data from S3.
         """
         a = OPENAQ()
-        return a.add_data(dates, num_workers=n_procs, wide_fmt=wide_fmt)
+        df = a.add_data(dates, num_workers=n_procs, wide_fmt=wide_fmt)
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

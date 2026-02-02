@@ -8,12 +8,18 @@ from .base import PointReader, register_reader
 
 @register_reader("nadp")
 class NADPReader(PointReader):
-    def open_dataset(self, dates, network="NTN", siteid=None, weekly=True, **kwargs):
+    def open_dataset(self, dates, network="NTN", siteid=None, weekly=True, as_xarray=False, **kwargs):
         """
         Reads NADP data.
         """
         n = NADP()
-        return n.add_data(dates, network=network, siteid=siteid, weekly=weekly)
+        df = n.add_data(dates, network=network, siteid=siteid, weekly=weekly)
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

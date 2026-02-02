@@ -22,13 +22,14 @@ class ISHLiteReader(PointReader):
         window="h",
         n_procs=1,
         verbose=False,
+        as_xarray=False,
         **kwargs,
     ):
         """
         Reads ISH Lite data.
         """
         ish = ISH()
-        return ish.add_data(
+        df = ish.add_data(
             dates,
             box=box,
             country=country,
@@ -39,6 +40,12 @@ class ISHLiteReader(PointReader):
             n_procs=n_procs,
             verbose=verbose,
         )
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

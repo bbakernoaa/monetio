@@ -24,6 +24,7 @@ class AQSReader(PointReader):
         wide_fmt=True,
         n_procs=1,
         meta=False,
+        as_xarray=False,
         **kwargs,
     ):
         """
@@ -42,9 +43,13 @@ class AQSReader(PointReader):
         )
 
         if wide_fmt:
-            return long_to_wide(df)
-        else:
-            return df
+            df = long_to_wide(df)
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

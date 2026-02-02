@@ -10,7 +10,7 @@ from .drivers import FileUtility
 
 @register_reader("pams")
 class PAMSReader(PointReader):
-    def open_dataset(self, files, **kwargs):
+    def open_dataset(self, files, as_xarray=False, **kwargs):
         """
         Reads PAMS JSON files.
         """
@@ -22,8 +22,15 @@ class PAMSReader(PointReader):
             dfs.append(df)
 
         if not dfs:
-            return pd.DataFrame()
-        return pd.concat(dfs)
+            df = pd.DataFrame()
+        else:
+            df = pd.concat(dfs)
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

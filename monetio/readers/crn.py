@@ -19,19 +19,26 @@ class CRNReader(PointReader):
         sub_hourly=False,
         download=False,
         latlonbox=None,
+        as_xarray=False,
         **kwargs,
     ):
         """
         Reads CRN data.
         """
         c = CRN()
-        return c.add_data(
+        df = c.add_data(
             dates,
             daily=daily,
             sub_hourly=sub_hourly,
             download=download,
             latlonbox=latlonbox,
         )
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

@@ -35,6 +35,7 @@ class AERONETReader(PointReader):
         n_procs=1,
         verbose=10,
         files=None,
+        as_xarray=False,
         **kwargs,
     ):
         """
@@ -74,8 +75,9 @@ class AERONETReader(PointReader):
                 dfs.append(a.df)
 
             if not dfs:
-                return pd.DataFrame()
-            return pd.concat(dfs)
+                df = pd.DataFrame()
+            else:
+                df = pd.concat(dfs)
 
         else:
             a = AERONET()
@@ -117,9 +119,15 @@ class AERONETReader(PointReader):
                 if freq is not None:
                     df.index = df.time
                     df = df.groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
-                return df.reset_index(drop=True)
+                df = df.reset_index(drop=True)
             else:
-                return a.add_data(dates=dates, freq=freq, **kwargs_inner)
+                df = a.add_data(dates=dates, freq=freq, **kwargs_inner)
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------
