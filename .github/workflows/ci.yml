@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [stable, develop]
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
   schedule:
@@ -20,7 +20,7 @@ env:
 
 jobs:
   test:
-    name: Test (Py ${{ matrix.python-version }} on ${{ matrix.os }})
+    name: "Test (Py ${{ matrix.python-version }} on ${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -28,56 +28,33 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
 
-    # This default shell configuration is critical for Windows compatibility
-    # with micromamba. It ensures Git Bash is used and the env is activated.
-    defaults:
-      run:
-        shell: bash -l {0}
-
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Python (micromamba)
-        uses: mamba-org/setup-micromamba@v2
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          environment-file: environment-dev.yml
-          environment-name: monetio-dev
-          cache-environment: true
-          # Explicitly initialize bash to support Windows Git Bash activation
-          init-shell: bash
-          create-args: >-
-            python=${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Test with pytest
-        run: pytest -n auto --dist loadgroup -v -ra -W "ignore:Downloading test file:UserWarning::"
+        run: uv run --extra test pytest -n auto --dist loadgroup -v -ra -W "ignore:Downloading test file:UserWarning::"
 
       - name: Test with pytspack installed
         run: |
-          pip install "git+https://github.com/noaa-oar-arl/pytspack.git"
-          pytest -k with_pytspack -n auto -v -ra -W "ignore:API key length is 0:UserWarning::"
+          uv pip install "git+https://github.com/noaa-oar-arl/pytspack.git"
+          uv run --extra test pytest -k with_pytspack -n auto -v -ra -W "ignore:API key length is 0:UserWarning::"
 
   docs:
     name: Check docs build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -l {0}
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Python (micromamba)
-        uses: mamba-org/setup-micromamba@v2
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          environment-file: environment-dev.yml
-          environment-name: monetio-dev
-          cache-environment: true
-          create-args: >-
-            python=3.12
-
-      - name: Install docs dependencies
-        run: |
-          pip install .[docs]
+          python-version: "3.12"
 
       - name: mkdocs build
-        run: python -m mkdocs build
+        run: uv run --extra docs mkdocs build
