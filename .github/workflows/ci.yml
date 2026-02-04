@@ -41,16 +41,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
 
-      - name: Install dependencies
-        run: uv pip install --system -e ".[test]"
-
       - name: Test with pytest
-        run: pytest -n auto --dist loadgroup -v -ra -W "ignore:Downloading test file:UserWarning::"
+        run: uv run --extra test pytest -n auto --dist loadgroup -v -ra -W "ignore:Downloading test file:UserWarning::"
 
       - name: Test with pytspack installed
         run: |
-          uv pip install --system "git+https://github.com/noaa-oar-arl/pytspack.git"
-          pytest -k with_pytspack -n auto -v -ra -W "ignore:API key length is 0:UserWarning::"
+          uv run --extra test --with "git+https://github.com/noaa-oar-arl/pytspack.git" pytest -k with_pytspack -n auto -v -ra -W "ignore:API key length is 0:UserWarning::"
 
   docs:
     name: Check docs build
@@ -68,9 +64,5 @@ jobs:
           python-version: 3.12
           enable-cache: true
 
-      - name: Install docs dependencies
-        run: |
-          uv pip install --system -e ".[docs]"
-
       - name: mkdocs build
-        run: python -m mkdocs build
+        run: uv run --extra docs mkdocs build
