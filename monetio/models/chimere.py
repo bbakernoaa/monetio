@@ -22,7 +22,7 @@ def open_mfdataset(files, var_list=None, surf_only=False, **kwargs):
 
     datasets = []
     for file in files:
-        datasets.append(xr.open_dataset(file))
+        datasets.append(xr.open_dataset(file, engine="h5netcdf"))
 
     # get the data_vars wanted
     if var_list is None:

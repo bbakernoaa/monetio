@@ -1,6 +1,9 @@
 import numpy as np
 import pytest
 
+# Skip this module if pyhdf is not installed or broken (e.g. on Windows CI)
+pytest.importorskip("pyhdf")
+
 import monetio.sat.hdfio as hdfio
 
 filename = "test.hdf"

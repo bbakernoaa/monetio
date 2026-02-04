@@ -15,10 +15,10 @@ from datetime import datetime
 from glob import glob
 from pathlib import Path
 
+import h5netcdf
 import numpy as np
 import xarray as xr
 from cftime import num2date
-from netCDF4 import Dataset
 
 
 def _open_one_dataset(fname, variable_dict):
@@ -37,31 +37,52 @@ def _open_one_dataset(fname, variable_dict):
 
     ds = xr.Dataset()
 
-    dso = Dataset(fname, "r")
+    dso = h5netcdf.File(fname, "r")
 
-    lon_var = dso.groups["PRODUCT"]["longitude"]
-    lat_var = dso.groups["PRODUCT"]["latitude"]
+    lon_var = dso["PRODUCT/longitude"]
+    lat_var = dso["PRODUCT/latitude"]
 
-    ref_time_var = dso.groups["PRODUCT"]["time"]
-    ref_time_val = np.datetime64(num2date(ref_time_var[:].item(), ref_time_var.units))
-    dtime_var = dso.groups["PRODUCT"]["delta_time"]
+    ref_time_var = dso["PRODUCT/time"]
+    ref_time_val = np.datetime64(num2date(ref_time_var[:].item(), ref_time_var.attrs["units"]))
+    dtime_var = dso["PRODUCT/delta_time"]
     dtime = xr.DataArray(dtime_var[:].squeeze(), dims=("y",)).astype("timedelta64[ms]")
 
     ds["lon"] = (
         ("y", "x"),
         lon_var[:].squeeze(),
-        {"long_name": lon_var.long_name, "units": lon_var.units},
+        dict(lon_var.attrs),
     )
     ds["lat"] = (
         ("y", "x"),
         lat_var[:].squeeze(),
-        {"long_name": lat_var.long_name, "units": lat_var.units},
+        dict(lat_var.attrs),
     )
     ds["time"] = ((), ref_time_val, {"long_name": "reference time"})
     ds["scan_time"] = ds["time"] + dtime
     ds["scan_time"].attrs.update({"long_name": "scan time"})
     ds = ds.set_coords(["lon", "lat", "time", "scan_time"])
     ds.attrs["reference_time_string"] = ref_time_val.astype(datetime).strftime(r"%Y-%m-%d")
+
+    def _get_var(group_path, var_name):
+        # Try direct access first using full path
+        full_path = f"{group_path}/{var_name}".strip("/")
+        if full_path in dso:
+            return dso[full_path]
+
+        # Fallback to recursive search
+        def search(g):
+            if var_name in g.variables:
+                return g[var_name]
+            for sg_name in g.groups:
+                res = search(g.groups[sg_name])
+                if res is not None:
+                    return res
+            return None
+
+        res = search(dso)
+        if res is not None:
+            return res
+        raise KeyError(f"Variable {var_name} not found in {fname}")
 
     def get_extra(varname_, *, dct_=None, default_group="PRODUCT"):
         """Get non-varname variables."""
@@ -70,7 +91,7 @@ def _open_one_dataset(fname, variable_dict):
         group_name = dct_.get("group", default_group)
         if isinstance(group_name, list):
             group_name = group_name[0]
-        return _get_values(dso[group_name][varname_], dct_)
+        return _get_values(_get_var(group_name, varname_), dct_)
 
     for varname, dct in variable_dict.items():
         print(f"- {varname}")
@@ -111,7 +132,7 @@ def _open_one_dataset(fname, variable_dict):
 
         elif varname in {"latitude_bounds", "longitude_bounds"}:
             group_name = dct.get("group", "PRODUCT/SUPPORT_DATA/GEOLOCATIONS")
-            values = _get_values(dso[group_name][varname], dct)
+            values = _get_values(_get_var(group_name, varname), dct)
             assert values.shape[-1] == 4
             for i in range(4):
                 ds[f"{varname}_{i}"] = (
@@ -122,7 +143,7 @@ def _open_one_dataset(fname, variable_dict):
 
         else:
             group_name = dct.get("group", "PRODUCT")
-            var = dso[group_name][varname]
+            var = _get_var(group_name, varname)
             values = _get_values(var, dct)
 
             if values.ndim == 2:
@@ -135,7 +156,7 @@ def _open_one_dataset(fname, variable_dict):
             ds[varname] = (
                 dims,
                 values,
-                {"long_name": var.long_name, "units": var.units},
+                dict(var.attrs),
             )
 
             if "quality_flag_min" in dct:
@@ -149,10 +170,27 @@ def _open_one_dataset(fname, variable_dict):
 
 
 def _get_values(var, dct):
-    """Take netCDF4 Variable, squeeze, tweak values based on user-provided attribute dict,
+    """Take Variable, squeeze, tweak values based on user-provided attribute dict,
     and return NumPy array."""
 
     values = var[:].squeeze()
+
+    # manual masking
+    fill_value = var.attrs.get("_FillValue")
+    if fill_value is None:
+        fill_value = var.attrs.get("missing_value")
+    if fill_value is not None:
+        values = np.ma.masked_values(values, fill_value, rtol=1e-5, copy=False)
+
+    # fallback for very large values (typical of unmasked NetCDF)
+    if np.issubdtype(values.dtype, np.floating):
+        values = np.ma.masked_greater(values, 1e36, copy=False)
+
+    # manual scaling
+    scale = var.attrs.get("scale_factor", 1.0)
+    offset = var.attrs.get("add_offset", 0.0)
+    if scale != 1.0 or offset != 0.0:
+        values = values * scale + offset
 
     if np.ma.is_masked(values):
         logging.info(f"{var.name} already masked")

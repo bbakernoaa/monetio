@@ -52,6 +52,8 @@ def open_mfdataset(
     # open the dataset using xarray
     try:
         if netcdf:
+            if "engine" not in kwargs:
+                kwargs["engine"] = "h5netcdf"
             dset_load = xr.open_mfdataset(fname, combine="nested", concat_dim="time", **kwargs)
         else:
             raise ValueError

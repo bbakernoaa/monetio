@@ -3,7 +3,7 @@
 import glob
 import warnings
 
-import netCDF4 as nc4
+import h5netcdf
 import numpy as np
 import xarray as xr
 
@@ -25,11 +25,11 @@ def _open_one_dataset(fname, variable_dict):
     print(f"reading {fname}")
 
     ds = xr.Dataset()
-    dso = nc4.Dataset(fname, "r")
-    ds.attrs = dso.__dict__
+    dso = h5netcdf.File(fname, "r")
+    ds.attrs = dict(dso.attrs)
     time = open_var_no_format("time", dso)  # base unit in seconds since...
     dtime = open_var_no_format("delta_time", dso)  # in ms
-    time_cast = xr.DataArray(data=time[:], dims=time.dimensions, attrs=time.__dict__)
+    time_cast = xr.DataArray(data=time[:], dims=time.dimensions, attrs=dict(time.attrs))
     ds["time"] = xr.conventions.decode_cf_variable("time", time_cast.variable)
     lon = open_var_no_format("longitude", dso)
     lat = open_var_no_format("latitude", dso)
@@ -125,9 +125,9 @@ def _add_time_granule(time, dtime):
 
     Parameters
     ----------
-    time : nc4.Variable
+    time : Variable
         reference time in seconds since reference
-    dtime : nc4.variable
+    dtime : variable
         Dataset with original data
 
     Returns
@@ -137,10 +137,10 @@ def _add_time_granule(time, dtime):
     """
     _time_granule = time[:] + dtime[:] * MILISECONDS_TO_SECONDS
     if len(_time_granule.shape) == 2:
-        time_granule = xr.DataArray(data=_time_granule, dims=("time", "y"), attrs=time.__dict__)
+        time_granule = xr.DataArray(data=_time_granule, dims=("time", "y"), attrs=dict(time.attrs))
     elif len(_time_granule.shape) == 3:
         time_granule = xr.DataArray(
-            data=_time_granule, dims=("time", "y", "x"), attrs=time.__dict__
+            data=_time_granule, dims=("time", "y", "x"), attrs=dict(time.attrs)
         )
     else:
         raise ValueError("Could not assign the time of each granule. Check data dimensions.")
@@ -149,22 +149,20 @@ def _add_time_granule(time, dtime):
     return time_granule
 
 
-def _walktree_search(variable, netcdf_dataset, path=""):
+def _walktree_search(variable, netcdf_dataset):
     """Recursive search for each variable
 
     Parameters
     ----------
     variable : str
         Variable name
-    netcdf_dataset : nc4.Dataset
-        netCDF4 dataset with data to search
-    path : str, optional
-        Path within the netCDF4 dataset, by default ""
+    netcdf_dataset : h5netcdf.File or h5netcdf.Group
+        Dataset or group with data to search
 
     Returns
     -------
-    str
-        str path that was searched for.
+    h5netcdf.Variable
+        The variable object that was searched for.
 
     Raises
     ------
@@ -172,11 +170,11 @@ def _walktree_search(variable, netcdf_dataset, path=""):
         If variable is not found
     """
     if variable in netcdf_dataset.variables:
-        return f"{path}/{variable}"
+        return netcdf_dataset.variables[variable]
     groups = netcdf_dataset.groups
     for group in groups:
         try:
-            return _walktree_search(variable, netcdf_dataset[group], f"{path}/{group}")
+            return _walktree_search(variable, netcdf_dataset.groups[group])
         except ValueError:
             continue
     raise ValueError(f"{variable} not found in {netcdf_dataset}")
@@ -189,8 +187,8 @@ def _add_variable(variable, netcdf_dataset):
     ----------
     variable : str
         Variable name
-    netcdf_dataset : nc4.Dataset
-        nc4.Dataset with data to search
+    netcdf_dataset : h5netcdf.File
+        Dataset with data to search
 
     Returns
     -------
@@ -203,11 +201,30 @@ def _add_variable(variable, netcdf_dataset):
     _dimensions = list(var.dimensions)
     dimensions = [_replacements[x] if x in _replacements else x for x in _dimensions]
     dtype = var[:].dtype
+
+    values = var[:]
+    # manual masking
+    fill_value = var.attrs.get("_FillValue")
+    if fill_value is None:
+        fill_value = var.attrs.get("missing_value")
+    if fill_value is not None:
+        values = np.ma.masked_values(values, fill_value, rtol=1e-5, copy=False)
+
+    # fallback for very large values (typical of unmasked NetCDF)
+    if np.issubdtype(values.dtype, np.floating):
+        values = np.ma.masked_greater(values, 1e36, copy=False)
+
+    # manual scaling
+    scale = var.attrs.get("scale_factor", 1.0)
+    offset = var.attrs.get("add_offset", 0.0)
+    if scale != 1.0 or offset != 0.0:
+        values = values * scale + offset
+
     if np.issubdtype(dtype, np.integer):
-        var_values = var[:].filled(np.iinfo(dtype).min)
-        da = xr.DataArray(data=var_values, dims=dimensions, attrs=var.__dict__).astype(dtype)
+        var_values = values.filled(np.iinfo(dtype).min)
+        da = xr.DataArray(data=var_values, dims=dimensions, attrs=dict(var.attrs)).astype(dtype)
     else:
-        da = xr.DataArray(data=var[:], dims=dimensions, attrs=var.__dict__).astype(dtype)
+        da = xr.DataArray(data=values, dims=dimensions, attrs=dict(var.attrs)).astype(dtype)
     return da
 
 
@@ -218,14 +235,14 @@ def open_var_no_format(variable, netcdf_dataset):
     ----------
     variable : str
         Variable name
-    netcdf_dataset : nc4.Dataset
-        nc4.Dataset with data to search
+    netcdf_dataset : h5netcdf.File
+        Dataset with data to search
 
     Returns
     -------
-    xr.DataArray
-        DataArray with the variable that was searched for"""
-    return netcdf_dataset[_walktree_search(variable, netcdf_dataset)]
+    h5netcdf.Variable
+        The variable that was searched for"""
+    return _walktree_search(variable, netcdf_dataset)
 
 
 def _calc_pressure_levels(netcdf_tropomi, product="check"):
@@ -233,7 +250,7 @@ def _calc_pressure_levels(netcdf_tropomi, product="check"):
 
     Parameters
     ----------
-    netcdf_tropomi : nc4.Dataset
+    netcdf_tropomi : h5netcdf.File
         Dataset from TROPOMI files
     product : str  ("no2" "hcho")
         str indicating which product it is. If 'check', all are tried
@@ -244,7 +261,7 @@ def _calc_pressure_levels(netcdf_tropomi, product="check"):
         Two DataArrays containing the midlevel pressure and the
         pressure at the layer interface respectively.
     """
-    if ("id" in netcdf_tropomi.ncattrs()) and ("_CO_" in netcdf_tropomi.id):
+    if ("id" in netcdf_tropomi.attrs) and ("_CO_" in netcdf_tropomi.attrs["id"]):
         pressure_level_bottom = _add_variable("pressure_levels", netcdf_tropomi)
         return _calc_pressure_tropomi_co(pressure_level_bottom)
     tm5_constant_a = _add_variable("tm5_constant_a", netcdf_tropomi)
@@ -382,8 +399,8 @@ def _calc_tm5_tropopause_pressure(processed_data, netcdf_tropomi):
     processsed_data : xr.Dataset
         Dataset containing processed data. It has to include
         'pres_pa_mid' as a variable
-    netcdf_tropomi : nc4.Dataset
-        Dataset containing the netCDF4 tropomi file
+    netcdf_tropomi : h5netcdf.File
+        Dataset from TROPOMI file
 
     Returns
     -------
@@ -406,8 +423,8 @@ def apply_quality_flag(variable, netcdf_tropomi):
     ----------
     variable : str
         Variable containing the attribute qa_thersh_min.
-    netcdf_tropomi : nc4.Dataset
-        Dataset containing the netCDF4 tropomi file
+    netcdf_tropomi : h5netcdf.File
+        Dataset from TROPOMI file
 
     Returns
     -------

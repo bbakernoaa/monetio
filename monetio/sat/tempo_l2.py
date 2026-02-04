@@ -12,10 +12,10 @@ import warnings
 from glob import glob
 from pathlib import Path
 
+import h5netcdf
 import numpy as np
 import xarray as xr
 from cftime import num2pydate
-from netCDF4 import Dataset
 
 
 def _open_one_dataset(fname, variable_dict):
@@ -24,7 +24,7 @@ def _open_one_dataset(fname, variable_dict):
     Parameters
     ----------
     fname : str
-        Local path to netCDF4 (HDF5) file.
+        Local path to (HDF5) file.
     variable_dict : dict
 
     Returns
@@ -35,32 +35,32 @@ def _open_one_dataset(fname, variable_dict):
 
     ds = xr.Dataset()
 
-    dso = Dataset(fname, "r")
-    lon_var = dso.groups["geolocation"]["longitude"]
-    lat_var = dso.groups["geolocation"]["latitude"]
-    time_var = dso.groups["geolocation"]["time"]
-    time_units = time_var.units
+    dso = h5netcdf.File(fname, "r")
+    lon_var = dso["geolocation/longitude"]
+    lat_var = dso["geolocation/latitude"]
+    time_var = dso["geolocation/time"]
+    time_units = time_var.attrs["units"]
 
     ds["lon"] = (
         ("x", "y"),
         lon_var[:].squeeze(),
-        {"long_name": lon_var.long_name, "units": lon_var.units},
+        dict(lon_var.attrs),
     )
     ds["lat"] = (
         ("x", "y"),
         lat_var[:].squeeze(),
-        {"long_name": lat_var.long_name, "units": lat_var.units},
+        dict(lat_var.attrs),
     )
     ds["time"] = (
         ("time",),
         num2pydate(time_var[:].squeeze(), time_units),
-        {"long_name": time_var.long_name},
+        dict(time_var.attrs),
     )
     ds = ds.set_coords(["time", "lon", "lat"])
 
-    ds.attrs["reference_time_string"] = dso.time_coverage_start
-    ds.attrs["granule_number"] = dso.granule_num
-    ds.attrs["scan_num"] = dso.scan_num
+    ds.attrs["reference_time_string"] = dso.attrs["time_coverage_start"]
+    ds.attrs["granule_number"] = dso.attrs["granule_num"]
+    ds.attrs["scan_num"] = dso.attrs["scan_num"]
 
     if ("pressure" in variable_dict) and "surface_pressure" not in variable_dict:
         warnings.warn(
@@ -78,7 +78,7 @@ def _open_one_dataset(fname, variable_dict):
             "vertical_column",
             "vertical_column_uncertainty",
         ]:
-            values_var = dso.groups["product"][varname]
+            values_var = dso[f"product/{varname}"]
         elif varname in [
             "latitude_bounds",
             "longitude_bounds",
@@ -88,7 +88,7 @@ def _open_one_dataset(fname, variable_dict):
             "viewing_azimuth_angle",
             "relative_azimuth_angle",
         ]:
-            values_var = dso.groups["geolocation"][varname]
+            values_var = dso[f"geolocation/{varname}"]
         elif varname in [
             "vertical_column_total",
             "vertical_column_total_uncertainty",
@@ -113,10 +113,27 @@ def _open_one_dataset(fname, variable_dict):
             "amf_stratosphere",
             "background_correction",
         ]:
-            values_var = dso.groups["support_data"][varname]
+            values_var = dso[f"support_data/{varname}"]
         elif varname in ["fit_rms_residual", "fit_convergence_flag"]:
-            values_var = dso.groups["qa_statistics"][varname]
+            values_var = dso[f"qa_statistics/{varname}"]
         values = values_var[:].squeeze()
+
+        # manual masking
+        fill_value = values_var.attrs.get("_FillValue")
+        if fill_value is None:
+            fill_value = values_var.attrs.get("missing_value")
+        if fill_value is not None:
+            values = np.ma.masked_values(values, fill_value, rtol=1e-5, copy=False)
+
+        # fallback for very large values
+        if np.issubdtype(values.dtype, np.floating):
+            values = np.ma.masked_greater(values, 1e36, copy=False)
+
+        # manual scaling
+        scale = values_var.attrs.get("scale_factor", 1.0)
+        offset = values_var.attrs.get("add_offset", 0.0)
+        if scale != 1.0 or offset != 0.0:
+            values = values * scale + offset
 
         if "scale" in variable_dict[varname]:
             values[:] = variable_dict[varname]["scale"] * values[:]
@@ -129,12 +146,13 @@ def _open_one_dataset(fname, variable_dict):
             maximum = variable_dict[varname]["maximum"]
             values = np.ma.masked_greater(values, maximum, copy=False)
 
+        attrs = dict(values_var.attrs)
         if "corner" in values_var.dimensions:
-            ds[varname] = (("x", "y", "corner"), values, values_var.__dict__)
+            ds[varname] = (("x", "y", "corner"), values, attrs)
         elif "swt_level" in values_var.dimensions:
-            ds[varname] = (("x", "y", "swt_level"), values, values_var.__dict__)
+            ds[varname] = (("x", "y", "swt_level"), values, attrs)
         else:
-            ds[varname] = (("x", "y"), values, values_var.__dict__)
+            ds[varname] = (("x", "y"), values, attrs)
 
         if "quality_flag_max" in variable_dict[varname]:
             ds.attrs["quality_flag"] = varname

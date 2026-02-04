@@ -17,6 +17,10 @@ TEST_FP_PANDORA_NO2_TOTCOL = (
 )
 
 
+@pytest.mark.skipif(
+    pytest.importorskip("pyhdf", reason="pyhdf not installed or broken") is None,
+    reason="pyhdf not installed or broken",
+)
 def test_open():
     ds = geoms.open_dataset(TEST_FP)
     assert "o3_mixing_ratio_volume_derived" in ds.variables
@@ -24,6 +28,10 @@ def test_open():
     assert ds.sizes == {"time": 28, "altitude": 496}
 
 
+@pytest.mark.skipif(
+    pytest.importorskip("pyhdf", reason="pyhdf not installed or broken") is None,
+    reason="pyhdf not installed or broken",
+)
 def test_open_no_rename_vars():
     ds = geoms.open_dataset(TEST_FP, rename_all=False)
     assert "O3.MIXING.RATIO.VOLUME_DERIVED" in ds.variables
@@ -31,6 +39,10 @@ def test_open_no_rename_vars():
     assert ds.sizes == {"time": 28, "altitude": 496}
 
 
+@pytest.mark.skipif(
+    pytest.importorskip("pyhdf", reason="pyhdf not installed or broken") is None,
+    reason="pyhdf not installed or broken",
+)
 def test_open_no_squeeze():
     ds = geoms.open_dataset(TEST_FP, squeeze=False)
     assert ds.sizes == {
@@ -55,9 +67,13 @@ def test_mjd2k():
     assert geoms._dti_from_mjd2000(da) == dti
 
 
+@pytest.mark.skipif(
+    pytest.importorskip("pyhdf", reason="pyhdf not installed or broken") is None,
+    reason="pyhdf not installed or broken",
+)
 def test_cmp_h4tonccf():
     ds = geoms.open_dataset(TEST_FP, rename_all=False)
-    ds_h4tonccf = xr.open_dataset(TEST_FP_H4TONCCF)
+    ds_h4tonccf = xr.open_dataset(TEST_FP_H4TONCCF, engine="h5netcdf")
     # Note: h4tonccf_nc4 replaces all `.` in var names to `_`
     assert sorted(ds.sizes.values()) == sorted(ds_h4tonccf.squeeze().sizes.values())
 
