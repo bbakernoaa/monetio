@@ -13,10 +13,13 @@ jobs:
     if: github.repository == 'noaa-oar-arl/monetio'
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.9"
+          enable-cache: true
       - uses: pre-commit/action@v3.0.1
+        env:
+          PRE_COMMIT_USE_UV: 1
 
   cff:
     name: Validate CITATION.cff

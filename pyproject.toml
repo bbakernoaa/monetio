@@ -30,6 +30,7 @@ urls = {"Homepage" = "https://github.com/noaa-oar-arl/monetio"}
 dependencies = [
     "dask",
     "netCDF4",
+    "numpy",
     "pandas",
     "s3fs",
     "scipy",
