@@ -1,5 +1,8 @@
-import numpy as np
 import pytest
+
+pytest.importorskip("pyhdf.SD")
+
+import numpy as np
 
 import monetio.sat.hdfio as hdfio
 
@@ -82,5 +85,5 @@ def pyhdf_missing(monkeypatch):
 
 
 def test_pyhdf_missing_error(pyhdf_missing):
-    with pytest.raises(RuntimeError, match="importing required module 'pyhdf.SD'"):
+    with pytest.raises(ImportError, match="importing required module 'pyhdf.SD'"):
         import monetio.sat.hdfio  # noqa: F401

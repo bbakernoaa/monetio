@@ -52,10 +52,18 @@ def open_mfdataset(
     # open the dataset using xarray
     try:
         if netcdf:
-            dset_load = xr.open_mfdataset(fname, combine="nested", concat_dim="time", **kwargs)
+            # Try h5netcdf engine first if not specified in kwargs
+            xr_kwargs = {"combine": "nested", "concat_dim": "time", **kwargs}
+            if "engine" not in xr_kwargs:
+                try:
+                    dset_load = xr.open_mfdataset(fname, engine="h5netcdf", **xr_kwargs)
+                except Exception:
+                    dset_load = xr.open_mfdataset(fname, **xr_kwargs)
+            else:
+                dset_load = xr.open_mfdataset(fname, **xr_kwargs)
         else:
             raise ValueError
-    except ValueError:
+    except (ValueError, OSError):
         print(
             """File format not recognized. Note that files should be in netcdf
                 format. Do not mix and match file types."""

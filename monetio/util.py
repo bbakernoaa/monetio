@@ -376,7 +376,7 @@ def _import_required(mod_name: str):
     try:
         return import_module(mod_name)
     except ImportError as e:
-        raise RuntimeError(
+        raise ImportError(
             f"importing required module '{mod_name}' failed. {_install_message(mod_name)}"
         ) from e
 

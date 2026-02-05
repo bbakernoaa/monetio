@@ -35,32 +35,44 @@ def _open_one_dataset(fname, variable_dict):
 
     ds = xr.Dataset()
 
-    dso = Dataset(fname, "r")
-    lon_var = dso.groups["geolocation"]["longitude"]
-    lat_var = dso.groups["geolocation"]["latitude"]
-    time_var = dso.groups["geolocation"]["time"]
-    time_units = time_var.units
+    # Cache for opened groups
+    _groups = {}
+
+    def get_group(group_name):
+        if group_name not in _groups:
+            _groups[group_name] = xr.open_dataset(
+                fname, group=group_name, engine="h5netcdf", decode_times=False
+            )
+        return _groups[group_name]
+
+    ds_geo = get_group("geolocation")
+    lon_var = ds_geo["longitude"]
+    lat_var = ds_geo["latitude"]
+    time_var = ds_geo["time"]
+    time_units = time_var.attrs.get("units", "")
 
     ds["lon"] = (
         ("x", "y"),
-        lon_var[:].squeeze(),
-        {"long_name": lon_var.long_name, "units": lon_var.units},
+        lon_var.values.squeeze(),
+        {"long_name": lon_var.attrs.get("long_name"), "units": lon_var.attrs.get("units")},
     )
     ds["lat"] = (
         ("x", "y"),
-        lat_var[:].squeeze(),
-        {"long_name": lat_var.long_name, "units": lat_var.units},
+        lat_var.values.squeeze(),
+        {"long_name": lat_var.attrs.get("long_name"), "units": lat_var.attrs.get("units")},
     )
     ds["time"] = (
         ("time",),
-        num2pydate(time_var[:].squeeze(), time_units),
-        {"long_name": time_var.long_name},
+        num2pydate(time_var.values.squeeze(), time_units),
+        {"long_name": time_var.attrs.get("long_name")},
     )
     ds = ds.set_coords(["time", "lon", "lat"])
 
-    ds.attrs["reference_time_string"] = dso.time_coverage_start
-    ds.attrs["granule_number"] = dso.granule_num
-    ds.attrs["scan_num"] = dso.scan_num
+    # Root attributes
+    with xr.open_dataset(fname, engine="h5netcdf") as ds_root:
+        ds.attrs["reference_time_string"] = ds_root.attrs.get("time_coverage_start")
+        ds.attrs["granule_number"] = ds_root.attrs.get("granule_num")
+        ds.attrs["scan_num"] = ds_root.attrs.get("scan_num")
 
     if ("pressure" in variable_dict) and "surface_pressure" not in variable_dict:
         warnings.warn(
@@ -78,7 +90,7 @@ def _open_one_dataset(fname, variable_dict):
             "vertical_column",
             "vertical_column_uncertainty",
         ]:
-            values_var = dso.groups["product"][varname]
+            group_name = "product"
         elif varname in [
             "latitude_bounds",
             "longitude_bounds",
@@ -88,7 +100,7 @@ def _open_one_dataset(fname, variable_dict):
             "viewing_azimuth_angle",
             "relative_azimuth_angle",
         ]:
-            values_var = dso.groups["geolocation"][varname]
+            group_name = "geolocation"
         elif varname in [
             "vertical_column_total",
             "vertical_column_total_uncertainty",
@@ -113,10 +125,18 @@ def _open_one_dataset(fname, variable_dict):
             "amf_stratosphere",
             "background_correction",
         ]:
-            values_var = dso.groups["support_data"][varname]
+            group_name = "support_data"
         elif varname in ["fit_rms_residual", "fit_convergence_flag"]:
-            values_var = dso.groups["qa_statistics"][varname]
-        values = values_var[:].squeeze()
+            group_name = "qa_statistics"
+
+        values_var = get_group(group_name)[varname]
+        values = values_var.values.copy()
+        if not np.ma.is_masked(values):
+            if "_FillValue" in values_var.attrs:
+                values = np.ma.masked_equal(values, values_var.attrs["_FillValue"])
+            elif "missing_value" in values_var.attrs:
+                values = np.ma.masked_equal(values, values_var.attrs["missing_value"])
+        values = values.squeeze()
 
         if "scale" in variable_dict[varname]:
             values[:] = variable_dict[varname]["scale"] * values[:]
@@ -129,18 +149,19 @@ def _open_one_dataset(fname, variable_dict):
             maximum = variable_dict[varname]["maximum"]
             values = np.ma.masked_greater(values, maximum, copy=False)
 
-        if "corner" in values_var.dimensions:
-            ds[varname] = (("x", "y", "corner"), values, values_var.__dict__)
-        elif "swt_level" in values_var.dimensions:
-            ds[varname] = (("x", "y", "swt_level"), values, values_var.__dict__)
+        if "corner" in values_var.dims:
+            ds[varname] = (("x", "y", "corner"), values, values_var.attrs)
+        elif "swt_level" in values_var.dims:
+            ds[varname] = (("x", "y", "swt_level"), values, values_var.attrs)
         else:
-            ds[varname] = (("x", "y"), values, values_var.__dict__)
+            ds[varname] = (("x", "y"), values, values_var.attrs)
 
         if "quality_flag_max" in variable_dict[varname]:
             ds.attrs["quality_flag"] = varname
             ds.attrs["quality_thresh_max"] = variable_dict[varname]["quality_flag_max"]
 
-    dso.close()
+    for g in _groups.values():
+        g.close()
 
     if "surface_pressure" in variable_dict:
         if ds["surface_pressure"].attrs["units"] == "hPa":

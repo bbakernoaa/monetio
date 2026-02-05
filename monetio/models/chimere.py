@@ -22,7 +22,13 @@ def open_mfdataset(files, var_list=None, surf_only=False, **kwargs):
 
     datasets = []
     for file in files:
-        datasets.append(xr.open_dataset(file))
+        if "engine" not in kwargs:
+            try:
+                datasets.append(xr.open_dataset(file, engine="h5netcdf", **kwargs))
+            except Exception:
+                datasets.append(xr.open_dataset(file, **kwargs))
+        else:
+            datasets.append(xr.open_dataset(file, **kwargs))
 
     # get the data_vars wanted
     if var_list is None:

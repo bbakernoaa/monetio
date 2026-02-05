@@ -37,25 +37,39 @@ def _open_one_dataset(fname, variable_dict):
 
     ds = xr.Dataset()
 
-    dso = Dataset(fname, "r")
+    # Cache for opened groups
+    _groups = {}
 
-    lon_var = dso.groups["PRODUCT"]["longitude"]
-    lat_var = dso.groups["PRODUCT"]["latitude"]
+    def get_group(group_name):
+        if group_name not in _groups:
+            # We use engine="h5netcdf" as it is generally more robust for TROPOMI files
+            # and supports the group flag. We use decode_times=False to maintain
+            # consistency with existing manual decoding logic.
+            _groups[group_name] = xr.open_dataset(
+                fname, group=group_name, engine="h5netcdf", decode_times=False
+            )
+        return _groups[group_name]
 
-    ref_time_var = dso.groups["PRODUCT"]["time"]
-    ref_time_val = np.datetime64(num2date(ref_time_var[:].item(), ref_time_var.units))
-    dtime_var = dso.groups["PRODUCT"]["delta_time"]
-    dtime = xr.DataArray(dtime_var[:].squeeze(), dims=("y",)).astype("timedelta64[ms]")
+    ds_product = get_group("PRODUCT")
+    lon_var = ds_product["longitude"]
+    lat_var = ds_product["latitude"]
+
+    ref_time_var = ds_product["time"]
+    ref_time_val = np.datetime64(
+        num2date(ref_time_var.values.item(), ref_time_var.attrs.get("units", ""))
+    )
+    dtime_var = ds_product["delta_time"]
+    dtime = xr.DataArray(dtime_var.values.squeeze(), dims=("y",)).astype("timedelta64[ms]")
 
     ds["lon"] = (
         ("y", "x"),
-        lon_var[:].squeeze(),
-        {"long_name": lon_var.long_name, "units": lon_var.units},
+        lon_var.values.squeeze(),
+        {"long_name": lon_var.attrs.get("long_name"), "units": lon_var.attrs.get("units")},
     )
     ds["lat"] = (
         ("y", "x"),
-        lat_var[:].squeeze(),
-        {"long_name": lat_var.long_name, "units": lat_var.units},
+        lat_var.values.squeeze(),
+        {"long_name": lat_var.attrs.get("long_name"), "units": lat_var.attrs.get("units")},
     )
     ds["time"] = ((), ref_time_val, {"long_name": "reference time"})
     ds["scan_time"] = ds["time"] + dtime
@@ -70,7 +84,7 @@ def _open_one_dataset(fname, variable_dict):
         group_name = dct_.get("group", default_group)
         if isinstance(group_name, list):
             group_name = group_name[0]
-        return _get_values(dso[group_name][varname_], dct_)
+        return _get_values(get_group(group_name)[varname_], dct_)
 
     for varname, dct in variable_dict.items():
         print(f"- {varname}")
@@ -111,7 +125,7 @@ def _open_one_dataset(fname, variable_dict):
 
         elif varname in {"latitude_bounds", "longitude_bounds"}:
             group_name = dct.get("group", "PRODUCT/SUPPORT_DATA/GEOLOCATIONS")
-            values = _get_values(dso[group_name][varname], dct)
+            values = _get_values(get_group(group_name)[varname], dct)
             assert values.shape[-1] == 4
             for i in range(4):
                 ds[f"{varname}_{i}"] = (
@@ -122,7 +136,7 @@ def _open_one_dataset(fname, variable_dict):
 
         else:
             group_name = dct.get("group", "PRODUCT")
-            var = dso[group_name][varname]
+            var = get_group(group_name)[varname]
             values = _get_values(var, dct)
 
             if values.ndim == 2:
@@ -135,7 +149,7 @@ def _open_one_dataset(fname, variable_dict):
             ds[varname] = (
                 dims,
                 values,
-                {"long_name": var.long_name, "units": var.units},
+                {"long_name": var.attrs.get("long_name"), "units": var.attrs.get("units")},
             )
 
             if "quality_flag_min" in dct:
@@ -143,16 +157,23 @@ def _open_one_dataset(fname, variable_dict):
                 ds.attrs["quality_thresh_min"] = dct["quality_flag_min"]
                 ds.attrs["var_applied"] = dct.get("var_applied", [])
 
-    dso.close()
+    for g in _groups.values():
+        g.close()
 
     return ds
 
 
 def _get_values(var, dct):
-    """Take netCDF4 Variable, squeeze, tweak values based on user-provided attribute dict,
+    """Take xarray DataArray, squeeze, tweak values based on user-provided attribute dict,
     and return NumPy array."""
 
-    values = var[:].squeeze()
+    values = var.values.copy()
+    if not np.ma.is_masked(values):
+        if "_FillValue" in var.attrs:
+            values = np.ma.masked_equal(values, var.attrs["_FillValue"])
+        elif "missing_value" in var.attrs:
+            values = np.ma.masked_equal(values, var.attrs["missing_value"])
+    values = values.squeeze()
 
     if np.ma.is_masked(values):
         logging.info(f"{var.name} already masked")

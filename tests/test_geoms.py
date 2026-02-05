@@ -18,6 +18,7 @@ TEST_FP_PANDORA_NO2_TOTCOL = (
 
 
 def test_open():
+    pytest.importorskip("pyhdf.SD")
     ds = geoms.open_dataset(TEST_FP)
     assert "o3_mixing_ratio_volume_derived" in ds.variables
     assert tuple(ds["o3_mixing_ratio_volume_derived"].dims) == ("time", "altitude")
@@ -25,6 +26,7 @@ def test_open():
 
 
 def test_open_no_rename_vars():
+    pytest.importorskip("pyhdf.SD")
     ds = geoms.open_dataset(TEST_FP, rename_all=False)
     assert "O3.MIXING.RATIO.VOLUME_DERIVED" in ds.variables
     assert tuple(ds["O3.MIXING.RATIO.VOLUME_DERIVED"].dims) == ("time", "altitude")
@@ -32,6 +34,7 @@ def test_open_no_rename_vars():
 
 
 def test_open_no_squeeze():
+    pytest.importorskip("pyhdf.SD")
     ds = geoms.open_dataset(TEST_FP, squeeze=False)
     assert ds.sizes == {
         "latitude": 1,
@@ -56,8 +59,12 @@ def test_mjd2k():
 
 
 def test_cmp_h4tonccf():
+    pytest.importorskip("pyhdf.SD")
     ds = geoms.open_dataset(TEST_FP, rename_all=False)
-    ds_h4tonccf = xr.open_dataset(TEST_FP_H4TONCCF)
+    try:
+        ds_h4tonccf = xr.open_dataset(TEST_FP_H4TONCCF, engine="h5netcdf")
+    except Exception:
+        ds_h4tonccf = xr.open_dataset(TEST_FP_H4TONCCF)
     # Note: h4tonccf_nc4 replaces all `.` in var names to `_`
     assert sorted(ds.sizes.values()) == sorted(ds_h4tonccf.squeeze().sizes.values())
 
