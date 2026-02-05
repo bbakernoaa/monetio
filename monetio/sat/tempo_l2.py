@@ -16,10 +16,16 @@ import numpy as np
 import xarray as xr
 from cftime import num2pydate
 
+import platform
+
+import netCDF4
+
 try:
-    from h5netcdf.legacyapi import Dataset
+    import h5netcdf.legacyapi as h5nc
 except ImportError:
-    from netCDF4 import Dataset
+    h5nc = None
+
+from ..util import get_nc_attrs, get_nc_values
 
 
 def _open_one_dataset(fname, variable_dict):
@@ -39,32 +45,45 @@ def _open_one_dataset(fname, variable_dict):
 
     ds = xr.Dataset()
 
-    dso = Dataset(fname, "r")
+    # Prefer netCDF4 on Windows, try both on other platforms
+    dso = None
+    if platform.system() == "Windows":
+        dso = netCDF4.Dataset(fname, "r")
+    else:
+        try:
+            dso = netCDF4.Dataset(fname, "r")
+        except Exception:
+            if h5nc is not None:
+                dso = h5nc.Dataset(fname, "r")
+            else:
+                raise
+
     lon_var = dso.groups["geolocation"]["longitude"]
     lat_var = dso.groups["geolocation"]["latitude"]
     time_var = dso.groups["geolocation"]["time"]
-    time_units = time_var.units
+    time_units = get_nc_attrs(time_var).get("units", "")
 
     ds["lon"] = (
         ("x", "y"),
-        lon_var[:].squeeze(),
-        {"long_name": lon_var.long_name, "units": lon_var.units},
+        get_nc_values(lon_var),
+        get_nc_attrs(lon_var),
     )
     ds["lat"] = (
         ("x", "y"),
-        lat_var[:].squeeze(),
-        {"long_name": lat_var.long_name, "units": lat_var.units},
+        get_nc_values(lat_var),
+        get_nc_attrs(lat_var),
     )
     ds["time"] = (
         ("time",),
-        num2pydate(time_var[:].squeeze(), time_units),
-        {"long_name": time_var.long_name},
+        num2pydate(get_nc_values(time_var), time_units),
+        get_nc_attrs(time_var),
     )
     ds = ds.set_coords(["time", "lon", "lat"])
 
-    ds.attrs["reference_time_string"] = dso.time_coverage_start
-    ds.attrs["granule_number"] = dso.granule_num
-    ds.attrs["scan_num"] = dso.scan_num
+    dso_attrs = get_nc_attrs(dso)
+    ds.attrs["reference_time_string"] = dso_attrs.get("time_coverage_start", "")
+    ds.attrs["granule_number"] = dso_attrs.get("granule_num", "")
+    ds.attrs["scan_num"] = dso_attrs.get("scan_num", "")
 
     if ("pressure" in variable_dict) and "surface_pressure" not in variable_dict:
         warnings.warn(
@@ -120,7 +139,8 @@ def _open_one_dataset(fname, variable_dict):
             values_var = dso.groups["support_data"][varname]
         elif varname in ["fit_rms_residual", "fit_convergence_flag"]:
             values_var = dso.groups["qa_statistics"][varname]
-        values = values_var[:].squeeze()
+        values = get_nc_values(values_var)
+        attrs = get_nc_attrs(values_var)
 
         if "scale" in variable_dict[varname]:
             values[:] = variable_dict[varname]["scale"] * values[:]
@@ -134,11 +154,11 @@ def _open_one_dataset(fname, variable_dict):
             values = np.ma.masked_greater(values, maximum, copy=False)
 
         if "corner" in values_var.dimensions:
-            ds[varname] = (("x", "y", "corner"), values, values_var.__dict__)
+            ds[varname] = (("x", "y", "corner"), values, attrs)
         elif "swt_level" in values_var.dimensions:
-            ds[varname] = (("x", "y", "swt_level"), values, values_var.__dict__)
+            ds[varname] = (("x", "y", "swt_level"), values, attrs)
         else:
-            ds[varname] = (("x", "y"), values, values_var.__dict__)
+            ds[varname] = (("x", "y"), values, attrs)
 
         if "quality_flag_max" in variable_dict[varname]:
             ds.attrs["quality_flag"] = varname

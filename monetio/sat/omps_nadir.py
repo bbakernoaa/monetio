@@ -65,21 +65,36 @@ def extract_OMPS_nm_opendap(fname):
     import numpy as np
     import xarray as xr
 
-    try:
-        from h5netcdf.legacyapi import Dataset
-    except ImportError:
-        from netCDF4 import Dataset
+    import platform
 
-    with Dataset(fname, "r") as f:
-        time = f["GeolocationData_Time"][:]
-        to3 = f["ScienceData_ColumnAmountO3"][:]
-        lat = f["GeolocationData_Latitude"][:]
-        lon = f["GeolocationData_Longitude"][:]
-        aprior = f["AncillaryData_APrioriLayerO3"][:]
-        plevs = f["DimPressureLevel"][:]
-        layere = f["ScienceData_LayerEfficiency"][:]
-        flags = f["ScienceData_QualityFlags"][:]
-        cloud_fraction = f["ScienceData_RadiativeCloudFraction"][:]
+    import netCDF4
+
+    try:
+        import h5netcdf.legacyapi as h5nc
+    except ImportError:
+        h5nc = None
+
+    from ..util import get_nc_values
+
+    # Prefer netCDF4 on Windows, try both on other platforms
+    dso_class = netCDF4.Dataset
+    if platform.system() != "Windows":
+        try:
+            netCDF4.Dataset(fname, "r").close()
+        except Exception:
+            if h5nc is not None:
+                dso_class = h5nc.Dataset
+
+    with dso_class(fname, "r") as f:
+        time = get_nc_values(f["GeolocationData_Time"])
+        to3 = get_nc_values(f["ScienceData_ColumnAmountO3"])
+        lat = get_nc_values(f["GeolocationData_Latitude"])
+        lon = get_nc_values(f["GeolocationData_Longitude"])
+        aprior = get_nc_values(f["AncillaryData_APrioriLayerO3"])
+        plevs = get_nc_values(f["DimPressureLevel"])
+        layere = get_nc_values(f["ScienceData_LayerEfficiency"])
+        flags = get_nc_values(f["ScienceData_QualityFlags"])
+        cloud_fraction = get_nc_values(f["ScienceData_RadiativeCloudFraction"])
 
     # Apply Quality Control filters and convert time to usable version
     to3[((to3 < 50.0) | (to3 > 700.0))] = np.nan

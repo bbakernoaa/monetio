@@ -381,6 +381,39 @@ def _import_required(mod_name: str):
         ) from e
 
 
+def get_nc_attrs(nc_obj):
+    """Safe retrieval of attributes from both netCDF4 and h5netcdf."""
+    if hasattr(nc_obj, "ncattrs"):
+        return {a: nc_obj.getncattr(a) for a in nc_obj.ncattrs()}
+    elif hasattr(nc_obj, "attrs"):
+        return dict(nc_obj.attrs)
+    return getattr(nc_obj, "__dict__", {})
+
+
+def get_nc_values(nc_var):
+    """Safe retrieval of masked and scaled values from both netCDF4 and h5netcdf."""
+    import numpy as np
+
+    values = nc_var[:].squeeze()
+    if not isinstance(values, np.ma.MaskedArray):
+        # Handle manual masking/scaling for h5netcdf
+        attrs = get_nc_attrs(nc_var)
+        fill_value = attrs.get("_FillValue", attrs.get("missing_value"))
+        if fill_value is not None:
+            # Handle possible array-like fill_value
+            if hasattr(fill_value, "__iter__") and not isinstance(fill_value, (str, bytes)):
+                fill_value = fill_value[0]
+            values = np.ma.masked_equal(values, fill_value)
+
+        scale_factor = attrs.get("scale_factor")
+        add_offset = attrs.get("add_offset")
+        if scale_factor is not None or add_offset is not None:
+            sf = float(scale_factor) if scale_factor is not None else 1.0
+            ao = float(add_offset) if add_offset is not None else 0.0
+            values = values * sf + ao
+    return values
+
+
 def _try_merge_exact(left, right, *, right_name=None):
     """For two ``xr.Dataset``s, try ``left.merge(right, compat="equals", join="exact")``.
     If it fails, print informative debugging messages and re-raise.
