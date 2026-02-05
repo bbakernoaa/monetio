@@ -621,7 +621,11 @@ def _choose_xarray_engine_and_keywords(fname):
         check_extension = fname
 
     if check_extension.split(".")[-1] in netcdf_file_extensions:
-        keywords = {"paths": fname, "engine": "netcdf4"}
+        try:
+            xr.open_dataset(check_extension, engine="h5netcdf").close()
+            keywords = {"paths": fname, "engine": "h5netcdf"}
+        except Exception:
+            keywords = {"paths": fname, "engine": "netcdf4"}
     else:
         keywords = {
             "paths": fname,

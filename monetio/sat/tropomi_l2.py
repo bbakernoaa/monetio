@@ -3,7 +3,10 @@
 import glob
 import warnings
 
-import netCDF4 as nc4
+try:
+    import h5netcdf.legacyapi as nc4
+except ImportError:
+    import netCDF4 as nc4
 import numpy as np
 import xarray as xr
 

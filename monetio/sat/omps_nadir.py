@@ -64,7 +64,11 @@ def extract_OMPS_nm_opendap(fname):
 
     import numpy as np
     import xarray as xr
-    from netCDF4 import Dataset
+
+    try:
+        from h5netcdf.legacyapi import Dataset
+    except ImportError:
+        from netCDF4 import Dataset
 
     with Dataset(fname, "r") as f:
         time = f["GeolocationData_Time"][:]

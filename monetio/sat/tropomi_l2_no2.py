@@ -18,7 +18,11 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 from cftime import num2date
-from netCDF4 import Dataset
+
+try:
+    from h5netcdf.legacyapi import Dataset
+except ImportError:
+    from netCDF4 import Dataset
 
 
 def _open_one_dataset(fname, variable_dict):

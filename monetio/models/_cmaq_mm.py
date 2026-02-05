@@ -69,14 +69,20 @@ def open_mfdataset(
         dset_list = []
         for file_n in fname:
             # open the dataset using xarray
-            dset = xr.open_mfdataset(file_n, **kwargs)
+            try:
+                dset = xr.open_mfdataset(file_n, engine="h5netcdf", **kwargs)
+            except Exception:
+                dset = xr.open_mfdataset(file_n, **kwargs)
             # get the times
             dset = _get_times(dset, drop_duplicates=drop_duplicates)
             dset_list.append(dset)
         dset = xr.concat(dset_list, "time")
     else:
         # open the dataset using xarray
-        dset = xr.open_mfdataset(fname, **kwargs)
+        try:
+            dset = xr.open_mfdataset(fname, engine="h5netcdf", **kwargs)
+        except Exception:
+            dset = xr.open_mfdataset(fname, **kwargs)
         # get the times
         dset = _get_times(dset, drop_duplicates=drop_duplicates)
 
@@ -125,7 +131,10 @@ def open_mfdataset(
     dset = dset.drop(labels="TFLAG")
 
     if fname_vert is not None:
-        dset_vert = xr.open_mfdataset(fname_vert, **kwargs)
+        try:
+            dset_vert = xr.open_mfdataset(fname_vert, engine="h5netcdf", **kwargs)
+        except Exception:
+            dset_vert = xr.open_mfdataset(fname_vert, **kwargs)
         dset_vert = _get_times(dset_vert, drop_duplicates=drop_duplicates)
         dset_vert = dset_vert.drop(labels="TFLAG")
         dset = dset.merge(dset_vert)
@@ -140,7 +149,10 @@ def open_mfdataset(
             }
         )
     if fname_surf is not None:
-        dset_surf = xr.open_mfdataset(fname_surf, **kwargs)
+        try:
+            dset_surf = xr.open_mfdataset(fname_surf, engine="h5netcdf", **kwargs)
+        except Exception:
+            dset_surf = xr.open_mfdataset(fname_surf, **kwargs)
         dset_surf = _get_times(dset_surf, drop_duplicates=drop_duplicates)
         dset_surf = dset_surf.drop(labels="TFLAG").squeeze()
         dset = dset.merge(dset_surf)

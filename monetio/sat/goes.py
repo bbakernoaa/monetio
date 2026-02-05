@@ -48,7 +48,10 @@ def _get_time_from_fname(fname):
 
 def _open_single_file(fname):
     # open the file
-    dset = xr.open_dataset(fname)
+    try:
+        dset = xr.open_dataset(fname, engine="h5netcdf")
+    except Exception:
+        dset = xr.open_dataset(fname)
     dset = dset.rename({"t": "time"})
     # get the area def
     area = _geos_16_grid(dset)

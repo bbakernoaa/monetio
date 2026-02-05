@@ -57,7 +57,10 @@ def test_mjd2k():
 
 def test_cmp_h4tonccf():
     ds = geoms.open_dataset(TEST_FP, rename_all=False)
-    ds_h4tonccf = xr.open_dataset(TEST_FP_H4TONCCF)
+    try:
+        ds_h4tonccf = xr.open_dataset(TEST_FP_H4TONCCF, engine="h5netcdf")
+    except Exception:
+        ds_h4tonccf = xr.open_dataset(TEST_FP_H4TONCCF)
     # Note: h4tonccf_nc4 replaces all `.` in var names to `_`
     assert sorted(ds.sizes.values()) == sorted(ds_h4tonccf.squeeze().sizes.values())
 
