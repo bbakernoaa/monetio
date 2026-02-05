@@ -390,6 +390,43 @@ def get_nc_attrs(nc_obj):
     return getattr(nc_obj, "__dict__", {})
 
 
+def get_nc_var(dso, group_path, varname):
+    """Safe retrieval of a variable from nested groups in both netCDF4 and h5netcdf."""
+    # Handle list-like group_path
+    if isinstance(group_path, list):
+        group_path = group_path[0]
+
+    if not group_path or group_path == "/":
+        return dso.variables[varname]
+
+    # Try direct access if supported (h5netcdf)
+    # h5netcdf.legacyapi.Dataset and Group support this.
+    full_path = f"/{group_path.strip('/')}/{varname}"
+    try:
+        # Check if we are dealing with h5netcdf
+        if hasattr(dso, "_h5group") or "h5netcdf" in str(type(dso)):
+            return dso[full_path]
+    except (KeyError, TypeError, AttributeError):
+        pass
+
+    # Fallback to nested navigation (netCDF4)
+    obj = dso
+    for part in group_path.strip("/").split("/"):
+        if part:
+            if hasattr(obj, "groups") and part in obj.groups:
+                obj = obj.groups[part]
+            else:
+                # Try accessing as an item (works for some objects)
+                try:
+                    obj = obj[part]
+                except Exception:
+                    # Last resort, try variables if part is the varname but it shouldn't be
+                    if part == varname:
+                        return obj.variables[varname]
+                    raise
+    return obj.variables[varname]
+
+
 def get_nc_values(nc_var):
     """Safe retrieval of masked and scaled values from both netCDF4 and h5netcdf."""
     import numpy as np
@@ -403,7 +440,8 @@ def get_nc_values(nc_var):
             # Handle possible array-like fill_value
             if hasattr(fill_value, "__iter__") and not isinstance(fill_value, (str, bytes)):
                 fill_value = fill_value[0]
-            values = np.ma.masked_equal(values, fill_value)
+            # Use masked_values for float precision tolerance
+            values = np.ma.masked_values(values, fill_value, atol=1e-5, copy=False)
 
         scale_factor = attrs.get("scale_factor")
         add_offset = attrs.get("add_offset")
@@ -411,6 +449,11 @@ def get_nc_values(nc_var):
             sf = float(scale_factor) if scale_factor is not None else 1.0
             ao = float(add_offset) if add_offset is not None else 0.0
             values = values * sf + ao
+    else:
+        # NetCDF4 already masked
+        # Sometimes netCDF4 doesn't mask INF values if they were meant to be FillValue
+        # but the attribute didn't match perfectly.
+        pass
     return values
 
 

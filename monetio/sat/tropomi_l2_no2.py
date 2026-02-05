@@ -24,11 +24,11 @@ import platform
 import netCDF4
 
 try:
-    import h5netcdf.legacyapi as h5nc
+    import h5netcdf
 except ImportError:
-    h5nc = None
+    h5netcdf = None
 
-from ..util import get_nc_attrs, get_nc_values
+from ..util import get_nc_attrs, get_nc_var, get_nc_values
 
 
 def _open_one_dataset(fname, variable_dict):
@@ -55,20 +55,20 @@ def _open_one_dataset(fname, variable_dict):
         try:
             dso = netCDF4.Dataset(fname, "r")
         except Exception:
-            if h5nc is not None:
-                dso = h5nc.Dataset(fname, "r")
+            if h5netcdf is not None:
+                dso = h5netcdf.File(fname, "r")
             else:
                 raise
 
-    lon_var = dso.groups["PRODUCT"]["longitude"]
-    lat_var = dso.groups["PRODUCT"]["latitude"]
+    lon_var = get_nc_var(dso, "PRODUCT", "longitude")
+    lat_var = get_nc_var(dso, "PRODUCT", "latitude")
 
-    ref_time_var = dso.groups["PRODUCT"]["time"]
+    ref_time_var = get_nc_var(dso, "PRODUCT", "time")
     ref_time_val = np.datetime64(
-        num2date(ref_time_var[:].item(), get_nc_attrs(ref_time_var)["units"])
+        num2date(get_nc_values(ref_time_var).item(), get_nc_attrs(ref_time_var)["units"])
     )
-    dtime_var = dso.groups["PRODUCT"]["delta_time"]
-    dtime = xr.DataArray(dtime_var[:].squeeze(), dims=("y",)).astype("timedelta64[ms]")
+    dtime_var = get_nc_var(dso, "PRODUCT", "delta_time")
+    dtime = xr.DataArray(get_nc_values(dtime_var), dims=("y",)).astype("timedelta64[ms]")
 
     ds["lon"] = (
         ("y", "x"),
@@ -86,20 +86,13 @@ def _open_one_dataset(fname, variable_dict):
     ds = ds.set_coords(["lon", "lat", "time", "scan_time"])
     ds.attrs["reference_time_string"] = ref_time_val.astype(datetime).strftime(r"%Y-%m-%d")
 
-    def _get_group(obj, path):
-        for part in path.split("/"):
-            obj = obj.groups[part]
-        return obj
-
     def get_extra(varname_, *, dct_=None, default_group="PRODUCT"):
         """Get non-varname variables."""
         if dct_ is None:
             dct_ = variable_dict.get(varname_, {})
         group_name = dct_.get("group", default_group)
-        if isinstance(group_name, list):
-            group_name = group_name[0]
-        g = _get_group(dso, group_name)
-        return _get_values(g[varname_], dct_)
+        var_ = get_nc_var(dso, group_name, varname_)
+        return _get_values(var_, dct_)
 
     for varname, dct in variable_dict.items():
         print(f"- {varname}")
@@ -140,8 +133,8 @@ def _open_one_dataset(fname, variable_dict):
 
         elif varname in {"latitude_bounds", "longitude_bounds"}:
             group_name = dct.get("group", "PRODUCT/SUPPORT_DATA/GEOLOCATIONS")
-            g = _get_group(dso, group_name)
-            values = _get_values(g[varname], dct)
+            var = get_nc_var(dso, group_name, varname)
+            values = _get_values(var, dct)
             assert values.shape[-1] == 4
             for i in range(4):
                 ds[f"{varname}_{i}"] = (
@@ -152,8 +145,7 @@ def _open_one_dataset(fname, variable_dict):
 
         else:
             group_name = dct.get("group", "PRODUCT")
-            g = _get_group(dso, group_name)
-            var = g[varname]
+            var = get_nc_var(dso, group_name, varname)
             values = _get_values(var, dct)
 
             if values.ndim == 2:
