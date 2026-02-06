@@ -1,10 +1,11 @@
 """Read TROPOMI data into MELODIES-MONET"""
 
 import glob
-import warnings
 import platform
+import warnings
 
 import netCDF4 as nc4
+
 try:
     import h5netcdf.legacyapi as h5nc
 except ImportError:
@@ -54,20 +55,21 @@ def _open_one_dataset(fname, variable_dict):
     time_values = get_nc_values(time_var)
     time_attrs = get_nc_attrs(time_var)
     time_cast = xr.DataArray(data=time_values, dims=time_var.dimensions, attrs=time_attrs)
+    # Convert variable to xarray format for decoding
     ds["time"] = xr.conventions.decode_cf_variable("time", time_cast.variable)
 
-    lon = open_var_no_format("longitude", dso)
-    lat = open_var_no_format("latitude", dso)
+    lon_var = open_var_no_format("longitude", dso)
+    lat_var = open_var_no_format("latitude", dso)
     ds["pres_pa_mid"], ds["pres_pa_int"] = _calc_pressure_levels(dso)
     ds = ds.assign_coords(
         {
             "time": (("time",), ds["time"].values),
-            "latitude": (("y", "x"), get_nc_values(lat)),
-            "longitude": (("y", "x"), get_nc_values(lon)),
+            "latitude": (("y", "x"), get_nc_values(lat_var)),
+            "longitude": (("y", "x"), get_nc_values(lon_var)),
         }
     )
-    _set_latlon(ds, lat[:], lon[:])
-    ds["time_granule"] = _add_time_granule(time, dtime)
+    _set_latlon(ds, get_nc_values(lat_var), get_nc_values(lon_var))
+    ds["time_granule"] = _add_time_granule(time_var, dtime_var)
 
     for variable in variable_dict:
         if variable not in ["pres_pa_mid", "tm5_tropopause_pressure"]:
@@ -234,9 +236,9 @@ def _add_variable(variable, netcdf_dataset):
     dtype = values.dtype
     if np.issubdtype(dtype, np.integer):
         if isinstance(values, np.ma.MaskedArray):
-             var_values = values.filled(np.iinfo(dtype).min)
+            var_values = values.filled(np.iinfo(dtype).min)
         else:
-             var_values = values
+            var_values = values
         da = xr.DataArray(data=var_values, dims=dimensions, attrs=attrs).astype(dtype)
     else:
         da = xr.DataArray(data=values, dims=dimensions, attrs=attrs).astype(dtype)

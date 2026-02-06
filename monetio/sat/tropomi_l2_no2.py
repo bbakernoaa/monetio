@@ -8,6 +8,7 @@ https://sentinels.copernicus.eu/web/sentinel/missions/sentinel-5p
 
 import logging
 import os
+import platform
 import sys
 import warnings
 from collections import OrderedDict
@@ -15,20 +16,17 @@ from datetime import datetime
 from glob import glob
 from pathlib import Path
 
+import netCDF4
 import numpy as np
 import xarray as xr
 from cftime import num2date
-
-import platform
-
-import netCDF4
 
 try:
     import h5netcdf
 except ImportError:
     h5netcdf = None
 
-from ..util import get_nc_attrs, get_nc_var, get_nc_values
+from ..util import get_nc_attrs, get_nc_values, get_nc_var
 
 
 def _open_one_dataset(fname, variable_dict):

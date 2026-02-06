@@ -60,14 +60,12 @@ def extract_OMPS_nm_opendap(fname):
     ds: xarray dataset
     """
 
+    import platform
     from datetime import datetime, timedelta
 
+    import netCDF4
     import numpy as np
     import xarray as xr
-
-    import platform
-
-    import netCDF4
 
     try:
         import h5netcdf.legacyapi as h5nc

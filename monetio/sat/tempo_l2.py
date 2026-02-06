@@ -7,18 +7,16 @@ History:
 
 import logging
 import os
+import platform
 import sys
 import warnings
 from glob import glob
 from pathlib import Path
 
+import netCDF4
 import numpy as np
 import xarray as xr
 from cftime import num2pydate
-
-import platform
-
-import netCDF4
 
 try:
     import h5netcdf.legacyapi as h5nc
