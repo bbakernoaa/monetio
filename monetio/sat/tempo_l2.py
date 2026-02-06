@@ -19,11 +19,11 @@ import xarray as xr
 from cftime import num2pydate
 
 try:
-    import h5netcdf.legacyapi as h5nc
+    import h5netcdf
 except ImportError:
-    h5nc = None
+    h5netcdf = None
 
-from ..util import get_nc_attrs, get_nc_values
+from ..util import get_nc_attrs, get_nc_values, get_nc_var
 
 
 def _open_one_dataset(fname, variable_dict):
@@ -51,14 +51,14 @@ def _open_one_dataset(fname, variable_dict):
         try:
             dso = netCDF4.Dataset(fname, "r")
         except Exception:
-            if h5nc is not None:
-                dso = h5nc.Dataset(fname, "r")
+            if h5netcdf is not None:
+                dso = h5netcdf.File(fname, "r")
             else:
                 raise
 
-    lon_var = dso.groups["geolocation"]["longitude"]
-    lat_var = dso.groups["geolocation"]["latitude"]
-    time_var = dso.groups["geolocation"]["time"]
+    lon_var = get_nc_var(dso, "geolocation", "longitude")
+    lat_var = get_nc_var(dso, "geolocation", "latitude")
+    time_var = get_nc_var(dso, "geolocation", "time")
     time_units = get_nc_attrs(time_var).get("units", "")
 
     ds["lon"] = (
@@ -99,7 +99,7 @@ def _open_one_dataset(fname, variable_dict):
             "vertical_column",
             "vertical_column_uncertainty",
         ]:
-            values_var = dso.groups["product"][varname]
+            values_var = get_nc_var(dso, "product", varname)
         elif varname in [
             "latitude_bounds",
             "longitude_bounds",
@@ -109,7 +109,7 @@ def _open_one_dataset(fname, variable_dict):
             "viewing_azimuth_angle",
             "relative_azimuth_angle",
         ]:
-            values_var = dso.groups["geolocation"][varname]
+            values_var = get_nc_var(dso, "geolocation", varname)
         elif varname in [
             "vertical_column_total",
             "vertical_column_total_uncertainty",
@@ -134,9 +134,9 @@ def _open_one_dataset(fname, variable_dict):
             "amf_stratosphere",
             "background_correction",
         ]:
-            values_var = dso.groups["support_data"][varname]
+            values_var = get_nc_var(dso, "support_data", varname)
         elif varname in ["fit_rms_residual", "fit_convergence_flag"]:
-            values_var = dso.groups["qa_statistics"][varname]
+            values_var = get_nc_var(dso, "qa_statistics", varname)
         values = get_nc_values(values_var)
         attrs = get_nc_attrs(values_var)
 

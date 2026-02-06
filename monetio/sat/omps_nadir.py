@@ -68,11 +68,11 @@ def extract_OMPS_nm_opendap(fname):
     import xarray as xr
 
     try:
-        import h5netcdf.legacyapi as h5nc
+        import h5netcdf
     except ImportError:
-        h5nc = None
+        h5netcdf = None
 
-    from ..util import get_nc_values
+    from ..util import get_nc_values, get_nc_var
 
     # Prefer netCDF4 on Windows, try both on other platforms
     dso_class = netCDF4.Dataset
@@ -80,19 +80,19 @@ def extract_OMPS_nm_opendap(fname):
         try:
             netCDF4.Dataset(fname, "r").close()
         except Exception:
-            if h5nc is not None:
-                dso_class = h5nc.Dataset
+            if h5netcdf is not None:
+                dso_class = h5netcdf.File
 
     with dso_class(fname, "r") as f:
-        time = get_nc_values(f["GeolocationData_Time"])
-        to3 = get_nc_values(f["ScienceData_ColumnAmountO3"])
-        lat = get_nc_values(f["GeolocationData_Latitude"])
-        lon = get_nc_values(f["GeolocationData_Longitude"])
-        aprior = get_nc_values(f["AncillaryData_APrioriLayerO3"])
-        plevs = get_nc_values(f["DimPressureLevel"])
-        layere = get_nc_values(f["ScienceData_LayerEfficiency"])
-        flags = get_nc_values(f["ScienceData_QualityFlags"])
-        cloud_fraction = get_nc_values(f["ScienceData_RadiativeCloudFraction"])
+        time = get_nc_values(get_nc_var(f, "GeolocationData", "Time"))
+        to3 = get_nc_values(get_nc_var(f, "ScienceData", "ColumnAmountO3"))
+        lat = get_nc_values(get_nc_var(f, "GeolocationData", "Latitude"))
+        lon = get_nc_values(get_nc_var(f, "GeolocationData", "Longitude"))
+        aprior = get_nc_values(get_nc_var(f, "AncillaryData", "APrioriLayerO3"))
+        plevs = get_nc_values(f.variables["DimPressureLevel"])
+        layere = get_nc_values(get_nc_var(f, "ScienceData", "LayerEfficiency"))
+        flags = get_nc_values(get_nc_var(f, "ScienceData", "QualityFlags"))
+        cloud_fraction = get_nc_values(get_nc_var(f, "ScienceData", "RadiativeCloudFraction"))
 
     # Apply Quality Control filters and convert time to usable version
     to3[((to3 < 50.0) | (to3 > 700.0))] = np.nan

@@ -7,14 +7,14 @@ import warnings
 import netCDF4 as nc4
 
 try:
-    import h5netcdf.legacyapi as h5nc
+    import h5netcdf
 except ImportError:
-    h5nc = None
+    h5netcdf = None
 
 import numpy as np
 import xarray as xr
 
-from ..util import get_nc_attrs, get_nc_values
+from ..util import get_nc_attrs, get_nc_values, get_nc_var
 
 MILISECONDS_TO_SECONDS = 0.001
 
@@ -43,8 +43,8 @@ def _open_one_dataset(fname, variable_dict):
         try:
             dso = nc4.Dataset(fname, "r")
         except Exception:
-            if h5nc is not None:
-                dso = h5nc.Dataset(fname, "r")
+            if h5netcdf is not None:
+                dso = h5netcdf.File(fname, "r")
             else:
                 raise
 
@@ -257,17 +257,15 @@ def open_var_no_format(variable, netcdf_dataset):
 
     Returns
     -------
-    xr.DataArray
-        DataArray with the variable that was searched for"""
+    Variable
+        The variable object that was searched for
+    """
     path = _walktree_search(variable, netcdf_dataset)
     # Robustly navigate path
-    obj = netcdf_dataset
-    for part in path.strip("/").split("/"):
-        if part in obj.groups:
-            obj = obj.groups[part]
-        else:
-            obj = obj[part]
-    return obj
+    parts = path.strip("/").split("/")
+    varname = parts[-1]
+    group_path = "/".join(parts[:-1])
+    return get_nc_var(netcdf_dataset, group_path, varname)
 
 
 def _calc_pressure_levels(netcdf_tropomi, product="check"):
