@@ -165,7 +165,10 @@ def open_mfdataset_icap(
         for url, fname in zip(urls, fnames):
             _check_file_url(url, verbose=verbose)
             o = retrieve(url, fname, download=False, verbose=verbose)
-            dsets.append(xr.open_dataset(o))
+            try:
+                dsets.append(xr.open_dataset(o, engine="h5netcdf"))
+            except Exception:
+                dsets.append(xr.open_dataset(o))
         dset = xr.concat(dsets, dim="time")
 
     return dset

@@ -78,7 +78,10 @@ def read_data(fname, lat, lon, date):
     from pandas import to_datetime
 
     # We use xr.open_dataset directly as it is netcdf
-    f = xr.open_dataset(fname)
+    try:
+        f = xr.open_dataset(fname, engine="h5netcdf")
+    except Exception:
+        f = xr.open_dataset(fname)
     datearr = to_datetime([date])
     da = f["aot_ip_out"]
     da = da.rename({"nlat": "y", "nlon": "x"})

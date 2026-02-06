@@ -51,7 +51,10 @@ def open_mfdataset(
 
 
     """
-    from netCDF4 import Dataset
+    try:
+        from h5netcdf.legacyapi import Dataset
+    except ImportError:
+        from netCDF4 import Dataset
     from wrf import ALL_TIMES, extract_global_attrs, getvar
 
     if var_list is None:

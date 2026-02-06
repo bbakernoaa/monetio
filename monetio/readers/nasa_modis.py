@@ -63,7 +63,10 @@ def open_single_file(fname):
 
     h, v = _get_swath_from_fname(fname)
     timestamp = _get_time_from_fname(fname)
-    dset = xr.open_dataset(fname)
+    try:
+        dset = xr.open_dataset(fname, engine="h5netcdf")
+    except Exception:
+        dset = xr.open_dataset(fname)
     dset = dset.rename({"XDim:MOD_Grid_BRDF": "x", "YDim:MOD_Grid_BRDF": "y"})
     dset = get_modis_latlon_from_swath_hv(h, v, dset)
     dset.attrs["area"] = get_sinu_area_def(dset)

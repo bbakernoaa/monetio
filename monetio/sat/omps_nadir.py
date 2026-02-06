@@ -60,22 +60,39 @@ def extract_OMPS_nm_opendap(fname):
     ds: xarray dataset
     """
 
+    import platform
     from datetime import datetime, timedelta
 
+    import netCDF4
     import numpy as np
     import xarray as xr
-    from netCDF4 import Dataset
 
-    with Dataset(fname, "r") as f:
-        time = f["GeolocationData_Time"][:]
-        to3 = f["ScienceData_ColumnAmountO3"][:]
-        lat = f["GeolocationData_Latitude"][:]
-        lon = f["GeolocationData_Longitude"][:]
-        aprior = f["AncillaryData_APrioriLayerO3"][:]
-        plevs = f["DimPressureLevel"][:]
-        layere = f["ScienceData_LayerEfficiency"][:]
-        flags = f["ScienceData_QualityFlags"][:]
-        cloud_fraction = f["ScienceData_RadiativeCloudFraction"][:]
+    try:
+        import h5netcdf
+    except ImportError:
+        h5netcdf = None
+
+    from ..util import get_nc_values, get_nc_var
+
+    # Prefer netCDF4 on Windows, try both on other platforms
+    dso_class = netCDF4.Dataset
+    if platform.system() != "Windows":
+        try:
+            netCDF4.Dataset(fname, "r").close()
+        except Exception:
+            if h5netcdf is not None:
+                dso_class = h5netcdf.File
+
+    with dso_class(fname, "r") as f:
+        time = get_nc_values(get_nc_var(f, "GeolocationData", "Time"))
+        to3 = get_nc_values(get_nc_var(f, "ScienceData", "ColumnAmountO3"))
+        lat = get_nc_values(get_nc_var(f, "GeolocationData", "Latitude"))
+        lon = get_nc_values(get_nc_var(f, "GeolocationData", "Longitude"))
+        aprior = get_nc_values(get_nc_var(f, "AncillaryData", "APrioriLayerO3"))
+        plevs = get_nc_values(f.variables["DimPressureLevel"])
+        layere = get_nc_values(get_nc_var(f, "ScienceData", "LayerEfficiency"))
+        flags = get_nc_values(get_nc_var(f, "ScienceData", "QualityFlags"))
+        cloud_fraction = get_nc_values(get_nc_var(f, "ScienceData", "RadiativeCloudFraction"))
 
     # Apply Quality Control filters and convert time to usable version
     to3[((to3 < 50.0) | (to3 > 700.0))] = np.nan

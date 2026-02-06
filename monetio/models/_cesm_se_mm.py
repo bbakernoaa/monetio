@@ -45,7 +45,10 @@ def open_mfdataset(
     # open the dataset using xarray
     try:
         if netcdf:
-            dset_load = xr.open_mfdataset(fname, **kwargs)
+            try:
+                dset_load = xr.open_mfdataset(fname, engine="h5netcdf", **kwargs)
+            except Exception:
+                dset_load = xr.open_mfdataset(fname, **kwargs)
         else:
             raise ValueError
     except ValueError:

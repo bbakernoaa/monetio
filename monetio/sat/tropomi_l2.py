@@ -1,11 +1,20 @@
 """Read TROPOMI data into MELODIES-MONET"""
 
 import glob
+import platform
 import warnings
 
 import netCDF4 as nc4
+
+try:
+    import h5netcdf
+except ImportError:
+    h5netcdf = None
+
 import numpy as np
 import xarray as xr
+
+from ..util import get_nc_attrs, get_nc_values, get_nc_var
 
 MILISECONDS_TO_SECONDS = 0.001
 
@@ -25,24 +34,42 @@ def _open_one_dataset(fname, variable_dict):
     print(f"reading {fname}")
 
     ds = xr.Dataset()
-    dso = nc4.Dataset(fname, "r")
-    ds.attrs = dso.__dict__
-    time = open_var_no_format("time", dso)  # base unit in seconds since...
-    dtime = open_var_no_format("delta_time", dso)  # in ms
-    time_cast = xr.DataArray(data=time[:], dims=time.dimensions, attrs=time.__dict__)
+
+    # Prefer netCDF4 on Windows, try both on other platforms
+    dso = None
+    if platform.system() == "Windows":
+        dso = nc4.Dataset(fname, "r")
+    else:
+        try:
+            dso = nc4.Dataset(fname, "r")
+        except Exception:
+            if h5netcdf is not None:
+                dso = h5netcdf.File(fname, "r")
+            else:
+                raise
+
+    ds.attrs = get_nc_attrs(dso)
+    time_var = open_var_no_format("time", dso)  # base unit in seconds since...
+    dtime_var = open_var_no_format("delta_time", dso)  # in ms
+
+    time_values = get_nc_values(time_var)
+    time_attrs = get_nc_attrs(time_var)
+    time_cast = xr.DataArray(data=time_values, dims=time_var.dimensions, attrs=time_attrs)
+    # Convert variable to xarray format for decoding
     ds["time"] = xr.conventions.decode_cf_variable("time", time_cast.variable)
-    lon = open_var_no_format("longitude", dso)
-    lat = open_var_no_format("latitude", dso)
+
+    lon_var = open_var_no_format("longitude", dso)
+    lat_var = open_var_no_format("latitude", dso)
     ds["pres_pa_mid"], ds["pres_pa_int"] = _calc_pressure_levels(dso)
     ds = ds.assign_coords(
         {
             "time": (("time",), ds["time"].values),
-            "latitude": (("y", "x"), lat[:].squeeze()),
-            "longitude": (("y", "x"), lon[:].squeeze()),
+            "latitude": (("y", "x"), get_nc_values(lat_var)),
+            "longitude": (("y", "x"), get_nc_values(lon_var)),
         }
     )
-    _set_latlon(ds, lat[:], lon[:])
-    ds["time_granule"] = _add_time_granule(time, dtime)
+    _set_latlon(ds, get_nc_values(lat_var), get_nc_values(lon_var))
+    ds["time_granule"] = _add_time_granule(time_var, dtime_var)
 
     for variable in variable_dict:
         if variable not in ["pres_pa_mid", "tm5_tropopause_pressure"]:
@@ -202,12 +229,19 @@ def _add_variable(variable, netcdf_dataset):
     _replacements = {"layer": "z", "scanline": "y", "ground_pixel": "x"}
     _dimensions = list(var.dimensions)
     dimensions = [_replacements[x] if x in _replacements else x for x in _dimensions]
-    dtype = var[:].dtype
+
+    values = get_nc_values(var)
+    attrs = get_nc_attrs(var)
+
+    dtype = values.dtype
     if np.issubdtype(dtype, np.integer):
-        var_values = var[:].filled(np.iinfo(dtype).min)
-        da = xr.DataArray(data=var_values, dims=dimensions, attrs=var.__dict__).astype(dtype)
+        if isinstance(values, np.ma.MaskedArray):
+            var_values = values.filled(np.iinfo(dtype).min)
+        else:
+            var_values = values
+        da = xr.DataArray(data=var_values, dims=dimensions, attrs=attrs).astype(dtype)
     else:
-        da = xr.DataArray(data=var[:], dims=dimensions, attrs=var.__dict__).astype(dtype)
+        da = xr.DataArray(data=values, dims=dimensions, attrs=attrs).astype(dtype)
     return da
 
 
@@ -223,9 +257,15 @@ def open_var_no_format(variable, netcdf_dataset):
 
     Returns
     -------
-    xr.DataArray
-        DataArray with the variable that was searched for"""
-    return netcdf_dataset[_walktree_search(variable, netcdf_dataset)]
+    Variable
+        The variable object that was searched for
+    """
+    path = _walktree_search(variable, netcdf_dataset)
+    # Robustly navigate path
+    parts = path.strip("/").split("/")
+    varname = parts[-1]
+    group_path = "/".join(parts[:-1])
+    return get_nc_var(netcdf_dataset, group_path, varname)
 
 
 def _calc_pressure_levels(netcdf_tropomi, product="check"):
@@ -244,7 +284,8 @@ def _calc_pressure_levels(netcdf_tropomi, product="check"):
         Two DataArrays containing the midlevel pressure and the
         pressure at the layer interface respectively.
     """
-    if ("id" in netcdf_tropomi.ncattrs()) and ("_CO_" in netcdf_tropomi.id):
+    attrs = get_nc_attrs(netcdf_tropomi)
+    if ("id" in attrs) and ("_CO_" in attrs["id"]):
         pressure_level_bottom = _add_variable("pressure_levels", netcdf_tropomi)
         return _calc_pressure_tropomi_co(pressure_level_bottom)
     tm5_constant_a = _add_variable("tm5_constant_a", netcdf_tropomi)
