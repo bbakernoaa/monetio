@@ -1,3 +1,10 @@
+import datetime
+from typing import Union
+
+import numpy as np
+import xarray as xr
+
+
 def nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
@@ -288,70 +295,85 @@ def get_giorgi_region_df(df):
     return df
 
 
-def calc_13_category_usda_soil_type(clay, sand, silt):
-    """Calculate the 13 category usda soil type from the clay sand and silt
+def calc_13_category_usda_soil_type(
+    clay: Union[xr.DataArray, np.ndarray],
+    sand: Union[xr.DataArray, np.ndarray],
+    silt: Union[xr.DataArray, np.ndarray],
+) -> Union[xr.DataArray, np.ndarray]:
+    """Calculate the 13 category USDA soil type from clay, sand, and silt percentages.
 
-    0 -- WATER
-    1 -- SAND
-    2 -- LOAMY SAND
-    3 -- SANDY LOAM
-    4 -- SILT LOAM
-    5 -- SILT
-    6 -- LOAM
-    7 -- SANDY CLAY LOAM
-    8 -- SILTY CLAY LOAM
-    9 -- CLAY LOAM
-    10 --SANDY CLAY
-    11 --SILY CLAY
-    12 --CLAY
+    The categories are:
+    0  -- WATER
+    1  -- SAND
+    2  -- LOAMY SAND
+    3  -- SANDY LOAM
+    4  -- SILT LOAM
+    5  -- SILT
+    6  -- LOAM
+    7  -- SANDY CLAY LOAM
+    8  -- SILTY CLAY LOAM
+    9  -- CLAY LOAM
+    10 -- SANDY CLAY
+    11 -- SILTY CLAY
+    12 -- CLAY
 
     Parameters
     ----------
-    clay : type
-        Description of parameter `clay`.
-    sand : type
-        Description of parameter `sand`.
-    silt : type
-        Description of parameter `silt`.
+    clay : xarray.DataArray or numpy.ndarray
+        Percentage of clay (0-100).
+    sand : xarray.DataArray or numpy.ndarray
+        Percentage of sand (0-100).
+    silt : xarray.DataArray or numpy.ndarray
+        Percentage of silt (0-100).
 
     Returns
     -------
-    type
-        Description of returned object.
-
+    xarray.DataArray or numpy.ndarray
+        The 13-category USDA soil type.
     """
-    from numpy import where, zeros
 
-    stype = zeros(clay.shape)
-    stype[where((silt + clay * 1.5 < 15.0) & (clay != 255))] = 1.0  # SAND
-    stype[where((silt + 1.5 * clay >= 15.0) & (silt + 1.5 * clay < 30) & (clay != 255))] = (
-        2.0  # Loamy Sand
+    def _logic(c, sa, si):
+        # We use the reverse order of the original assignments to ensure correct priority
+        # in np.select (first matching condition wins).
+        condlist = [
+            (c >= 40) & (sa <= 45) & (si < 40) & (c != 255),  # 12: CLAY
+            (c >= 40) & (si >= 40) & (c != 255),  # 11: SILTY CLAY
+            (c >= 35) & (sa > 45) & (c != 255),  # 10: SANDY CLAY
+            (c >= 27) & (c < 40.0) & (sa > 20) & (sa <= 45) & (c != 255),  # 9: CLAY LOAM
+            (c >= 27) & (c < 40.0) & (sa > 40) & (c != 255),  # 8: SILTY CLAY LOAM
+            (c >= 20) & (c < 35) & (si < 28) & (sa > 45) & (c != 255),  # 7: SANDY CLAY LOAM
+            (c >= 7) & (c < 27) & (si >= 28) & (si < 50) & (sa <= 52) & (c != 255),  # 6: LOAM
+            (si >= 80) & (c < 12) & (c != 255),  # 5: SILT
+            ((si >= 50) & (c >= 12) & (c < 27) & (c != 255))
+            | ((si >= 50) & (si < 80) & (c < 12) & (c != 255)),  # 4: SILT LOAM
+            ((c >= 7.0) & (c < 20) & (sa > 52) & (si + 2 * c >= 30) & (c != 255))
+            | ((c < 7) & (si < 50) & (si + 2 * c >= 30) & (c != 255)),  # 3: SANDY LOAM
+            (si + 1.5 * c >= 15.0) & (si + 1.5 * c < 30) & (c != 255),  # 2: LOAMY SAND
+            (si + c * 1.5 < 15.0) & (c != 255),  # 1: SAND
+        ]
+        choicelist = [12.0, 11.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0]
+        return np.select(condlist, choicelist, default=0.0)
+
+    result = xr.apply_ufunc(
+        _logic,
+        clay,
+        sand,
+        silt,
+        dask="parallelized",
+        output_dtypes=[float],
     )
-    stype[
-        where((clay >= 7.0) & (clay < 20) & (sand > 52) & (silt + 2 * clay >= 30) & (clay != 255))
-    ] = 3.0  # Sandy Loam (cond 1)
-    stype[where((clay < 7) & (silt < 50) & (silt + 2 * clay >= 30) & (clay != 255))] = (
-        3  # sandy loam (cond 2)
-    )
-    stype[where((silt >= 50) & (clay >= 12) & (clay < 27) & (clay != 255))] = (
-        4  # silt loam (cond 1)
-    )
-    stype[where((silt >= 50) & (silt < 80) & (clay < 12) & (clay != 255))] = 4  # silt loam (cond 2)
-    stype[where((silt >= 80) & (clay < 12) & (clay != 255))] = 5  # silt
-    stype[
-        where((clay >= 7) & (clay < 27) & (silt >= 28) & (silt < 50) & (sand <= 52) & (clay != 255))
-    ] = 6  # loam
-    stype[where((clay >= 20) & (clay < 35) & (silt < 28) & (sand > 45) & (clay != 255))] = (
-        7  # sandy clay loam
-    )
-    stype[where((clay >= 27) & (clay < 40.0) & (sand > 40) & (clay != 255))] = 8  # silt clay loam
-    stype[where((clay >= 27) & (clay < 40.0) & (sand > 20) & (sand <= 45) & (clay != 255))] = (
-        9  # clay loam
-    )
-    stype[where((clay >= 35) & (sand > 45) & (clay != 255))] = 10  # sandy clay
-    stype[where((clay >= 40) & (silt >= 40) & (clay != 255))] = 11  # silty clay
-    stype[where((clay >= 40) & (sand <= 45) & (silt < 40) & (clay != 255))] = 12  # clay
-    return stype
+
+    if isinstance(result, xr.DataArray):
+        history = (
+            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
+            "Calculated USDA soil type using Aero Protocol."
+        )
+        if "history" in result.attrs:
+            result.attrs["history"] = f"{result.attrs['history']}\n{history}"
+        else:
+            result.attrs["history"] = history
+
+    return result
 
 
 _module_install_names = {
