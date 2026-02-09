@@ -119,6 +119,64 @@ def test_cmaq_coordinates(tmp_path):
     assert ds_out.latitude.isel(y=-1, x=0) > ds_out.latitude.isel(y=0, x=0)
 
 
+def test_cmaq_multi_file(tmp_path):
+    """Verifies CMAQ reader with multiple files."""
+    # 1. Setup two mock files
+    ds1 = create_mock_cmaq_dataset(n_times=2)
+    # Adjust times for second file
+    ds2 = create_mock_cmaq_dataset(n_times=2)
+    times2 = pd.date_range("2023-01-01 02:00:00", periods=2, freq="h")
+    tflag2 = np.zeros((2, 1, 2), dtype=np.int32)
+    for i, t in enumerate(times2):
+        tflag2[i, 0, 0] = int(t.strftime("%Y%j"))
+        tflag2[i, 0, 1] = int(t.strftime("%H%M%S"))
+    ds2["TFLAG"] = (("TSTEP", "VAR", "DATE_TIME"), tflag2)
+
+    f1 = str(tmp_path / "cmaq_1.nc")
+    f2 = str(tmp_path / "cmaq_2.nc")
+    ds1.to_netcdf(f1, engine="h5netcdf")
+    ds2.to_netcdf(f2, engine="h5netcdf")
+
+    reader = CMAQReader()
+    ds_out = reader.open_dataset([f1, f2], engine="h5netcdf")
+
+    assert ds_out.time.size == 4
+    assert "x" in ds_out.dims
+    assert "y" in ds_out.dims
+    assert "z" in ds_out.dims
+    assert ds_out.time[0].values == np.datetime64("2023-01-01T00:00:00")
+    assert ds_out.time[-1].values == np.datetime64("2023-01-01T03:00:00")
+
+
+def test_cmaq_overlap(tmp_path):
+    """Verifies that overlapping times between files are handled."""
+    # 1. Setup two mock files with overlap
+    # File 1: 00h, 01h
+    ds1 = create_mock_cmaq_dataset(n_times=2)
+    # File 2: 01h, 02h
+    ds2 = create_mock_cmaq_dataset(n_times=2)
+    times2 = pd.date_range("2023-01-01 01:00:00", periods=2, freq="h")
+    tflag2 = np.zeros((2, 1, 2), dtype=np.int32)
+    for i, t in enumerate(times2):
+        tflag2[i, 0, 0] = int(t.strftime("%Y%j"))
+        tflag2[i, 0, 1] = int(t.strftime("%H%M%S"))
+    ds2["TFLAG"] = (("TSTEP", "VAR", "DATE_TIME"), tflag2)
+
+    f1 = str(tmp_path / "overlap_1.nc")
+    f2 = str(tmp_path / "overlap_2.nc")
+    ds1.to_netcdf(f1, engine="h5netcdf")
+    ds2.to_netcdf(f2, engine="h5netcdf")
+
+    reader = CMAQReader()
+    # Test with drop_duplicates=True
+    ds_out = reader.open_dataset([f1, f2], drop_duplicates=True, engine="h5netcdf")
+
+    assert ds_out.time.size == 3
+    assert ds_out.time[0].values == np.datetime64("2023-01-01T00:00:00")
+    assert ds_out.time[1].values == np.datetime64("2023-01-01T01:00:00")
+    assert ds_out.time[2].values == np.datetime64("2023-01-01T02:00:00")
+
+
 def test_add_lazy_diagnostic():
     """Test the generic diagnostic addition logic."""
     from monetio.readers.cmaq import add_lazy_diagnostic
