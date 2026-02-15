@@ -63,6 +63,7 @@ def test_add_data():
     df = add_data(
         "2022-05-03",
         siteid="2178",
+        as_xarray=False,
     )
     assert len(df) > 0
 

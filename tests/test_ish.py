@@ -46,7 +46,7 @@ def test_ish_one_site(download):
     dates = pd.date_range("2020-09-01", "2020-09-02")
     site = "72224400358"  # "College Park AP"
 
-    df = ish.add_data(dates, site=site, download=download)
+    df = ish.add_data(dates, site=site, download=download, as_xarray=False)
 
     if download:
         p = Path("isd.722244-00358-2020")
@@ -85,7 +85,7 @@ def test_ish_no_resample():
     dates = pd.date_range("2020-09-01", "2020-09-02")
     site = "72224400358"  # "College Park AP"
 
-    df = ish.add_data(dates, site=site, resample=False)
+    df = ish.add_data(dates, site=site, resample=False, as_xarray=False)
 
     assert (df.time.diff().dropna() < pd.Timedelta("1h")).all()
     assert len(df) > 24
@@ -102,7 +102,7 @@ def test_ish_one_state_partially_empty():
     meta = ish_.history
     all_sites = sorted(meta.query("state == @state").station_id)  # 8 sites
 
-    df = ish.add_data(dates, state=state, n_procs=2)
+    df = ish.add_data(dates, state=state, n_procs=2, as_xarray=False)
     assert len(df) >= 1
     sites = sorted(df.siteid.unique())
     assert set(all_sites) - set(sites) == {"99816999999"}, (
@@ -115,7 +115,7 @@ def test_ish_one_site_empty(resample):
     dates = pd.date_range("2020-09-01", "2020-09-02")
     site = "99816999999"  # "Delaware Reserve"
 
-    df = ish.add_data(dates, site=site, resample=resample)
+    df = ish.add_data(dates, site=site, resample=resample, as_xarray=False)
     assert df.empty
 
 
@@ -124,7 +124,7 @@ def test_ish_resample():
     site = "72224400358"  # "College Park AP"
     freq = "3h"
 
-    df = ish.add_data(dates, site=site, resample=True, window=freq)
+    df = ish.add_data(dates, site=site, resample=True, window=freq, as_xarray=False)
 
     assert (df.time.diff().dropna() == pd.Timedelta(freq)).all()
     assert len(df) == 8

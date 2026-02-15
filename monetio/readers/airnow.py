@@ -27,7 +27,7 @@ class AirNowReader(PointReader):
         n_procs=1,
         daily=False,
         bad_utcoffset="drop",
-        as_xarray=False,
+        as_xarray=True,
         lazy=False,
         **kwargs,
     ):

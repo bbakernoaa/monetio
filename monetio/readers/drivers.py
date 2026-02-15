@@ -33,9 +33,13 @@ class FileUtility:
         Converts a string (with wildcards), a single path, or a list of paths
         into a guaranteed list of file paths/objects.
         """
+        # Convert Path objects to string
+        if hasattr(path_input, "__fspath__"):
+            path_input = str(path_input)
+
         # Case 1: It's a list already
         if isinstance(path_input, list):
-            return sorted(path_input)
+            return sorted([str(p) if hasattr(p, "__fspath__") else p for p in path_input])
 
         # Case 2: It's a single string (S3 or Local)
         if isinstance(path_input, str):

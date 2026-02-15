@@ -24,6 +24,7 @@ def test_aqs_daily_long():
             network=network,
             wide_fmt=False,
             daily=True,
+            as_xarray=False,
         )
     assert (df.variable == "").sum() == 0
     t = df.time
@@ -39,6 +40,7 @@ def test_aqs_daily_wide():
         network="IMPROVE",
         wide_fmt=True,
         daily=True,
+        as_xarray=False,
     )
     t = df.time
     assert ((t.dt.year == 2019) & (t.dt.month == 8)).all()

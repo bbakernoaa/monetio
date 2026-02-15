@@ -13,8 +13,9 @@ def add_data(
     n_procs=1,
     daily=False,
     bad_utcoffset="drop",
+    as_xarray=True,
 ):
-    """Retrieve and load AirNow data as a DataFrame."""
+    """Retrieve and load AirNow data."""
     return AirNowReader().open_dataset(
         dates=dates,
         download=download,
@@ -22,6 +23,7 @@ def add_data(
         n_procs=n_procs,
         daily=daily,
         bad_utcoffset=bad_utcoffset,
+        as_xarray=as_xarray,
     )
 
 

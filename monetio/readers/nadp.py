@@ -9,7 +9,7 @@ from .base import PointReader, register_reader
 @register_reader("nadp")
 class NADPReader(PointReader):
     def open_dataset(
-        self, dates, network="NTN", siteid=None, weekly=True, as_xarray=False, **kwargs
+        self, dates, network="NTN", siteid=None, weekly=True, as_xarray=True, **kwargs
     ):
         """
         Reads NADP data.

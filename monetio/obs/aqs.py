@@ -15,6 +15,7 @@ def add_data(
     wide_fmt=True,
     n_procs=1,
     meta=False,
+    as_xarray=True,
 ):
     """Retrieve and load AQS data."""
     return AQSReader().open_dataset(
@@ -27,4 +28,5 @@ def add_data(
         wide_fmt=wide_fmt,
         n_procs=n_procs,
         meta=meta,
+        as_xarray=as_xarray,
     )

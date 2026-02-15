@@ -2,10 +2,8 @@ from . import (
     aeronet,
     airnow,
     aqs,
-    cems_mod,
     crn,
     epa_util,
-    improve_mod,
     ish,
     ish_lite,
     nadp,
@@ -14,6 +12,12 @@ from . import (
     openaq_v3,
     pams,
 )
+from . import (
+    cems as cems,
+)
+from . import (
+    improve as improve,
+)
 
 __all__ = [
     "aeronet",
@@ -21,10 +25,10 @@ __all__ = [
     "aqs",
     "crn",
     "epa_util",
-    "improve_mod",
+    "improve",
     "ish",
     "ish_lite",
-    "cems_mod",
+    "cems",
     "nadp",
     "openaq",
     "openaq_v2",
@@ -39,8 +43,8 @@ __name__ = "obs"
 # aqs = aqs_mod.AQS()
 # aeronet = aeronet_mod.AERONET()
 # crn = crn_mod.crn()
-improve = improve_mod.IMPROVE()
+# improve = improve_mod.IMPROVE()
 # tolnet = tolnet_mod.TOLNet()
-cems = cems_mod.CEMS()
+# cems = cems_mod.CEMS()
 # nadp = nadp_mod.NADP()
 # icartt = icartt_mod.icartt()

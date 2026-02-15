@@ -95,7 +95,7 @@ def test_add_data_bad_siteid():
 
 def test_add_data_one_site():
     dates = pd.date_range("2021/08/01", "2021/08/03")
-    df = aeronet.add_data(dates, siteid="SERC")
+    df = aeronet.add_data(dates, siteid="SERC", as_xarray=False)
     assert df.index.size > 0
     assert (df.siteid == "SERC").all()
     assert df.attrs["info"].startswith("AERONET Data Download")
@@ -104,7 +104,7 @@ def test_add_data_one_site():
 def test_add_data_inv():
     dates = pd.date_range("2021/08/01", "2021/08/02")
 
-    df = aeronet.add_data(dates, inv_type="ALM15", product="SIZ")
+    df = aeronet.add_data(dates, inv_type="ALM15", product="SIZ", as_xarray=False)
     assert df.inversion_data_quality_level.eq("lev15").all()
     assert df.retrieval_measurement_scan_type.eq("Almucantar").all()
 
@@ -120,7 +120,7 @@ def test_add_data_all_noninv(product):
     dates = pd.date_range("2021/08/01", "2021/08/02")
     site = "Mauna_Loa"
 
-    df = aeronet.add_data(dates, product=product, siteid=site)
+    df = aeronet.add_data(dates, product=product, siteid=site, as_xarray=False)
     assert df.index.size > 0
 
 
@@ -147,7 +147,7 @@ def test_load_local():
     fp = DATA / "aeronet-AOD15-example.txt"
     assert fp.is_file()
 
-    df = aeronet.add_local(fp)
+    df = aeronet.add_local(fp, as_xarray=False)
     assert df.index.size > 0
     assert (df.siteid == "Mauna_Loa").all(0)
     assert df.attrs["info"].startswith("AERONET Data Download")
@@ -160,7 +160,7 @@ def test_load_local_inv():
     fp = DATA / "aeronet-inv-ALM15-SIZ-example.txt"
     assert fp.is_file()
 
-    df = aeronet.add_local(fp)
+    df = aeronet.add_local(fp, as_xarray=False)
     assert df.index.size > 0
     assert (df.siteid == "Cart_Site").all(0)
 
@@ -178,7 +178,7 @@ def test_add_data_lunar():
 def test_serial_freq():
     # For MM data proc example
     dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
-    df = aeronet.add_data(dates, freq="2h", n_procs=1)
+    df = aeronet.add_data(dates, freq="2h", n_procs=1, as_xarray=False)
     assert (
         pd.DatetimeIndex(sorted(df.time.unique()))
         == pd.date_range("2019-09-01", freq="2h", periods=12)
@@ -200,7 +200,9 @@ def test_interp_with_pytspack():
     dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
     standard_wavelengths = np.array([0.34, 0.44, 0.55, 0.66, 0.86, 1.63, 11.1]) * 1000
     with pytest.warns(UserWarning, match="Renaming duplicate AOD columns"):
-        df = aeronet.add_data(dates, n_procs=1, interp_to_aod_values=standard_wavelengths)
+        df = aeronet.add_data(
+            dates, n_procs=1, interp_to_aod_values=standard_wavelengths, as_xarray=False
+        )
     # Note: default wls for this period:
     #
     # wls = sorted(df.columns[df.columns.str.startswith("aod")].str.slice(4, -2).astype(int).tolist())
@@ -233,7 +235,9 @@ def test_interp_with_pytspack():
 def test_interp_daily_with_pytspack():
     dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
     standard_wavelengths = np.array([0.55]) * 1000
-    df = aeronet.add_data(dates, daily=True, n_procs=1, interp_to_aod_values=standard_wavelengths)
+    df = aeronet.add_data(
+        dates, daily=True, n_procs=1, interp_to_aod_values=standard_wavelengths, as_xarray=False
+    )
 
     assert {f"aod_{int(wl)}nm" for wl in standard_wavelengths}.issubset(df.columns)
 
@@ -252,8 +256,8 @@ def test_interp_daily_with_pytspack():
     ],
 )
 def test_issue100(dates, request):
-    df1 = aeronet.add_data(dates, n_procs=1)
-    df2 = aeronet.add_data(dates, n_procs=2)
+    df1 = aeronet.add_data(dates, n_procs=1, as_xarray=False)
+    df2 = aeronet.add_data(dates, n_procs=2, as_xarray=False)
     assert len(df1) == len(df2)
     if request.node.callspec.id == "two days":
         # Sort first (can use `df1.compare(df2)` for debugging)

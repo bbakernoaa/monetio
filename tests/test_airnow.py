@@ -28,12 +28,12 @@ def test_add_data_hourly():
     print(dates)
 
     # Wide format (default)
-    df = airnow.add_data(dates)
+    df = airnow.add_data(dates, as_xarray=False)
     _check_df(df)
     assert all(col in df.columns for col in ["OZONE", "OZONE_unit"])
 
     # Non-wide
-    df = airnow.add_data(dates, wide_fmt=False)
+    df = airnow.add_data(dates, wide_fmt=False, as_xarray=False)
     _check_df(df)
     assert all(col in df.columns for col in ["variable", "units", "obs"])
 
@@ -42,7 +42,7 @@ def test_add_data_daily():
     dates = pd.date_range("2021/07/01", "2021/07/03")  # 3 days
 
     # Wide format (default)
-    df = airnow.add_data(dates, daily=True)
+    df = airnow.add_data(dates, daily=True, as_xarray=False)
     _check_df(df)
     assert all(
         col in df.columns for col in ["OZONE-1HR", "OZONE-8HR", "OZONE-1HR_unit", "OZONE-8HR_unit"]
@@ -50,7 +50,7 @@ def test_add_data_daily():
     assert df.time.unique().size == 3
 
     # Non-wide
-    df = airnow.add_data(dates, daily=True, wide_fmt=False, n_procs=2)
+    df = airnow.add_data(dates, daily=True, wide_fmt=False, n_procs=2, as_xarray=False)
     _check_df(df)
     assert all(col in df.columns for col in ["variable", "units", "obs"])
     assert df.time.unique().size == 3
@@ -78,7 +78,9 @@ def test_check_zero_utc_offsets(date, bad_utcoffset, request, printer):
     case = request.node.callspec.id.split("-")[0]
     assert case in {"multiple_bad", "some_bad", "zero_bad", "yesterday"}
 
-    df = airnow.add_data(dates, daily=False, wide_fmt=True, bad_utcoffset=bad_utcoffset)
+    df = airnow.add_data(
+        dates, daily=False, wide_fmt=True, bad_utcoffset=bad_utcoffset, as_xarray=False
+    )
     # NOTE: No utcoffset in the data if daily
 
     assert -180 <= df.longitude.min() < 0 < df.longitude.max() < 180

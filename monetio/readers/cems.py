@@ -12,11 +12,12 @@ from .base import PointReader, register_reader
 class CEMSReader(PointReader):
     def open_dataset(
         self,
-        rdate,
+        rdate=None,
         states=["md"],
         download=False,
         verbose=True,
-        files=None,  # Support local files directly
+        files=None,
+        as_xarray=True,
         **kwargs,
     ):
         """
@@ -26,7 +27,7 @@ class CEMSReader(PointReader):
 
         if files:
             # If explicit files are provided
-            if isinstance(files, str):
+            if isinstance(files, (str, pd.Timestamp)) or not hasattr(files, "__iter__"):
                 files = [files]
 
             dfs = []
@@ -35,11 +36,18 @@ class CEMSReader(PointReader):
                 dfs.append(df)
 
             if not dfs:
-                return pd.DataFrame()
-            return pd.concat(dfs)
+                df = pd.DataFrame()
+            else:
+                df = pd.concat(dfs)
 
         else:
-            return c.add_data(rdate, states=states, download=download, verbose=verbose)
+            df = c.add_data(rdate, states=states, download=download, verbose=verbose)
+
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

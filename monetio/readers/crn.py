@@ -19,7 +19,7 @@ class CRNReader(PointReader):
         sub_hourly=False,
         download=False,
         latlonbox=None,
-        as_xarray=False,
+        as_xarray=True,
         **kwargs,
     ):
         """

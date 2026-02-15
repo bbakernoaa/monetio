@@ -1,6 +1,8 @@
 import abc
+from datetime import datetime
 from typing import List, Union
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -79,7 +81,7 @@ class PointReader(BaseReader):
         self,
         files: Union[str, List[str]],
         read_method="read_csv",
-        as_xarray=False,
+        as_xarray=True,
         lazy=False,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset]:
@@ -105,7 +107,7 @@ class PointReader(BaseReader):
 
     def to_xarray(self, df: pd.DataFrame) -> xr.Dataset:
         """
-        Convert the DataFrame to an xarray Dataset.
+        Convert the DataFrame to an xarray Dataset in UGRID convention.
         """
         temp_df = df.copy()
 
@@ -116,21 +118,21 @@ class PointReader(BaseReader):
 
         index_cols = [c for c in ["time", "siteid"] if c in temp_df.columns]
 
-        if "time" in index_cols and "siteid" in index_cols:
-            # Standard MONET site metadata columns
-            site_meta_cols = [
-                "latitude",
-                "longitude",
-                "site",
-                "site_name",
-                "state_name",
-                "epa_region",
-                "msa_name",
-                "msa_code",
-                "cmsa_name",
-                "utcoffset",
-            ]
+        # Standard MONET site metadata columns
+        site_meta_cols = [
+            "latitude",
+            "longitude",
+            "site",
+            "site_name",
+            "state_name",
+            "epa_region",
+            "msa_name",
+            "msa_code",
+            "cmsa_name",
+            "utcoffset",
+        ]
 
+        if "time" in index_cols and "siteid" in index_cols:
             present_meta = [c for c in site_meta_cols if c in temp_df.columns]
 
             if present_meta:
@@ -145,13 +147,52 @@ class PointReader(BaseReader):
             # Create the dense 2D Dataset for observation data
             ds = temp_df.set_index(["time", "siteid"]).to_xarray()
 
-            # Re-attach site metadata as 1D coords indexed by siteid
+            # Rename siteid to node for UGRID compliance
+            ds = ds.rename({"siteid": "node"})
+
+            # Re-attach site metadata as 1D coords indexed by node
             for col in meta_df.columns:
-                ds.coords[col] = (("siteid",), meta_df.loc[ds.siteid.values, col].values)
+                ds.coords[col] = (("node",), meta_df.loc[ds.node.values, col].values)
 
-            return ds
+        elif index_cols:
+            ds = temp_df.set_index(index_cols).to_xarray()
+            if "siteid" in ds.dims:
+                ds = ds.rename({"siteid": "node"})
+        else:
+            ds = temp_df.to_xarray()
 
-        if index_cols:
-            return temp_df.set_index(index_cols).to_xarray()
+        # Add UGRID metadata
+        if "node" in ds.dims:
+            ds["mesh"] = xr.DataArray(
+                data=np.int32(0),
+                attrs={
+                    "cf_role": "mesh_topology",
+                    "topology_dimension": 0,
+                    "node_coordinates": "longitude latitude",
+                },
+            )
 
-        return temp_df.to_xarray()
+            if "latitude" in ds.coords:
+                ds.coords["latitude"].attrs.update(
+                    {"units": "degrees_north", "standard_name": "latitude"}
+                )
+            if "longitude" in ds.coords:
+                ds.coords["longitude"].attrs.update(
+                    {"units": "degrees_east", "standard_name": "longitude"}
+                )
+
+            for var in ds.data_vars:
+                if "node" in ds[var].dims:
+                    ds[var].attrs.update({"mesh": "mesh", "location": "node"})
+
+        # Update history
+        history = (
+            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
+            "Converted to xarray Dataset with UGRID convention."
+        )
+        if "history" in ds.attrs:
+            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+        else:
+            ds.attrs["history"] = history
+
+        return ds

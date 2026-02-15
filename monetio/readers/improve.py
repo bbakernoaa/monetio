@@ -10,7 +10,7 @@ from .drivers import FileUtility
 
 @register_reader("improve")
 class IMPROVEReader(PointReader):
-    def open_dataset(self, files, add_meta=False, delimiter="\t", as_xarray=False, **kwargs):
+    def open_dataset(self, files, add_meta=False, delimiter="\t", as_xarray=True, **kwargs):
         """
         Reads IMPROVE data files.
         """
