@@ -2,8 +2,14 @@
 
 import os
 import warnings
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Union
 
 import pandas as pd
+import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from monetio.obs.epa_util import read_monitor_file
 from monetio.util import long_to_wide
@@ -15,20 +21,53 @@ from .base import PointReader, register_reader
 class AQSReader(PointReader):
     def open_dataset(
         self,
-        dates,
-        param=None,
-        daily=False,
-        network=None,
-        download=False,
-        local=False,
-        wide_fmt=True,
-        n_procs=1,
-        meta=False,
-        as_xarray=True,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        param: Union[str, List[str]] = None,
+        daily: bool = False,
+        network: str = None,
+        download: bool = False,
+        local: bool = False,
+        wide_fmt: bool = True,
+        n_procs: int = 1,
+        meta: bool = False,
+        as_xarray: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ):
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Reads AQS data.
+        Retrieve and load AQS (Air Quality System) data.
+
+        Parameters
+        ----------
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+            Dates to retrieve.
+        param : Union[str, List[str]], optional
+            Parameter(s) to retrieve (e.g., 'OZONE', 'PM2.5'), by default None.
+        daily : bool, optional
+            Whether to load daily data, by default False.
+        network : str, optional
+            Network to filter sites, by default None.
+        download : bool, optional
+            Whether to download files, by default False.
+        local : bool, optional
+            Whether to load from local files, by default False.
+        wide_fmt : bool, optional
+            Whether to return data in wide format, by default True.
+        n_procs : int, optional
+            Number of processors for dask compute, by default 1.
+        meta : bool, optional
+            Whether to add site metadata, by default False.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded AQS data.
         """
         a = AQS()
         df = a.add_data(
@@ -40,6 +79,7 @@ class AQSReader(PointReader):
             local=local,
             n_procs=n_procs,
             meta=meta,
+            lazy=lazy,
         )
 
         if wide_fmt:
@@ -47,7 +87,14 @@ class AQSReader(PointReader):
 
         df = self.harmonize(df)
         if as_xarray:
-            return self.to_xarray(df)
+            ds = self.to_xarray(df)
+            # Update history
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read AQS data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
 
         return df
 
@@ -264,6 +311,7 @@ class AQS:
         local=False,
         n_procs=1,
         meta=False,
+        lazy=False,
     ):
         import dask
         import dask.dataframe as dd
@@ -305,7 +353,11 @@ class AQS:
             return pd.DataFrame()
 
         dff = dd.from_delayed(dfs)
-        dfff = dff.compute(num_workers=n_procs)
+        if not lazy:
+            dfff = dff.compute(num_workers=n_procs)
+        else:
+            dfff = dff
+
         dfff = dfff[dfff.time.between(dates.min(), dates.max())]
 
         if meta:

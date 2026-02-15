@@ -164,27 +164,37 @@ class PandasDriver:
     def open(
         self,
         files: Union[str, List[str]],
-        read_method: str = "read_csv",
+        read_method: Union[str, callable] = "read_csv",
         lazy: bool = False,
         **kwargs,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         file_list = FileUtility.expand_paths(files)
 
-        # Get the actual pandas function
-        if not hasattr(pd, read_method):
-            raise ValueError(f"Pandas method '{read_method}' not found.")
-        reader_func = getattr(pd, read_method)
+        # Get the actual reading function
+        if callable(read_method):
+            reader_func = read_method
+        elif hasattr(pd, read_method):
+            reader_func = getattr(pd, read_method)
+        else:
+            raise ValueError(f"Pandas method '{read_method}' not found and not callable.")
 
         if lazy:
             import dask
             import dask.dataframe as dd
+
+            # Extract preprocess if present
+            preprocess = kwargs.pop("preprocess", None)
 
             delayed_dfs = []
             for f in file_list:
                 if f.startswith("s3://"):
                     if "storage_options" not in kwargs:
                         kwargs["storage_options"] = {"anon": True}
-                delayed_dfs.append(dask.delayed(reader_func)(f, **kwargs))
+
+                d = dask.delayed(reader_func)(f, **kwargs)
+                if preprocess:
+                    d = dask.delayed(preprocess)(d)
+                delayed_dfs.append(d)
 
             if not delayed_dfs:
                 return dd.from_pandas(pd.DataFrame(), npartitions=1)
@@ -194,6 +204,9 @@ class PandasDriver:
         data_frames = []
         # Reuse our filesystem logic
         try:
+            # Extract preprocess if present
+            preprocess = kwargs.pop("preprocess", None)
+
             for f in file_list:
                 if f.startswith("s3://"):
                     # Pandas can read S3 URLs directly if s3fs is installed!
@@ -204,6 +217,9 @@ class PandasDriver:
                     df = reader_func(f, **kwargs)
                 else:
                     df = reader_func(f, **kwargs)
+
+                if preprocess:
+                    df = preprocess(df)
                 data_frames.append(df)
 
             if not data_frames:

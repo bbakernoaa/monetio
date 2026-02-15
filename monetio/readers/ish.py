@@ -1,9 +1,14 @@
 """ISH Reader"""
 
-import dask
-import dask.dataframe as dd
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Union
+
 import numpy as np
 import pandas as pd
+import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
@@ -13,26 +18,65 @@ from .drivers import FileUtility
 class ISHReader(PointReader):
     def open_dataset(
         self,
-        dates,
-        box=None,
-        country=None,
-        state=None,
-        site=None,
-        resample=True,
-        window="h",
-        download=False,
-        n_procs=1,
-        request_timeout=10,
-        request_retries=4,
-        verbose=False,
-        source="ncdc",
-        as_xarray=True,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        box: List[float] = None,
+        country: str = None,
+        state: str = None,
+        site: str = None,
+        resample: bool = True,
+        window: str = "h",
+        download: bool = False,
+        n_procs: int = 1,
+        request_timeout: int = 10,
+        request_retries: int = 4,
+        verbose: bool = False,
+        source: str = "ncdc",
+        as_xarray: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ):
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Reads ISH data.
+        Retrieve and load ISH (Integrated Surface Hourly) data.
 
-        source: "ncdc" (default) or "aws".
+        Parameters
+        ----------
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+            Dates to retrieve.
+        box : List[float], optional
+            Bounding box [latmin, lonmin, latmax, lonmax].
+        country : str, optional
+            Country code to filter sites.
+        state : str, optional
+            State code to filter sites.
+        site : str, optional
+            Specific station ID to filter.
+        resample : bool, optional
+            Whether to resample data to a regular window, by default True.
+        window : str, optional
+            Resampling window (e.g., 'h'), by default 'h'.
+        download : bool, optional
+            Whether to download files (if source is ncdc), by default False.
+        n_procs : int, optional
+            Number of processors for dask compute, by default 1.
+        request_timeout : int, optional
+            Timeout for HTTP requests in seconds, by default 10.
+        request_retries : int, optional
+            Number of retries for HTTP requests, by default 4.
+        verbose : bool, optional
+            Whether to print verbose output, by default False.
+        source : str, optional
+            Data source: 'ncdc' or 'aws', by default 'ncdc'.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded ISH data.
         """
         ish = ISH()
         df = ish.add_data(
@@ -49,11 +93,19 @@ class ISHReader(PointReader):
             request_retries=request_retries,
             verbose=verbose,
             source=source,
+            lazy=lazy,
         )
 
         df = self.harmonize(df)
         if as_xarray:
-            return self.to_xarray(df)
+            ds = self.to_xarray(df)
+            # Update history
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ISH data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
 
         return df
 
@@ -337,6 +389,7 @@ class ISH:
         request_retries=4,
         verbose=False,
         source="ncdc",
+        lazy=False,
     ):
         if sum([box is not None, country is not None, state is not None, site is not None]) > 1:
             raise ValueError("Only one of `box`, `country`, `state`, or `site` can be used")
@@ -388,39 +441,42 @@ class ISH:
             except Exception:
                 meta = None
 
+        import dask
+        import dask.dataframe as dd
+
+        def func(url_or_file):
+            return self.read_data_frame(
+                url_or_file, request_timeout=request_timeout, request_retries=request_retries
+            )
+
         if download:
             objs = self.get_url_file_objs(urls.name)
-
-            def func(fname):
-                return self.read_data_frame(
-                    fname, request_timeout=request_timeout, request_retries=request_retries
-                )
-
             dfs = [dask.delayed(func)(f) for f in objs]
-            dff = dd.from_delayed(dfs, meta=meta)
-            self.df = dff.compute(num_workers=n_procs)
         else:
-
-            def func(url):
-                return self.read_data_frame(
-                    url, request_timeout=request_timeout, request_retries=request_retries
-                )
-
             dfs = [dask.delayed(func)(f) for f in urls.name]
-            dff = dd.from_delayed(dfs, meta=meta)
-            self.df = dff.compute(num_workers=n_procs)
 
-        if resample and not self.df.empty:
-            self.df.index = self.df.time
-            numeric_cols = self.df.select_dtypes(include=["number"]).columns
-            group_cols = ["station_id"]
-            self.df = (
-                self.df[group_cols + list(numeric_cols)]
-                .groupby("station_id")
-                .resample(window)
-                .mean()
-                .reset_index()
-            )
+        self.df = dd.from_delayed(dfs, meta=meta)
+
+        if not lazy:
+            self.df = self.df.compute(num_workers=n_procs)
+
+        if resample:
+            if not lazy:
+                if not self.df.empty:
+                    self.df.index = self.df.time
+                    numeric_cols = self.df.select_dtypes(include=["number"]).columns
+                    group_cols = ["station_id"]
+                    self.df = (
+                        self.df[group_cols + list(numeric_cols)]
+                        .groupby("station_id")
+                        .resample(window)
+                        .mean()
+                        .reset_index()
+                    )
+            else:
+                import warnings
+
+                warnings.warn("ISHReader: Resampling is currently not supported in lazy mode.")
 
         self.df = self.df.merge(dfloc, on="station_id", how="left")
         self.df = self.df.rename(columns={"station_id": "siteid", "ctry": "country"})

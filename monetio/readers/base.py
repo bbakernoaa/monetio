@@ -1,10 +1,13 @@
 import abc
 from datetime import datetime
-from typing import List, Union
+from typing import TYPE_CHECKING, List, Union
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .drivers import PandasDriver, XarrayDriver
 
@@ -80,41 +83,86 @@ class PointReader(BaseReader):
     def open_dataset(
         self,
         files: Union[str, List[str]],
-        read_method="read_csv",
-        as_xarray=True,
-        lazy=False,
+        read_method: str = "read_csv",
+        as_xarray: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ) -> Union[pd.DataFrame, xr.Dataset]:
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Uses PandasDriver to open files.
-        Readers can override this to add pre/post processing.
+        Retrieve and load point data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path, list of paths, or glob pattern.
+        read_method : str, optional
+            The pandas/dask reading method to use, by default "read_csv".
+        as_xarray : bool, optional
+            If True, return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            If True, return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments passed to the reader and driver.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded dataset.
         """
         df = self.driver.open(files, read_method=read_method, lazy=lazy, **kwargs)
 
-        if not lazy:
-            df = self.harmonize(df)
-            if as_xarray:
-                return self.to_xarray(df)
+        df = self.harmonize(df)
+
+        if as_xarray:
+            return self.to_xarray(df)
+
         return df
 
-    def harmonize(self, df: pd.DataFrame) -> pd.DataFrame:
+    def harmonize(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"]
+    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         """
-        Standardize point data: drop NaNs in coordinates.
+        Harmonize the dataset (standard naming, dropping NaNs).
+
+        Parameters
+        ----------
+        df : Union[pd.DataFrame, "dd.DataFrame"]
+            Input dataframe.
+
+        Returns
+        -------
+        Union[pd.DataFrame, "dd.DataFrame"]
+            Harmonized dataframe.
         """
         if "latitude" in df.columns and "longitude" in df.columns:
             df = df.dropna(subset=["latitude", "longitude"])
         return super().harmonize(df)
 
-    def to_xarray(self, df: pd.DataFrame) -> xr.Dataset:
+    def to_xarray(self, df: Union[pd.DataFrame, "dd.DataFrame"]) -> xr.Dataset:
         """
         Convert the DataFrame to an xarray Dataset in UGRID convention.
+
+        Parameters
+        ----------
+        df : Union[pd.DataFrame, dd.DataFrame]
+            Input dataframe.
+
+        Returns
+        -------
+        xr.Dataset
+            The dataset in UGRID convention.
         """
         temp_df = df.copy()
 
         # Handle cases where 'time' or 'siteid' might be in the index already
         for name in ["time", "siteid"]:
-            if name in temp_df.index.names:
-                temp_df = temp_df.reset_index(name)
+            try:
+                names = temp_df.index.names
+            except AttributeError:
+                names = [temp_df.index.name]
+
+            if name in names:
+                temp_df = temp_df.reset_index()
 
         index_cols = [c for c in ["time", "siteid"] if c in temp_df.columns]
 
@@ -132,7 +180,25 @@ class PointReader(BaseReader):
             "utcoffset",
         ]
 
-        if "time" in index_cols and "siteid" in index_cols:
+        # Check for dask
+        is_dask = False
+        try:
+            import dask.dataframe as dd
+
+            if isinstance(df, dd.DataFrame):
+                is_dask = True
+        except ImportError:
+            pass
+
+        if is_dask:
+            # For dask dataframes, we return a 1D dataset to keep it lazy and avoid shuffles.
+            ds = xr.Dataset()
+            for col in temp_df.columns:
+                ds[col] = (("node",), temp_df[col].to_dask_array(lengths=True))
+
+            # If we have time and siteid, we still name the dimension node for UGRID
+            # but it represents individual observations.
+        elif "time" in index_cols and "siteid" in index_cols:
             present_meta = [c for c in site_meta_cols if c in temp_df.columns]
 
             if present_meta:
@@ -145,13 +211,20 @@ class PointReader(BaseReader):
                 meta_df = pd.DataFrame()
 
             # Create the dense 2D Dataset for observation data
-            ds = temp_df.set_index(["time", "siteid"]).to_xarray()
+            # Only if the index is unique, otherwise stay 1D
+            idx_cols = ["time", "siteid"]
+            if temp_df.set_index(idx_cols).index.is_unique:
+                ds = temp_df.set_index(idx_cols).to_xarray()
+            else:
+                # Fallback to 1D
+                ds = temp_df.to_xarray()
 
             # Rename siteid to node for UGRID compliance
             ds = ds.rename({"siteid": "node"})
 
             # Re-attach site metadata as 1D coords indexed by node
             for col in meta_df.columns:
+                # Use .values safely if possible, but for 2D transformation we already computed
                 ds.coords[col] = (("node",), meta_df.loc[ds.node.values, col].values)
 
         elif index_cols:

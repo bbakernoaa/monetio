@@ -80,9 +80,26 @@ def wsdir2uv(ws, wdir):
 
 
 def long_to_wide(df):
+    try:
+        import dask.dataframe as dd
+
+        is_dask = isinstance(df, dd.DataFrame)
+    except ImportError:
+        is_dask = False
+
+    if is_dask:
+        # Dask doesn't support multi-index pivot_table well.
+        # We compute for now, but warn.
+        # TODO: Implement lazy pivot if possible.
+        import warnings
+
+        warnings.warn("long_to_wide: Computing dask dataframe to perform pivot_table.")
+        df = df.compute()
+
     w = df.pivot_table(values="obs", index=["time", "siteid"], columns="variable").reset_index()
 
     # Add units (columns)
+    # If it was dask, it is now pandas.
     for name, group in df.groupby("variable"):
         units = group.units.unique().tolist()
         if len(units) > 1:

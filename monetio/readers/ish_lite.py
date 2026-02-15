@@ -1,9 +1,14 @@
 """ISH Lite Reader"""
 
-import dask
-import dask.dataframe as dd
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Union
+
 import numpy as np
 import pandas as pd
+import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
@@ -13,20 +18,53 @@ from .drivers import FileUtility
 class ISHLiteReader(PointReader):
     def open_dataset(
         self,
-        dates,
-        box=None,
-        country=None,
-        state=None,
-        site=None,
-        resample=False,
-        window="h",
-        n_procs=1,
-        verbose=False,
-        as_xarray=True,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        box: List[float] = None,
+        country: str = None,
+        state: str = None,
+        site: str = None,
+        resample: bool = False,
+        window: str = "h",
+        n_procs: int = 1,
+        verbose: bool = False,
+        as_xarray: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ):
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Reads ISH Lite data.
+        Retrieve and load ISH (Integrated Surface Hourly) Lite data.
+
+        Parameters
+        ----------
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+            Dates to retrieve.
+        box : List[float], optional
+            Bounding box [latmin, lonmin, latmax, lonmax].
+        country : str, optional
+            Country code to filter sites.
+        state : str, optional
+            State code to filter sites.
+        site : str, optional
+            Specific station ID to filter.
+        resample : bool, optional
+            Whether to resample data to a regular window, by default False.
+        window : str, optional
+            Resampling window (e.g., 'h'), by default 'h'.
+        n_procs : int, optional
+            Number of processors for dask compute, by default 1.
+        verbose : bool, optional
+            Whether to print verbose output, by default False.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded ISH Lite data.
         """
         ish = ISH()
         df = ish.add_data(
@@ -39,11 +77,19 @@ class ISHLiteReader(PointReader):
             window=window,
             n_procs=n_procs,
             verbose=verbose,
+            lazy=lazy,
         )
 
         df = self.harmonize(df)
         if as_xarray:
-            return self.to_xarray(df)
+            ds = self.to_xarray(df)
+            # Update history
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ISH Lite data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
 
         return df
 
@@ -120,6 +166,19 @@ class ISH:
         return pd.Series(furls, name="name").to_frame()
 
     def read_csv(self, fname):
+        """
+        Read a single ISH Lite file.
+
+        Parameters
+        ----------
+        fname : str
+            File path or URL.
+
+        Returns
+        -------
+        pd.DataFrame
+            The loaded data.
+        """
         from numpy import nan
 
         columns = [
@@ -160,11 +219,32 @@ class ISH:
         df = df.replace(-9999, nan)
         return df
 
-    def aggregrate_files(self, urls, n_procs=1):
+    def aggregate_files(self, urls, n_procs=1, lazy=False):
+        """
+        Aggregate multiple ISH Lite files.
+
+        Parameters
+        ----------
+        urls : pd.DataFrame
+            Dataframe with 'name' column containing URLs.
+        n_procs : int, optional
+            Number of processors for compute, by default 1.
+        lazy : bool, optional
+            Whether to stay lazy, by default False.
+
+        Returns
+        -------
+        Union[pd.DataFrame, dd.DataFrame]
+            The aggregated data.
+        """
+        import dask
+        import dask.dataframe as dd
+
         dfs = [dask.delayed(self.read_csv)(f) for f in urls.name]
         dff = dd.from_delayed(dfs)
-        df = dff.compute(num_workers=n_procs)
-        return df
+        if not lazy:
+            return dff.compute(num_workers=n_procs)
+        return dff
 
     def add_data(
         self,
@@ -177,6 +257,7 @@ class ISH:
         window="h",
         n_procs=1,
         verbose=False,
+        lazy=False,
     ):
         self.dates = pd.to_datetime(dates)
         self.verbose = verbose
@@ -197,16 +278,24 @@ class ISH:
         if urls.empty:
             raise ValueError("No data URLs found")
 
-        df = self.aggregrate_files(urls, n_procs=n_procs)
+        df = self.aggregate_files(urls, n_procs=n_procs, lazy=lazy)
 
         # Use exclusive upper bound to match unit test expectations (e.g. 24 hours for 1 day range)
         df = df.loc[(df.time >= self.dates.min()) & (df.time < self.dates.max())]
         df = df.replace(-999.9, np.nan)
 
-        if resample and not df.empty:
-            df = df.set_index("time").groupby("siteid").resample(window).mean().reset_index()
+        if resample:
+            if not lazy:
+                if not df.empty:
+                    df = (
+                        df.set_index("time").groupby("siteid").resample(window).mean().reset_index()
+                    )
+            else:
+                import warnings
 
-        df = pd.merge(df, dfloc, how="left", left_on="siteid", right_on="station_id").rename(
+                warnings.warn("ISHLiteReader: Resampling is currently not supported in lazy mode.")
+
+        df = df.merge(dfloc, how="left", left_on="siteid", right_on="station_id").rename(
             columns={"ctry": "country"}
         )
         return df.drop(["station_id"], axis=1)
