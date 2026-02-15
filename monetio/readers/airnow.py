@@ -2,11 +2,14 @@
 
 import os
 from datetime import datetime
-from functools import lru_cache
+from functools import lru_cache, partial
+from typing import TYPE_CHECKING, List, Union
 
-import dask
-import dask.dataframe as dd
 import pandas as pd
+import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 from numpy import nan
 
 from monetio.obs.epa_util import read_monitor_file
@@ -20,19 +23,48 @@ from .drivers import FileUtility
 class AirNowReader(PointReader):
     def open_dataset(
         self,
-        files=None,
-        dates=None,
-        download=False,
-        wide_fmt=True,
-        n_procs=1,
-        daily=False,
-        bad_utcoffset="drop",
-        as_xarray=True,
-        lazy=False,
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        download: bool = False,
+        wide_fmt: bool = True,
+        n_procs: int = 1,
+        daily: bool = False,
+        bad_utcoffset: str = "drop",
+        as_xarray: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ):
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Retrieve and load AirNow data as a DataFrame or xarray Dataset.
+        Retrieve and load AirNow data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File path, list of paths, or glob pattern.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve if files are not provided.
+        download : bool, optional
+            Whether to download files to local directory, by default False.
+        wide_fmt : bool, optional
+            Whether to return data in wide format, by default True.
+        n_procs : int, optional
+            Number of processors for dask compute (if not lazy), by default 1.
+        daily : bool, optional
+            Whether to load daily data instead of hourly, by default False.
+        bad_utcoffset : str, optional
+            How to handle sites with zero UTC offset and large longitude.
+            Options: 'drop', 'null', 'fix', 'leave'. By default 'drop'.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded AirNow data.
         """
 
         if files is None and dates is not None:
@@ -49,36 +81,73 @@ class AirNowReader(PointReader):
         if not files:
             raise ValueError("Must provide either 'files' or 'dates'.")
 
-        print("Aggregating AIRNOW files...")
-
-        # We define a custom read function that matches the old read_csv
-        # Pass storage options if S3
+        # Define per-file preprocessing
         storage_options = kwargs.get("storage_options", {})
-        if not storage_options and any(f.startswith("s3://") for f in files):
+        if not storage_options and any(str(f).startswith("s3://") for f in files):
             storage_options = {"anon": True}
 
-        def _read_helper(fn):
-            return read_airnow_csv(fn, daily=daily, storage_options=storage_options)
+        read_func = partial(read_airnow_csv, daily=daily, storage_options=storage_options)
 
-        dfs = [dask.delayed(_read_helper)(f) for f in files]
-        df_lazy = dd.from_delayed(dfs)
+        # Use base class to open
+        df = super().open_dataset(
+            files,
+            read_method=read_func,
+            as_xarray=False,  # We do conversion manually after post-processing
+            lazy=lazy,
+            **kwargs,
+        )
 
-        if lazy:
-            return df_lazy
+        # Post-processing (Backend-agnostic)
+        df = self._post_process(df, daily=daily, wide_fmt=wide_fmt, bad_utcoffset=bad_utcoffset)
+        df = self.harmonize(df)
 
-        df = df_lazy.compute(num_workers=n_procs).reset_index()
+        if not lazy and hasattr(df, "compute"):
+            df = df.compute(num_workers=n_procs)
 
-        if daily:
-            df["time"] = pd.to_datetime(df.date, format=r"%m/%d/%y", exact=True)
+        if as_xarray:
+            ds = self.to_xarray(df)
+            # Update history
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read AirNow data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
+
+        return df
+
+    def _post_process(self, df, daily=False, wide_fmt=True, bad_utcoffset="drop"):
+        """Internal post-processing logic."""
+        import pandas as pd
+
+        # Check if dask
+        try:
+            import dask.dataframe as dd
+
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
+
+        if is_dask:
+            # Dask operations
+            if daily:
+                df["time"] = dd.to_datetime(df.date, format=r"%m/%d/%y")
+            else:
+                df["time"] = dd.to_datetime(df.date + " " + df.time, format=r"%m/%d/%y %H:%M")
+                df["time_local"] = df.time + dd.to_timedelta(df.utcoffset, unit="h")
         else:
-            df["time"] = pd.to_datetime(
-                df.date + " " + df.time, format=r"%m/%d/%y %H:%M", exact=True
-            )
-            df["time_local"] = df.time + pd.to_timedelta(df.utcoffset, unit="h")
+            # Pandas operations
+            if daily:
+                df["time"] = pd.to_datetime(df.date, format=r"%m/%d/%y", exact=True)
+            else:
+                df["time"] = pd.to_datetime(
+                    df.date + " " + df.time, format=r"%m/%d/%y %H:%M", exact=True
+                )
+                df["time_local"] = df.time + pd.to_timedelta(df.utcoffset, unit="h")
 
-        df.drop(["date"], axis=1, inplace=True)
+        df = df.drop(columns=["date"])
 
-        print("    Adding in Meta-data")
+        # Metadata
         df = get_station_locations(df)
 
         savecols = [
@@ -101,24 +170,19 @@ class AirNowReader(PointReader):
 
         if daily:
             cols = [col for col in savecols if col not in {"time_local", "utcoffset"}]
-            df = df[cols]
+            df = df[[c for c in cols if c in df.columns]]
         else:
-            df = df[savecols]
+            df = df[[c for c in savecols if c in df.columns]]
 
-        df.drop_duplicates(inplace=True)
+        df = df.drop_duplicates()
         df = filter_bad_values(df, bad_utcoffset=bad_utcoffset)
-        df = df.reset_index(drop=True)
 
         if wide_fmt:
-            df = (
-                long_to_wide(df)
-                .drop_duplicates(subset=["time", "latitude", "longitude", "siteid"])
-                .reset_index(drop=True)
-            )
-
-        df = self.harmonize(df)
-        if as_xarray:
-            return self.to_xarray(df)
+            # Note: long_to_wide uses pivot_table which might trigger compute on Dask
+            df = long_to_wide(df)
+            # drop_duplicates after wide might also be expensive
+            subset = [c for c in ["time", "latitude", "longitude", "siteid"] if c in df.columns]
+            df = df.drop_duplicates(subset=subset)
 
         return df
 
@@ -176,7 +240,26 @@ def retrieve(url, fname):
         print("\n File Exists: " + fname)
 
 
-def read_airnow_csv(fn, daily=False, storage_options=None):
+def read_airnow_csv(fn, daily=False, storage_options=None, **kwargs):
+    """
+    Read a single AirNow CSV file.
+
+    Parameters
+    ----------
+    fn : str
+        File path or URL.
+    daily : bool, optional
+        Whether the file contains daily data, by default False.
+    storage_options : dict, optional
+        Storage options for fsspec, by default None.
+    **kwargs : dict
+        Additional arguments passed to pd.read_csv.
+
+    Returns
+    -------
+    pd.DataFrame
+        The loaded data.
+    """
     hourly_cols = [
         "date",
         "time",
@@ -235,16 +318,37 @@ def read_airnow_csv(fn, daily=False, storage_options=None):
 
 
 def filter_bad_values(df, *, max=3000, bad_utcoffset="drop"):
+    """
+    Filter bad values and handle zero UTC offsets.
+
+    Parameters
+    ----------
+    df : Union[pd.DataFrame, dd.DataFrame]
+        Input dataframe.
+    max : int, optional
+        Maximum allowed observation value, by default 3000.
+    bad_utcoffset : str, optional
+        How to handle sites with zero UTC offset and large longitude,
+        by default "drop".
+
+    Returns
+    -------
+    Union[pd.DataFrame, dd.DataFrame]
+        Filtered dataframe.
+    """
     from numpy import nan
 
-    df.loc[(df.obs > max) | (df.obs < 0), "obs"] = nan
+    df["obs"] = df["obs"].where((df.obs <= max) & (df.obs >= 0), nan)
 
     if "utcoffset" in df.columns:
         bad_rows = df.query("utcoffset == 0 and abs(longitude) > 20")
         if bad_utcoffset == "null":
-            df.loc[bad_rows.index, "utcoffset"] = nan
+            # For dask compatibility
+            df["utcoffset"] = df["utcoffset"].where(
+                ~((df.utcoffset == 0) & (df.longitude.abs() > 20)), nan
+            )
         elif bad_utcoffset == "drop":
-            df.drop(bad_rows.index, inplace=True)
+            df = df.loc[~((df.utcoffset == 0) & (df.longitude.abs() > 20))]
         elif bad_utcoffset == "fix":
             # TimezoneFinder is slow, so only call it for unique locations
             unique_locs = bad_rows.drop_duplicates(subset=["latitude", "longitude"])
@@ -300,6 +404,30 @@ def get_utcoffset(lat, lon):
 
 
 def get_station_locations(df):
+    """
+    Add site metadata to the dataframe.
+
+    Parameters
+    ----------
+    df : Union[pd.DataFrame, dd.DataFrame]
+        Input dataframe.
+
+    Returns
+    -------
+    Union[pd.DataFrame, dd.DataFrame]
+        Dataframe with site metadata.
+    """
     monitor_df = read_monitor_file(airnow=True)
-    df = df.merge(monitor_df.drop_duplicates(), on="siteid", how="left", copy=False)
+    # Check if dask
+    try:
+        import dask.dataframe as dd
+
+        is_dask = isinstance(df, dd.DataFrame)
+    except ImportError:
+        is_dask = False
+
+    if is_dask:
+        df = df.merge(monitor_df.drop_duplicates(), on="siteid", how="left")
+    else:
+        df = df.merge(monitor_df.drop_duplicates(), on="siteid", how="left", copy=False)
     return df
