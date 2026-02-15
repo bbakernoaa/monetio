@@ -1,13 +1,13 @@
 import pandas as pd
-import pytest
-import xarray as xr
+
 from monetio.readers.ish import ISHReader
+
 
 def test_ish_eager_vs_lazy():
     """Verify that Eager and Lazy loading of ISH data produces identical results."""
     # Use a single day to keep it fast
     dates = pd.date_range("2020-09-01", "2020-09-01 23:00", freq="h")
-    site = "72224400358" # College Park AP
+    site = "72224400358"  # College Park AP
 
     reader = ISHReader()
 
@@ -19,6 +19,7 @@ def test_ish_eager_vs_lazy():
 
     # Check that df_lazy is indeed lazy
     import dask.dataframe as dd
+
     assert isinstance(df_lazy, dd.DataFrame)
 
     # Compute
@@ -32,9 +33,10 @@ def test_ish_eager_vs_lazy():
     # Handle dtypes (Dask might have object instead of string for some columns)
     for col in df_eager.columns:
         if df_eager[col].dtype != df_lazy_c[col].dtype:
-             df_lazy_c[col] = df_lazy_c[col].astype(df_eager[col].dtype)
+            df_lazy_c[col] = df_lazy_c[col].astype(df_eager[col].dtype)
 
     pd.testing.assert_frame_equal(df_eager, df_lazy_c)
+
 
 def test_ish_lazy_resample():
     """Verify that resampling works on a lazy ISH dataset."""
@@ -45,7 +47,9 @@ def test_ish_lazy_resample():
     reader = ISHReader()
 
     # Load lazy with resample=True
-    ds = reader.open_dataset(dates, site=site, as_xarray=True, lazy=True, resample=True, window="3h")
+    ds = reader.open_dataset(
+        dates, site=site, as_xarray=True, lazy=True, resample=True, window="3h"
+    )
 
     # Compute
     ds_c = ds.compute()

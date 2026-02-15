@@ -270,10 +270,9 @@ def read_ish_file(
 
         import gzip
         import io
+        import warnings
 
         import requests
-
-        import warnings
 
         tries = 0
         while tries - 1 < request_retries:
@@ -424,7 +423,9 @@ class ISH:
         self.verbose = False
         self.source = "ncdc"
 
-    def read_data_frame(self, url_or_file: str, *, request_timeout: int = 10, request_retries: int = 4) -> pd.DataFrame:
+    def read_data_frame(
+        self, url_or_file: str, *, request_timeout: int = 10, request_retries: int = 4
+    ) -> pd.DataFrame:
         """Read a single ISH data frame."""
         return read_ish_file(
             url_or_file,
@@ -433,7 +434,9 @@ class ISH:
             request_retries=request_retries,
         )
 
-    def read_ish_history(self, dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None):
+    def read_ish_history(
+        self, dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None
+    ):
         """
         Read the ISH history file and filter by dates.
 
