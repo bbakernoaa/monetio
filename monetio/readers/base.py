@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from ..util import force_object_strings
+from ..util import ds_to_2d, force_object_strings
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
@@ -146,6 +146,7 @@ class PointReader(BaseReader):
     def to_xarray(self, df: Union[pd.DataFrame, "dd.DataFrame"]) -> xr.Dataset:
         """
         Convert the DataFrame to an xarray Dataset in UGRID convention.
+        Returns a 1D dataset by default to ensure backend consistency and laziness.
 
         Parameters
         ----------
@@ -155,7 +156,7 @@ class PointReader(BaseReader):
         Returns
         -------
         xr.Dataset
-            The dataset in UGRID convention.
+            The dataset in 1D UGRID convention.
         """
         # 1. Identify backend
         try:
@@ -185,81 +186,30 @@ class PointReader(BaseReader):
         temp_df = force_object_strings(temp_df)
 
         if is_dask:
-            # 3a. Lazy Path (Always 1D)
-            # For dask dataframes, we return a 1D dataset to keep it lazy and avoid shuffles.
+            # 3a. Lazy Path
             ds = xr.Dataset()
             # Exception to "No Hidden Computes": lengths=True is required by Xarray
             # to determine dimension sizes for the Dataset structure.
             for col in temp_df.columns:
                 ds[col] = (("node",), temp_df[col].to_dask_array(lengths=True))
+        else:
+            # 3b. Eager Path
+            # Consistently use 1D for both Eager and Lazy by default.
+            ds = temp_df.reset_index(drop=True).to_xarray()
+            if "index" in ds.dims:
+                ds = ds.rename({"index": "node"})
 
-            # Set standard coordinates
-            coords = [c for c in ["time", "siteid", "latitude", "longitude"] if c in ds.data_vars]
-            ds = ds.set_coords(coords)
-            # Add node coordinate to match pandas behavior
+        # Set standard coordinates
+        coords = [c for c in ["time", "siteid", "latitude", "longitude"] if c in ds.data_vars]
+        ds = ds.set_coords(coords)
+
+        # Ensure node coordinate is a simple integer range for both
+        if "node" in ds.dims:
             ds.coords["node"] = (("node",), np.arange(ds.sizes["node"]))
 
-        else:
-            # 3b. Eager Path (Try 2D expansion)
-            index_cols = [c for c in ["time", "siteid"] if c in temp_df.columns]
-
-            if len(index_cols) == 2:
-                # Check for uniqueness to see if we can create a 2D (time x site) dataset
-                idx_cols = ["time", "siteid"]
-                if temp_df.set_index(idx_cols).index.is_unique:
-                    # Standard MONET site metadata columns
-                    site_meta_cols = [
-                        "latitude",
-                        "longitude",
-                        "site",
-                        "site_name",
-                        "state_name",
-                        "epa_region",
-                        "msa_name",
-                        "msa_code",
-                        "cmsa_name",
-                        "utcoffset",
-                    ]
-                    present_meta = [c for c in site_meta_cols if c in temp_df.columns]
-
-                    if present_meta:
-                        # Extract one record per siteid to create 1D coordinates
-                        meta_df = temp_df[["siteid"] + present_meta].drop_duplicates(
-                            subset=["siteid"]
-                        )
-                        meta_df = meta_df.set_index("siteid")
-                        # Remove from main DF so they don't become 2D variables
-                        temp_df = temp_df.drop(columns=present_meta)
-                    else:
-                        meta_df = pd.DataFrame()
-
-                    ds = temp_df.set_index(idx_cols).to_xarray()
-                    # Rename siteid to node for UGRID compliance
-                    ds = ds.rename({"siteid": "node"})
-
-                    # Re-attach site metadata as 1D coords indexed by node
-                    for col in meta_df.columns:
-                        ds.coords[col] = (("node",), meta_df.loc[ds.node.values, col].values)
-                else:
-                    # Fallback to 1D for long format
-                    ds = temp_df.reset_index(drop=True).to_xarray()
-                    if "index" in ds.dims:
-                        ds = ds.rename({"index": "node"})
-                    coords = [
-                        c for c in ["time", "siteid", "latitude", "longitude"] if c in ds.data_vars
-                    ]
-                    ds = ds.set_coords(coords)
-
-            elif index_cols:
-                ds = temp_df.set_index(index_cols).to_xarray()
-                if "siteid" in ds.dims:
-                    ds = ds.rename({"siteid": "node"})
-                if "index" in ds.dims:
-                    ds = ds.rename({"index": "node"})
-            else:
-                ds = temp_df.to_xarray()
-                if "index" in ds.dims:
-                    ds = ds.rename({"index": "node"})
+        # 4. Standard Path (Consistently try 2D expansion by default)
+        # The user requested 2D UGRID as default.
+        ds = ds_to_2d(ds)
 
         # Add UGRID metadata
         if "node" in ds.dims:

@@ -138,13 +138,6 @@ class AQSReader(PointReader):
             else:
                 ds.attrs["history"] = history
 
-            if wide_fmt and lazy and "variable" in ds.data_vars:
-                warnings.warn(
-                    "AQS: Dataset is in 'long' format because lazy=True. "
-                    "Use ds.to_dataset(dim='variable') or similar to pivot lazily.",
-                    UserWarning,
-                )
-
             return ds
 
         return df
