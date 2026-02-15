@@ -140,8 +140,14 @@ class AQSReader(PointReader):
 
             return ds
 
-        return df
+            if wide_fmt and lazy and "variable" in ds.data_vars:
+                warnings.warn(
+                    "AQS: Dataset is in 'long' format because lazy=True. "
+                    "Use ds.to_dataset(dim='variable') or similar to pivot lazily.",
+                    UserWarning,
+                )
 
+            return ds
 
 class AQS:
     """Helper class for AQS data retrieval and processing."""
