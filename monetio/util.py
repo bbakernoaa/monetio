@@ -518,6 +518,44 @@ def get_nc_values(nc_var):
     return values
 
 
+def force_object_strings(df):
+    """
+    Force string columns to 'object' dtype to avoid nullable string issues in Pandas/Dask.
+
+    Parameters
+    ----------
+    df : Union[pd.DataFrame, dd.DataFrame]
+        Input dataframe.
+
+    Returns
+    -------
+    Union[pd.DataFrame, dd.DataFrame]
+        Dataframe with string columns cast to object.
+    """
+    import pandas as pd
+
+    try:
+        import dask.dataframe as dd
+
+        is_dask = isinstance(df, dd.DataFrame)
+    except ImportError:
+        is_dask = False
+
+    if is_dask:
+        # For Dask, we use assign to ensure metadata is updated
+        # and we explicitly cast to object.
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]):
+                df = df.assign(**{col: df[col].astype(object)})
+        return df
+    else:
+        df = df.copy()
+        for col in df.columns:
+            if pd.api.types.is_string_dtype(df[col]):
+                df[col] = df[col].astype(object)
+        return df
+
+
 def _try_merge_exact(left, right, *, right_name=None):
     """For two ``xr.Dataset``s, try ``left.merge(right, compat="equals", join="exact")``.
     If it fails, print informative debugging messages and re-raise.
