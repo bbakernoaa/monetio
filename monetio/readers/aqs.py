@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     import dask.dataframe as dd
 
 from monetio.obs.epa_util import read_monitor_file
-from monetio.util import long_to_wide
+from monetio.util import force_object_strings, long_to_wide
 
 from .base import PointReader, register_reader
 
@@ -275,6 +275,7 @@ class AQS:
         voc = "VOC" in url
         df = self.get_species(df, voc=voc)
         df = self.change_units(df)
+        df = force_object_strings(df)
         return df.drop(columns="date_of_last_change", errors="ignore")
 
     def build_url(self, param: str, year: str, daily: bool = False) -> tuple:
