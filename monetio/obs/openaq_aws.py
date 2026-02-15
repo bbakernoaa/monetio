@@ -21,6 +21,7 @@ def add_data(
     provider=None,
     find_paths=True,
     n_procs=1,
+    as_xarray=True,
 ):
     """Retrieve and load OpenAQ archive data from AWS."""
     return OpenAQAWSReader().open_dataset(
@@ -30,4 +31,5 @@ def add_data(
         provider=provider,
         find_paths=find_paths,
         n_procs=n_procs,
+        as_xarray=as_xarray,
     )

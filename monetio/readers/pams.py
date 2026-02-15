@@ -10,7 +10,7 @@ from .drivers import FileUtility
 
 @register_reader("pams")
 class PAMSReader(PointReader):
-    def open_dataset(self, files, as_xarray=False, **kwargs):
+    def open_dataset(self, files, as_xarray=True, **kwargs):
         """
         Reads PAMS JSON files.
         """

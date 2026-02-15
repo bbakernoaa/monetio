@@ -4,6 +4,7 @@ import warnings
 from datetime import datetime
 from functools import lru_cache
 from io import BytesIO
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -36,7 +37,7 @@ class AERONETReader(PointReader):
         n_procs=1,
         verbose=10,
         files=None,
-        as_xarray=False,
+        as_xarray=True,
         lazy=False,
         **kwargs,
     ):
@@ -44,7 +45,7 @@ class AERONETReader(PointReader):
         Reads AERONET data.
         """
         if files:
-            if isinstance(files, str):
+            if isinstance(files, (str, Path)) or hasattr(files, "__fspath__"):
                 files = [files]
 
             dfs = []
@@ -349,12 +350,21 @@ class AERONET:
             engine="python",
             header="infer",
             skiprows=skiprows,
-            parse_dates={"time": [1, 2]},
             usecols=None,
-            date_format=r"%d:%m:%Y %H:%M:%S",
             na_values=-999,
         )
         df.rename(columns=str.lower, inplace=True)
+
+        # Handle time manually for Pandas 3.0 compatibility
+        # In AERONET v3, columns are Date(dd:mm:yyyy) and Time(hh:mm:ss)
+        # They are usually the 2nd and 3rd columns (index 1 and 2)
+        # After lowercasing: 'date(dd:mm:yyyy)' and 'time(hh:mm:ss)'
+        date_col = [c for c in df.columns if "date(" in c][0]
+        time_col = [c for c in df.columns if "time(" in c][0]
+        df["time"] = pd.to_datetime(
+            df[date_col] + " " + df[time_col], format=r"%d:%m:%Y %H:%M:%S", errors="coerce"
+        )
+        df.drop(columns=[date_col, time_col], inplace=True)
         df.rename(
             columns={
                 "aeronet_site": "siteid",

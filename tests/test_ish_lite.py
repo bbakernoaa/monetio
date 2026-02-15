@@ -32,7 +32,7 @@ def test_ish_lite_one_site():
     dates = pd.date_range("2020-09-01", "2020-09-02")
     site = "72224400358"  # "College Park AP"
 
-    df = ish_lite.add_data(dates, site=site)
+    df = ish_lite.add_data(dates, site=site, as_xarray=False)
 
     assert (df.siteid == site).all(), "correct site"
     assert (df.time.diff().dropna() == pd.Timedelta("1h")).all(), "hourly data"
@@ -66,7 +66,7 @@ def test_ish_lite_one_site_empty(resample):
     dates = pd.date_range("2020-09-01", "2020-09-02")
     site = "99816999999"  # "Delaware Reserve"
 
-    df = ish_lite.add_data(dates, site=site, resample=resample)
+    df = ish_lite.add_data(dates, site=site, resample=resample, as_xarray=False)
     assert df.empty
 
 
@@ -75,7 +75,7 @@ def test_ish_lite_resample():
     site = "72224400358"  # "College Park AP"
     freq = "3h"
 
-    df = ish_lite.add_data(dates, site=site, resample=True, window=freq)
+    df = ish_lite.add_data(dates, site=site, resample=True, window=freq, as_xarray=False)
 
     assert (df.time.diff().dropna() == pd.Timedelta(freq)).all()
     assert len(df) == 8

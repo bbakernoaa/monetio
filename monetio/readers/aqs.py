@@ -24,7 +24,7 @@ class AQSReader(PointReader):
         wide_fmt=True,
         n_procs=1,
         meta=False,
-        as_xarray=False,
+        as_xarray=True,
         **kwargs,
     ):
         """

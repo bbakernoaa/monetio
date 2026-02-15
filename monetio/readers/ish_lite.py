@@ -22,7 +22,7 @@ class ISHLiteReader(PointReader):
         window="h",
         n_procs=1,
         verbose=False,
-        as_xarray=False,
+        as_xarray=True,
         **kwargs,
     ):
         """

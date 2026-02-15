@@ -19,8 +19,9 @@ def add_data(
     request_timeout=10,
     request_retries=4,
     verbose=False,
+    as_xarray=True,
 ):
-    """Retrieve and load ISH data as a DataFrame."""
+    """Retrieve and load ISH data."""
     return ISHReader().open_dataset(
         dates,
         box=box,
@@ -34,4 +35,5 @@ def add_data(
         request_timeout=request_timeout,
         request_retries=request_retries,
         verbose=verbose,
+        as_xarray=as_xarray,
     )

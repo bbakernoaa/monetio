@@ -12,7 +12,7 @@ from .base import PointReader, register_reader
 
 @register_reader("openaq")
 class OpenAQReader(PointReader):
-    def open_dataset(self, dates, n_procs=1, wide_fmt=True, as_xarray=False, lazy=False, **kwargs):
+    def open_dataset(self, dates, n_procs=1, wide_fmt=True, as_xarray=True, lazy=False, **kwargs):
         """
         Reads OpenAQ data from S3.
         """

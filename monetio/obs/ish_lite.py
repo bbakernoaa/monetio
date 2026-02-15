@@ -16,8 +16,9 @@ def add_data(
     window="h",
     n_procs=1,
     verbose=False,
+    as_xarray=True,
 ):
-    """Retrieve and load ISH-lite data as a DataFrame."""
+    """Retrieve and load ISH Lite data."""
     return ISHLiteReader().open_dataset(
         dates,
         box=box,
@@ -28,4 +29,5 @@ def add_data(
         window=window,
         n_procs=n_procs,
         verbose=verbose,
+        as_xarray=as_xarray,
     )

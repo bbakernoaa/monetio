@@ -26,7 +26,7 @@ class ISHReader(PointReader):
         request_retries=4,
         verbose=False,
         source="ncdc",
-        as_xarray=False,
+        as_xarray=True,
         **kwargs,
     ):
         """

@@ -273,6 +273,7 @@ class OpenAQAWSReader(PointReader):
         provider=None,
         find_paths=True,
         n_procs=1,
+        as_xarray=True,
         **kwargs,
     ):
         """Add OpenAQ data from AWS Open Data."""
@@ -305,11 +306,11 @@ class OpenAQAWSReader(PointReader):
         ]
         df = dd.from_map(func, urls, meta=meta).compute(num_workers=n_procs)
 
-        ds = df.reset_index(drop=True)
-        ds.attrs["history"] = (
-            f"Read OpenAQ AWS Archive data for dates {dates.min()} to {dates.max()}"
-        )
-        return ds
+        df = self.harmonize(df)
+        if as_xarray:
+            return self.to_xarray(df)
+
+        return df
 
 
 def add_data(
