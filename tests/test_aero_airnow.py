@@ -1,7 +1,9 @@
 import pandas as pd
 import pytest
 import xarray as xr
+
 from monetio.readers.airnow import AirNowReader
+
 
 def test_airnow_eager_vs_lazy():
     """
@@ -40,6 +42,7 @@ def test_airnow_eager_vs_lazy():
     assert "history" in ds_eager.attrs
     assert "Read AirNow data" in ds_eager.attrs["history"]
     assert "Converted to xarray Dataset" in ds_eager.attrs["history"]
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

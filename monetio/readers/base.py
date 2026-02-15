@@ -195,7 +195,8 @@ class PointReader(BaseReader):
         if is_dask:
             # For dask dataframes, we return a 1D dataset to keep it lazy and avoid shuffles.
             ds = xr.Dataset()
-            # lengths=True is needed by Xarray to know the dimension size
+            # Exception to "No Hidden Computes": lengths=True is required by Xarray
+            # to determine dimension sizes for the Dataset structure.
             for col in temp_df.columns:
                 ds[col] = (("node",), temp_df[col].to_dask_array(lengths=True))
 
