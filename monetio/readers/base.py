@@ -119,7 +119,7 @@ class PointReader(BaseReader):
         df = force_object_strings(df)
 
         if as_xarray:
-            return self.to_xarray(df)
+            return self.to_xarray(df, **kwargs)
 
         return df
 
@@ -143,20 +143,26 @@ class PointReader(BaseReader):
             df = df.dropna(subset=["latitude", "longitude"])
         return super().harmonize(df)
 
-    def to_xarray(self, df: Union[pd.DataFrame, "dd.DataFrame"]) -> xr.Dataset:
+    def to_xarray(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs
+    ) -> xr.Dataset:
         """
         Convert the DataFrame to an xarray Dataset in UGRID convention.
-        Returns a 1D dataset by default to ensure backend consistency and laziness.
+        By default, returns a 2D dataset (time, node) if expand2d=True.
 
         Parameters
         ----------
         df : Union[pd.DataFrame, dd.DataFrame]
             Input dataframe.
+        expand2d : bool, optional
+            Whether to expand to 2D (time, node) structure, by default True.
+        **kwargs : dict
+            Additional arguments passed to ds_to_2d (e.g. pivot).
 
         Returns
         -------
         xr.Dataset
-            The dataset in 1D UGRID convention.
+            The dataset in UGRID convention.
         """
         # 1. Identify backend
         try:
@@ -209,7 +215,10 @@ class PointReader(BaseReader):
 
         # 4. Standard Path (Consistently try 2D expansion by default)
         # The user requested 2D UGRID as default.
-        ds = ds_to_2d(ds)
+        if expand2d:
+            # We pass kwargs to allow control over pivoting (wide_fmt or pivot)
+            pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
+            ds = ds_to_2d(ds, pivot=pivot)
 
         # Add UGRID metadata
         if "node" in ds.dims:

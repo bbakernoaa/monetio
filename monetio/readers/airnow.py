@@ -110,7 +110,7 @@ class AirNowReader(PointReader):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
-            ds = self.to_xarray(df)
+            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
 
             # Update history
             history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read AirNow data."

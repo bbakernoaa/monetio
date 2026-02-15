@@ -556,15 +556,17 @@ def force_object_strings(df):
         return df
 
 
-def ds_to_2d(ds):
+def ds_to_2d(ds, pivot=True):
     """
     Lazily transform a 1D UGRID dataset into a 2D (time, node) dataset.
-    If 'variable' is present in coordinates, it also pivots the data variables.
+    If 'variable' is present in coordinates and pivot=True, it also pivots the data variables.
 
     Parameters
     ----------
     ds : xarray.Dataset
         Input 1D dataset with 'time' and 'siteid' coordinates.
+    pivot : bool, optional
+        Whether to pivot by 'variable' column if present, by default True.
 
     Returns
     -------
@@ -591,7 +593,7 @@ def ds_to_2d(ds):
     )
 
     try:
-        if "variable" in ds.coords:
+        if "variable" in ds.coords and pivot:
             # Full pivot path (long-to-wide)
             # 1. Expand obs and units to 2D (time, siteid, variable)
             # To handle multiple data vars consistently, we set MultiIndex and unstack
