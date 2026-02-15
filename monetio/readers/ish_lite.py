@@ -297,10 +297,11 @@ class ISH:
 
         # Ensure consistent dtypes for merge and to avoid nullable string issues in Pandas 3.0
         def _force_object(df_in):
-            for col in df_in.columns:
-                if pd.api.types.is_string_dtype(df_in[col]):
-                    df_in[col] = df_in[col].astype(object)
-            return df_in
+            df_out = df_in.copy()
+            for col in df_out.columns:
+                if pd.api.types.is_string_dtype(df_out[col]):
+                    df_out[col] = df_out[col].astype(object)
+            return df_out
 
         dfloc = _force_object(dfloc)
 

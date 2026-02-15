@@ -511,10 +511,11 @@ def get_station_locations(
     # we force string columns to 'object' (NumPy style) rather than nullable 'string'.
     # This ensures bit-perfect matching in tests and avoids Dask/Pandas 3.0 discrepancies.
     def _force_object(df_in):
-        for col in df_in.columns:
-            if pd.api.types.is_string_dtype(df_in[col]):
-                df_in[col] = df_in[col].astype(object)
-        return df_in
+        df_out = df_in.copy()
+        for col in df_out.columns:
+            if pd.api.types.is_string_dtype(df_out[col]):
+                df_out[col] = df_out[col].astype(object)
+        return df_out
 
     monitor_df = _force_object(monitor_df.drop_duplicates(subset=["siteid"]))
 
