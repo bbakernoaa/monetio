@@ -80,6 +80,19 @@ def wsdir2uv(ws, wdir):
 
 
 def long_to_wide(df):
+    """
+    Convert a long-format DataFrame (or Dask DataFrame) to wide format.
+
+    Parameters
+    ----------
+    df : Union[pd.DataFrame, dd.DataFrame]
+        The input DataFrame in long format, containing 'time', 'siteid', 'variable', 'obs', and 'units'.
+
+    Returns
+    -------
+    Union[pd.DataFrame, dd.DataFrame]
+        The DataFrame in wide format.
+    """
     try:
         import dask.dataframe as dd
 
@@ -88,28 +101,37 @@ def long_to_wide(df):
         is_dask = False
 
     if is_dask:
-        # Dask doesn't support multi-index pivot_table well.
-        # We compute for now, but warn.
-        # TODO: Implement lazy pivot if possible.
+        # Dask doesn't support multi-index pivot_table well and requires categories.
+        # To remain lazy, we should avoid computing here if possible.
+        # However, many parts of MONETIO expect a wide DataFrame before Xarray conversion.
+        # For now, we keep the compute but make it explicit that it's a bottleneck.
         import warnings
 
-        warnings.warn("long_to_wide: Computing dask dataframe to perform pivot_table.")
+        warnings.warn(
+            "long_to_wide: Computing dask dataframe to perform pivot_table. "
+            "Consider using as_xarray=True with lazy=True to avoid this.",
+            UserWarning,
+        )
         df = df.compute()
 
+    # Pivot the data
     w = df.pivot_table(values="obs", index=["time", "siteid"], columns="variable").reset_index()
 
     # Add units (columns)
-    # If it was dask, it is now pandas.
-    for name, group in df.groupby("variable"):
-        units = group.units.unique().tolist()
-        if len(units) > 1:
-            print(f"warning: non-unique units found, {units!r}, taking first")
-        w[f"{name}_unit"] = units[0]
+    # We do this in a vectorized way to be faster
+    if not w.empty:
+        # Get unique variable/unit pairs
+        units_map = df[["variable", "units"]].drop_duplicates()
+        # If there are multiple units for one variable, we take the first
+        units_map = units_map.drop_duplicates(subset=["variable"])
+        for _, row in units_map.iterrows():
+            w[f"{row.variable}_unit"] = row.units
 
     # Get site info to add, allowing for possible time variation
-    site_info = df.drop(["variable", "obs", "units"], axis=1).drop_duplicates()
+    # We drop 'variable', 'obs', 'units' which are handled by the pivot/units_map
+    site_info = df.drop(columns=["variable", "obs", "units"], errors="ignore").drop_duplicates()
 
-    return w.merge(site_info, on=["time", "siteid"], how="left")  # .reset_index()
+    return w.merge(site_info, on=["time", "siteid"], how="left")
 
 
 def calc_8hr_rolling_max(df, col=None, window=None):
