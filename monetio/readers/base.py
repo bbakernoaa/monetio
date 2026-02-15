@@ -198,7 +198,11 @@ class PointReader(BaseReader):
             # Exception to "No Hidden Computes": lengths=True is required by Xarray
             # to determine dimension sizes for the Dataset structure.
             for col in temp_df.columns:
-                ds[col] = (("node",), temp_df[col].to_dask_array(lengths=True))
+                # Force string columns to object to avoid nullable string issues in Xarray/Dask
+                series = temp_df[col]
+                if pd.api.types.is_string_dtype(series):
+                    series = series.astype(object)
+                ds[col] = (("node",), series.to_dask_array(lengths=True))
 
             # Set standard coordinates
             coords = [c for c in ["time", "siteid", "latitude", "longitude"] if c in ds.data_vars]

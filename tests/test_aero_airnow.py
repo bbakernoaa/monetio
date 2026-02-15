@@ -36,6 +36,19 @@ def test_airnow_eager_vs_lazy():
     ds_eager_no_hist.attrs.pop("history", None)
     ds_lazy_no_hist.attrs.pop("history", None)
 
+    # To avoid "boolean value of NA is ambiguous" in assert_allclose
+    # when pd.NA is present in object arrays (common in Pandas 3.0),
+    # we convert object arrays to standard NumPy objects (using None for missing).
+    def _sanitize(ds):
+        for v in list(ds.data_vars) + list(ds.coords):
+            if ds[v].dtype == object:
+                # This converts pd.NA to None in object arrays
+                ds[v] = ds[v].where(ds[v].notnull(), None)
+        return ds
+
+    ds_eager_no_hist = _sanitize(ds_eager_no_hist)
+    ds_lazy_no_hist = _sanitize(ds_lazy_no_hist)
+
     xr.testing.assert_allclose(ds_eager_no_hist, ds_lazy_no_hist)
 
     # Verify provenance

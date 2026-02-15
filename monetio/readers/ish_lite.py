@@ -295,7 +295,26 @@ class ISH:
 
                 warnings.warn("ISHLiteReader: Resampling is currently not supported in lazy mode.")
 
-        df = df.merge(dfloc, how="left", left_on="siteid", right_on="station_id").rename(
-            columns={"ctry": "country"}
-        )
+        # Ensure consistent dtypes for merge and to avoid nullable string issues in Pandas 3.0
+        def _force_object(df_in):
+            for col in df_in.columns:
+                if pd.api.types.is_string_dtype(df_in[col]):
+                    df_in[col] = df_in[col].astype(object)
+            return df_in
+
+        dfloc = _force_object(dfloc)
+
+        if lazy:
+            import dask.dataframe as dd
+
+            df = df.assign(siteid=df.siteid.astype(object))
+            dfloc_dask = dd.from_pandas(dfloc, npartitions=1).assign(
+                station_id=lambda x: x.station_id.astype(object)
+            )
+            df = df.merge(dfloc_dask, how="left", left_on="siteid", right_on="station_id")
+        else:
+            df["siteid"] = df["siteid"].astype(object)
+            df = df.merge(dfloc, how="left", left_on="siteid", right_on="station_id")
+
+        df = df.rename(columns={"ctry": "country"})
         return df.drop(["station_id"], axis=1)

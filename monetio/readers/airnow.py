@@ -368,7 +368,8 @@ def read_airnow_csv(
             return pd.DataFrame(columns=hourly_cols)
 
     dft["obs"] = dft.obs.astype(float)
-    dft["siteid"] = dft.siteid.str.zfill(9)
+    # Ensure siteid is object (str) to avoid nullable string issues in Dask/Pandas 3.0
+    dft["siteid"] = dft.siteid.str.zfill(9).astype(object)
 
     if not daily and "utcoffset" in dft.columns:
         dft["utcoffset"] = dft.utcoffset.astype(int)
@@ -496,10 +497,6 @@ def get_station_locations(
     Union[pd.DataFrame, dd.DataFrame]
         Dataframe with site metadata.
     """
-    monitor_df = read_monitor_file(airnow=True)
-    # Ensure siteid is object to avoid dtype mismatch warnings and issues
-    monitor_df["siteid"] = monitor_df["siteid"].astype(object)
-
     # Check if dask
     try:
         import dask.dataframe as dd
@@ -508,20 +505,30 @@ def get_station_locations(
     except ImportError:
         is_dask = False
 
+    monitor_df = read_monitor_file(airnow=True)
+
+    # To avoid "boolean value of NA is ambiguous" and merge warnings,
+    # we force string columns to 'object' (NumPy style) rather than nullable 'string'.
+    # This ensures bit-perfect matching in tests and avoids Dask/Pandas 3.0 discrepancies.
+    def _force_object(df_in):
+        for col in df_in.columns:
+            if pd.api.types.is_string_dtype(df_in[col]):
+                df_in[col] = df_in[col].astype(object)
+        return df_in
+
+    monitor_df = _force_object(monitor_df.drop_duplicates(subset=["siteid"]))
+
     if is_dask:
-        # Avoid the 'string' (Pandas extension) vs 'object' mismatch in Dask
-        # Convert both to object for a safe merge
+        # Cast key to object on dask side too
         df["siteid"] = df["siteid"].astype(object)
-        monitor_df["siteid"] = monitor_df["siteid"].astype(object)
         # Convert monitor_df to dask to ensure consistent merging
-        monitor_df_dask = dd.from_pandas(
-            monitor_df.drop_duplicates(subset=["siteid"]), npartitions=1
+        # and explicitly cast to object to avoid nullable string issues in Pandas 3.0
+        monitor_df_dask = dd.from_pandas(monitor_df, npartitions=1).assign(
+            siteid=lambda x: x.siteid.astype(object)
         )
         df = df.merge(monitor_df_dask, on="siteid", how="left")
     else:
         df["siteid"] = df["siteid"].astype(object)
-        monitor_df["siteid"] = monitor_df["siteid"].astype(object)
-        df = df.merge(
-            monitor_df.drop_duplicates(subset=["siteid"]), on="siteid", how="left", copy=False
-        )
+        df = df.merge(monitor_df, on="siteid", how="left")
+
     return df
