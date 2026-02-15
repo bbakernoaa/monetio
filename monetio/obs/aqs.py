@@ -19,7 +19,7 @@ def add_data(
 ):
     """Retrieve and load AQS data."""
     return AQSReader().open_dataset(
-        dates,
+        dates=dates,
         param=param,
         daily=daily,
         network=network,

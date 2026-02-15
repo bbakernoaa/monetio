@@ -1,10 +1,11 @@
 """AQS Reader"""
 
-import os
 import warnings
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Union
+from functools import partial
+from typing import TYPE_CHECKING, List, Optional, Union
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -21,10 +22,11 @@ from .base import PointReader, register_reader
 class AQSReader(PointReader):
     def open_dataset(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
-        param: Union[str, List[str]] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
+        param: Optional[Union[str, List[str]]] = None,
         daily: bool = False,
-        network: str = None,
+        network: Optional[str] = None,
         download: bool = False,
         local: bool = False,
         wide_fmt: bool = True,
@@ -39,8 +41,10 @@ class AQSReader(PointReader):
 
         Parameters
         ----------
-        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
-            Dates to retrieve.
+        files : Union[str, List[str]], optional
+            File path, list of paths, or glob pattern.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve if files are not provided.
         param : Union[str, List[str]], optional
             Parameter(s) to retrieve (e.g., 'OZONE', 'PM2.5'), by default None.
         daily : bool, optional
@@ -62,7 +66,7 @@ class AQSReader(PointReader):
         lazy : bool, optional
             Whether to return a dask-backed object, by default False.
         **kwargs : dict
-            Additional arguments.
+            Additional arguments passed to the reader.
 
         Returns
         -------
@@ -70,22 +74,61 @@ class AQSReader(PointReader):
             The loaded AQS data.
         """
         a = AQS()
-        df = a.add_data(
-            dates,
-            param=param,
-            daily=daily,
-            network=network,
-            download=download,
-            local=local,
-            n_procs=n_procs,
-            meta=meta,
+
+        if files is None:
+            if dates is None:
+                raise ValueError("Must provide either 'files' or 'dates'.")
+
+            # Build URLs
+            params = a._get_param_list(param)
+            urls, fnames = a.build_urls(params, dates, daily=daily)
+
+            if not urls:
+                return pd.DataFrame()
+
+            if download:
+                for url, fname in zip(urls, fnames):
+                    a.retrieve(url, fname)
+                files = fnames
+            elif local:
+                files = fnames
+            else:
+                files = urls
+
+        # Use PandasDriver via base class
+        # Pass a partial of load_aqs_file as the read_method
+        read_func = partial(a.load_aqs_file, network=network)
+
+        df = super().open_dataset(
+            files,
+            read_method=read_func,
+            as_xarray=False,
             lazy=lazy,
+            **kwargs,
         )
 
-        if wide_fmt:
+        if len(df) == 0:
+            return df
+
+        # Filter dates
+        if dates is not None:
+            dates_idx = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
+            # Backend agnostic filter
+            df = df[df.time.between(dates_idx.min(), dates_idx.max())]
+
+        if meta:
+            df = a.add_metadata(df, daily=daily, network=network)
+
+        # We only perform wide_fmt here if NOT lazy, to avoid the hidden compute in long_to_wide
+        do_wide = wide_fmt and not lazy
+        if do_wide:
             df = long_to_wide(df)
 
         df = self.harmonize(df)
+
+        if not lazy and hasattr(df, "compute"):
+            df = df.compute(num_workers=n_procs)
+
         if as_xarray:
             ds = self.to_xarray(df)
             # Update history
@@ -94,19 +137,23 @@ class AQSReader(PointReader):
                 ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
             else:
                 ds.attrs["history"] = history
+
+            if wide_fmt and lazy and "variable" in ds.data_vars:
+                warnings.warn(
+                    "AQS: Dataset is in 'long' format because lazy=True. "
+                    "Use ds.to_dataset(dim='variable') or similar to pivot lazily.",
+                    UserWarning,
+                )
+
             return ds
 
         return df
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/obs/aqs.py
-# -----------------------------------------------------------------------------
-
-
 class AQS:
+    """Helper class for AQS data retrieval and processing."""
+
     def __init__(self):
-        self.objtype = "AQS"
         self.baseurl = "https://aqs.epa.gov/aqsweb/airdata/"
         self.renameddcols = [
             "time",
@@ -139,187 +186,10 @@ class AQS:
             "msa_name",
             "date_of_last_change",
         ]
-        self.savecols = [
-            "time_local",
-            "time",
-            "siteid",
-            "latitude",
-            "longitude",
-            "obs",
-            "units",
-            "variable",
-        ]
-        self.df = pd.DataFrame()
-        self.monitor_file = None
-        self.monitor_df = None
-        self.daily = False
-        self.d_df = None
 
-    def columns_rename(self, columns, verbose=False):
-        rcolumn = []
-        for ccc in columns:
-            if ccc.strip() == "Sample Measurement":
-                newc = "obs"
-            elif ccc.strip() == "Units of Measure":
-                newc = "units"
-            else:
-                newc = ccc.strip().lower().replace(" ", "_")
-            if verbose:
-                print(ccc + " renamed " + newc)
-            rcolumn.append(newc)
-        return rcolumn
-
-    def load_aqs_file(self, url, network):
-        if "daily" in url:
-            df = pd.read_csv(
-                url,
-                dtype={0: str, 1: str, 2: str},
-                encoding="ISO-8859-1",
-            )
-            # Find column for time_local
-            if "Date Local" in df.columns:
-                df["time_local"] = pd.to_datetime(df["Date Local"])
-                df.drop(["Date Local"], axis=1, inplace=True)
-
-            # Reorder columns to match renameddcols (first column is time_local, now named time in the result)
-            cols = df.columns.tolist()
-            if "time_local" in cols:
-                cols.insert(0, cols.pop(cols.index("time_local")))
-                df = df[cols]
-
-            if len(df.columns) == len(self.renameddcols):
-                df.columns = self.renameddcols
-
-            df["pollutant_standard"] = df.get("pollutant_standard", pd.Series(dtype=str)).astype(
-                str
-            )
-            self.daily = True
-        else:
-            df = pd.read_csv(
-                url,
-                low_memory=False,
-            )
-            # Handle dates manually to avoid deprecated parse_dates
-            if "Date GMT" in df.columns and "Time GMT" in df.columns:
-                df["time"] = pd.to_datetime(df["Date GMT"] + " " + df["Time GMT"])
-            if "Date Local" in df.columns and "Time Local" in df.columns:
-                df["time_local"] = pd.to_datetime(df["Date Local"] + " " + df["Time Local"])
-
-            df.columns = self.columns_rename(df.columns.values)
-
-        df["siteid"] = (
-            df.state_code.astype(str).str.zfill(2)
-            + df.county_code.astype(str).str.zfill(3)
-            + df.site_num.astype(str).str.zfill(4)
-        )
-        df.drop(["state_name", "county_name"], axis=1, inplace=True, errors="ignore")
-        df.columns = [i.lower() for i in df.columns]
-        if "daily" not in url:
-            df.drop(["datum", "qualifier"], axis=1, inplace=True, errors="ignore")
-        voc = "VOC" in url
-        df = self.get_species(df, voc=voc)
-        return df.drop("date_of_last_change", axis=1, errors="ignore")
-
-    def build_url(self, param, year, daily=False, download=False):
-        if daily:
-            beginning = self.baseurl + "daily_"
-            fname = "daily_"
-        else:
-            beginning = self.baseurl + "hourly_"
-            fname = "hourly_"
-
-        p = param.upper()
-        if p in ["OZONE", "O3"]:
-            code = "44201_"
-        elif p == "PM2.5":
-            code = "88101_"
-        elif p == "PM2.5_FRM":
-            code = "88502_"
-        elif p == "PM10":
-            code = "81102_"
-        elif p == "SO2":
-            code = "42401_"
-        elif p == "NO2":
-            code = "42602_"
-        elif p == "CO":
-            code = "42101_"
-        elif p == "NONOXNOY":
-            code = "NONOxNOy_"
-        elif p == "VOC":
-            code = "VOCS_"
-        elif p == "SPEC":
-            code = "SPEC_"
-        elif p == "PM10SPEC":
-            code = "PM10SPEC_"
-        elif p == "WIND":
-            code = "WIND_"
-        elif p == "TEMP":
-            code = "TEMP_"
-        elif p == "RHDP":
-            code = "RH_DP_"
-        elif p in ["WS", "WDIR"]:
-            code = "WIND_"
-        else:
-            code = p + "_"
-
-        url = beginning + code + year + ".zip"
-        fname = fname + code + year + ".zip"
-        return url, fname
-
-    def build_urls(self, params, dates, daily=False):
-        import requests
-
-        years = pd.DatetimeIndex(dates).year.unique().astype(str)
-        urls = []
-        fnames = []
-        for i in params:
-            for y in years:
-                url, fname = self.build_url(i, y, daily=daily)
-                try:
-                    # Using stream=True and Content-Length check to avoid downloading big files just for check
-                    with requests.get(url, stream=True, timeout=10) as r:
-                        if r.status_code == 200:
-                            content_length = int(r.headers.get("Content-Length", 0))
-                            if content_length > 500:
-                                urls.append(url)
-                                fnames.append(fname)
-                            else:
-                                print("File is Empty. Not Processing", url)
-                except Exception:
-                    pass
-        return urls, fnames
-
-    def retrieve(self, url, fname):
-        import requests
-
-        if not os.path.isfile(fname):
-            print("\n Retrieving: " + fname)
-            print(url)
-            r = requests.get(url)
-            with open(fname, "wb") as f:
-                f.write(r.content)
-        else:
-            print("\n File Exists: " + fname)
-
-    def add_data(
-        self,
-        dates,
-        param=None,
-        daily=False,
-        network=None,
-        download=False,
-        local=False,
-        n_procs=1,
-        meta=False,
-        lazy=False,
-    ):
-        import dask
-        import dask.dataframe as dd
-
-        dates = pd.DatetimeIndex(dates)
-
+    def _get_param_list(self, param: Optional[Union[str, List[str]]]) -> List[str]:
         if param is None:
-            params = [
+            return [
                 "SPEC",
                 "PM10",
                 "PM2.5",
@@ -334,64 +204,200 @@ class AQS:
                 "RHDP",
             ]
         elif isinstance(param, str):
-            params = [param]
+            return [param]
+        return param
+
+    def columns_rename(self, columns: List[str], verbose: bool = False) -> List[str]:
+        """Rename AQS columns to standard names."""
+        rcolumn = []
+        for ccc in columns:
+            ccc_clean = ccc.strip()
+            if ccc_clean == "Sample Measurement":
+                newc = "obs"
+            elif ccc_clean == "Units of Measure":
+                newc = "units"
+            else:
+                newc = ccc_clean.lower().replace(" ", "_")
+            if verbose:
+                print(f"{ccc} renamed {newc}")
+            rcolumn.append(newc)
+        return rcolumn
+
+    def load_aqs_file(self, url: str, network: Optional[str] = None) -> pd.DataFrame:
+        """Load a single AQS file."""
+        if "daily" in url:
+            df = pd.read_csv(
+                url,
+                dtype={0: str, 1: str, 2: str},
+                encoding="ISO-8859-1",
+            )
+            # Find column for time_local
+            if "Date Local" in df.columns:
+                df["time_local"] = pd.to_datetime(df["Date Local"])
+                df.drop(["Date Local"], axis=1, inplace=True)
+
+            # Reorder columns to match renameddcols (first column is time_local)
+            cols = df.columns.tolist()
+            if "time_local" in cols:
+                cols.insert(0, cols.pop(cols.index("time_local")))
+                df = df[cols]
+
+            if len(df.columns) == len(self.renameddcols):
+                df.columns = self.renameddcols
+
+            df["pollutant_standard"] = df.get("pollutant_standard", pd.Series(dtype=str)).astype(
+                str
+            )
         else:
-            params = param
+            df = pd.read_csv(
+                url,
+                low_memory=False,
+            )
+            # Handle dates manually
+            if "Date GMT" in df.columns and "Time GMT" in df.columns:
+                df["time"] = pd.to_datetime(df["Date GMT"] + " " + df["Time GMT"])
+            if "Date Local" in df.columns and "Time Local" in df.columns:
+                df["time_local"] = pd.to_datetime(df["Date Local"] + " " + df["Time Local"])
 
-        urls, fnames = self.build_urls(params, dates, daily=daily)
+            df.columns = self.columns_rename(df.columns.values)
+            # Remove duplicate time_local if it was created from 'Time Local'
+            df = df.loc[:, ~df.columns.duplicated()]
 
-        if download:
-            for url, fname in zip(urls, fnames):
-                self.retrieve(url, fname)
-            dfs = [dask.delayed(self.load_aqs_file)(i, network) for i in fnames]
-        elif local:
-            dfs = [dask.delayed(self.load_aqs_file)(i, network) for i in fnames]
+        df["siteid"] = (
+            df.state_code.astype(str).str.zfill(2)
+            + df.county_code.astype(str).str.zfill(3)
+            + df.site_num.astype(str).str.zfill(4)
+        )
+        df.drop(["state_name", "county_name"], axis=1, inplace=True, errors="ignore")
+        df.columns = [i.lower() for i in df.columns]
+        if "daily" not in url:
+            df.drop(["datum", "qualifier"], axis=1, inplace=True, errors="ignore")
+        voc = "VOC" in url
+        df = self.get_species(df, voc=voc)
+        df = self.change_units(df)
+        return df.drop(columns="date_of_last_change", errors="ignore")
+
+    def build_url(self, param: str, year: str, daily: bool = False) -> tuple:
+        """Build URL and filename for a given parameter and year."""
+        if daily:
+            beginning = self.baseurl + "daily_"
+            fname_prefix = "daily_"
         else:
-            dfs = [dask.delayed(self.load_aqs_file)(i, network) for i in urls]
+            beginning = self.baseurl + "hourly_"
+            fname_prefix = "hourly_"
 
-        if not dfs:
-            return pd.DataFrame()
+        p = param.upper()
+        mapping = {
+            "OZONE": "44201_",
+            "O3": "44201_",
+            "PM2.5": "88101_",
+            "PM2.5_FRM": "88502_",
+            "PM10": "81102_",
+            "SO2": "42401_",
+            "NO2": "42602_",
+            "CO": "42101_",
+            "NONOXNOY": "NONOxNOy_",
+            "VOC": "VOCS_",
+            "SPEC": "SPEC_",
+            "PM10SPEC": "PM10SPEC_",
+            "WIND": "WIND_",
+            "TEMP": "TEMP_",
+            "RHDP": "RH_DP_",
+            "WS": "WIND_",
+            "WDIR": "WIND_",
+        }
+        code = mapping.get(p, p + "_")
 
-        dff = dd.from_delayed(dfs)
-        if not lazy:
-            dfff = dff.compute(num_workers=n_procs)
+        url = f"{beginning}{code}{year}.zip"
+        fname = f"{fname_prefix}{code}{year}.zip"
+        return url, fname
+
+    def build_urls(self, params: List[str], dates, daily: bool = False) -> tuple:
+        """Build multiple URLs for given parameters and dates."""
+        import requests
+
+        years = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates))).year.unique().astype(str)
+        urls = []
+        fnames = []
+        for i in params:
+            for y in years:
+                url, fname = self.build_url(i, y, daily=daily)
+                try:
+                    with requests.get(url, stream=True, timeout=10) as r:
+                        if r.status_code == 200:
+                            content_length = int(r.headers.get("Content-Length", 0))
+                            if content_length > 500:
+                                urls.append(url)
+                                fnames.append(fname)
+                            else:
+                                print(f"File is Empty. Not Processing {url}")
+                except Exception:
+                    pass
+        return urls, fnames
+
+    def retrieve(self, url: str, fname: str):
+        """Retrieve a file from a URL."""
+        import os
+
+        import requests
+
+        if not os.path.isfile(fname):
+            print(f"\n Retrieving: {fname}")
+            print(url)
+            r = requests.get(url)
+            with open(fname, "wb") as f:
+                f.write(r.content)
         else:
-            dfff = dff
+            print(f"\n File Exists: {fname}")
 
-        dfff = dfff[dfff.time.between(dates.min(), dates.max())]
+    def add_metadata(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"], daily: bool = False, network: str = None
+    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
+        """Add site metadata and adjust time for daily data."""
+        try:
+            import dask.dataframe as dd
 
-        if meta:
-            return self.add_data2(dfff, daily, network)
-        else:
-            return dfff
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
 
-    def add_data2(self, df, daily=False, network=None):
-        self.df = df
-        self.df = self.change_units(self.df)
-        if self.monitor_df is None:
-            self.monitor_df = read_monitor_file()
+        monitor_df = read_monitor_file()
 
         if network is not None:
-            monitors = self.monitor_df.loc[
-                self.monitor_df.isin([network]).any(axis=1)
-            ].drop_duplicates(subset=["siteid"])
+            monitors = monitor_df.loc[monitor_df.isin([network]).any(axis=1)].drop_duplicates(
+                subset=["siteid"]
+            )
         else:
-            monitors = self.monitor_df.drop_duplicates(subset=["siteid"])
+            monitors = monitor_df.drop_duplicates(subset=["siteid"])
 
-        mlist = ["siteid"]
-        self.df = pd.merge(self.df, monitors, on=mlist, how="left")
+        # Ensure siteid is object for reliable merging
+        monitors = monitors.copy()
+        monitors["siteid"] = monitors["siteid"].astype(object)
 
-        if daily and "gmt_offset" in self.df.columns:
-            self.df["time"] = self.df.time_local - pd.to_timedelta(self.df.gmt_offset, unit="h")
+        if is_dask:
+            df["siteid"] = df["siteid"].astype(object)
+            monitors_dask = dd.from_pandas(monitors, npartitions=1)
+            df = df.merge(monitors_dask, on="siteid", how="left")
+        else:
+            df["siteid"] = df["siteid"].astype(object)
+            df = df.merge(monitors, on="siteid", how="left")
 
-        if "parameter_name" in self.df.columns:
-            self.df.drop("parameter_name", axis=1, inplace=True)
+        if daily and "gmt_offset" in df.columns:
+            # Adjust time for daily data based on local time and offset
+            if is_dask:
+                df["time"] = df.time_local - dd.to_timedelta(df.gmt_offset, unit="h")
+            else:
+                df["time"] = df.time_local - pd.to_timedelta(df.gmt_offset, unit="h")
 
-        return self.df
+        if "parameter_name" in df.columns:
+            df = df.drop(columns="parameter_name")
 
-    def get_species(self, df, voc=False):
-        pc = df.parameter_code.unique()
-        df["variable"] = ""
+        return df
+
+    def get_species(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"], voc: bool = False
+    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
+        """Map parameter codes to short variable names."""
         if voc:
             df["variable"] = df.parameter_name.str.upper()
             return df
@@ -477,51 +483,62 @@ class AQS:
             62103: "DP",
         }
 
-        for i in pc:
-            con = df.parameter_code == i
-            try:
-                # Try both int and string match
-                val = mapping.get(i) or mapping.get(int(i))
-                if val:
-                    df.loc[con, "variable"] = val
-            except Exception:
-                pass
+        # Convert keys to string for matching
+        mapping_str = {str(k): v for k, v in mapping.items()}
 
-        con = df.variable == ""
-        if con.sum() > 0:
-            _tbl = (
-                df[con][["parameter_name", "parameter_code"]]
-                .drop_duplicates("parameter_name")
-                .to_string(index=False)
-            )
-            warnings.warn(f"Short names not available for these variables:\n{_tbl}")
-            df.loc[con, "variable"] = df.parameter_name
+        if "variable" not in df.columns:
+            df["variable"] = ""
+
+        pcode_as_str = df["parameter_code"].astype(str)
+        df["variable"] = pcode_as_str.map(mapping_str)
+
+        # Handle missing mappings
+        if "variable" in df.columns:
+            # For the warning, we check if any are missing.
+            # To stay lazy, we only do this if df is not a dask dataframe.
+            if not hasattr(df, "compute"):
+                missing = df.loc[
+                    df["variable"].isna(), ["parameter_name", "parameter_code"]
+                ].drop_duplicates()
+                if not missing.empty:
+                    _tbl = missing.to_string(index=False)
+                    warnings.warn(f"Short names not available for these variables:\n{_tbl}")
+
+        df["variable"] = df["variable"].fillna(df["parameter_name"])
 
         return df
 
     @staticmethod
-    def change_units(df):
-        units = df.units.unique()
-        for i in units:
-            con = df.units == i
-            if i.upper() == "Parts per billion Carbon".upper():
-                df.loc[con, "units"] = "ppbC"
-            if i == "Parts per billion":
-                df.loc[con, "units"] = "ppb"
-            if i == "Parts per million":
-                df.loc[con, "units"] = "ppm"
-            if i == "Micrograms/cubic meter (25 C)":
-                df.loc[con, "units"] = "UG/M3".lower()
-            if i == "Degrees Centigrade":
-                df.loc[con, "units"] = "C"
-            if i == "Micrograms/cubic meter (LC)":
-                df.loc[con, "units"] = "UG/M3".lower()
-            if i == "Knots":
-                df.loc[con, "obs"] *= 0.51444
-                df.loc[con, "units"] = "M/S".lower()
-            if i == "Degrees Fahrenheit":
-                df.loc[con, "obs"] = (df.loc[con, "obs"] + 459.67) * 5.0 / 9.0
-                df.loc[con, "units"] = "K"
-            if i == "Percent relative humidity":
-                df.loc[con, "units"] = "%"
+    def change_units(
+        df: Union[pd.DataFrame, "dd.DataFrame"],
+    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
+        """Standardize units and adjust observation values accordingly."""
+        # Knots to m/s
+        is_knots = df.units.str.lower() == "knots"
+        df["obs"] = df["obs"].mask(is_knots, df.obs * 0.51444)
+        df["units"] = df["units"].mask(is_knots, "m/s")
+
+        # Fahrenheit to Kelvin
+        is_f = df.units.str.lower() == "degrees fahrenheit"
+        df["obs"] = df["obs"].mask(is_f, (df.obs + 459.67) * 5.0 / 9.0)
+        df["units"] = df["units"].mask(is_f, "k")
+
+        # Others (just rename)
+        unit_map = {
+            "parts per billion carbon": "ppbC",
+            "parts per billion": "ppb",
+            "parts per million": "ppm",
+            "micrograms/cubic meter (25 c)": "ug/m3",
+            "micrograms/cubic meter (lc)": "ug/m3",
+            "degrees centigrade": "c",
+            "percent relative humidity": "%",
+        }
+
+        # Apply mapping to units column
+        df["units_lower"] = df.units.str.lower()
+        for old, new in unit_map.items():
+            df["units"] = df["units"].mask(df.units_lower == old, new)
+
+        df = df.drop(columns="units_lower")
+
         return df
