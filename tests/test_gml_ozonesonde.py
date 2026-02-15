@@ -1,11 +1,19 @@
+import os
+
 import pandas as pd
 import pytest
 
 from monetio import gml_ozonesonde
 
+# Skip on CI because GML server can be unreliable
+skip_on_ci = pytest.mark.skipif(
+    os.environ.get("CI", "false").lower() == "true", reason="Skipped on CI"
+)
+
 uses_get_files = pytest.mark.xdist_group(name="get-files")
 
 
+@skip_on_ci
 @uses_get_files
 def test_discover_files():
     files = gml_ozonesonde.discover_files(n_threads=2)
@@ -13,6 +21,7 @@ def test_discover_files():
     assert set(files["location"].unique()) == set(gml_ozonesonde.LOCATIONS)
 
 
+@skip_on_ci
 def test_read_100m():
     url = r"https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/Boulder,%20Colorado/100%20Meter%20Average%20Files/bu1043_2023_12_27_17.l100"
     df = gml_ozonesonde.read_100m(url)
@@ -29,6 +38,7 @@ def test_read_100m():
     assert df.attrs["ds_attrs"]["Sonde Total O3 (SBUV)"] == "325 (62) DU"
 
 
+@skip_on_ci
 @pytest.mark.parametrize(
     "url",
     [
@@ -43,6 +53,7 @@ def test_read_100m_nonstd(url):
     assert len(df) > 0
 
 
+@skip_on_ci
 def test_read_100m_bad_data_line():
     url = r"https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/San%20Cristobal,%20Galapagos/100%20Meter%20Average%20Files/sc204_2002_01_31_12.l100"
     # Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp  O3 # DN O3 Res
@@ -54,6 +65,7 @@ def test_read_100m_bad_data_line():
         _ = gml_ozonesonde.read_100m(url)
 
 
+@skip_on_ci
 def test_read_100m_bad_header_line():
     url = r"https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/Boulder,%20Colorado/100%20Meter%20Average%20Files/bu913_2021_08_10_16.l100"
     # Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp  O3 # DN O3 Res   Ftemp   Water
@@ -63,6 +75,7 @@ def test_read_100m_bad_header_line():
         _ = gml_ozonesonde.read_100m(url)
 
 
+@skip_on_ci
 @uses_get_files
 def test_add_data():
     dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="h")
@@ -78,6 +91,7 @@ def test_add_data():
     assert df["siteid"].nunique() == latlon.nunique()
 
 
+@skip_on_ci
 @uses_get_files
 def test_add_data_location_sel():
     dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="h")
@@ -102,6 +116,7 @@ def test_add_data_invalid_location(location):
         _ = gml_ozonesonde.add_data(dates, location=location)
 
 
+@skip_on_ci
 @uses_get_files
 def test_same_location_and_launch_time():
     # Two files with same file time and launch time:
