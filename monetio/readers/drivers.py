@@ -227,5 +227,5 @@ class PandasDriver:
 
             return pd.concat(data_frames, ignore_index=True)
 
-        except Exception:
-            raise
+        except Exception as e:
+            raise OSError(f"PandasDriver failed to open files. Error: {e}")

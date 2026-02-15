@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+import xarray as xr
 
 from monetio.readers.aqs import AQSReader
 
@@ -95,23 +96,26 @@ def test_aqs_xarray_eager_vs_lazy(mock_aqs_hourly):
     dates = pd.date_range(start="2023-01-01", end="2023-01-02", freq="h")
     reader = AQSReader()
 
-    # Eager
+    # Both should be 2D by default now (time, node)
+    # Even if wide_fmt=False is passed, to_xarray handles the expansion.
+    # Note: If wide_fmt=False, 'variable' is still in coords, so ds_to_2d will pivot anyway.
+
+    # Eager 2D
     ds_eager = reader.open_dataset(
-        files=mock_aqs_hourly, dates=dates, as_xarray=True, lazy=False, wide_fmt=False
+        files=mock_aqs_hourly, dates=dates, as_xarray=True, lazy=False, wide_fmt=True
     )
 
-    # Lazy
+    # Lazy 2D
     ds_lazy = reader.open_dataset(
-        files=mock_aqs_hourly, dates=dates, as_xarray=True, lazy=True, wide_fmt=False
+        files=mock_aqs_hourly, dates=dates, as_xarray=True, lazy=True, wide_fmt=True
     )
 
     # Check that lazy one is indeed lazy (Dask-backed)
-    assert ds_lazy.obs.chunks is not None
+    # Since it's wide format now, we check one of the variables (e.g. OZONE)
+    assert ds_lazy.OZONE.chunks is not None
 
-    # Eager one is 2D (time, node), Lazy one is 1D (node,)
-    # To compare, we can flatten the Eager one or check values.
-    # We'll check that the flattened 'obs' values match.
-    np.testing.assert_allclose(ds_eager.obs.values.flatten(), ds_lazy.obs.compute().values)
+    # Now they should match perfectly because both are 2D
+    xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
 
     # Check history
     assert "Read AQS data" in ds_eager.attrs["history"]

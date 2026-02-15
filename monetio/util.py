@@ -556,6 +556,108 @@ def force_object_strings(df):
         return df
 
 
+def ds_to_2d(ds, pivot=True):
+    """
+    Lazily transform a 1D UGRID dataset into a 2D (time, node) dataset.
+    If 'variable' is present in coordinates and pivot=True, it also pivots the data variables.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input 1D dataset with 'time' and 'siteid' coordinates.
+    pivot : bool, optional
+        Whether to pivot by 'variable' column if present, by default True.
+
+    Returns
+    -------
+    xarray.Dataset
+        2D expanded dataset with dimensions (time, node).
+    """
+    import datetime
+
+    if "node" not in ds.dims:
+        return ds
+
+    # Ensure time, siteid, and variable are coords for set_index
+    for col in ["time", "siteid", "variable"]:
+        if col in ds.data_vars and col not in ds.coords:
+            ds = ds.set_coords(col)
+
+    if "time" not in ds.coords or "siteid" not in ds.coords:
+        return ds
+
+    # Handle history
+    history = (
+        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
+        "Expanded 1D UGRID to 2D (time, node) using Aero Protocol."
+    )
+
+    try:
+        if "variable" in ds.coords and pivot:
+            # Full pivot path (long-to-wide)
+            # 1. Expand obs and units to 2D (time, siteid, variable)
+            # To handle multiple data vars consistently, we set MultiIndex and unstack
+            # We use drop=True to avoid keeping the old 'node' coordinate which is now a MultiIndex
+            ds_idx = ds.set_index(node=["time", "siteid", "variable"])
+            ds_unstacked = ds_idx.unstack("node")
+
+            # 2. Extract 'obs' and pivot it by 'variable'
+            if "obs" in ds_unstacked.data_vars:
+                obs_wide = ds_unstacked["obs"].to_dataset(dim="variable")
+            else:
+                obs_wide = xr.Dataset()
+
+            # 3. Handle units
+            if "units" in ds_unstacked.data_vars:
+                # Get one unit per variable per site (usually constant)
+                units_wide = ds_unstacked["units"].to_dataset(dim="variable")
+                # Rename columns to match MONET convention (e.g. OZONE_unit)
+                units_wide = units_wide.rename({v: f"{v}_unit" for v in units_wide.data_vars})
+            else:
+                units_wide = xr.Dataset()
+
+            # 4. Handle other metadata (constant over variable)
+            # Unstacking node=[time, siteid, variable] makes everything 3D (time, siteid, variable)
+            # We want to keep metadata as 2D (time, siteid)
+            meta_vars = [v for v in ds_unstacked.data_vars if v not in ["obs", "units"]]
+
+            ds_meta = xr.Dataset()
+            for v in meta_vars:
+                # Metadata should be constant over 'variable' dimension, so we take the first
+                ds_meta[v] = ds_unstacked[v].isel(variable=0, drop=True)
+
+            # Explicitly set compat to avoid warnings
+            ds2d = xr.merge([obs_wide, units_wide, ds_meta], compat="no_conflicts")
+
+            # Handle coordinates that might still have 'variable' dimension
+            # and drop 'variable' coordinate
+            for c in list(ds2d.coords):
+                if "variable" in ds2d[c].dims:
+                    ds2d.coords[c] = ds2d[c].isel(variable=0, drop=True)
+            if "variable" in ds2d.coords:
+                ds2d = ds2d.drop_vars("variable")
+
+        else:
+            # Simple expansion path
+            ds2d = ds.set_index(node=["time", "siteid"]).unstack("node")
+
+        # In MONET 2D convention, 'siteid' becomes the second dimension,
+        # but we rename it to 'node' for UGRID compliance.
+        if "siteid" in ds2d.dims:
+            ds2d = ds2d.rename({"siteid": "node"})
+
+        if "history" in ds2d.attrs:
+            ds2d.attrs["history"] = f"{ds2d.attrs['history']}\n{history}"
+        else:
+            ds2d.attrs["history"] = history
+        return ds2d
+    except Exception as e:
+        import warnings
+
+        warnings.warn(f"ds_to_2d failed: {e}. Returning 1D dataset.")
+        return ds
+
+
 def _try_merge_exact(left, right, *, right_name=None):
     """For two ``xr.Dataset``s, try ``left.merge(right, compat="equals", join="exact")``.
     If it fails, print informative debugging messages and re-raise.

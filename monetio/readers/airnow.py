@@ -110,7 +110,7 @@ class AirNowReader(PointReader):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
-            ds = self.to_xarray(df)
+            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
 
             # Update history
             history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read AirNow data."
@@ -118,18 +118,6 @@ class AirNowReader(PointReader):
                 ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
             else:
                 ds.attrs["history"] = history
-
-            # If wide_fmt was requested but we stayed long because of laziness,
-            # we should ideally pivot here in Xarray.
-            # For now, we note that it is still in long format if lazy=True.
-            if wide_fmt and lazy and "variable" in ds.data_vars:
-                import warnings
-
-                warnings.warn(
-                    "AirNow: Dataset is in 'long' format because lazy=True. "
-                    "Use ds.to_dataset(dim='variable') or similar to pivot lazily.",
-                    UserWarning,
-                )
 
             return ds
 
