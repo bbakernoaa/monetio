@@ -2,7 +2,7 @@
 CRN Reader. Redirection to monetio.readers.crn
 """
 
-from ..readers.crn import CRN, CRNReader  # noqa: F401
+from ..readers.crn import CRNReader  # noqa: F401
 
 
 def add_data(

@@ -1,294 +1,451 @@
 """CRN Reader"""
 
 import os
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-import dask
-import dask.dataframe as dd
+import numpy as np
 import pandas as pd
+import xarray as xr
 
+from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
+
+HCOLS = [
+    "WBANNO",
+    "UTC_DATE",
+    "UTC_TIME",
+    "LST_DATE",
+    "LST_TIME",
+    "CRX_VN",
+    "LONGITUDE",
+    "LATITUDE",
+    "T_CALC",
+    "T_AVG",
+    "T_MAX",
+    "T_MIN",
+    "P_CALC",
+    "SOLARAD",
+    "SOLARAD_FLAG",
+    "SOLARAD_MAX",
+    "SOLARAD_MAX_FLAG",
+    "SOLARAD_MIN",
+    "SOLARAD_MIN_FLAG",
+    "SUR_TEMP_TYPE",
+    "SUR_TEMP",
+    "SUR_TEMP_FLAG",
+    "SUR_TEMP_MAX",
+    "SUR_TEMP_MAX_FLAG",
+    "SUR_TEMP_MIN",
+    "SUR_TEMP_MIN_FLAG",
+    "RH_AVG",
+    "RH_AVG_FLAG",
+    "SOIL_MOISTURE_5",
+    "SOIL_MOISTURE_10",
+    "SOIL_MOISTURE_20",
+    "SOIL_MOISTURE_50",
+    "SOIL_MOISTURE_100",
+    "SOIL_TEMP_5",
+    "SOIL_TEMP_10",
+    "SOIL_TEMP_20",
+    "SOIL_TEMP_50",
+    "SOIL_TEMP_100",
+]
+
+DCOLS = [
+    "WBANNO",
+    "LST_DATE",
+    "CRX_VN",
+    "LONGITUDE",
+    "LATITUDE",
+    "T_MAX",
+    "T_MIN",
+    "T_MEAN",
+    "T_AVG",
+    "P_CALC",
+    "SOLARAD",
+    "SUR_TEMP_TYPE",
+    "SUR_TEMP_MAX",
+    "SUR_TEMP_MAX_2",
+    "SUR_TEMP_MIN",
+    "SUR_TEMP_AVG",
+    "RH_MAX",
+    "RH_MIN",
+    "RH_AVG",
+    "SOIL_MOISTURE_5",
+    "SOIL_MOISTURE_10",
+    "SOIL_MOISTURE_20",
+    "SOIL_MOISTURE_50",
+    "SOIL_MOISTURE_100",
+    "SOIL_TEMP_5",
+    "SOIL_TEMP_10",
+    "SOIL_TEMP_20",
+    "SOIL_TEMP_50",
+    "SOIL_TEMP_100",
+]
+
+SHCOLS = [
+    "WBANNO",
+    "UTC_DATE",
+    "UTC_TIME",
+    "LST_DATE",
+    "LST_TIME",
+    "CRX_VN",
+    "LONGITUDE",
+    "LATITUDE",
+    "T_MEAN",
+    "P_CALC",
+    "SOLARAD",
+    "SOLARAD_FLAG",
+    "SUR_TEMP_AVG",
+    "SUR_TEMP_TYPE",
+    "SUR_TEMP_FLAG",
+    "RH_AVG",
+    "RH_FLAG",
+    "SOIL_MOISTURE_5",
+    "SOIL_TEMP_5",
+    "WETNESS",
+    "WET_FLAG",
+    "WIND",
+    "WIND_FLAG",
+]
+
+
+def read_crn(filename: str, **kwargs) -> pd.DataFrame:
+    """
+    Read a single CRN file.
+
+    Parameters
+    ----------
+    filename : str
+        The path or URL to the CRN file.
+    **kwargs : dict
+        Additional arguments passed to pd.read_csv.
+
+    Returns
+    -------
+    pd.DataFrame
+        The loaded data.
+    """
+    nanvals = [-99999, -9999.0]
+    if "CRND0103" in filename:
+        cols = DCOLS
+        is_daily = True
+    elif "CRNS0101" in filename:
+        cols = SHCOLS
+        is_daily = False
+    else:
+        cols = HCOLS
+        is_daily = False
+
+    # Use FileUtility to handle remote files
+    fs = FileUtility.get_fs(filename)
+    with fs.open(filename, "r") as f:
+        df = pd.read_csv(
+            f,
+            sep=r"\s+",
+            names=cols,
+            na_values=nanvals,
+            index_col=False,
+            **kwargs,
+        )
+
+    # Manual date parsing for compatibility with Pandas 3.0
+    if not is_daily:
+        if "UTC_DATE" in df.columns and "UTC_TIME" in df.columns:
+            df["time"] = pd.to_datetime(
+                df["UTC_DATE"].astype(str) + df["UTC_TIME"].astype(str).str.zfill(4),
+                format="%Y%m%d%H%M",
+                errors="coerce",
+            )
+        if "LST_DATE" in df.columns and "LST_TIME" in df.columns:
+            df["time_local"] = pd.to_datetime(
+                df["LST_DATE"].astype(str) + df["LST_TIME"].astype(str).str.zfill(4),
+                format="%Y%m%d%H%M",
+                errors="coerce",
+            )
+    else:
+        if "LST_DATE" in df.columns:
+            df["time_local"] = pd.to_datetime(
+                df["LST_DATE"].astype(str), format="%Y%m%d", errors="coerce"
+            )
+
+    return df
 
 
 @register_reader("crn")
 class CRNReader(PointReader):
+    """
+    Reader for US Climate Reference Network (USCRN) data.
+    """
+
     def open_dataset(
         self,
-        dates,
-        daily=False,
-        sub_hourly=False,
-        download=False,
-        latlonbox=None,
-        as_xarray=True,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Union[datetime, List[datetime], pd.DatetimeIndex]] = None,
+        daily: bool = False,
+        sub_hourly: bool = False,
+        download: bool = False,
+        latlonbox: Optional[List[float]] = None,
+        as_xarray: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ):
+    ) -> Union[xr.Dataset, pd.DataFrame]:
         """
-        Reads CRN data.
+        Open CRN dataset.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File paths or URLs. If None, uses `dates` to discover files.
+        dates : Union[datetime, List[datetime], pd.DatetimeIndex], optional
+            Dates to retrieve if `files` is None.
+        daily : bool, optional
+            If True, retrieves daily data, by default False.
+        sub_hourly : bool, optional
+            If True, retrieves sub-hourly (5-min) data, by default False.
+        download : bool, optional
+            If True, downloads files locally, by default False.
+        latlonbox : List[float], optional
+            Bounding box [lat_min, lon_min, lat_max, lon_max].
+        as_xarray : bool, optional
+            If True, returns an xarray.Dataset, by default True.
+        lazy : bool, optional
+            If True, returns a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments passed to the reader and driver.
+
+        Returns
+        -------
+        Union[xr.Dataset, pd.DataFrame]
+            The loaded dataset.
         """
-        c = CRN()
-        df = c.add_data(
-            dates,
-            daily=daily,
-            sub_hourly=sub_hourly,
-            download=download,
-            latlonbox=latlonbox,
-        )
-
-        df = self.harmonize(df)
-        if as_xarray:
-            return self.to_xarray(df)
-
-        return df
-
-
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/obs/crn.py
-# -----------------------------------------------------------------------------
-
-
-class CRN:
-    def __init__(self):
-        self.dates = None
-        self.daily = False
-        self.df = pd.DataFrame()
-        self.baseurl = "https://www1.ncdc.noaa.gov/pub/data/uscrn/products/"
-        self.monitor_df = None
-        # Columns definitions omitted for brevity
-        self.hcols = [
-            "WBANNO",
-            "UTC_DATE",
-            "UTC_TIME",
-            "LST_DATE",
-            "LST_TIME",
-            "CRX_VN",
-            "LONGITUDE",
-            "LATITUDE",
-            "T_CALC",
-            "T_AVG",
-            "T_MAX",
-            "T_MIN",
-            "P_CALC",
-            "SOLARAD",
-            "SOLARAD_FLAG",
-            "SOLARAD_MAX",
-            "SOLARAD_MAX_FLAG",
-            "SOLARAD_MIN",
-            "SOLARAD_MIN_FLAG",
-            "SUR_TEMP_TYPE",
-            "SUR_TEMP",
-            "SUR_TEMP_FLAG",
-            "SUR_TEMP_MAX",
-            "SUR_TEMP_MAX_FLAG",
-            "SUR_TEMP_MIN",
-            "SUR_TEMP_MIN_FLAG",
-            "RH_AVG",
-            "RH_AVG_FLAG",
-            "SOIL_MOISTURE_5",
-            "SOIL_MOISTURE_10",
-            "SOIL_MOISTURE_20",
-            "SOIL_MOISTURE_50",
-            "SOIL_MOISTURE_100",
-            "SOIL_TEMP_5",
-            "SOIL_TEMP_10",
-            "SOIL_TEMP_20",
-            "SOIL_TEMP_50",
-            "SOIL_TEMP_100",
-        ]
-        self.dcols = [
-            "WBANNO",
-            "LST_DATE",
-            "CRX_VN",
-            "LONGITUDE",
-            "LATITUDE",
-            "T_MAX",
-            "T_MIN",
-            "T_MEAN",
-            "T_AVG",
-            "P_CALC",
-            "SOLARAD",
-            "SUR_TEMP_TYPE",
-            "SUR_TEMP_MAX",
-            "SUR_TEMP_MAX",
-            "SUR_TEMP_MIN",
-            "SUR_TEMP_AVG",
-            "RH_MAX",
-            "RH_MIN",
-            "RH_AVG",
-            "SOIL_MOISTURE_5",
-            "SOIL_MOISTURE_10",
-            "SOIL_MOISTURE_20",
-            "SOIL_MOISTURE_50",
-            "SOIL_MOISTURE_100",
-            "SOIL_TEMP_5",
-            "SOIL_TEMP_10",
-            "SOIL_TEMP_20",
-            "SOIL_TEMP_50",
-            "SOIL_TEMP_100",
-        ]
-        self.shcols = [
-            "WBANNO",
-            "UTC_DATE",
-            "UTC_TIME",
-            "LST_DATE",
-            "LST_TIME",
-            "CRX_VN",
-            "LONGITUDE",
-            "LATITUDE",
-            "T_MEAN",
-            "P_CALC",
-            "SOLARAD",
-            "SOLARAD_FLAG",
-            "SUR_TEMP_AVG",
-            "SUR_TEMP_TYPE",
-            "SUR_TEMP_FLAG",
-            "RH_AVG",
-            "RH_FLAG",
-            "SOIL_MOISTURE_5",
-            "SOIL_TEMP_5",
-            "WETNESS",
-            "WET_FLAG",
-            "WIND",
-            "WIND_FLAG",
-        ]
-
-    def load_file(self, url):
-        nanvals = [-99999, -9999.0]
-        # Check url type via string (or regex if robust needed)
-        # The filename pattern indicates type
-        if "CRND0103" in url:
-            cols = self.dcols
-            parse_dates = {"time_local": [1]}
-            self.daily = True
-        elif "CRNS0101" in url:
-            cols = self.shcols
-            parse_dates = {
-                "time": ["UTC_DATE", "UTC_TIME"],
-                "time_local": ["LST_DATE", "LST_TIME"],
-            }
-        else:
-            cols = self.hcols
-            parse_dates = {
-                "time": ["UTC_DATE", "UTC_TIME"],
-                "time_local": ["LST_DATE", "LST_TIME"],
-            }
-
-        fs = FileUtility.get_fs(url)
-        with fs.open(url, "r") as f:
-            df = pd.read_csv(
-                f,
-                sep=r"\s+",
-                names=cols,
-                parse_dates=parse_dates,
-                na_values=nanvals,
+        if files is None:
+            if dates is None:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+            files, _ = self.build_urls(
+                dates, daily=daily, sub_hourly=sub_hourly, latlonbox=latlonbox
             )
+
+        if download:
+            files = self.retrieve(files)
+
+        # We use read_crn as the custom read_method
+        df = self.driver.open(files, read_method=read_crn, lazy=lazy, **kwargs)
+
+        # Post-processing: Merge with monitor info and fix columns
+        df = self._postprocess(df, latlonbox=latlonbox)
+
+        # Consistently force object strings
+        df = force_object_strings(df)
+
+        if as_xarray:
+            ds = self.to_xarray(df, **kwargs)
+            # Update history for provenance
+            history = (
+                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
+                "Merged with CRN station metadata and harmonized."
+            )
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
+
         return df
 
-    def build_url(self, year, state, site, vector, daily=False, sub_hourly=False):
-        if daily:
-            beginning = self.baseurl + "daily01/" + year + "/"
-            fname = "CRND0103-"
-        elif sub_hourly:
-            beginning = self.baseurl + "subhourly01/" + year + "/"
-            fname = "CRNS0101-05-"
-        else:
-            beginning = self.baseurl + "hourly02/" + year + "/"
-            fname = "CRNH0203-"
-        rest = year + "-" + state + "_" + site + "_" + vector + ".txt"
-        url = beginning + fname + rest
-        fname = fname + rest
-        return url, fname
+    def _postprocess(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"], latlonbox: Optional[List[float]] = None
+    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
+        """
+        Merge with station metadata and harmonize column names.
 
-    def check_url(self, url):
-        fs = FileUtility.get_fs(url)
+        Parameters
+        ----------
+        df : Union[pd.DataFrame, dd.DataFrame]
+            Input dataframe.
+        latlonbox : List[float], optional
+            Bounding box [lat_min, lon_min, lat_max, lon_max].
+
+        Returns
+        -------
+        Union[pd.DataFrame, dd.DataFrame]
+            Post-processed dataframe.
+        """
+        monitors = self.get_monitor_df(latlonbox=latlonbox)
+        # Rename WBAN to WBANNO to match data files
+        monitors = monitors.rename(columns={"WBAN": "WBANNO"})
+        # Ensure siteid/WBANNO is string and padded to 5 digits
+        monitors["WBANNO"] = monitors["WBANNO"].astype(str).str.zfill(5)
+
+        # Identify backend
         try:
-            # For http, exists calls HEAD. For s3/local, it checks existence.
-            return fs.exists(url)
-        except Exception:
-            return False
+            import dask.dataframe as dd
 
-    def build_urls(self, monitors, dates, daily=False, sub_hourly=False):
-        years = pd.DatetimeIndex(dates).year.unique().astype(str)
-        urls = []
-        fnames = []
-        for i in monitors.index:
-            for y in years:
-                state = monitors.iloc[i].STATE
-                site = monitors.iloc[i].LOCATION.replace(" ", "_")
-                vector = monitors.iloc[i].VECTOR.replace(" ", "_")
-                url, fname = self.build_url(
-                    y, state, site, vector, daily=daily, sub_hourly=sub_hourly
-                )
-                if self.check_url(url):
-                    urls.append(url)
-                    fnames.append(fname)
-        return urls, fnames
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
 
-    def retrieve(self, url, fname):
-        fs = FileUtility.get_fs(url)
-        if not os.path.isfile(fname):
-            print("Retrieving: " + fname)
-            print(url)
-            fs.get(url, fname)
-        else:
-            print("File Exists: " + fname)
+        df["WBANNO"] = df["WBANNO"].astype(str).str.zfill(5)
+        # Merge (unified logic for both backends)
+        df = df.merge(monitors, how="left", on=["WBANNO", "LATITUDE", "LONGITUDE"])
 
-    def get_monitor_df(self):
+        # Handle time conversion if needed
+        if "time" not in df.columns:
+            if "time_local" in df.columns and "GMT_OFFSET" in df.columns:
+                if is_dask:
+                    df["time"] = df["time_local"] + dd.to_timedelta(df["GMT_OFFSET"], unit="h")
+                else:
+                    df["time"] = df["time_local"] + pd.to_timedelta(df["GMT_OFFSET"], unit="h")
+            elif "time_local" in df.columns:
+                # Fallback for daily data if GMT_OFFSET is missing
+                df["time"] = df["time_local"]
+
+        df = df.rename(columns={"WBANNO": "siteid"})
+        # Lowercase all columns
+        df.columns = [c.lower() for c in df.columns]
+
+        return df
+
+    def get_monitor_df(self, latlonbox: Optional[List[float]] = None) -> pd.DataFrame:
+        """
+        Load the CRN station metadata.
+
+        Parameters
+        ----------
+        latlonbox : List[float], optional
+            Bounding box [lat_min, lon_min, lat_max, lon_max].
+
+        Returns
+        -------
+        pd.DataFrame
+            Station metadata.
+        """
+        import monetio
+
+        path = os.path.join(os.path.dirname(monetio.__file__), "data", "stations.tsv")
         try:
-            import monetio
-
-            path = os.path.join(os.path.dirname(monetio.__file__), "data", "stations.tsv")
-            self.monitor_df = pd.read_csv(path, delimiter="\t")
+            mdf = pd.read_csv(path, delimiter="\t")
+            # Filter for USCRN
+            mdf = mdf.loc[mdf["NETWORK"] == "USCRN"].copy()
         except Exception:
-            print("Could not load stations.tsv")
-            self.monitor_df = pd.DataFrame(
+            # Fallback if file missing
+            mdf = pd.DataFrame(
                 columns=[
                     "STATE",
                     "LOCATION",
                     "VECTOR",
-                    "WBANNO",
+                    "WBAN",
                     "LATITUDE",
                     "LONGITUDE",
+                    "NETWORK",
                 ]
             )
 
-    def add_data(self, dates, daily=False, sub_hourly=False, download=False, latlonbox=None):
-        if self.monitor_df is None:
-            self.get_monitor_df()
-
         if latlonbox is not None:
-            mdf = self.monitor_df
             con = (
                 (mdf.LATITUDE >= latlonbox[0])
                 & (mdf.LATITUDE <= latlonbox[2])
                 & (mdf.LONGITUDE >= latlonbox[1])
                 & (mdf.LONGITUDE <= latlonbox[3])
             )
-            monitors = mdf.loc[con].copy()
-        else:
-            monitors = self.monitor_df.copy()
+            mdf = mdf.loc[con].copy()
 
-        urls, fnames = self.build_urls(monitors, dates, daily=daily, sub_hourly=sub_hourly)
+        return mdf
 
-        if download:
-            for url, fname in zip(urls, fnames):
-                self.retrieve(url, fname)
-            # After download, files are local
-            # Original code used delayed(load_file)(fname)
-            # Here we just pass fnames (which are local paths)
-            dfs = [dask.delayed(self.load_file)(i) for i in fnames]
-        else:
-            dfs = [dask.delayed(self.load_file)(i) for i in urls]
+    def build_urls(
+        self,
+        dates: Union[datetime, List[datetime], pd.DatetimeIndex],
+        daily: bool = False,
+        sub_hourly: bool = False,
+        latlonbox: Optional[List[float]] = None,
+    ) -> Tuple[List[str], List[str]]:
+        """
+        Discover available URLs for the given dates and monitors.
 
-        dff = dd.from_delayed(dfs)
-        self.df = dff.compute()
+        Parameters
+        ----------
+        dates : Union[datetime, List[datetime], pd.DatetimeIndex]
+            Dates to retrieve.
+        daily : bool, optional
+            If True, retrieves daily data, by default False.
+        sub_hourly : bool, optional
+            If True, retrieves sub-hourly (5-min) data, by default False.
+        latlonbox : List[float], optional
+            Bounding box [lat_min, lon_min, lat_max, lon_max].
 
-        self.df = pd.merge(self.df, monitors, how="left", on=["WBANNO", "LATITUDE", "LONGITUDE"])
+        Returns
+        -------
+        Tuple[List[str], List[str]]
+            List of URLs and filenames.
+        """
+        baseurl = "https://www1.ncdc.noaa.gov/pub/data/uscrn/products/"
+        monitors = self.get_monitor_df(latlonbox=latlonbox)
+        years = pd.DatetimeIndex(np.atleast_1d(dates)).year.unique().astype(str)
 
-        if not self.df.columns.isin(["time"]).max():
-            if "time_local" in self.df.columns and "GMT_OFFSET" in self.df.columns:
-                self.df["time"] = self.df.time_local + pd.to_timedelta(self.df.GMT_OFFSET, unit="h")
+        urls = []
+        fnames = []
 
-        self.df.rename(columns={"WBANNO": "siteid"}, inplace=True)
-        self.df.columns = [i.lower() for i in self.df.columns]
+        for _, row in monitors.iterrows():
+            for y in years:
+                state = row["STATE"]
+                site = row["LOCATION"].replace(" ", "_")
+                vector = row["VECTOR"].replace(" ", "_")
 
-        return self.df
+                if daily:
+                    beginning = f"{baseurl}daily01/{y}/"
+                    fname_prefix = "CRND0103-"
+                elif sub_hourly:
+                    beginning = f"{baseurl}subhourly01/{y}/"
+                    fname_prefix = "CRNS0101-05-"
+                else:
+                    beginning = f"{baseurl}hourly02/{y}/"
+                    fname_prefix = "CRNH0203-"
+
+                rest = f"{y}-{state}_{site}_{vector}.txt"
+                url = f"{beginning}{fname_prefix}{rest}"
+                fname = f"{fname_prefix}{rest}"
+
+                fs = FileUtility.get_fs(url)
+                try:
+                    if fs.exists(url):
+                        urls.append(url)
+                        fnames.append(fname)
+                except Exception:
+                    pass
+
+        return urls, fnames
+
+    def retrieve(self, urls: Union[str, List[str]]) -> List[str]:
+        """
+        Download files locally if they don't exist.
+
+        Parameters
+        ----------
+        urls : Union[str, List[str]]
+            List of URLs to download.
+
+        Returns
+        -------
+        List[str]
+            List of local filenames.
+        """
+        if isinstance(urls, str):
+            urls = [urls]
+
+        local_files = []
+        for url in urls:
+            fname = os.path.basename(url)
+            if not os.path.isfile(fname):
+                fs = FileUtility.get_fs(url)
+                try:
+                    fs.get(url, fname)
+                except Exception as e:
+                    print(f"Failed to retrieve {url}: {e}")
+                    continue
+            local_files.append(fname)
+        return local_files
