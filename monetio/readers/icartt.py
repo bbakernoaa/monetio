@@ -1,280 +1,204 @@
-"""ICARTT Reader"""
+"""ICARTT Reader following the Aero Protocol."""
+
+from __future__ import annotations
 
 import datetime
+from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 import xarray as xr
-from numpy import nan
 
-from .base import GriddedReader, register_reader
+from .base import PointReader, register_reader
 from .drivers import FileUtility
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
+
+
+def read_icartt(filename: str, **kwargs) -> pd.DataFrame:
+    """Reads a single ICARTT file into a pandas DataFrame.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the ICARTT file.
+    **kwargs : dict
+        Additional arguments.
+
+    Returns
+    -------
+    pd.DataFrame
+        Data from the ICARTT file with time and metadata.
+    """
+    fs = FileUtility.get_fs(filename)
+    with fs.open(filename, "r") as f:
+        header_lines = []
+        line1 = f.readline()
+        if not line1:
+            return pd.DataFrame()
+        header_lines.append(line1.strip())
+        try:
+            n_header = int(line1.split(",")[0])
+        except (ValueError, IndexError):
+            return pd.DataFrame()
+
+        for _ in range(n_header - 1):
+            line = f.readline()
+            if not line:
+                break
+            header_lines.append(line.strip())
+
+    if len(header_lines) < 13:
+        return pd.DataFrame()
+
+    # Line 7: Dates (index 6) (YYYY, MM, DD, YYYY, MM, DD)
+    try:
+        date_line = [int(x) for x in header_lines[6].split(",")]
+        date_valid = datetime.datetime(date_line[0], date_line[1], date_line[2])
+    except (ValueError, IndexError):
+        date_valid = datetime.datetime(1970, 1, 1)
+
+    # Line 10: Number of dependent variables (index 9)
+    try:
+        n_vars = int(header_lines[9])
+    except (ValueError, IndexError):
+        n_vars = 0
+
+    # Line 11: Scales (index 10)
+    try:
+        scales = [float(x) for x in header_lines[10].split(",")]
+    except (ValueError, IndexError):
+        scales = [1.0] * n_vars
+
+    # Line 12: Missing values (index 11)
+    try:
+        missing_values = [x.strip() for x in header_lines[11].split(",")]
+    except (ValueError, IndexError):
+        missing_values = ["-9999"] * n_vars
+
+    # Variable names
+    # Independent variable (IVAR) on line 9 (index 8)
+    ivar_line = header_lines[8].split(",")
+    ivar_name = ivar_line[0].strip()
+    var_names = [ivar_name]
+
+    # Dependent variables (DVAR) on lines 13 (index 12) onwards
+    for i in range(n_vars):
+        try:
+            vname = header_lines[12 + i].split(",")[0].strip()
+            var_names.append(vname)
+        except IndexError:
+            var_names.append(f"var_{i}")
+
+    # Data part
+    # We use n_header because line numbers are 1-based and we want to skip n_header lines
+    df = pd.read_csv(filename, skiprows=n_header, names=var_names, sep=",", skipinitialspace=True)
+
+    # Apply scales and handle missing values for dependent variables
+    for i, (scale, miss) in enumerate(zip(scales, missing_values)):
+        if i + 1 >= len(var_names):
+            break
+        col = var_names[i + 1]
+        try:
+            miss_val = float(miss)
+            # Use a small tolerance for floating point comparison
+            mask = np.isclose(df[col].astype(float), miss_val)
+            df.loc[mask, col] = np.nan
+        except (ValueError, TypeError):
+            df.loc[df[col].astype(str) == miss, col] = np.nan
+
+        df[col] = df[col].astype(float) * scale
+
+    # Time conversion
+    # Assume IVAR is seconds from date_valid
+    if "time" in ivar_name.lower() or "sec" in ivar_line[1].lower():
+        df["time"] = date_valid + pd.to_timedelta(df[ivar_name], unit="s")
+
+    return df
 
 
 @register_reader("icartt")
-class ICARTTReader(GriddedReader):
-    def open_dataset(self, files, **kwargs):
+class ICARTTReader(PointReader):
+    """ICARTT Data Reader."""
+
+    def open_dataset(
+        self,
+        files: str | list[str],
+        as_xarray: bool = True,
+        lazy: bool = False,
+        **kwargs,
+    ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
+        """Retrieve and load ICARTT data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path, list of paths, or glob pattern.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments passed to the reader and driver.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded ICARTT data.
         """
-        Reads ICARTT files.
-        """
-        file_list = FileUtility.expand_paths(files)
+        df = self.driver.open(files, read_method=read_icartt, lazy=lazy, **kwargs)
 
-        ds_list = []
-        for f in file_list:
-            o = Dataset(f)
-            ds = class_to_xarray(o)
-            ds_list.append(ds)
+        df = self.harmonize(df)
 
-        if not ds_list:
-            return xr.Dataset()
+        if as_xarray:
+            ds = self.to_xarray(df, **kwargs)
 
-        if len(ds_list) == 1:
-            return ds_list[0]
-        else:
-            return xr.concat(ds_list, dim="time")
+            # Add global metadata from the first file
+            file_list = FileUtility.expand_paths(files)
+            if file_list:
+                try:
+                    meta = self._get_metadata(file_list[0])
+                    ds.attrs.update(meta)
+                except Exception:
+                    pass
 
-
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/profile/icartt.py
-# -----------------------------------------------------------------------------
-
-
-def var_to_da(o, var_name, time):
-    unit = o.units(var_name)
-    bad_val = nan
-    vals = o[var_name]
-    name = var_name
-    if "Latitude" in var_name:
-        name = "latitude"
-        unit = "degrees_north"
-    if "Longitude" in var_name:
-        name = "longitude"
-        unit = "degrees_east"
-    da = xr.DataArray(vals, coords=[time], dims=["time"])
-    da.name = name
-    da.attrs["units"] = unit
-    da.attrs["missing_value"] = bad_val
-    return da
-
-
-def class_to_xarray(o, time_str="Time_Start"):
-    time_index = pd.to_datetime(o.times)
-    das = {}
-    for i in o.varnames:
-        if i != "Time_Start":
-            das[i] = var_to_da(o, i, time_index)
-    ds = xr.Dataset(das)
-    ds.attrs["source"] = o.dataSource
-    ds.attrs["Date Revised"] = pd.to_datetime(o.dateRevised).strftime("%Y-%m-%d %H:%M:%S")
-    ds.attrs["mission"] = o.mission
-    ds.attrs["organization"] = o.organization
-    ds.attrs["PI"] = o.PI
-    if len(o.NCOM) > 1:
-        for i in o.NCOM[:-1]:
-            try:
-                name = i.split(":")[0].strip()
-                val = i.split(":")[1].strip()
-                ds.attrs[name] = val
-            except IndexError:
-                pass
-    return ds
-
-
-class Variable:
-    @property
-    def desc(self):
-        return self.splitChar.join([self.name, self.units, self.units])
-
-    def __init__(self, name, units, scale=1.0, miss=-9999999):
-        self.name = name
-        self.units = units
-        self.scale = scale
-        self.miss = str(miss)
-        self.splitChar = ","
-
-
-class Dataset:
-    @property
-    def nheader(self):
-        total = 12 + self.ndvar + 1 + self.nscom + 1 + self.nncom
-        if self.format == 2110:
-            total += self.nauxvar + 5
-        return total
-
-    @property
-    def ndvar(self):
-        return len(self.DVAR)
-
-    @property
-    def nauxvar(self):
-        return len(self.AUXVAR)
-
-    @property
-    def nvar(self):
-        return self.ndvar + 1
-
-    @property
-    def nscom(self):
-        return len(self.SCOM)
-
-    @property
-    def nncom(self):
-        return len(self.NCOM)
-
-    @property
-    def VAR(self):
-        return [self.IVAR] + self.DVAR
-
-    @property
-    def varnames(self):
-        return [x.name for x in self.VAR]
-
-    @property
-    def times(self):
-        return [self.dateValid + datetime.timedelta(seconds=x) for x in self[self.IVAR.name]]
-
-    def __getitem__(self, name):
-        idx = self.index(name)
-        if idx == -1:
-            raise Exception(f"{name:s} not found in data")
-        return [x[idx] for x in self.data]
-
-    def units(self, name):
-        res = [x.units for x in self.VAR if x.name == name]
-        if len(res) == 0:
-            res = [""]
-        return res[0]
-
-    def index(self, name):
-        res = [i for i, x in enumerate(self.VAR) if x.name == name]
-        if len(res) == 0:
-            res = [-1]
-        return res[0]
-
-    def __readline(self, do_split=True):
-        dmp = self.input_fhandle.readline().replace("\n", "").replace("\r", "")
-        if do_split:
-            dmp = [word.strip(" ") for word in dmp.split(self.splitChar)]
-        return dmp
-
-    def read_header(self):
-        if self.input_fhandle.closed:
-            self.input_fhandle = open(self.input_fhandle.name)
-
-        self.format = int(self.__readline()[1])
-        self.PI = self.__readline(do_split=False)
-        self.organization = self.__readline(do_split=False)
-        self.dataSource = self.__readline(do_split=False)
-        self.mission = self.__readline(do_split=False)
-        dmp = self.__readline()
-        self.VOL = int(dmp[0])
-        self.NVOL = int(dmp[1])
-        dmp = self.__readline()
-        self.dateValid = datetime.datetime.strptime("".join([f"{x:s}" for x in dmp[0:3]]), "%Y%m%d")
-        self.dateRevised = datetime.datetime.strptime(
-            "".join([f"{x:s}" for x in dmp[3:6]]), "%Y%m%d"
-        )
-        self.dataInterval = float(self.__readline()[0])
-        dmp = self.__readline()
-        self.IVAR = Variable(dmp[0], dmp[1])
-        ndvar = int(self.__readline()[0])
-        dvscale = [float(x) for x in self.__readline()]
-        dvmiss = [x for x in self.__readline()]
-
-        dmp = self.__readline()
-        dvname = [dmp[0]]
-        dvunits = [dmp[1]]
-
-        for i in range(1, ndvar):
-            dmp = self.__readline()
-            dvname += [dmp[0]]
-            dvunits += [dmp[1]]
-
-        self.DVAR = [
-            Variable(name, unit, scale, miss)
-            for name, unit, scale, miss in zip(dvname, dvunits, dvscale, dvmiss)
-        ]
-
-        nscom = int(self.__readline()[0])
-        self.SCOM = [self.__readline(do_split=False) for i in range(0, nscom)]
-        nncom = int(self.__readline()[0])
-        self.NCOM = [self.__readline(do_split=False) for i in range(0, nncom)]
-        self.input_fhandle.close()
-
-    def __nan_miss_float(self, raw):
-        vals = []
-        for i, x in enumerate(raw):
-            v = x.replace(self.VAR[i].miss, "NaN")
-            if "NaN" in v:
-                v = "NaN"
-            vals.append(float(v.strip()) * self.VAR[i].scale)
-        return vals
-
-    def read_data(self):
-        if self.input_fhandle.closed:
-            self.input_fhandle = open(self.input_fhandle.name)
-        _ = [self.input_fhandle.readline() for _ in range(self.nheader)]
-        self.data = [
-            self.__nan_miss_float(line.split(self.splitChar)) for line in self.input_fhandle
-        ]
-        self.input_fhandle.close()
-
-    def read(self):
-        self.read_header()
-        self.read_data()
-
-    def __init__(self, f=None, loadData=True):
-        self.format = 1001
-        self.revision = "0"
-        self.dataID = "dataID"
-        self.locationID = "locationID"
-        self.PI = "Mustermann, Martin"
-        self.organization = "Musterinstitut"
-        self.dataSource = "Musterdatenprodukt"
-        self.mission = "MUSTEREX"
-        self.VOL = 1
-        self.NVOL = 1
-        self.dateValid = datetime.datetime.today()
-        self.dateRevised = datetime.datetime.today()
-        self.dataInterval = 0
-        self.IVAR = Variable("Time_Start", "seconds_from_0_hours_on_valid_date", 1.0, -9999999)
-        self.DVAR = [
-            Variable("Time_Stop", "seconds_from_0_hours_on_valid_date", 1.0, -9999999),
-            Variable("Some_Variable", "ppbv", 1.0, -9999999),
-        ]
-        self.SCOM = []
-        self.NCOM = []
-        self.data = [[1.0, 2.0, 45.0], [2.0, 3.0, 36.0]]
-        self.IBVAR = None
-        self.AUXVAR = []
-        self.splitChar = ","
-
-        encoding = "utf-8"
-        if f is not None:
-            # Using FileUtility from driver logic? No, class takes filename.
-            # We should adapt to use file handle or ensure f is path.
-            # fsspec can handle paths.
-            # But the logic uses `open(self.input_fhandle.name)`. This assumes local file!
-
-            # Since I am in `monetio/readers/icartt.py`, I can import FileUtility.
-            # And override the open calls.
-
-            # BUT: self.input_fhandle is set to `open(f, ...)` initially if string.
-            # We need to change that.
-
-            self.filepath = f
-            if isinstance(f, str):
-                fs = FileUtility.get_fs(f)
-                # We need to keep fs around or re-open
-                # The read_header/read_data logic closes it.
-                # And re-opens using `open(self.input_fhandle.name)`.
-                # This logic is broken for S3 or remote files.
-
-                # I will modify read_header and read_data to use self.filepath and FileUtility.
-
-                self.input_fhandle = fs.open(f, "r", encoding=encoding)
+            # Update history
+            history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ICARTT data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
             else:
-                self.input_fhandle = f  # Assume it's a file-like object
+                ds.attrs["history"] = history
+            return ds
 
-            self.read_header()
-            if loadData:
-                self.read_data()
+        return df
+
+    def _get_metadata(self, filename: str) -> dict:
+        """Extract global metadata from the ICARTT header."""
+        meta = {}
+        fs = FileUtility.get_fs(filename)
+        with fs.open(filename, "r") as f:
+            f.readline()  # Line 1: n_header, format
+            meta["PI"] = f.readline().strip()  # Line 2
+            meta["organization"] = f.readline().strip()  # Line 3
+            meta["source"] = f.readline().strip()  # Line 4
+            meta["mission"] = f.readline().strip()  # Line 5
+        return meta
+
+    def harmonize(self, df: pd.DataFrame | dd.DataFrame) -> pd.DataFrame | dd.DataFrame:
+        """Standardize column names for coordinates."""
+        # Common ICARTT names for lat/lon
+        rename_dict = {}
+        for col in df.columns:
+            lcol = col.lower()
+            if "latitude" in lcol and col != "latitude":
+                rename_dict[col] = "latitude"
+            if "longitude" in lcol and col != "longitude":
+                rename_dict[col] = "longitude"
+            if "siteid" in lcol and col != "siteid":
+                rename_dict[col] = "siteid"
+
+        if rename_dict:
+            df = df.rename(columns=rename_dict)
+
+        return super().harmonize(df)
