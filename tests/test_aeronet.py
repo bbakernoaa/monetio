@@ -132,12 +132,12 @@ def test_add_data_inv():
 
     try:
         df = aeronet.add_data(dates, inv_type="ALM15", product="SIZ", as_xarray=False, retries=1)
-        assert df.inversion_data_quality_level.eq("lev15").all()
-        assert df.retrieval_measurement_scan_type.eq("Almucantar").all()
+        assert (df.inversion_data_quality_level == "lev15").all()
+        assert (df.retrieval_measurement_scan_type == "Almucantar").all()
 
         df = aeronet.add_data(dates, inv_type="HYB15", product="SIZ", retries=1)
-        assert df.inversion_data_quality_level.eq("lev15").all()
-        assert df.retrieval_measurement_scan_type.eq("Hybrid").all()
+        assert (df.inversion_data_quality_level == "lev15").all()
+        assert (df.retrieval_measurement_scan_type == "Hybrid").all()
     except Exception as e:
         if is_connection_error(e):
             pytest.skip(f"Network connection failed: {e}")
@@ -200,11 +200,11 @@ def test_add_data_lunar():
         df = aeronet.add_data(
             dates, lunar=True, daily=True, retries=1
         )  # only daily-average data at this time
-        assert df.index.size > 0
+        assert len(df.time) > 0
 
         dates = pd.date_range("2022/01/20", "2022/01/21")
         df = aeronet.add_data(dates, lunar=True, siteid="Chilbolton", retries=1)
-        assert df.index.size > 0
+        assert len(df.time) > 0
     except Exception as e:
         if is_connection_error(e):
             pytest.skip(f"Network connection failed: {e}")
@@ -322,7 +322,7 @@ def test_issue100(dates, request):
             assert df1_.equals(df2_)
         else:
             assert df1.equals(df2)
-        assert dates[0] < df1.time.min() < df1.time.max() < dates[-1]
+        assert dates[0] <= df1.time.min() <= df1.time.max() <= dates[-1]
     except Exception as e:
         if is_connection_error(e):
             pytest.skip(f"Network connection failed: {e}")

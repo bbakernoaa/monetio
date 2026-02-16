@@ -126,6 +126,9 @@ class AERONETReader(PointReader):
             **kwargs,
         )
 
+        if not lazy and df.empty:
+            raise Exception("valid query but no data found")
+
         # Handle eager parallelization if requested but not lazy
         if not lazy and n_procs > 1:
             try:
@@ -315,15 +318,27 @@ def build_urls(
         min_date = dates.min()
         max_date = dates.max()
         time_bounds = pd.date_range(start=min_date.floor("D"), end=max_date.ceil("D"), freq="D")
-        if not time_bounds.empty and time_bounds[-1] < max_date:
-            time_bounds = time_bounds.append(pd.DatetimeIndex([max_date]))
 
-        if len(time_bounds) < 2:
-            # Only one day or less
+        # Clip bounds to the actual requested range
+        time_list = time_bounds.tolist()
+        if not time_list or time_list[0] < min_date:
+            if not time_list:
+                time_list = [min_date, max_date]
+            else:
+                time_list[0] = min_date
+        if time_list[-1] > max_date:
+            time_list[-1] = max_date
+        elif time_list[-1] < max_date:
+            time_list.append(max_date)
+
+        # Ensure unique and sorted
+        time_list = sorted(list(set(time_list)))
+
+        if len(time_list) < 2:
             return [
                 _build_single_url(
-                    dates.min(),
-                    dates.max(),
+                    min_date,
+                    max_date,
                     product=product,
                     inv_type=inv_type,
                     daily=daily,
@@ -335,11 +350,11 @@ def build_urls(
             ]
 
         urls = []
-        for i in range(len(time_bounds) - 1):
+        for i in range(len(time_list) - 1):
             urls.append(
                 _build_single_url(
-                    time_bounds[i],
-                    time_bounds[i + 1],
+                    time_list[i],
+                    time_list[i + 1],
                     product=product,
                     inv_type=inv_type,
                     daily=daily,
@@ -520,7 +535,7 @@ def read_aeronet_csv(
     if df.empty:
         return df
 
-    df.rename(columns=str.lower, inplace=True)
+    df = df.rename(columns=str.lower).copy()
 
     # Handle time
     date_col = [c for c in df.columns if "date(" in c]
@@ -595,6 +610,8 @@ def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray
             return yi
 
     new_wv = np.asarray(new_wv)
+    # Copy to avoid fragmentation warning when adding many columns
+    df = df.copy()
     out = df.apply(_tspack_aod_interp, axis=1, result_type="expand", new_wv=new_wv)
     names = "aod_" + pd.Series(new_wv.astype(int).astype(str)) + "nm"
     out.columns = names.values
