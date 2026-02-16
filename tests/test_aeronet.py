@@ -27,6 +27,7 @@ def is_connection_error(e):
         or "Connection refused" in msg
         or "Max retries exceeded" in msg
         or "PandasDriver failed to open files" in msg
+        or "timed out" in msg.lower()
     )
 
 
@@ -236,70 +237,45 @@ def test_serial_freq():
 
 @pytest.mark.skipif(has_pytspack, reason="has pytspack")
 def test_interp_without_pytspack():
-    # For MM data proc example
-    dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
+    fp = DATA / "aeronet-AOD15-example.txt"
     standard_wavelengths = np.array([0.34, 0.44, 0.55, 0.66, 0.86, 1.63, 11.1]) * 1000
-    try:
-        with pytest.raises(RuntimeError, match="You must install pytspack"):
-            aeronet.add_data(dates, n_procs=1, interp_to_aod_values=standard_wavelengths, retries=5)
-    except Exception as e:
-        if is_connection_error(e):
-            pytest.skip(f"Network connection failed: {e}")
-        raise
+    with pytest.raises(RuntimeError, match="You must install pytspack"):
+        aeronet.add_local(fp, interp_to_aod_values=standard_wavelengths)
 
 
 @pytest.mark.skipif(not has_pytspack, reason="no pytspack")
 def test_interp_with_pytspack():
-    # For MM data proc example
-    dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
+    fp = DATA / "aeronet-AOD15-example.txt"
     standard_wavelengths = np.array([0.34, 0.44, 0.55, 0.66, 0.86, 1.63, 11.1]) * 1000
-    try:
-        with pytest.warns(UserWarning, match="Renaming duplicate AOD columns"):
-            df = aeronet.add_data(
-                dates,
-                n_procs=1,
-                interp_to_aod_values=standard_wavelengths,
-                as_xarray=False,
-                retries=5,
-            )
+    with pytest.warns(UserWarning, match="Renaming duplicate AOD columns"):
+        df = aeronet.add_local(
+            fp,
+            interp_to_aod_values=standard_wavelengths,
+            as_xarray=False,
+        )
 
-        # Check for the new columns
-        assert {f"aod_{int(wl)}nm" for wl in standard_wavelengths}.issubset(df.columns)
+    # Check for the new columns
+    assert {f"aod_{int(wl)}nm" for wl in standard_wavelengths}.issubset(df.columns)
 
-        # Check for renamed duplicate columns
-        assert {c for c in df if c.startswith("aod_") and c.endswith("nm_orig")} == {
-            "aod_340nm_orig",
-            "aod_440nm_orig",
-        }
-    except Exception as e:
-        if is_connection_error(e):
-            pytest.skip(f"Network connection failed: {e}")
-        if "valid query but no data found" in str(e):
-            pytest.skip("No data found for the given query")
-        raise
+    # Check for renamed duplicate columns
+    assert {c for c in df if c.startswith("aod_") and c.endswith("nm_orig")} == {
+        "aod_340nm_orig",
+        "aod_440nm_orig",
+    }
 
 
 @pytest.mark.skipif(not has_pytspack, reason="no pytspack")
 def test_interp_daily_with_pytspack():
-    dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
+    # Use the SDA example for a different product if needed, but AOD15 is fine
+    fp = DATA / "aeronet-AOD15-example.txt"
     standard_wavelengths = np.array([0.55]) * 1000
-    try:
-        df = aeronet.add_data(
-            dates,
-            daily=True,
-            n_procs=1,
-            interp_to_aod_values=standard_wavelengths,
-            as_xarray=False,
-            retries=5,
-        )
+    df = aeronet.add_local(
+        fp,
+        interp_to_aod_values=standard_wavelengths,
+        as_xarray=False,
+    )
 
-        assert {f"aod_{int(wl)}nm" for wl in standard_wavelengths}.issubset(df.columns)
-    except Exception as e:
-        if is_connection_error(e):
-            pytest.skip(f"Network connection failed: {e}")
-        if "valid query but no data found" in str(e):
-            pytest.skip("No data found for the given query")
-        raise
+    assert {f"aod_{int(wl)}nm" for wl in standard_wavelengths}.issubset(df.columns)
 
 
 @pytest.mark.parametrize(
