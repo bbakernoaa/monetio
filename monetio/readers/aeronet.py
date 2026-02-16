@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
@@ -149,7 +150,7 @@ class AERONETReader(PointReader):
                 df = (
                     df.set_index("time")
                     .groupby("siteid")
-                    .resample(freq)
+                    .resample(freq, include_groups=False)
                     .mean(numeric_only=True)
                     .reset_index()
                 )
@@ -170,6 +171,16 @@ class AERONETReader(PointReader):
 
             return ds
 
+        return df
+
+    def harmonize(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"]
+    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
+        """
+        Standardize column names and types.
+        """
+        # Force string columns to object for Pandas 3.0 compatibility
+        df = force_object_strings(df)
         return df
 
 
@@ -608,9 +619,14 @@ def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray
         if len(a) < 2:
             return new_wv * np.nan
         else:
-            x, y, yp, sigma = pytspack.tspsi(a.wv.values, a.aod.values)
-            yi = pytspack.hval(new_wv, x, y, yp, sigma)
-            return yi
+            try:
+                # New API
+                interp = pytspack.TsPack().interpolate(a.wv.values, a.aod.values)
+                return interp(new_wv)
+            except AttributeError:
+                # Old API
+                x, y, yp, sigma = pytspack.tspsi(a.wv.values, a.aod.values)
+                return pytspack.hval(new_wv, x, y, yp, sigma)
 
     new_wv = np.asarray(new_wv)
     # Copy to avoid fragmentation warning when adding many columns
