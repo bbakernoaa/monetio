@@ -36,6 +36,8 @@ class AERONETReader(PointReader):
         n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,
+        retries: int = 5,
+        backoff_factor: float = 2.0,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset]:
         """
@@ -71,6 +73,10 @@ class AERONETReader(PointReader):
                     Whether to return an xarray.Dataset, by default True.
                 lazy : bool, optional
                     Whether to return a dask-backed object, by default False.
+                retries : int, optional
+                    Number of retries for network calls, by default 5.
+                backoff_factor : float, optional
+                    Backoff factor for exponential retries, by default 1.0.
                 **kwargs : dict
                     Additional arguments passed to the driver.
 
@@ -120,6 +126,8 @@ class AERONETReader(PointReader):
             interp_to_aod_values=interp_to_aod_values,
             detect_dust=detect_dust,
             storage_options=storage_options,
+            retries=retries,
+            backoff_factor=backoff_factor,
             **kwargs,
         )
 
@@ -192,7 +200,7 @@ class AERONETReader(PointReader):
 # -----------------------------------------------------------------------------
 
 
-def _get_robust_session(retries: int = 5, backoff_factor: float = 1.0):
+def _get_robust_session(retries: int = 5, backoff_factor: float = 2.0):
     """
     Create a requests session with retries and a standard User-Agent.
 
@@ -201,7 +209,7 @@ def _get_robust_session(retries: int = 5, backoff_factor: float = 1.0):
     retries : int, optional
         Number of retries, by default 5.
     backoff_factor : float, optional
-        Backoff factor for retries, by default 1.0.
+        Backoff factor for retries, by default 2.0.
 
     Returns
     -------
@@ -216,7 +224,7 @@ def _get_robust_session(retries: int = 5, backoff_factor: float = 1.0):
     retry = Retry(
         total=retries,
         backoff_factor=backoff_factor,
-        status_forcelist=[500, 502, 503, 504],
+        status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=["HEAD", "GET", "OPTIONS"],
     )
     adapter = HTTPAdapter(max_retries=retry)
@@ -235,7 +243,7 @@ def _get_robust_session(retries: int = 5, backoff_factor: float = 1.0):
 
 
 @lru_cache(1)
-def get_valid_sites(retries: int = 5) -> pd.DataFrame:
+def get_valid_sites(retries: int = 5, backoff_factor: float = 2.0) -> pd.DataFrame:
     """
     Fetch valid AERONET sites from NASA.
 
@@ -243,6 +251,8 @@ def get_valid_sites(retries: int = 5) -> pd.DataFrame:
     ----------
     retries : int, optional
         Number of retries for network call, by default 5.
+    backoff_factor : float, optional
+        Backoff factor for retries, by default 2.0.
 
     Returns
     -------
@@ -254,9 +264,9 @@ def get_valid_sites(retries: int = 5) -> pd.DataFrame:
     >>> sites = get_valid_sites()
     """
     try:
-        session = _get_robust_session(retries=retries)
+        session = _get_robust_session(retries=retries, backoff_factor=backoff_factor)
         url = "https://aeronet.gsfc.nasa.gov/aeronet_locations_v3.txt"
-        response = session.get(url, timeout=30)
+        response = session.get(url, timeout=120)
         response.raise_for_status()
 
         df = pd.read_csv(
@@ -491,8 +501,17 @@ def read_aeronet_csv(
     if str(fn).startswith("http"):
         try:
             retries = kwargs.get("retries", 5)
-            session = _get_robust_session(retries=retries)
-            response = session.get(str(fn), timeout=60)
+            backoff_factor = kwargs.get("backoff_factor", 2.0)
+            session = _get_robust_session(retries=retries, backoff_factor=backoff_factor)
+
+            # Jitter to avoid thundering herd on throttled servers
+            if kwargs.get("n_procs", 1) > 1 or kwargs.get("lazy", False):
+                import random
+                import time
+
+                time.sleep(random.uniform(0, 5))
+
+            response = session.get(str(fn), timeout=120)
             response.raise_for_status()
             source = BytesIO(response.content)
         except Exception as e:
