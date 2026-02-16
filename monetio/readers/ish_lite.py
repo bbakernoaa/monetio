@@ -1,5 +1,6 @@
 """ISH Lite Reader"""
 
+import os
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Union
 
@@ -61,7 +62,7 @@ def read_ish_lite_file(fname: str) -> pd.DataFrame:
     df["time"] = pd.to_datetime(df[["year", "month", "day", "hour"]])
     df.drop(["year", "month", "day", "hour"], axis=1, inplace=True)
 
-    filename = fname.split("/")[-1].split("-")
+    filename = os.path.basename(fname).split("-")
     siteid = filename[0] + filename[1]
     for col in ["temp", "dew_pt_temp", "press", "ws", "precip_1hr", "precip_6hr"]:
         df[col] /= 10.0
