@@ -1,6 +1,7 @@
 """ISH Lite Reader"""
 
-from datetime import datetime
+import datetime
+import warnings
 from typing import TYPE_CHECKING, List, Union
 
 import numpy as np
@@ -18,7 +19,7 @@ from .drivers import FileUtility
 class ISHLiteReader(PointReader):
     def open_dataset(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
         box: List[float] = None,
         country: str = None,
         state: str = None,
@@ -67,31 +68,227 @@ class ISHLiteReader(PointReader):
             The loaded ISH Lite data.
         """
         ish = ISH()
-        df = ish.add_data(
-            dates,
-            box=box,
-            country=country,
-            state=state,
-            site=site,
-            resample=resample,
-            window=window,
-            n_procs=n_procs,
-            verbose=verbose,
+        ish.dates = pd.to_datetime(dates)
+        if ish.history is None:
+            ish.read_ish_history()
+        dfloc = ish.history.copy()
+
+        if box is not None:
+            dfloc = ish.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
+        elif country is not None:
+            dfloc = dfloc.loc[dfloc.ctry == country, :]
+        elif state is not None:
+            dfloc = dfloc.loc[dfloc.state == state, :]
+        elif site is not None:
+            dfloc = dfloc.loc[dfloc.station_id == site, :]
+
+        urls = ish.build_urls(sites=dfloc)
+        if urls.empty:
+            raise ValueError("No data URLs found")
+
+        # Define per-file preprocessing if needed, or just use the reader_func
+        # For ISH Lite, we need to handle the fixed-width/space-separated format.
+        read_func = read_ish_lite_file
+
+        df = super().open_dataset(
+            urls.name.tolist(),
+            read_method=read_func,
+            as_xarray=False,
             lazy=lazy,
+            **kwargs,
         )
 
+        # Filtering by time range (exclusive upper bound to match legacy behavior)
+        df = df.loc[(df.time >= ish.dates.min()) & (df.time < ish.dates.max())]
+
+        # Merge with location metadata
+        # We ensure consistent dtypes for merge
+        dfloc["station_id"] = dfloc["station_id"].astype(object)
+        if lazy:
+            import dask.dataframe as dd
+
+            df = df.assign(siteid=df.siteid.astype(object))
+            # Convert dfloc to dask to ensure consistent merging and avoid warnings
+            dfloc_dask = dd.from_pandas(dfloc, npartitions=1).assign(
+                station_id=lambda x: x.station_id.astype(object)
+            )
+            df = df.merge(dfloc_dask, how="left", left_on="siteid", right_on="station_id")
+        else:
+            df["siteid"] = df["siteid"].astype(object)
+            df = df.merge(dfloc, how="left", left_on="siteid", right_on="station_id")
+
+        df = df.rename(columns={"ctry": "country"}).drop(columns=["station_id"], errors="ignore")
         df = self.harmonize(df)
+
+        if not lazy and hasattr(df, "compute"):
+            df = df.compute(num_workers=n_procs)
+
         if as_xarray:
-            ds = self.to_xarray(df)
+            ds = self.to_xarray(df, **kwargs)
+
+            if resample and ds.sizes.get("time", 0) > 0:
+                ds = self._resample_xarray(ds, window=window)
+
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ISH Lite data."
+            history = (
+                f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ISH Lite data."
+            )
             if "history" in ds.attrs:
                 ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
             else:
                 ds.attrs["history"] = history
             return ds
 
+        # Note: resample is NOT applied to DataFrame here if as_xarray=False
+        if resample and not as_xarray:
+            if lazy:
+                warnings.warn(
+                    "ISHLiteReader: Resampling is currently not supported for lazy DataFrames."
+                )
+            else:
+                # Eager path handles resample by checking if empty
+                if not df.empty:
+                    df = (
+                        df.set_index("time")
+                        .groupby("siteid")
+                        .resample(window)
+                        .mean(numeric_only=True)
+                        .reset_index()
+                    )
+
         return df
+
+    def _resample_xarray(self, ds: xr.Dataset, window: str) -> xr.Dataset:
+        """
+        Resample an xarray Dataset while preserving metadata.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            Input 1D or 2D dataset.
+        window : str
+            Resampling window.
+
+        Returns
+        -------
+        xr.Dataset
+            Resampled dataset.
+        """
+        # 1. Ensure 2D (time, node) for clean resampling
+        if "node" in ds.dims and "time" in ds.coords:
+            is_2d = "time" in ds.dims and "node" in ds.dims
+            if not is_2d:
+                from ..util import ds_to_2d
+
+                ds = ds_to_2d(ds)
+
+        if "time" in ds.dims:
+            # 2. Identify coordinates and variables to preserve
+            coord_names = [c for c in ds.coords if c not in ds.dims]
+            ds = ds.reset_coords(coord_names)
+
+            # 3. Resample numeric data variables
+            ds_resampled = ds.resample(time=window).mean()
+
+            # 4. Handle non-numeric or static variables that were dropped
+            for v in ds.data_vars:
+                if v not in ds_resampled.data_vars:
+                    # For metadata that is constant over time, we take the first value.
+                    if "time" in ds[v].dims:
+                        if ds.sizes["time"] > 0:
+                            ds_resampled[v] = ds[v].isel(time=0, drop=True)
+                    else:
+                        ds_resampled[v] = ds[v]
+
+            # 5. Restore coordinates
+            to_restore = [c for c in coord_names if c in ds_resampled.data_vars]
+            ds_resampled = ds_resampled.set_coords(to_restore)
+
+            return ds_resampled
+
+        return ds
+
+
+def read_ish_lite_file(fname: str, **kwargs) -> pd.DataFrame:
+    """
+    Read a single ISH Lite file.
+
+    Parameters
+    ----------
+    fname : str
+        File path or URL.
+    **kwargs : dict
+        Additional arguments.
+
+    Returns
+    -------
+    pd.DataFrame
+        The loaded data.
+    """
+    columns = [
+        "year",
+        "month",
+        "day",
+        "hour",
+        "temp",
+        "dew_pt_temp",
+        "press",
+        "wdir",
+        "ws",
+        "sky_condition",
+        "precip_1hr",
+        "precip_6hr",
+    ]
+
+    # Use FileUtility
+    fs = FileUtility.get_fs(str(fname))
+    compression = "gzip" if str(fname).endswith(".gz") else None
+
+    storage_options = kwargs.get("storage_options", {})
+    if str(fname).startswith("s3://") and not storage_options:
+        storage_options = {"anon": True}
+
+    try:
+        with fs.open(str(fname), "rb", compression=compression, **storage_options) as f:
+            df = pd.read_csv(
+                f,
+                sep=r"\s+",
+                header=None,
+                names=columns,
+                on_bad_lines="warn",
+            )
+    except Exception as e:
+        warnings.warn(f"ISHLiteReader: Failed to read {fname}. Error: {e}")
+        return pd.DataFrame(columns=["time", "siteid"] + columns[4:])
+
+    if df.empty:
+        return pd.DataFrame(columns=["time", "siteid"] + columns[4:])
+
+    # Create time column
+    df["time"] = pd.to_datetime(df[["year", "month", "day", "hour"]])
+    df = df.drop(columns=["year", "month", "day", "hour"])
+
+    # Extract siteid from filename
+    import os
+
+    basename = os.path.basename(str(fname))
+    parts = basename.split("-")
+    if len(parts) >= 2:
+        siteid = parts[0] + parts[1]
+    else:
+        siteid = "unknown"
+    df["siteid"] = siteid
+
+    # Scale values
+    for col in ["temp", "dew_pt_temp", "press", "ws", "precip_1hr", "precip_6hr"]:
+        if col in df.columns:
+            df[col] = df[col] / 10.0
+
+    # Handle missing values
+    df = df.replace(-9999, np.nan)
+    df = df.replace(-999.9, np.nan)
+
+    return df
 
 
 # -----------------------------------------------------------------------------
@@ -118,6 +315,7 @@ class ISH:
                     f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str}
                 )
         except Exception:
+            # Fallback for deprecated www1 host
             alt = fname.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
             if alt != fname:
                 fs_alt = FileUtility.get_fs(alt)
@@ -164,158 +362,3 @@ class ISH:
                 furls.append(f"{url}/{syear}/{fname}")
 
         return pd.Series(furls, name="name").to_frame()
-
-    def read_csv(self, fname):
-        """
-        Read a single ISH Lite file.
-
-        Parameters
-        ----------
-        fname : str
-            File path or URL.
-
-        Returns
-        -------
-        pd.DataFrame
-            The loaded data.
-        """
-        from numpy import nan
-
-        columns = [
-            "year",
-            "month",
-            "day",
-            "hour",
-            "temp",
-            "dew_pt_temp",
-            "press",
-            "wdir",
-            "ws",
-            "sky_condition",
-            "precip_1hr",
-            "precip_6hr",
-        ]
-
-        # Use FileUtility
-        fs = FileUtility.get_fs(fname)
-        compression = "gzip" if fname.endswith(".gz") else None
-
-        with fs.open(fname, "rb", compression=compression) as f:
-            df = pd.read_csv(
-                f,
-                sep=r"\s+",
-                header=None,
-                names=columns,
-            )
-        # Create time column manually
-        df["time"] = pd.to_datetime(df[["year", "month", "day", "hour"]])
-        df.drop(["year", "month", "day", "hour"], axis=1, inplace=True)
-
-        filename = fname.split("/")[-1].split("-")
-        siteid = filename[0] + filename[1]
-        for col in ["temp", "dew_pt_temp", "press", "ws", "precip_1hr", "precip_6hr"]:
-            df[col] /= 10.0
-        df["siteid"] = siteid
-        df = df.replace(-9999, nan)
-        return df
-
-    def aggregate_files(self, urls, n_procs=1, lazy=False):
-        """
-        Aggregate multiple ISH Lite files.
-
-        Parameters
-        ----------
-        urls : pd.DataFrame
-            Dataframe with 'name' column containing URLs.
-        n_procs : int, optional
-            Number of processors for compute, by default 1.
-        lazy : bool, optional
-            Whether to stay lazy, by default False.
-
-        Returns
-        -------
-        Union[pd.DataFrame, dd.DataFrame]
-            The aggregated data.
-        """
-        import dask
-        import dask.dataframe as dd
-
-        dfs = [dask.delayed(self.read_csv)(f) for f in urls.name]
-        dff = dd.from_delayed(dfs)
-        if not lazy:
-            return dff.compute(num_workers=n_procs)
-        return dff
-
-    def add_data(
-        self,
-        dates,
-        box=None,
-        country=None,
-        state=None,
-        site=None,
-        resample=False,
-        window="h",
-        n_procs=1,
-        verbose=False,
-        lazy=False,
-    ):
-        self.dates = pd.to_datetime(dates)
-        self.verbose = verbose
-        if self.history is None:
-            self.read_ish_history()
-        dfloc = self.history.copy()
-
-        if box is not None:
-            dfloc = self.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
-        elif country is not None:
-            dfloc = dfloc.loc[dfloc.ctry == country, :]
-        elif state is not None:
-            dfloc = dfloc.loc[dfloc.state == state, :]
-        elif site is not None:
-            dfloc = dfloc.loc[dfloc.station_id == site, :]
-
-        urls = self.build_urls(sites=dfloc)
-        if urls.empty:
-            raise ValueError("No data URLs found")
-
-        df = self.aggregate_files(urls, n_procs=n_procs, lazy=lazy)
-
-        # Use exclusive upper bound to match unit test expectations (e.g. 24 hours for 1 day range)
-        df = df.loc[(df.time >= self.dates.min()) & (df.time < self.dates.max())]
-        df = df.replace(-999.9, np.nan)
-
-        if resample:
-            if not lazy:
-                if not df.empty:
-                    df = (
-                        df.set_index("time").groupby("siteid").resample(window).mean().reset_index()
-                    )
-            else:
-                import warnings
-
-                warnings.warn("ISHLiteReader: Resampling is currently not supported in lazy mode.")
-
-        # Ensure consistent dtypes for merge and to avoid nullable string issues in Pandas 3.0
-        def _force_object(df_in):
-            df_out = df_in.copy()
-            for col in df_out.columns:
-                if pd.api.types.is_string_dtype(df_out[col]):
-                    df_out[col] = df_out[col].astype(object)
-            return df_out
-
-        dfloc = _force_object(dfloc)
-
-        if lazy:
-            import dask.dataframe as dd
-
-            df = df.assign(siteid=df.siteid.astype(object))
-            dfloc_dask = dd.from_pandas(dfloc, npartitions=1).assign(
-                station_id=lambda x: x.station_id.astype(object)
-            )
-            df = df.merge(dfloc_dask, how="left", left_on="siteid", right_on="station_id")
-        else:
-            df["siteid"] = df["siteid"].astype(object)
-            df = df.merge(dfloc, how="left", left_on="siteid", right_on="station_id")
-
-        df = df.rename(columns={"ctry": "country"})
-        return df.drop(["station_id"], axis=1)
