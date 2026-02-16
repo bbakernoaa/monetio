@@ -1,11 +1,13 @@
-import pytest
-import pandas as pd
-import xarray as xr
-import numpy as np
-from monetio.readers.aeronet import AERONETReader
 from pathlib import Path
 
+import pandas as pd
+import pytest
+import xarray as xr
+
+from monetio.readers.aeronet import AERONETReader
+
 DATA = Path(__file__).parent / "data"
+
 
 def test_aeronet_aero_protocol():
     # Use local file to avoid network issues
@@ -26,6 +28,7 @@ def test_aeronet_aero_protocol():
     df_lazy = reader.open_dataset(files=str(fp), as_xarray=False, lazy=True)
     try:
         import dask.dataframe as dd
+
         assert isinstance(df_lazy, dd.DataFrame)
     except ImportError:
         pytest.skip("Dask not installed")
@@ -57,8 +60,10 @@ def test_aeronet_aero_protocol():
     # Use check_like=True to ignore coordinate order
     xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
 
+
 def test_aeronet_build_urls():
     from monetio.readers.aeronet import build_urls
+
     dates = pd.date_range("2021-08-01", "2021-08-02", freq="D")
     urls = build_urls(dates, product="AOD15", siteid="SERC")
     assert len(urls) == 1
@@ -68,7 +73,7 @@ def test_aeronet_build_urls():
 
     # Split by day
     urls_split = build_urls(dates, product="AOD15", siteid="SERC", split_by_day=True)
-    assert len(urls_split) == 1 # 2021-08-01 to 2021-08-02 is one span
+    assert len(urls_split) == 1  # 2021-08-01 to 2021-08-02 is one span
 
     dates_multi = pd.date_range("2021-08-01", "2021-08-03", freq="D")
     urls_multi = build_urls(dates_multi, split_by_day=True)

@@ -70,7 +70,7 @@ class AERONETReader(PointReader):
             Additional arguments passed to the driver.
 
         Returns
--------
+        -------
         Union[pd.DataFrame, xr.Dataset]
             The loaded AERONET data.
 
