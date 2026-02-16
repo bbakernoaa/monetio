@@ -258,7 +258,7 @@ def calc_daily_max(df, param=None, rolling_frequency=8):
             .reset_index()
             .rename({"level_1": "time_local"})
         )
-    columnstomerge = temp.columns[~temp.columns.isin(k.columns) * (temp.columns != "time")].append(
+    columnstomerge = temp.columns[~temp.columns.isin(k.columns) & (temp.columns != "time")].append(
         Index(["siteid"])
     )
     if param is None:
@@ -330,9 +330,9 @@ def convert_statenames_to_abv(df):
         "Wyoming": "WY",
     }
     for i in d:
-        df["state_name"].loc[df.state_name.isin([i])] = d[i]
-    df["state_name"].loc[df.state_name.isin(["Canada"])] = "CC"
-    df["state_name"].loc[df.state_name.isin(["Mexico"])] = "MM"
+        df.loc[df.state_name.isin([i]), "state_name"] = d[i]
+    df.loc[df.state_name.isin(["Canada"]), "state_name"] = "CC"
+    df.loc[df.state_name.isin(["Mexico"]), "state_name"] = "MM"
     return df
 
 
@@ -405,12 +405,12 @@ def read_monitor_file(network=None, airnow=False, drop_latlon=True):
         airnow.columns = [i.lower() for i in airnow.columns]
         return airnow
     else:
+        sss = pd.DataFrame()
         try:
             basedir = os.path.abspath(os.path.dirname(__file__))[:-3]
             fname = os.path.join(basedir, "data", "monitoring_site_locations.hdf")
-            if os.path.isfile(fname):
-                print("Monitor File Path: " + fname)
-                sss = pd.read_hdf(fname)
+            print("Monitor File Path: " + fname)
+            sss = pd.read_hdf(fname)
             # monitor_drop = ['state_code', u'county_code']
             # s.drop(monitor_drop, axis=1, inplace=True)
         except Exception:
@@ -517,7 +517,7 @@ def read_monitor_file(network=None, airnow=False, drop_latlon=True):
                 "naaqs_primary_monitor",
                 "qa_primary_monitor",
             ]
-            s.drop(monitor_drop, axis=1, inplace=True)
+            s = s.drop(monitor_drop, axis=1)
             # drop airnow keys for merge
             airnow_drop = [
                 "site_Code",
@@ -537,15 +537,21 @@ def read_monitor_file(network=None, airnow=False, drop_latlon=True):
                 "county_name",
             ]
             airnow_drop = [i.lower() for i in airnow_drop]
-            airnow.drop(airnow_drop, axis=1, inplace=True)
+            airnow = airnow.drop(airnow_drop, axis=1)
             ss = pd.concat([s, airnow], ignore_index=True, sort=True)
             sss = convert_statenames_to_abv(ss).dropna(subset=["latitude", "longitude"])
-        if network is not None:
-            sss = sss.loc[sss.networks.isin([network])].drop_duplicates(subset=["siteid"])
+        if not sss.empty:
+            if network is not None:
+                sss = sss.loc[sss.networks.isin([network])].drop_duplicates(subset=["siteid"])
+
+            # Force object strings for Pandas 3.0 compatibility
+            from ..util import force_object_strings
+
+            sss = force_object_strings(sss)
+
         # Getting error that 'latitude' 'longitude' not contained in axis
         drop_latlon = False
         if drop_latlon:
-            if pd.Series(sss.keys()).isin(["latitude", "longitude"]):
+            if not sss.empty and pd.Series(sss.keys()).isin(["latitude", "longitude"]):
                 return sss.drop(["latitude", "longitude"], axis=1).drop_duplicates()
-        else:
-            return sss.drop_duplicates()
+        return sss.drop_duplicates()
