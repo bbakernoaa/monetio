@@ -3,6 +3,7 @@
 import warnings
 from datetime import datetime, timezone
 from functools import lru_cache, partial
+from io import BytesIO
 from typing import List, Optional, Union
 
 import numpy as np
@@ -34,51 +35,51 @@ class AERONETReader(PointReader):
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset]:
         """
-        Retrieve and load AERONET data following the Aero Protocol.
+                Retrieve and load AERONET data following the Aero Protocol.
 
-        Parameters
-        ----------
-        files : Union[str, List[str]], optional
-            File path, list of paths, or glob pattern.
-        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
-            Dates to retrieve if files are not provided.
-        product : str, optional
-            AERONET product (e.g., 'AOD15', 'SDA20'), by default "AOD15".
-        inv_type : str, optional
-            Inversion type (e.g., 'ALM15', 'HYB20'), by default None.
-        latlonbox : List[float], optional
-            Bounding box [latmin, lonmin, latmax, lonmax], by default None.
-        siteid : str, optional
-            Specific AERONET site ID, by default None.
-        daily : bool, optional
-            Whether to load daily averages instead of all points, by default False.
-        lunar : bool, optional
-            Whether to include lunar data, by default False.
-        freq : str, optional
-            Resampling frequency (e.g., '1H'), by default None.
-        detect_dust : bool, optional
-            Whether to add a 'dust' column based on AOD/Angstrom, by default False.
-        interp_to_aod_values : Union[List[float], np.ndarray], optional
-            Wavelengths (nm) to interpolate AOD to, by default None.
-        n_procs : int, optional
-            Number of processors for parallel loading (non-lazy), by default 1.
-        as_xarray : bool, optional
-            Whether to return an xarray.Dataset, by default True.
-        lazy : bool, optional
-            Whether to return a dask-backed object, by default False.
-        **kwargs : dict
-            Additional arguments passed to the driver.
+                Parameters
+                ----------
+                files : Union[str, List[str]], optional
+                    File path, list of paths, or glob pattern.
+                dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+                    Dates to retrieve if files are not provided.
+                product : str, optional
+                    AERONET product (e.g., 'AOD15', 'SDA20'), by default "AOD15".
+                inv_type : str, optional
+                    Inversion type (e.g., 'ALM15', 'HYB20'), by default None.
+                latlonbox : List[float], optional
+                    Bounding box [latmin, lonmin, latmax, lonmax], by default None.
+                siteid : str, optional
+                    Specific AERONET site ID, by default None.
+                daily : bool, optional
+                    Whether to load daily averages instead of all points, by default False.
+                lunar : bool, optional
+                    Whether to include lunar data, by default False.
+                freq : str, optional
+                    Resampling frequency (e.g., '1H'), by default None.
+                detect_dust : bool, optional
+                    Whether to add a 'dust' column based on AOD/Angstrom, by default False.
+                interp_to_aod_values : Union[List[float], np.ndarray], optional
+                    Wavelengths (nm) to interpolate AOD to, by default None.
+                n_procs : int, optional
+                    Number of processors for parallel loading (non-lazy), by default 1.
+                as_xarray : bool, optional
+                    Whether to return an xarray.Dataset, by default True.
+                lazy : bool, optional
+                    Whether to return a dask-backed object, by default False.
+                **kwargs : dict
+                    Additional arguments passed to the driver.
 
-        Returns
+                Returns
         -------
-        Union[pd.DataFrame, xr.Dataset]
-            The loaded AERONET data.
+                Union[pd.DataFrame, xr.Dataset]
+                    The loaded AERONET data.
 
-        Examples
-        --------
-        >>> from monetio.readers.aeronet import AERONETReader
-        >>> reader = AERONETReader()
-        >>> ds = reader.open_dataset(dates='2021-08-01', siteid='Mauna_Loa')
+                Examples
+                --------
+                >>> from monetio.readers.aeronet import AERONETReader
+                >>> reader = AERONETReader()
+                >>> ds = reader.open_dataset(dates='2021-08-01', siteid='Mauna_Loa')
         """
         if files is None:
             if dates is None:
@@ -97,6 +98,7 @@ class AERONETReader(PointReader):
                 siteid=siteid,
                 latlonbox=latlonbox,
                 split_by_day=(n_procs > 1 or lazy),
+                **kwargs,
             )
 
         if not files:
@@ -112,6 +114,7 @@ class AERONETReader(PointReader):
             interp_to_aod_values=interp_to_aod_values,
             detect_dust=detect_dust,
             storage_options=storage_options,
+            **kwargs,
         )
 
         # Use base class to open
@@ -169,10 +172,57 @@ class AERONETReader(PointReader):
 # -----------------------------------------------------------------------------
 
 
+def _get_robust_session(retries: int = 5, backoff_factor: float = 1.0):
+    """
+    Create a requests session with retries and a standard User-Agent.
+
+    Parameters
+    ----------
+    retries : int, optional
+        Number of retries, by default 5.
+    backoff_factor : float, optional
+        Backoff factor for retries, by default 1.0.
+
+    Returns
+    -------
+    requests.Session
+        A robust requests session.
+    """
+    import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
+    session = requests.Session()
+    retry = Retry(
+        total=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=[500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "OPTIONS"],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    session.headers.update(
+        {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/91.0.4472.124 Safari/537.36"
+            )
+        }
+    )
+    return session
+
+
 @lru_cache(1)
-def get_valid_sites() -> pd.DataFrame:
+def get_valid_sites(retries: int = 5) -> pd.DataFrame:
     """
     Fetch valid AERONET sites from NASA.
+
+    Parameters
+    ----------
+    retries : int, optional
+        Number of retries for network call, by default 5.
 
     Returns
     -------
@@ -183,11 +233,14 @@ def get_valid_sites() -> pd.DataFrame:
     --------
     >>> sites = get_valid_sites()
     """
-    from urllib.error import URLError
-
     try:
+        session = _get_robust_session(retries=retries)
+        url = "https://aeronet.gsfc.nasa.gov/aeronet_locations_v3.txt"
+        response = session.get(url, timeout=30)
+        response.raise_for_status()
+
         df = pd.read_csv(
-            "https://aeronet.gsfc.nasa.gov/aeronet_locations_v3.txt",
+            BytesIO(response.content),
             skiprows=1,
         ).rename(
             columns={
@@ -197,8 +250,14 @@ def get_valid_sites() -> pd.DataFrame:
                 "Elevation(meters)": "elevation",
             },
         )
-    except (URLError, Exception) as e:
-        warnings.warn(f"Getting valid sites failed: {e}")
+    except Exception as e:
+        # Check if it's a connection error
+        import requests
+
+        if isinstance(e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+            raise
+
+        warnings.warn(f"Getting valid sites failed: {e}. Site validation will be skipped.")
         # Return empty with correct columns to avoid AttributeError in legacy code
         return pd.DataFrame(columns=["siteid", "longitude", "latitude", "elevation"])
     return df
@@ -214,6 +273,7 @@ def build_urls(
     siteid: Optional[str] = None,
     latlonbox: Optional[List[float]] = None,
     split_by_day: bool = False,
+    **kwargs,
 ) -> List[str]:
     """
     Construct AERONET URLs.
@@ -270,6 +330,7 @@ def build_urls(
                     lunar=lunar,
                     siteid=siteid,
                     latlonbox=latlonbox,
+                    **kwargs,
                 )
             ]
 
@@ -285,6 +346,7 @@ def build_urls(
                     lunar=lunar,
                     siteid=siteid,
                     latlonbox=latlonbox,
+                    **kwargs,
                 )
             )
         return urls
@@ -299,11 +361,12 @@ def build_urls(
                 lunar=lunar,
                 siteid=siteid,
                 latlonbox=latlonbox,
+                **kwargs,
             )
         ]
 
 
-def _build_single_url(d1, d2, product, inv_type, daily, lunar, siteid, latlonbox):
+def _build_single_url(d1, d2, product, inv_type, daily, lunar, siteid, latlonbox, **kwargs):
     """Internal helper to build a single URL."""
     sy, sm, sd, sh = d1.strftime(r"%Y"), d1.strftime(r"%m"), d1.strftime(r"%d"), d1.strftime(r"%H")
     ey, em, ed, eh = d2.strftime(r"%Y"), d2.strftime(r"%m"), d2.strftime(r"%d"), d2.strftime(r"%H")
@@ -344,7 +407,8 @@ def _build_single_url(d1, d2, product, inv_type, daily, lunar, siteid, latlonbox
 
     if siteid is not None:
         # Restore validation for test_add_data_bad_siteid
-        valid_sites = get_valid_sites()
+        retries = kwargs.get("retries", 5)
+        valid_sites = get_valid_sites(retries=retries)
         if not valid_sites.empty and siteid not in valid_sites.siteid.values:
             raise ValueError(f"invalid site {siteid!r}")
         loc_ = f"&site={siteid}"
@@ -391,22 +455,41 @@ def read_aeronet_csv(
     --------
     >>> df = read_aeronet_csv('path/to/file.txt')
     """
-    fs = FileUtility.get_fs(str(fn))
+    # Robust fetch for HTTP(S) URLs
+    if str(fn).startswith("http"):
+        try:
+            retries = kwargs.get("retries", 5)
+            session = _get_robust_session(retries=retries)
+            response = session.get(str(fn), timeout=60)
+            response.raise_for_status()
+            source = BytesIO(response.content)
+        except Exception as e:
+            import requests
+
+            if isinstance(e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+                raise
+
+            warnings.warn(f"Failed to fetch {fn}: {e}")
+            return pd.DataFrame()
+    else:
+        source = fn
 
     # Determine skiprows and check for errors
     try:
-        with fs.open(str(fn), mode="rb") as f:
-            header_lines = []
-            for _ in range(10):
-                line = f.readline().decode("utf-8", errors="replace").strip()
-                if not line:
-                    break
-                header_lines.append(line)
+        if isinstance(source, BytesIO):
+            source.seek(0)
+            header_lines = [
+                source.readline().decode("utf-8", errors="replace").strip() for _ in range(10)
+            ]
+            source.seek(0)
+        else:
+            fs = FileUtility.get_fs(str(fn))
+            with fs.open(str(fn), mode="rb") as f:
+                header_lines = [
+                    f.readline().decode("utf-8", errors="replace").strip() for _ in range(10)
+                ]
     except Exception as e:
-        warnings.warn(f"Failed to open {fn}: {e}")
-        return pd.DataFrame()
-
-    if not header_lines:
+        warnings.warn(f"Failed to read header of {fn}: {e}")
         return pd.DataFrame()
 
     header_text = "\n".join(header_lines)
@@ -414,7 +497,7 @@ def read_aeronet_csv(
         # Invalid query
         return pd.DataFrame()
 
-    if len(header_lines) < 2:
+    if len([line for line in header_lines if line]) < 2:
         # Might be "valid query but no data found"
         return pd.DataFrame()
 
@@ -423,7 +506,7 @@ def read_aeronet_csv(
 
     try:
         df = pd.read_csv(
-            fn,
+            source,
             engine="python",
             header="infer",
             skiprows=skiprows,
@@ -431,7 +514,7 @@ def read_aeronet_csv(
             storage_options=storage_options,
         )
     except Exception as e:
-        warnings.warn(f"Error reading {fn}: {e}")
+        warnings.warn(f"Error parsing CSV from {fn}: {e}")
         return pd.DataFrame()
 
     if df.empty:
