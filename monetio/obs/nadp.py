@@ -2,7 +2,7 @@
 NADP Reader Redirection
 """
 
-from ..readers.nadp import NADP, NADPReader  # noqa: F401
+from ..readers.nadp import NADPReader  # noqa: F401
 
 
 def add_data(dates, network="NTN", siteid=None, weekly=True, as_xarray=True):
