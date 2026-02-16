@@ -20,7 +20,7 @@ def add_data(
 ):
     """Retrieve and load ISH Lite data."""
     return ISHLiteReader().open_dataset(
-        dates,
+        dates=dates,
         box=box,
         country=country,
         state=state,
