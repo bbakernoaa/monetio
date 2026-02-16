@@ -103,7 +103,9 @@ class AERONETReader(PointReader):
 
         if not files:
             if dates is not None:
-                return xr.Dataset() if as_xarray else pd.DataFrame()
+                if as_xarray:
+                    return xr.Dataset()
+                raise Exception("valid query but no data found")
             raise ValueError("Must provide either 'files' or 'dates'.")
 
         # Define per-file preprocessing
@@ -118,19 +120,17 @@ class AERONETReader(PointReader):
         )
 
         # Use base class to open
+        # If n_procs > 1 and not lazy, we use dask to parallelize the load then compute
+        use_dask = lazy or (n_procs > 1)
         df = super().open_dataset(
             files,
             read_method=read_func,
             as_xarray=False,
-            lazy=lazy,
+            lazy=use_dask,
             **kwargs,
         )
 
-        if not lazy and df.empty:
-            raise Exception("valid query but no data found")
-
-        # Handle eager parallelization if requested but not lazy
-        if not lazy and n_procs > 1:
+        if not lazy and use_dask:
             try:
                 import dask.dataframe as dd
 
@@ -138,6 +138,9 @@ class AERONETReader(PointReader):
                     df = df.compute(num_workers=n_procs)
             except ImportError:
                 pass
+
+        if not lazy and df.empty:
+            raise Exception("valid query but no data found")
 
         # Post-processing (Freq resampling)
         if freq is not None and not lazy:

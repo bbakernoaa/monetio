@@ -135,7 +135,7 @@ def test_add_data_inv():
         assert (df.inversion_data_quality_level == "lev15").all()
         assert (df.retrieval_measurement_scan_type == "Almucantar").all()
 
-        df = aeronet.add_data(dates, inv_type="HYB15", product="SIZ", retries=1)
+        df = aeronet.add_data(dates, inv_type="HYB15", product="SIZ", retries=1, as_xarray=False)
         assert (df.inversion_data_quality_level == "lev15").all()
         assert (df.retrieval_measurement_scan_type == "Hybrid").all()
     except Exception as e:
@@ -168,7 +168,7 @@ def test_add_data_valid_empty_query():
 
     try:
         with pytest.raises(Exception, match="valid query but no data found"):
-            aeronet.add_data(dates, product="AOD20", siteid=site, retries=1)
+            aeronet.add_data(dates, product="AOD20", siteid=site, retries=1, as_xarray=False)
     except Exception as e:
         if is_connection_error(e):
             pytest.skip(f"Network connection failed: {e}")
@@ -198,13 +198,13 @@ def test_add_data_lunar():
     dates = pd.date_range("2021/08/01", "2021/08/02")
     try:
         df = aeronet.add_data(
-            dates, lunar=True, daily=True, retries=1
+            dates, lunar=True, daily=True, retries=1, as_xarray=False
         )  # only daily-average data at this time
-        assert len(df.time) > 0
+        assert len(df) > 0
 
         dates = pd.date_range("2022/01/20", "2022/01/21")
-        df = aeronet.add_data(dates, lunar=True, siteid="Chilbolton", retries=1)
-        assert len(df.time) > 0
+        df = aeronet.add_data(dates, lunar=True, siteid="Chilbolton", retries=1, as_xarray=False)
+        assert len(df) > 0
     except Exception as e:
         if is_connection_error(e):
             pytest.skip(f"Network connection failed: {e}")
