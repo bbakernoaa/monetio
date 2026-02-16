@@ -667,13 +667,16 @@ def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray
             return new_wv * np.nan
         else:
             try:
-                # New API
-                interp = pytspack.TsPack().interpolate(a.wv.values, a.aod.values)
-                return interp(new_wv)
-            except AttributeError:
-                # Old API
-                x, y, yp, sigma = pytspack.tspsi(a.wv.values, a.aod.values)
-                return pytspack.hval(new_wv, x, y, yp, sigma)
+                try:
+                    # New API
+                    interp = pytspack.TsPack().interpolate(a.wv.values, a.aod.values)
+                    return interp(new_wv)
+                except AttributeError:
+                    # Old API
+                    x, y, yp, sigma = pytspack.tspsi(a.wv.values, a.aod.values)
+                    return pytspack.hval(new_wv, x, y, yp, sigma)
+            except RuntimeError as e:
+                raise RuntimeError(f"pytspack is installed but not usable: {e}")
 
     new_wv = np.asarray(new_wv)
     # Copy to avoid fragmentation warning when adding many columns

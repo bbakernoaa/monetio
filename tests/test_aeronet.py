@@ -10,8 +10,16 @@ from monetio import aeronet
 DATA = Path(__file__).parent / "data"
 
 try:
-    import pytspack  # noqa: F401
-except ImportError:
+    import pytspack
+
+    # Check if actually usable (fixes Windows CI issue where symbols are missing)
+    # Some versions/platforms might have the module but not the shared library symbols
+    try:
+        pytspack.TsPack()
+    except (RuntimeError, AttributeError):
+        # Fallback check for older versions
+        pytspack.tspsi([0.0, 1.0], [0.0, 1.0])
+except (ImportError, RuntimeError, AttributeError, TypeError):
     has_pytspack = False
 else:
     has_pytspack = True
