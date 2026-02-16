@@ -201,6 +201,46 @@ def test_aeronet_build_urls_n_chunks(mock_valid_sites):
     assert "day2=31" in urls[-1]
 
 
+def test_aeronet_chunking_logic():
+    import pandas as pd
+
+    from monetio.readers.aeronet import AERONETReader
+
+    reader = AERONETReader()
+    dates = pd.date_range("2021-01-01", "2021-01-02", freq="D")  # 2 days
+
+    # All sites, short range -> should be 1 chunk
+    with patch("monetio.readers.aeronet.build_urls") as mock_build:
+        mock_build.return_value = ["http://test.com"]
+        with patch("monetio.readers.base.PointReader.open_dataset") as mock_open:
+            mock_open.return_value = pd.DataFrame()
+            reader.open_dataset(dates=dates, siteid=None, lazy=True)
+            mock_build.assert_called_once()
+            assert mock_build.call_args[1]["n_chunks"] == 1
+
+    # Single site, short range -> should be 2 chunks (min(n_days, 8))
+    with patch("monetio.readers.aeronet.build_urls") as mock_build:
+        mock_build.return_value = ["http://test.com"]
+        # Mock site validation
+        with patch("monetio.readers.aeronet.get_valid_sites") as mock_sites:
+            mock_sites.return_value = pd.DataFrame({"siteid": ["Mauna_Loa"]})
+            with patch("monetio.readers.base.PointReader.open_dataset") as mock_open:
+                mock_open.return_value = pd.DataFrame()
+                reader.open_dataset(dates=dates, siteid="Mauna_Loa", lazy=True)
+                mock_build.assert_called_once()
+                assert mock_build.call_args[1]["n_chunks"] == 2
+
+    # All sites, long range -> should be 8 chunks
+    dates_long = pd.date_range("2021-01-01", "2021-03-01", freq="D")  # ~60 days
+    with patch("monetio.readers.aeronet.build_urls") as mock_build:
+        mock_build.return_value = ["http://test.com"]
+        with patch("monetio.readers.base.PointReader.open_dataset") as mock_open:
+            mock_open.return_value = pd.DataFrame()
+            reader.open_dataset(dates=dates_long, siteid=None, lazy=True)
+            mock_build.assert_called_once()
+            assert mock_build.call_args[1]["n_chunks"] == 8
+
+
 def test_aeronet_build_urls_split_by_day(mock_valid_sites):
     from monetio.readers.aeronet import build_urls
 

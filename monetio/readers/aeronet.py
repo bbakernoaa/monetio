@@ -102,10 +102,16 @@ class AERONETReader(PointReader):
             # Throttling mitigation:
             # By default, we request the whole range to minimize calls to NASA.
             # However, if we are in parallel (n_procs > 1) or lazy (lazy=True),
-            # we split into a small number of chunks (defaulting to 8, < 10)
+            # we split into a small number of chunks (up to 8, < 10)
             # to ensure robust retrieval without timeouts or hitting rate limits hard.
             if n_chunks is None and (n_procs > 1 or lazy):
-                n_chunks = 8
+                n_days = (dates.max() - dates.min()).days + 1
+                if siteid is None and n_days <= 7:
+                    # For all-site or bounding-box requests, avoid chunking short ranges
+                    # to prevent Dask metadata mismatch from varying sites/columns.
+                    n_chunks = 1
+                else:
+                    n_chunks = min(n_days, 8)
 
             # Construct URLs from dates
             files = build_urls(
