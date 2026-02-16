@@ -4,9 +4,12 @@ import warnings
 from datetime import datetime, timezone
 from functools import lru_cache, partial
 from io import BytesIO
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import numpy as np
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 import pandas as pd
 import xarray as xr
 
