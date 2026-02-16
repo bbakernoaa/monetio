@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import xarray as xr
 
 from monetio import raqms
 
@@ -73,3 +74,22 @@ def test_surf_only(fn):
     assert set(ds.dims) == {"time", "z", "y", "x"}
     assert tuple(ds.o3vmr.dims) == ("time", "z", "y", "x")
     assert ds.sizes["z"] == 1
+
+
+def test_raqms_eager_vs_lazy():
+    """Verifies RAQMS reader with both Eager and Lazy data."""
+    from monetio.readers.raqms import RAQMSReader
+
+    reader = RAQMSReader()
+
+    # 1. Test Eager
+    ds_eager = reader.open_dataset(TEST_FP, use_dask=False)
+    assert isinstance(ds_eager.o3vmr.data, np.ndarray)
+
+    # 2. Test Lazy
+    ds_lazy = reader.open_dataset(TEST_FP, chunks={"time": 1})
+    assert hasattr(ds_lazy.o3vmr.data, "dask")
+
+    # 3. Verify results are identical
+    # We use compute() on the lazy one and compare with eager
+    xr.testing.assert_allclose(ds_eager, ds_lazy.compute())

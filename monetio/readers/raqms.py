@@ -1,17 +1,49 @@
 """RAQMS Reader"""
 
+import datetime
+from typing import List, Optional, Union
+
+import numpy as np
 import pandas as pd
 import xarray as xr
-from numpy import meshgrid
 
 from .base import GriddedReader, register_reader
 
 
 @register_reader("raqms")
 class RAQMSReader(GriddedReader):
-    def open_dataset(self, files, convert_to_ppb=True, var_list=None, surf_only=False, **kwargs):
+    """
+    Reader for RAQMS (Real-time Air Quality Modeling System) model output files.
+    """
+
+    def open_dataset(
+        self,
+        files: Union[str, List[str]],
+        convert_to_ppb: bool = True,
+        var_list: Optional[List[str]] = None,
+        surf_only: bool = False,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads RAQMS netCDF files.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path, list of paths, or glob pattern.
+        convert_to_ppb : bool, optional
+            Convert gas species from ppv to ppbv, by default True.
+        var_list : List[str], optional
+            List of variables to keep, by default None.
+        surf_only : bool, optional
+            Whether to only return the surface layer, by default False.
+        **kwargs : dict
+            Additional arguments passed to xarray.open_mfdataset or the driver.
+
+        Returns
+        -------
+        xr.Dataset
+            The processed RAQMS dataset.
         """
         # RAQMS check file format
         import os
@@ -45,6 +77,13 @@ class RAQMSReader(GriddedReader):
 
         ds = self.driver.open(files, **kwargs)
 
+        # 1. Update history
+        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read RAQMS data."
+        if "history" in ds.attrs:
+            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+        else:
+            ds.attrs["history"] = history
+
         if var_list is not None:
             # Add required vars
             required = [
@@ -74,7 +113,24 @@ class RAQMSReader(GriddedReader):
 # -----------------------------------------------------------------------------
 
 
-def _fix(ds, *, surf_only, convert_to_ppb):
+def _fix(ds: xr.Dataset, *, surf_only: bool, convert_to_ppb: bool) -> xr.Dataset:
+    """
+    Internal fix function for RAQMS dataset.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input RAQMS dataset.
+    surf_only : bool
+        Whether to keep only the surface layer.
+    convert_to_ppb : bool
+        Whether to convert ppv to ppbv.
+
+    Returns
+    -------
+    xr.Dataset
+        Fixed dataset.
+    """
     ds = _fix_grid(ds)
     ds = _fix_time(ds)
     ds = _fix_pres(ds)
@@ -83,34 +139,55 @@ def _fix(ds, *, surf_only, convert_to_ppb):
         ds = ds.isel(z=0).expand_dims("z")
 
     if convert_to_ppb:
-        for i in ds.variables:
+        for i in ds.data_vars:
             if "units" in ds[i].attrs:
                 if ds[i].attrs["units"] == "ppv":
                     with xr.set_options(keep_attrs=True):
                         ds[i] = ds[i] * 1e9
                     ds[i].attrs["units"] = "ppbv"
 
-    if "ttheta" in ds.keys():
+    if "ttheta" in ds.data_vars:
         # Calculate temperature from potential temperature
-        k = 0.28571428571428564  # R/cp = kappa (unitless; value for dry air from metpy.constants)
-        ds["temperature_k"] = ds["ttheta"] * (ds["pres_pa_mid"] / 100000) ** k
+        k = 0.28571428571428564  # R/cp = kappa (unitless)
+        with xr.set_options(keep_attrs=True):
+            ds["temperature_k"] = ds["ttheta"] * (ds["pres_pa_mid"] / 100000) ** k
         ds["temperature_k"].attrs["units"] = "K"
+        ds["temperature_k"].attrs["long_name"] = "Temperature"
 
     # Transpose if dims exist
-    # Check dims existence
     dims = [d for d in ["time", "z", "y", "x"] if d in ds.dims]
     ds = ds.transpose(*dims)
 
     return ds
 
 
-def _fix_grid(ds):
-    lat = ds.lat.values
-    lon = ds.lon.values.copy()
-    lon[(lon >= 180)] -= 360
-    lon, lat = meshgrid(lon, lat)
+def _fix_grid(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Fix grid and coordinates for RAQMS.
 
-    # Rename dims
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 'latitude' and 'longitude' coordinates.
+    """
+    # Handle coordinates lazily BEFORE renaming dims
+    lat_name = "lat" if "lat" in ds.dims else "y"
+    lon_name = "lon" if "lon" in ds.dims else "x"
+
+    lat_orig = ds[lat_name]
+    lon_orig = ds[lon_name]
+    lon_adj = xr.where(lon_orig >= 180, lon_orig - 360, lon_orig)
+
+    # Broadcast to 2D
+    # xr.broadcast will handle both NumPy and Dask lazily
+    lon2d, lat2d = xr.broadcast(lon_adj, lat_orig)
+
+    # Rename dims of the dataset FIRST
     rename_dims = {}
     if "lat" in ds.dims:
         rename_dims["lat"] = "y"
@@ -119,28 +196,30 @@ def _fix_grid(ds):
     if "lev" in ds.dims:
         rename_dims["lev"] = "z"
 
-    ds = ds.rename_dims(rename_dims)
-    ds = ds.drop_vars(["lat", "lon"], errors="ignore")
+    if rename_dims:
+        ds = ds.rename_dims(rename_dims)
 
-    ds["longitude"] = (
-        ("y", "x"),
-        lon,
+    # Ensure dimension order and rename to standard y, x for coordinates
+    lon2d = lon2d.transpose(lat_name, lon_name).rename({lat_name: "y", lon_name: "x"})
+    lat2d = lat2d.transpose(lat_name, lon_name).rename({lat_name: "y", lon_name: "x"})
+
+    ds["longitude"] = lon2d.assign_attrs(
         {
             "long_name": "Longitude",
             "units": "degree_east",
             "standard_name": "longitude",
-        },
+        }
     )
-    ds["latitude"] = (
-        ("y", "x"),
-        lat,
+    ds["latitude"] = lat2d.assign_attrs(
         {
             "long_name": "Latitude",
             "units": "degree_north",
             "standard_name": "latitude",
-        },
+        }
     )
-    ds = ds.reset_coords().set_coords(["latitude", "longitude"])
+
+    ds = ds.drop_vars(["lat", "lon"], errors="ignore")
+    ds = ds.set_coords(["latitude", "longitude"])
 
     if "lev" in ds.variables:
         ds["lev"].attrs.update(
@@ -159,19 +238,71 @@ def _fix_grid(ds):
     return ds
 
 
-def _fix_time(ds):
+def _fix_time(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Fix time coordinate for RAQMS.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 'time' coordinate.
+    """
     if "Times" in ds.variables:
-        dtstr = ds.Times.values.astype(str)
-        time = pd.to_datetime(dtstr, format=r"%Y_%m_%d_%H:%M:%S")
-        if "time" not in ds.coords:
-            # If 'time' dim exists but no coord, or if we need to replace it
-            pass
-        ds = ds.assign_coords(time=time)
+        # Times is usually a character array (time, char_len)
+        # We want to convert it to datetime64 lazily if possible.
+        # But constructing strings and then datetimes is usually not lazy in Xarray
+        # unless we use apply_ufunc.
+        # For now, if it's small (one time per file), we might compute it,
+        # but the Aero Protocol says NO HIDDEN COMPUTES.
+
+        # Use apply_ufunc with vectorize=True to handle character arrays or strings lazily.
+        def _parse_raqms_times(times_val):
+            # times_val is a single value (string or bytes) due to vectorize=True
+            if hasattr(times_val, "decode"):
+                s = times_val.decode("utf-8").strip()
+            else:
+                s = str(times_val).strip()
+
+            if not s:
+                return np.datetime64("NaT")
+            try:
+                return pd.to_datetime(s, format=r"%Y_%m_%d_%H:%M:%S").to_datetime64()
+            except Exception:
+                return np.datetime64("NaT")
+
+        # If it's dask, we use apply_ufunc to keep it lazy
+        time_values = xr.apply_ufunc(
+            _parse_raqms_times,
+            ds.Times,
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[np.dtype("datetime64[ns]")],
+        )
+
+        ds = ds.assign_coords(time=time_values)
         ds = ds.drop_vars(["IDATE", "Times"], errors="ignore")
     return ds
 
 
-def _fix_pres(ds):
+def _fix_pres(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Fix pressure variables for RAQMS.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with renamed and scaled pressure variables.
+    """
     rename0 = {
         "psfc": "surfpres_pa",
         "delp": "dp_pa",
@@ -179,11 +310,13 @@ def _fix_pres(ds):
     }
     rename = {k: v for k, v in rename0.items() if k in ds.variables}
 
-    ds = ds.rename_vars(rename)
+    if rename:
+        ds = ds.rename_vars(rename)
+
     for vn in rename.values():
         if "units" in ds[vn].attrs and ds[vn].attrs["units"] in {"mb", "hPa"}:
             with xr.set_options(keep_attrs=True):
-                ds[vn] *= 100
+                ds[vn] = ds[vn] * 100
             ds[vn].attrs.update(units="Pa")
 
     return ds

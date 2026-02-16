@@ -4,10 +4,12 @@ import datetime
 from functools import partial
 from typing import List, Union
 
+import numpy as np
+import pandas as pd
 import xarray as xr
-from pandas import Series, to_datetime
+from pandas import Series
 
-from monetio.grids import get_latlon_ioapi, grid_from_dataset
+from monetio.grids import grid_from_dataset
 
 from .base import GriddedReader, register_reader
 from .cmaq_specs import DIAGNOSTICS, DiagnosticSpec
@@ -167,6 +169,13 @@ def cmaq_preprocess(
             if isinstance(val, str):
                 ds[var].attrs[attr] = val.strip()
 
+    # Update history
+    history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Preprocessed CMAQ data."
+    if "history" in ds.attrs:
+        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+    else:
+        ds.attrs["history"] = history
+
     return ds
 
 
@@ -220,7 +229,7 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
 
 def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
     """
-    Extracts and assigns time coordinate from TFLAG.
+    Extracts and assigns time coordinate from TFLAG lazily.
 
     Parameters
     ----------
@@ -232,25 +241,42 @@ def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
     Returns
     -------
     xr.Dataset
-        Dataset with 'time' coordinate instead of 'TSTEP'.
+        Dataset with 'time' coordinate.
     """
     # TFLAG format: [YYYYDDD, HHMMSS]
     # We take the first variable's flags as they are typically identical for all.
-    tflag = ds.TFLAG.compute()
+    tflag = ds.TFLAG
     if tflag.ndim == 3:
         # (TSTEP, VAR, DATE_TIME) -> (TSTEP, DATE_TIME)
-        tflag = tflag[:, 0, :]
+        tflag = tflag.isel(VAR=0, drop=True)
 
-    tflag1 = Series(tflag[:, 0]).astype(str).str.zfill(7)
-    tflag2 = Series(tflag[:, 1]).astype(str).str.zfill(6)
+    # Handle different possible names for DATE_TIME dimension (e.g. DATE_TIME or DATE-TIME)
+    dt_dim = [d for d in tflag.dims if "DATE" in str(d).upper() and "TIME" in str(d).upper()][0]
 
-    dates = to_datetime(tflag1 + tflag2, format="%Y%j%H%M%S")
+    # Use apply_ufunc to construct dates lazily
+    def _parse_cmaq_times(yyyymmdd, hhmmss):
+        # Vectorized scalar operations
+        s1 = str(yyyymmdd).zfill(7)
+        s2 = str(hhmmss).zfill(6)
+        return pd.to_datetime(s1 + s2, format="%Y%j%H%M%S").to_datetime64()
+
+    dates = xr.apply_ufunc(
+        _parse_cmaq_times,
+        tflag.isel(**{dt_dim: 0}),
+        tflag.isel(**{dt_dim: 1}),
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[np.dtype("datetime64[ns]")],
+    )
 
     if drop_duplicates:
-        # Use pandas to find unique indices, keeping the last occurrence (common for CMAQ)
-        unique_indices = Series(dates).drop_duplicates(keep="last").index.values
+        # Warning: drop_duplicates requires computation of the coordinate
+        # to identify unique values. This is an unavoidable "Lazy Breaker"
+        # but we only trigger it if explicitly requested.
+        dates_computed = dates.compute()
+        unique_indices = Series(dates_computed).drop_duplicates(keep="last").index.values
         ds = ds.isel(TSTEP=unique_indices)
-        dates = dates[unique_indices]
+        dates = dates.isel(TSTEP=unique_indices)
 
     ds = ds.assign_coords(TSTEP=dates)
     ds = ds.rename({"TSTEP": "time"})
@@ -259,7 +285,7 @@ def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
 
 def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     """
-    Assigns latitude and longitude coordinates using the projection string.
+    Assigns latitude and longitude coordinates lazily.
 
     Parameters
     ----------
@@ -273,10 +299,47 @@ def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     xr.Dataset
         Dataset with 'latitude' and 'longitude' coordinates.
     """
-    # get_latlon_ioapi currently returns NumPy arrays.
-    lon, lat = get_latlon_ioapi(ds, proj4_srs)
+    from pyproj import Proj
 
-    ds = ds.assign_coords(longitude=(("ROW", "COL"), lon), latitude=(("ROW", "COL"), lat))
+    # 1. Generate 1D x and y values
+    x = np.linspace(
+        ds.XORIG + ds.XCELL * 0.5,
+        ds.XORIG + (ds.NCOLS - 0.5) * ds.XCELL,
+        ds.NCOLS,
+    )
+    y = np.linspace(
+        ds.YORIG + ds.YCELL * 0.5,
+        ds.YORIG + (ds.NROWS - 0.5) * ds.YCELL,
+        ds.NROWS,
+    )
+
+    # 2. Broadcast to 2D (ensure ROW is first dim)
+    yv, xv = xr.broadcast(xr.DataArray(y, dims="ROW"), xr.DataArray(x, dims="COL"))
+
+    # 3. Apply projection lazily
+    def _proj_inv(x_val, y_val, p_srs):
+        p = Proj(p_srs)
+        return p(x_val, y_val, inverse=True)
+
+    lon, lat = xr.apply_ufunc(
+        _proj_inv,
+        xv,
+        yv,
+        proj4_srs,
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float, float],
+        output_core_dims=[(), ()],
+    )
+
+    ds = ds.assign_coords(
+        longitude=lon.assign_attrs(
+            {"long_name": "Longitude", "units": "degree_east", "standard_name": "longitude"}
+        ),
+        latitude=lat.assign_attrs(
+            {"long_name": "Latitude", "units": "degree_north", "standard_name": "latitude"}
+        ),
+    )
     return ds
 
 
