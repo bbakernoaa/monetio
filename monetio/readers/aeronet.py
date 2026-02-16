@@ -1,138 +1,165 @@
-"""AERONET Reader"""
+"""AERONET Reader following the Aero Protocol."""
 
 import warnings
-from datetime import datetime
-from functools import lru_cache
-from io import BytesIO
-from pathlib import Path
+from datetime import datetime, timezone
+from functools import lru_cache, partial
+from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 from .base import PointReader, register_reader
-
-try:
-    import dask
-    import dask.dataframe as dd
-
-    has_dask = True
-except ImportError:
-    has_dask = False
+from .drivers import FileUtility
 
 
 @register_reader("aeronet")
 class AERONETReader(PointReader):
     def open_dataset(
         self,
-        dates=None,
-        product="AOD15",
-        inv_type=None,
-        latlonbox=None,
-        siteid=None,
-        daily=False,
-        lunar=False,
-        freq=None,
-        detect_dust=False,
-        interp_to_aod_values=None,
-        n_procs=1,
-        verbose=10,
-        files=None,
-        as_xarray=True,
-        lazy=False,
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        product: str = "AOD15",
+        inv_type: str = None,
+        latlonbox: List[float] = None,
+        siteid: str = None,
+        daily: bool = False,
+        lunar: bool = False,
+        freq: str = None,
+        detect_dust: bool = False,
+        interp_to_aod_values: Union[List[float], np.ndarray] = None,
+        n_procs: int = 1,
+        as_xarray: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ):
+    ) -> Union[pd.DataFrame, xr.Dataset]:
         """
-        Reads AERONET data.
+        Retrieve and load AERONET data following the Aero Protocol.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File path, list of paths, or glob pattern.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve if files are not provided.
+        product : str, optional
+            AERONET product (e.g., 'AOD15', 'SDA20'), by default "AOD15".
+        inv_type : str, optional
+            Inversion type (e.g., 'ALM15', 'HYB20'), by default None.
+        latlonbox : List[float], optional
+            Bounding box [latmin, lonmin, latmax, lonmax], by default None.
+        siteid : str, optional
+            Specific AERONET site ID, by default None.
+        daily : bool, optional
+            Whether to load daily averages instead of all points, by default False.
+        lunar : bool, optional
+            Whether to include lunar data, by default False.
+        freq : str, optional
+            Resampling frequency (e.g., '1H'), by default None.
+        detect_dust : bool, optional
+            Whether to add a 'dust' column based on AOD/Angstrom, by default False.
+        interp_to_aod_values : Union[List[float], np.ndarray], optional
+            Wavelengths (nm) to interpolate AOD to, by default None.
+        n_procs : int, optional
+            Number of processors for parallel loading (non-lazy), by default 1.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments passed to the driver.
+
+        Returns
+-------
+        Union[pd.DataFrame, xr.Dataset]
+            The loaded AERONET data.
+
+        Examples
+        --------
+        >>> from monetio.readers.aeronet import AERONETReader
+        >>> reader = AERONETReader()
+        >>> ds = reader.open_dataset(dates='2021-08-01', siteid='Mauna_Loa')
         """
-        if files:
-            if isinstance(files, (str, Path)) or hasattr(files, "__fspath__"):
-                files = [files]
+        if files is None:
+            if dates is None:
+                # Default to today (use naive to avoid pd.date_range issues)
+                now = datetime.now(timezone.utc)
+                start = datetime(now.year, now.month, now.day)
+                dates = pd.date_range(start=start, end=now.replace(tzinfo=None), freq="h")
 
-            dfs = []
-            for f in files:
-                a = AERONET()
-                try:
-                    with open(f) as fid:
-                        if "Inversion" in fid.readline():
-                            a.inv_type = True
-                except Exception:
-                    pass
-
-                a.new_aod_values = interp_to_aod_values
-                a.url = f
-                a.read_aeronet()
-
-                if freq is not None and not a.df.empty:
-                    a.df = (
-                        a.df.set_index("time")
-                        .groupby("siteid")
-                        .resample(freq)
-                        .mean(numeric_only=True)
-                        .reset_index()
-                    )
-                if detect_dust:
-                    a.dust_detect()
-                if a.new_aod_values is not None:
-                    a.calc_new_aod_values()
-
-                dfs.append(a.df)
-
-            if not dfs:
-                df = pd.DataFrame()
-            else:
-                df = pd.concat(dfs)
-
-        else:
-            a = AERONET()
-            if interp_to_aod_values is not None:
-                interp_to_aod_values = np.asarray(interp_to_aod_values)
-
-            kwargs_inner = dict(
+            # Construct URLs from dates
+            files = build_urls(
+                dates,
                 product=product,
                 inv_type=inv_type,
-                latlonbox=latlonbox,
-                siteid=siteid,
                 daily=daily,
                 lunar=lunar,
-                detect_dust=detect_dust,
-                interp_to_aod_values=interp_to_aod_values,
+                siteid=siteid,
+                latlonbox=latlonbox,
+                split_by_day=(n_procs > 1 or lazy),
             )
 
-            requested_parallel = n_procs != 1
-
+        if not files:
             if dates is not None:
-                dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
-                min_date = dates.min()
-                max_date = dates.max()
-                time_bounds = pd.date_range(start=min_date, end=max_date, freq="d")
-                if max_date not in time_bounds:
-                    time_bounds = time_bounds.append(pd.DatetimeIndex([max_date]))
-            else:
-                time_bounds = []
+                return xr.Dataset() if as_xarray else pd.DataFrame()
+            raise ValueError("Must provide either 'files' or 'dates'.")
 
-            if has_dask and requested_parallel and dates is not None and len(time_bounds) > 2:
-                tasks = [
-                    dask.delayed(_parallel_aeronet_call)(
-                        pd.DatetimeIndex([t1, t2]), **kwargs_inner, freq=None
-                    )
-                    for t1, t2 in zip(time_bounds[:-1], time_bounds[1:])
-                ]
+        # Define per-file preprocessing
+        storage_options = kwargs.get("storage_options", {})
+        read_func = partial(
+            read_aeronet_csv,
+            inv_type=inv_type,
+            interp_to_aod_values=interp_to_aod_values,
+            detect_dust=detect_dust,
+            storage_options=storage_options,
+        )
 
-                if lazy:
-                    return dd.from_delayed(tasks)
+        # Use base class to open
+        df = super().open_dataset(
+            files,
+            read_method=read_func,
+            as_xarray=False,
+            lazy=lazy,
+            **kwargs,
+        )
 
-                dfs = dask.compute(*tasks, scheduler="processes", num_workers=n_procs)
-                df = pd.concat(dfs, ignore_index=True).drop_duplicates()
-                if freq is not None:
-                    df.index = df.time
-                    df = df.groupby("siteid").resample(freq).mean(numeric_only=True).reset_index()
-                df = df.reset_index(drop=True)
-            else:
-                df = a.add_data(dates=dates, freq=freq, **kwargs_inner)
+        # Handle eager parallelization if requested but not lazy
+        if not lazy and n_procs > 1:
+            try:
+                import dask.dataframe as dd
+
+                if isinstance(df, dd.DataFrame):
+                    df = df.compute(num_workers=n_procs)
+            except ImportError:
+                pass
+
+        # Post-processing (Freq resampling)
+        if freq is not None and not lazy:
+            # We can only resample eagerly here to avoid hidden compute in dask
+            if not df.empty:
+                df = (
+                    df.set_index("time")
+                    .groupby("siteid")
+                    .resample(freq)
+                    .mean(numeric_only=True)
+                    .reset_index()
+                )
 
         df = self.harmonize(df)
+
         if as_xarray:
-            return self.to_xarray(df)
+            ds = self.to_xarray(df, **kwargs)
+
+            # Update history
+            history = (
+                f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}: Read AERONET data."
+            )
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+
+            return ds
 
         return df
 
@@ -143,7 +170,19 @@ class AERONETReader(PointReader):
 
 
 @lru_cache(1)
-def get_valid_sites():
+def get_valid_sites() -> pd.DataFrame:
+    """
+    Fetch valid AERONET sites from NASA.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with valid sites and their locations.
+
+    Examples
+    --------
+    >>> sites = get_valid_sites()
+    """
     from urllib.error import URLError
 
     try:
@@ -158,20 +197,346 @@ def get_valid_sites():
                 "Elevation(meters)": "elevation",
             },
         )
-    except URLError:
-        print("getting valid sites failed")
-        return None
-    except Exception:
-        raise
+    except (URLError, Exception) as e:
+        warnings.warn(f"Getting valid sites failed: {e}")
+        # Return empty with correct columns to avoid AttributeError in legacy code
+        return pd.DataFrame(columns=["siteid", "longitude", "latitude", "elevation"])
     return df
 
 
-def _parallel_aeronet_call(**kwargs):
-    a = AERONET()
-    return a.add_data(**kwargs)
+def build_urls(
+    dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+    product: str = "AOD15",
+    *,
+    inv_type: Optional[str] = None,
+    daily: bool = False,
+    lunar: bool = False,
+    siteid: Optional[str] = None,
+    latlonbox: Optional[List[float]] = None,
+    split_by_day: bool = False,
+) -> List[str]:
+    """
+    Construct AERONET URLs.
+
+    Parameters
+    ----------
+    dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+        Dates to build URLs for.
+    product : str, optional
+        AERONET product, by default "AOD15".
+    inv_type : Optional[str], optional
+        Inversion type, by default None.
+    daily : bool, optional
+        Whether to request daily averages, by default False.
+    lunar : bool, optional
+        Whether to request lunar data, by default False.
+    siteid : Optional[str], optional
+        Specific site ID, by default None.
+    latlonbox : Optional[List[float]], optional
+        Bounding box, by default None.
+    split_by_day : bool, optional
+        Whether to generate one URL per day, by default False.
+
+    Returns
+    -------
+    List[str]
+        List of AERONET download URLs.
+
+    Examples
+    --------
+    >>> urls = build_urls('2021-08-01', siteid='Mauna_Loa')
+    """
+    dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
+    if dates.empty:
+        return []
+
+    if split_by_day:
+        # Generate daily URLs
+        min_date = dates.min()
+        max_date = dates.max()
+        time_bounds = pd.date_range(start=min_date.floor("D"), end=max_date.ceil("D"), freq="D")
+        if not time_bounds.empty and time_bounds[-1] < max_date:
+            time_bounds = time_bounds.append(pd.DatetimeIndex([max_date]))
+
+        if len(time_bounds) < 2:
+            # Only one day or less
+            return [
+                _build_single_url(
+                    dates.min(),
+                    dates.max(),
+                    product=product,
+                    inv_type=inv_type,
+                    daily=daily,
+                    lunar=lunar,
+                    siteid=siteid,
+                    latlonbox=latlonbox,
+                )
+            ]
+
+        urls = []
+        for i in range(len(time_bounds) - 1):
+            urls.append(
+                _build_single_url(
+                    time_bounds[i],
+                    time_bounds[i + 1],
+                    product=product,
+                    inv_type=inv_type,
+                    daily=daily,
+                    lunar=lunar,
+                    siteid=siteid,
+                    latlonbox=latlonbox,
+                )
+            )
+        return urls
+    else:
+        return [
+            _build_single_url(
+                dates.min(),
+                dates.max(),
+                product=product,
+                inv_type=inv_type,
+                daily=daily,
+                lunar=lunar,
+                siteid=siteid,
+                latlonbox=latlonbox,
+            )
+        ]
+
+
+def _build_single_url(d1, d2, product, inv_type, daily, lunar, siteid, latlonbox):
+    """Internal helper to build a single URL."""
+    sy, sm, sd, sh = d1.strftime(r"%Y"), d1.strftime(r"%m"), d1.strftime(r"%d"), d1.strftime(r"%H")
+    ey, em, ed, eh = d2.strftime(r"%Y"), d2.strftime(r"%m"), d2.strftime(r"%d"), d2.strftime(r"%H")
+    dates_ = f"year={sy}&month={sm}&day={sd}&hour={sh}&year2={ey}&month2={em}&day2={ed}&hour2={eh}"
+
+    valid_prod_noninv = (
+        "AOD10",
+        "AOD15",
+        "AOD20",
+        "SDA10",
+        "SDA15",
+        "SDA20",
+        "TOT10",
+        "TOT15",
+        "TOT20",
+    )
+    valid_prod_inv = ("SIZ", "RIN", "CAD", "VOL", "TAB", "AOD", "SSA", "ASY", "FRC", "LID", "FLX")
+    valid_inv_type = ("ALM15", "ALM20", "HYB15", "HYB20")
+
+    product = product.upper()
+    if inv_type is None:
+        if product not in valid_prod_noninv:
+            raise ValueError(f"invalid product {product!r}")
+        base_url = "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?"
+        inv_type_ = ""
+        product_ = f"&{product}=1"
+    elif inv_type in valid_inv_type:
+        if product not in valid_prod_inv:
+            raise ValueError(f"invalid product {product!r}")
+        base_url = "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_inv_v3?"
+        inv_type_ = f"&{inv_type}=1"
+        product_ = f"&product={product}"
+    else:
+        raise ValueError(f"invalid inv type: {inv_type!r}")
+
+    avg_ = f"&AVG={20 if daily else 10}"
+    lunar_ = f"&lunar_merge={1 if lunar else 0}"
+
+    if siteid is not None:
+        # Restore validation for test_add_data_bad_siteid
+        valid_sites = get_valid_sites()
+        if not valid_sites.empty and siteid not in valid_sites.siteid.values:
+            raise ValueError(f"invalid site {siteid!r}")
+        loc_ = f"&site={siteid}"
+    elif latlonbox is not None:
+        lat1, lon1, lat2, lon2 = map(str, map(float, latlonbox))
+        loc_ = f"&lat1={lat1}&lat2={lat2}&lon1={lon1}&lon2={lon2}"
+    else:
+        loc_ = ""
+
+    return f"{base_url}{dates_}{product_}{avg_}{lunar_}{inv_type_}{loc_}&if_no_html=1"
+
+
+def read_aeronet_csv(
+    fn: str,
+    *,
+    inv_type: Optional[str] = None,
+    interp_to_aod_values: Optional[Union[List[float], np.ndarray]] = None,
+    detect_dust: bool = False,
+    storage_options: Optional[dict] = None,
+    **kwargs,
+) -> pd.DataFrame:
+    """
+    Read a single AERONET file or URL.
+
+    Parameters
+    ----------
+    fn : str
+        File path or URL.
+    inv_type : Optional[str], optional
+        Inversion type, by default None.
+    interp_to_aod_values : Optional[Union[List[float], np.ndarray]], optional
+        Wavelengths to interpolate to, by default None.
+    detect_dust : bool, optional
+        Whether to detect dust, by default False.
+    storage_options : Optional[dict], optional
+        fsspec storage options, by default None.
+
+    Returns
+    -------
+    pd.DataFrame
+        Loaded AERONET data.
+
+    Examples
+    --------
+    >>> df = read_aeronet_csv('path/to/file.txt')
+    """
+    fs = FileUtility.get_fs(str(fn))
+
+    # Determine skiprows and check for errors
+    try:
+        with fs.open(str(fn), mode="rb") as f:
+            header_lines = []
+            for _ in range(10):
+                line = f.readline().decode("utf-8", errors="replace").strip()
+                if not line:
+                    break
+                header_lines.append(line)
+    except Exception as e:
+        warnings.warn(f"Failed to open {fn}: {e}")
+        return pd.DataFrame()
+
+    if not header_lines:
+        return pd.DataFrame()
+
+    header_text = "\n".join(header_lines)
+    if "<html>" in header_text:
+        # Invalid query
+        return pd.DataFrame()
+
+    if len(header_lines) < 2:
+        # Might be "valid query but no data found"
+        return pd.DataFrame()
+
+    is_inv = "Inversion" in header_text or inv_type is not None
+    skiprows = 5 if not is_inv else 6
+
+    try:
+        df = pd.read_csv(
+            fn,
+            engine="python",
+            header="infer",
+            skiprows=skiprows,
+            na_values=-999,
+            storage_options=storage_options,
+        )
+    except Exception as e:
+        warnings.warn(f"Error reading {fn}: {e}")
+        return pd.DataFrame()
+
+    if df.empty:
+        return df
+
+    df.rename(columns=str.lower, inplace=True)
+
+    # Handle time
+    date_col = [c for c in df.columns if "date(" in c]
+    time_col = [c for c in df.columns if "time(" in c]
+    if date_col and time_col:
+        df["time"] = pd.to_datetime(
+            df[date_col[0]] + " " + df[time_col[0]], format=r"%d:%m:%Y %H:%M:%S", errors="coerce"
+        )
+        df = df.drop(columns=[date_col[0], time_col[0]])
+
+    # Standard names
+    df = df.rename(
+        columns={
+            "aeronet_site": "siteid",
+            "aeronet_aeronet_site": "siteid",
+            "site_latitude(degrees)": "latitude",
+            "site_longitude(degrees)": "longitude",
+            "site_elevation(m)": "elevation",
+            "latitude(degrees)": "latitude",
+            "longitude(degrees)": "longitude",
+            "elevation(m)": "elevation",
+        }
+    )
+
+    # Apply Aero Protocol Scientific Hygiene
+    if "latitude" in df.columns and "longitude" in df.columns:
+        df = df.dropna(subset=["latitude", "longitude"])
+    df = df.dropna(axis=1, how="all")
+
+    if hasattr(df, "attrs"):
+        df.attrs["info"] = header_text
+
+    # Dust detect
+    if detect_dust:
+        df = _dust_detect(df)
+
+    # Interpolate
+    if interp_to_aod_values is not None:
+        df = _calc_new_aod_values(df, interp_to_aod_values)
+
+    return df.copy()
+
+
+def _dust_detect(df: pd.DataFrame) -> pd.DataFrame:
+    """Detect dust based on AOD and Angstrom exponent."""
+    if "aod_1020nm" in df.columns and "440-870_angstrom_exponent" in df.columns:
+        df["dust"] = (df["aod_1020nm"] > 0.3) & (df["440-870_angstrom_exponent"] < 0.6)
+    return df
+
+
+def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray]) -> pd.DataFrame:
+    """Interpolate AOD to new wavelengths."""
+
+    def _tspack_aod_interp(row, new_wv):
+        try:
+            import pytspack
+        except ImportError:
+            # Re-raise as RuntimeError to match expected behavior in tests
+            raise RuntimeError("You must install pytspack before using this function.")
+
+        aod_columns = [c for c in row.index if c.startswith("aod_") and c.endswith("nm")]
+        aods = row[aod_columns]
+        wv = [float(c.replace("aod_", "").replace("nm", "")) for c in aod_columns]
+
+        a = pd.DataFrame({"aod": aods, "wv": wv}).dropna()
+        a = a.sort_values(by="wv")
+        if len(a) < 2:
+            return new_wv * np.nan
+        else:
+            x, y, yp, sigma = pytspack.tspsi(a.wv.values, a.aod.values)
+            yi = pytspack.hval(new_wv, x, y, yp, sigma)
+            return yi
+
+    new_wv = np.asarray(new_wv)
+    out = df.apply(_tspack_aod_interp, axis=1, result_type="expand", new_wv=new_wv)
+    names = "aod_" + pd.Series(new_wv.astype(int).astype(str)) + "nm"
+    out.columns = names.values
+
+    dup_names = list(set(df.columns) & set(out.columns))
+    if dup_names:
+        suff = "_orig"
+        warnings.warn(
+            f"Renaming duplicate AOD columns {dup_names} by adding suffix '{suff}'.",
+            stacklevel=2,
+        )
+        for name in dup_names:
+            df = df.rename(columns={name: f"{name}{suff}"})
+            # Also rename exact wavelengths if they exist
+            wl = name[4:-2]
+            ename = f"exact_wavelengths_of_aod(um)_{wl}nm"
+            if ename in df.columns:
+                df = df.rename(columns={ename: f"{ename}{suff}"})
+
+    return pd.concat([df, out], axis=1)
 
 
 class AERONET:
+    """Legacy AERONET class for backward compatibility."""
+
     _valid_prod_noninv = (
         "AOD10",
         "AOD15",
@@ -210,285 +575,60 @@ class AERONET:
         self.siteid = None
         self.new_aod_values = None
 
-        # Buffer to store downloaded content
-        self._content_buffer = None
-
     def build_url(self):
+        """Build the AERONET URL."""
         assert self.dates is not None, "required parameter"
-        d1, d2 = self.dates.min(), self.dates.max()
-        sy, sm, sd, sh = (
-            d1.strftime(r"%Y"),
-            d1.strftime(r"%m"),
-            d1.strftime(r"%d"),
-            d1.strftime(r"%H"),
-        )
-        ey, em, ed, eh = (
-            d2.strftime(r"%Y"),
-            d2.strftime(r"%m"),
-            d2.strftime(r"%d"),
-            d2.strftime(r"%H"),
-        )
-        dates_ = (
-            f"year={sy}&month={sm}&day={sd}&hour={sh}&year2={ey}&month2={em}&day2={ed}&hour2={eh}"
-        )
-
         assert self.prod is not None, "required parameter"
-
-        if self.inv_type is None:
-            if self.prod in self._valid_prod_noninv:
-                base_url = "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?"
-            else:
-                raise ValueError(f"invalid product {self.prod!r}")
-            inv_type_ = ""
-            product_ = f"&{self.prod}=1"
-
-        elif self.inv_type in self._valid_inv_type:
-            if self.prod in self._valid_prod_inv:
-                base_url = "https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_inv_v3?"
-            else:
-                raise ValueError(f"invalid product {self.prod!r}")
-            inv_type_ = f"&{self.inv_type}=1"
-            product_ = f"&product={self.prod}"
-        else:
-            raise ValueError(f"invalid inv type: {self.inv_type!r}")
-
         assert self.daily in {10, 20}, "required parameter"
-        avg_ = f"&AVG={self.daily}"
 
-        if self.lunar is not None:
-            if self.lunar in {0, 1}:
-                lunar_ = f"&lunar_merge={self.lunar}"
-            else:
-                raise ValueError(f"invalid lunar setting {self.lunar!r}")
-        else:
-            lunar_ = ""
-
-        if self.siteid is not None:
-            if self.siteid in get_valid_sites().siteid.values:
-                loc_ = f"&site={self.siteid}"
-            else:
-                raise ValueError(f"invalid site {self.siteid!r}")
-        elif self.latlonbox is None:
-            loc_ = ""
-        else:
-            lat1, lon1, lat2, lon2 = map(str, map(float, self.latlonbox))
-            loc_ = f"&lat1={lat1}&lat2={lat2}&lon1={lon1}&lon2={lon2}"
-
-        self.url = f"{base_url}{dates_}{product_}{avg_}{lunar_}{inv_type_}{loc_}&if_no_html=1"
-
-    def _get_content(self, timeout=60, retries=3):
-        """Robustly fetch content from URL."""
-        if not (isinstance(self.url, str) and self.url.startswith("http")):
-            return None  # Local file handled elsewhere
-
-        if self._content_buffer:
-            self._content_buffer.seek(0)
-            return self._content_buffer
-
-        import requests
-        from requests.adapters import HTTPAdapter
-        from urllib3.util.retry import Retry
-
-        session = requests.Session()
-        retry = Retry(total=retries, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
-        adapter = HTTPAdapter(max_retries=retry)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-
-        response = session.get(self.url, timeout=timeout)
-        response.raise_for_status()
-
-        self._content_buffer = BytesIO(response.content)
-        return self._content_buffer
-
-    def _lines_from_url(self, *, n=10):
-        from itertools import islice
-
-        if isinstance(self.url, str) and self.url.startswith("http"):
-            # Use the robust fetcher
-            content = self._get_content()
-            # Read first n lines from bytes buffer
-            # Need to decode carefully
-            content.seek(0)
-            # Read a chunk that should contain enough lines?
-            # Or just wrap in TextIOWrapper for iteration?
-            import io
-
-            wrapper = io.TextIOWrapper(content, encoding="utf-8", errors="replace")
-            # iter_lines in requests yields lines without newlines? No, this is TextIOWrapper.
-            # We strip to match behavior of 'iter_lines' join logic often used or just to look nice.
-            s = "\n".join(line.rstrip("\n") for line in islice(wrapper, n))
-            wrapper.detach()  # Don't close the BytesIO
-            content.seek(0)  # Reset
-        else:
-            with open(self.url) as f:
-                s = "\n".join(islice(f, n))
-        return s
+        self.url = _build_single_url(
+            self.dates.min(),
+            self.dates.max(),
+            product=self.prod,
+            inv_type=self.inv_type,
+            daily=(self.daily == 20),
+            lunar=(self.lunar == 1),
+            siteid=self.siteid,
+            latlonbox=self.latlonbox,
+        )
 
     def read_aeronet(self):
-        print("Reading Aeronet Data...")
-        inv = self.inv_type is not None
-        skiprows = 5 if not inv else 6
-
-        # This will trigger download if needed
-        info = self._lines_from_url(n=skiprows)
-
-        if len(info.splitlines()) == 1:
+        """Read the AERONET data."""
+        self.df = read_aeronet_csv(
+            self.url,
+            inv_type=self.inv_type,
+            interp_to_aod_values=self.new_aod_values,
+        )
+        if self.df.empty:
+            # Matches old behavior for some tests
             raise Exception("valid query but no data found")
-        elif info.startswith("<html>"):
-            raise Exception("invalid query, open the URL to check the error")
 
-        # Determine source for read_csv
-        if self._content_buffer:
-            self._content_buffer.seek(0)
-            source = self._content_buffer
-        else:
-            source = self.url
-
-        df = pd.read_csv(
-            source,
-            engine="python",
-            header="infer",
-            skiprows=skiprows,
-            usecols=None,
-            na_values=-999,
-        )
-        df.rename(columns=str.lower, inplace=True)
-
-        # Handle time manually for Pandas 3.0 compatibility
-        # In AERONET v3, columns are Date(dd:mm:yyyy) and Time(hh:mm:ss)
-        # They are usually the 2nd and 3rd columns (index 1 and 2)
-        # After lowercasing: 'date(dd:mm:yyyy)' and 'time(hh:mm:ss)'
-        date_col = [c for c in df.columns if "date(" in c][0]
-        time_col = [c for c in df.columns if "time(" in c][0]
-        df["time"] = pd.to_datetime(
-            df[date_col] + " " + df[time_col], format=r"%d:%m:%Y %H:%M:%S", errors="coerce"
-        )
-        df.drop(columns=[date_col, time_col], inplace=True)
-        df.rename(
-            columns={
-                "aeronet_site": "siteid",
-                "aeronet_aeronet_site": "siteid",
-                "site_latitude(degrees)": "latitude",
-                "site_longitude(degrees)": "longitude",
-                "site_elevation(m)": "elevation",
-                "latitude(degrees)": "latitude",
-                "longitude(degrees)": "longitude",
-                "elevation(m)": "elevation",
-            },
-            inplace=True,
-        )
-        if df.siteid.unique().size == 1:
-            df.set_index("time", inplace=True)
-        df.dropna(subset=["latitude", "longitude"], inplace=True)
-        df.dropna(axis=1, how="all", inplace=True)
-        if hasattr(df, "attrs"):
-            df.attrs["info"] = info
+    def add_data(self, **kwargs):
+        """Add data (legacy)."""
+        # Determine if we should return xarray or dataframe
+        # In legacy mode, if not specified, return dataframe
+        as_xarray = kwargs.get("as_xarray", False)
+        kwargs["as_xarray"] = False
+        df = AERONETReader().open_dataset(**kwargs)
+        if df.empty:
+            raise Exception("valid query but no data found")
         self.df = df
-
-    def add_data(
-        self,
-        dates=None,
-        product="AOD15",
-        *,
-        inv_type=None,
-        siteid=None,
-        latlonbox=None,
-        daily=False,
-        lunar=False,
-        freq=None,
-        detect_dust=False,
-        interp_to_aod_values=None,
-    ):
-        self.latlonbox = latlonbox
-        self.siteid = siteid
-        if dates is None:
-            now = datetime.utcnow()
-            self.dates = pd.date_range(start=now.date(), end=now, freq="h")
-        else:
-            self.dates = pd.DatetimeIndex(dates)
-
-        self.prod = product.upper() if product else product
-        self.inv_type = inv_type
-        self.daily = 20 if daily else 10
-        self.lunar = 1 if lunar else 0
-        self.new_aod_values = interp_to_aod_values
-
-        if self.new_aod_values is not None and not self.prod.startswith("AOD"):
-            print("`interp_to_aod_values` will be ignored")
-
-        self.build_url()
-        try:
-            self.read_aeronet()
-        except Exception as e:
-            raise Exception(f"loading from URL {self.url!r} failed.") from e
-
-        if freq is not None:
-            self.df = (
-                self.df.set_index("time")
-                .groupby("siteid")
-                .resample(freq)
-                .mean(numeric_only=True)
-                .reset_index()
-            )
-
-        if detect_dust:
-            self.dust_detect()
-
-        if self.new_aod_values is not None:
-            self.calc_new_aod_values()
-
+        if as_xarray:
+            return AERONETReader().to_xarray(df)
         return self.df
 
     def dust_detect(self):
-        self.df["dust"] = (self.df["aod_1020nm"] > 0.3) & (
-            self.df["440-870_angstrom_exponent"] < 0.6
-        )
+        """Detect dust."""
+        if self.df is not None:
+            self.df = _dust_detect(self.df)
 
     def calc_new_aod_values(self):
-        def _tspack_aod_interp(row, new_wv=[440.0, 470.0, 550.0, 670.0, 870.0, 1020.0, 1240.0]):
-            import numpy as np
+        """Calculate new AOD values."""
+        if self.df is not None and self.new_aod_values is not None:
+            self.df = _calc_new_aod_values(self.df, self.new_aod_values)
 
-            try:
-                import pytspack
-            except ImportError as e:
-                raise RuntimeError("You must install pytspack before using this function.") from e
 
-            new_wv = np.asarray(new_wv)
-            aod_columns = [c for c in row.index if c.startswith("aod_")]
-            aods = row[aod_columns]
-            wv = [float(c.replace("aod_", "").replace("nm", "")) for c in aod_columns]
-
-            a = pd.DataFrame({"aod": aods}).reset_index()
-            a["wv"] = wv
-            df_aod_nu = a.dropna()
-            df_aod_nu_sorted = df_aod_nu.sort_values(by="wv").dropna()
-            if len(df_aod_nu_sorted) < 2:
-                return new_wv * np.nan
-            else:
-                x, y, yp, sigma = pytspack.tspsi(
-                    df_aod_nu_sorted.wv.values, df_aod_nu_sorted.aod.values
-                )
-                yi = pytspack.hval(self.new_aod_values, x, y, yp, sigma)
-                return yi
-
-        out = self.df.apply(
-            _tspack_aod_interp, axis=1, result_type="expand", new_wv=self.new_aod_values
-        )
-        names = "aod_" + pd.Series(self.new_aod_values.astype(int).astype(str)) + "nm"
-        out.columns = names.values
-        dup_names = list(set(self.df) & set(out))
-        if dup_names:
-            suff = "_orig"
-            warnings.warn(
-                f"Renaming duplicate AOD columns {dup_names} by adding suffix '{suff}'.",
-                stacklevel=2,
-            )
-            for name in dup_names:
-                self.df = self.df.rename(columns={name: f"{name}{suff}"})
-                if self.daily == 10:
-                    wl = name[4:-2]
-                    ename = f"exact_wavelengths_of_aod(um)_{wl}nm"
-                    ename_new = f"exact_wavelengths_of_aod(um)_{wl}nm{suff}"
-                    self.df = self.df.rename(columns={ename: ename_new})
-        self.df = pd.concat([self.df, out], axis=1)
+def _parallel_aeronet_call(**kwargs):
+    """Legacy parallel call."""
+    # This remains for backward compatibility
+    return AERONETReader().open_dataset(as_xarray=False, **kwargs)
