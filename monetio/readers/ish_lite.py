@@ -19,7 +19,8 @@ from .drivers import FileUtility
 class ISHLiteReader(PointReader):
     def open_dataset(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
         box: List[float] = None,
         country: str = None,
         state: str = None,
@@ -37,8 +38,10 @@ class ISHLiteReader(PointReader):
 
         Parameters
         ----------
-        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
-            Dates to retrieve.
+        files : Union[str, List[str]], optional
+            File path, list of paths, or glob pattern.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve if files are not provided.
         box : List[float], optional
             Bounding box [latmin, lonmin, latmax, lonmax].
         country : str, optional
@@ -68,47 +71,55 @@ class ISHLiteReader(PointReader):
             The loaded ISH Lite data.
         """
         ish = ISH()
-        ish.dates = pd.to_datetime(dates)
-        if ish.history is None:
-            ish.read_ish_history()
-        dfloc = ish.history.copy()
+        if dates is not None:
+            ish.dates = pd.to_datetime(dates)
 
-        if box is not None:
-            dfloc = ish.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
-        elif country is not None:
-            dfloc = dfloc.loc[dfloc.ctry == country, :]
-        elif state is not None:
-            dfloc = dfloc.loc[dfloc.state == state, :]
-        elif site is not None:
-            dfloc = dfloc.loc[dfloc.station_id == site, :]
+        if files is None:
+            if dates is None:
+                raise ValueError("Must provide either 'files' or 'dates'.")
 
-        urls = ish.build_urls(sites=dfloc)
-        if urls.empty:
-            raise ValueError("No data URLs found")
+            if ish.history is None:
+                ish.read_ish_history()
+            dfloc = ish.history.copy()
 
-        # Define per-file preprocessing if needed, or just use the reader_func
-        # For ISH Lite, we need to handle the fixed-width/space-separated format.
-        read_func = read_ish_lite_file
+            if box is not None:
+                dfloc = ish.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
+            elif country is not None:
+                dfloc = dfloc.loc[dfloc.ctry == country, :]
+            elif state is not None:
+                dfloc = dfloc.loc[dfloc.state == state, :]
+            elif site is not None:
+                dfloc = dfloc.loc[dfloc.station_id == site, :]
 
+            urls = ish.build_urls(sites=dfloc)
+            if urls.empty:
+                raise ValueError("No data URLs found")
+            files = urls.name.tolist()
+        else:
+            # Files provided, we still need history for metadata if possible
+            if ish.history is None:
+                ish.read_ish_history()
+            dfloc = ish.history.copy()
+
+        # Call super to load files via PandasDriver
         df = super().open_dataset(
-            urls.name.tolist(),
-            read_method=read_func,
+            files,
+            read_method=read_ish_lite_file,
             as_xarray=False,
             lazy=lazy,
             **kwargs,
         )
 
-        # Filtering by time range (exclusive upper bound to match legacy behavior)
-        df = df.loc[(df.time >= ish.dates.min()) & (df.time < ish.dates.max())]
+        # Filtering by time range if dates provided (exclusive upper bound)
+        if ish.dates is not None:
+            df = df.loc[(df.time >= ish.dates.min()) & (df.time < ish.dates.max())]
 
         # Merge with location metadata
-        # We ensure consistent dtypes for merge
         dfloc["station_id"] = dfloc["station_id"].astype(object)
         if lazy:
             import dask.dataframe as dd
 
             df = df.assign(siteid=df.siteid.astype(object))
-            # Convert dfloc to dask to ensure consistent merging and avoid warnings
             dfloc_dask = dd.from_pandas(dfloc, npartitions=1).assign(
                 station_id=lambda x: x.station_id.astype(object)
             )
@@ -139,15 +150,22 @@ class ISHLiteReader(PointReader):
                 ds.attrs["history"] = history
             return ds
 
-        # Note: resample is NOT applied to DataFrame here if as_xarray=False
+        # Handle resampling for eager DataFrame path
         if resample and not as_xarray:
             if lazy:
                 warnings.warn(
                     "ISHLiteReader: Resampling is currently not supported for lazy DataFrames."
                 )
             else:
-                # Eager path handles resample by checking if empty
                 if not df.empty:
+                    # Save non-numeric metadata to re-join after resampling
+                    meta_cols = [
+                        c
+                        for c in df.columns
+                        if not pd.api.types.is_numeric_dtype(df[c]) and c != "time"
+                    ]
+                    df_meta = df.drop_duplicates(subset=["siteid"])[meta_cols]
+
                     df = (
                         df.set_index("time")
                         .groupby("siteid")
@@ -155,6 +173,8 @@ class ISHLiteReader(PointReader):
                         .mean(numeric_only=True)
                         .reset_index()
                     )
+
+                    df = df.merge(df_meta, on="siteid", how="left")
 
         return df
 
@@ -193,7 +213,6 @@ class ISHLiteReader(PointReader):
             # 4. Handle non-numeric or static variables that were dropped
             for v in ds.data_vars:
                 if v not in ds_resampled.data_vars:
-                    # For metadata that is constant over time, we take the first value.
                     if "time" in ds[v].dims:
                         if ds.sizes["time"] > 0:
                             ds_resampled[v] = ds[v].isel(time=0, drop=True)
