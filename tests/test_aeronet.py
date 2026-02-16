@@ -132,6 +132,82 @@ def test_add_data_one_site():
         raise
 
 
+def test_aeronet_aero_protocol():
+    import xarray as xr
+
+    from monetio.readers.aeronet import AERONETReader
+
+    # Use local file to avoid network issues
+    fp = DATA / "aeronet-AOD15-example.txt"
+    if not fp.exists():
+        pytest.skip(f"Local data file not found at {fp}")
+
+    reader = AERONETReader()
+
+    # 1. Eager Load
+    df_eager = reader.open_dataset(files=str(fp), as_xarray=False, lazy=False)
+    assert isinstance(df_eager, pd.DataFrame)
+    assert not df_eager.empty
+    assert "time" in df_eager.columns
+    assert "siteid" in df_eager.columns
+
+    # 2. Lazy Load
+    df_lazy = reader.open_dataset(files=str(fp), as_xarray=False, lazy=True)
+    try:
+        import dask.dataframe as dd
+
+        assert isinstance(df_lazy, dd.DataFrame)
+    except ImportError:
+        pytest.skip("Dask not installed")
+
+    # Check they match after compute
+    df_eager = df_eager.reindex(sorted(df_eager.columns), axis=1)
+    df_lazy_computed = df_lazy.compute().reindex(sorted(df_eager.columns), axis=1)
+    df_eager["siteid"] = df_eager["siteid"].astype(object)
+    pd.testing.assert_frame_equal(df_eager, df_lazy_computed)
+
+    # 3. Xarray Eager
+    ds_eager = reader.open_dataset(files=str(fp), as_xarray=True, lazy=False)
+    assert isinstance(ds_eager, xr.Dataset)
+    assert "time" in ds_eager.coords
+    assert "node" in ds_eager.dims
+
+    # 4. Xarray Lazy
+    ds_lazy = reader.open_dataset(files=str(fp), as_xarray=True, lazy=True)
+    assert isinstance(ds_lazy, xr.Dataset)
+    assert any(ds_lazy[v].chunks is not None for v in ds_lazy.data_vars)
+
+    # Match
+    xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
+
+
+def test_aeronet_build_urls_n_chunks(mock_valid_sites):
+    from monetio.readers.aeronet import build_urls
+
+    dates = pd.date_range("2021-01-01", "2021-01-31", freq="D")
+    urls = build_urls(dates, product="AOD15", siteid="SERC", n_chunks=3)
+    assert len(urls) == 3
+    assert "site=SERC" in urls[0]
+    # Check that they cover the whole range roughly
+    assert "day=01" in urls[0]
+    assert "day2=31" in urls[-1]
+
+
+def test_aeronet_build_urls_split_by_day(mock_valid_sites):
+    from monetio.readers.aeronet import build_urls
+
+    dates = pd.date_range("2021-08-01", "2021-08-02", freq="D")
+    urls = build_urls(dates, product="AOD15", siteid="SERC", split_by_day=True)
+    # 2021-08-01 to 2021-08-02 is one span (one daily averaging period or full day)
+    # Wait, my logic for split_by_day produces intervals.
+    # If 2021-08-01 to 2021-08-02, it's 1 chunk.
+    assert len(urls) == 1
+
+    dates_multi = pd.date_range("2021-08-01", "2021-08-03", freq="D")
+    urls_multi = build_urls(dates_multi, split_by_day=True)
+    assert len(urls_multi) == 2
+
+
 def test_add_data_inv():
     dates = pd.date_range("2021/08/01", "2021/08/02")
 

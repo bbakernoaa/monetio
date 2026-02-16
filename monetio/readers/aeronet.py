@@ -38,6 +38,7 @@ class AERONETReader(PointReader):
         lazy: bool = False,
         retries: int = 5,
         backoff_factor: float = 2.0,
+        n_chunks: Optional[int] = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset]:
         """
@@ -98,6 +99,14 @@ class AERONETReader(PointReader):
                 start = datetime(now.year, now.month, now.day)
                 dates = pd.date_range(start=start, end=now.replace(tzinfo=None), freq="h")
 
+            # Throttling mitigation:
+            # By default, we request the whole range to minimize calls to NASA.
+            # However, if we are in parallel (n_procs > 1) or lazy (lazy=True),
+            # we split into a small number of chunks (defaulting to 8, < 10)
+            # to ensure robust retrieval without timeouts or hitting rate limits hard.
+            if n_chunks is None and (n_procs > 1 or lazy):
+                n_chunks = 8
+
             # Construct URLs from dates
             files = build_urls(
                 dates,
@@ -107,7 +116,7 @@ class AERONETReader(PointReader):
                 lunar=lunar,
                 siteid=siteid,
                 latlonbox=latlonbox,
-                split_by_day=(n_procs > 1 or lazy),
+                n_chunks=n_chunks,
                 **kwargs,
             )
 
@@ -303,6 +312,7 @@ def build_urls(
     siteid: Optional[str] = None,
     latlonbox: Optional[List[float]] = None,
     split_by_day: bool = False,
+    n_chunks: Optional[int] = None,
     **kwargs,
 ) -> List[str]:
     """
@@ -340,23 +350,38 @@ def build_urls(
     if dates.empty:
         return []
 
-    if split_by_day:
-        # Generate daily URLs
+    if split_by_day or n_chunks is not None:
         min_date = dates.min()
         max_date = dates.max()
-        time_bounds = pd.date_range(start=min_date.floor("D"), end=max_date.ceil("D"), freq="D")
 
-        # Clip bounds to the actual requested range
-        time_list = time_bounds.tolist()
-        if not time_list or time_list[0] < min_date:
-            if not time_list:
+        if n_chunks is not None:
+            # Generate N roughly equal chunks
+            # Ensure at least 1 chunk
+            n_chunks = max(1, n_chunks)
+            if (max_date - min_date).total_seconds() == 0:
                 time_list = [min_date, max_date]
             else:
-                time_list[0] = min_date
-        if time_list[-1] > max_date:
-            time_list[-1] = max_date
-        elif time_list[-1] < max_date:
-            time_list.append(max_date)
+                # Use linspace for dates
+                # Convert to unix timestamps for easier division
+                t_start = min_date.timestamp()
+                t_end = max_date.timestamp()
+                t_list = np.linspace(t_start, t_end, n_chunks + 1)
+                time_list = [pd.to_datetime(t, unit="s", utc=True) for t in t_list]
+        else:
+            # Generate daily URLs
+            time_bounds = pd.date_range(start=min_date.floor("D"), end=max_date.ceil("D"), freq="D")
+
+            # Clip bounds to the actual requested range
+            time_list = time_bounds.tolist()
+            if not time_list or time_list[0] < min_date:
+                if not time_list:
+                    time_list = [min_date, max_date]
+                else:
+                    time_list[0] = min_date
+            if time_list[-1] > max_date:
+                time_list[-1] = max_date
+            elif time_list[-1] < max_date:
+                time_list.append(max_date)
 
         # Ensure unique and sorted
         time_list = sorted(list(set(time_list)))
