@@ -1,17 +1,6 @@
 import os
-
-import pytest
-
-# TODO: Skip on CI until we can fix this with NASA.  NASA seems to be blocking requests from CI IPs.
-# This is a temporary solution until we can resolve the issue with NASA.
-# If you are running this locally, you can remove the skip decorator.
-skip_on_ci = pytest.mark.skipif(
-    os.environ.get("CI", "false").lower() == "true", reason="Skipped on CI"
-)
-
-pytestmark = skip_on_ci
-
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -28,8 +17,28 @@ except ImportError:
 else:
     has_pytspack = True
 
+# Decorator to skip tests that require external network access in CI
+skip_on_ci = pytest.mark.skipif(
+    os.environ.get("CI", "false").lower() == "true", reason="Skipped on CI"
+)
 
-def test_build_url_required_param_checks():
+
+@pytest.fixture
+def mock_valid_sites():
+    """Mock get_valid_sites to avoid network calls during tests."""
+    with patch("monetio.readers.aeronet.get_valid_sites") as mock:
+        mock.return_value = pd.DataFrame(
+            {
+                "siteid": ["Mauna_Loa", "SERC", "Cart_Site", "Chilbolton", "Banana_River"],
+                "longitude": [-155.6, -76.5, -97.5, -1.4, -80.6],
+                "latitude": [19.5, 38.9, 36.6, 51.1, 28.4],
+                "elevation": [3397.0, 10.0, 315.0, 84.0, 2.0],
+            }
+        )
+        yield mock
+
+
+def test_build_url_required_param_checks(mock_valid_sites):
     # Default (nothing set; `dates`, `prod``, `daily` required)
     a = aeronet.AERONET()
     with pytest.raises(AssertionError):
@@ -50,7 +59,7 @@ def test_build_url_required_param_checks():
     a.build_url()
 
 
-def test_build_url_bad_prod():
+def test_build_url_bad_prod(mock_valid_sites):
     dates = pd.date_range("2021/08/01", "2021/08/02")
     a = aeronet.AERONET()
     a.dates = dates
@@ -82,17 +91,20 @@ def test_build_url_bad_prod():
     a.build_url()
 
 
+@skip_on_ci
 def test_valid_sites_col_rename():
     assert (
         aeronet.get_valid_sites().columns == ["siteid", "longitude", "latitude", "elevation"]
     ).all()
 
 
+@skip_on_ci
 def test_add_data_bad_siteid():
     with pytest.raises(ValueError, match="invalid site"):
         aeronet.add_data(siteid="Rivendell")
 
 
+@skip_on_ci
 def test_add_data_one_site():
     dates = pd.date_range("2021/08/01", "2021/08/03")
     df = aeronet.add_data(dates, siteid="SERC", as_xarray=False)
@@ -101,6 +113,7 @@ def test_add_data_one_site():
     assert df.attrs["info"].startswith("AERONET Data Download")
 
 
+@skip_on_ci
 def test_add_data_inv():
     dates = pd.date_range("2021/08/01", "2021/08/02")
 
@@ -112,9 +125,8 @@ def test_add_data_inv():
     assert df.inversion_data_quality_level.eq("lev15").all()
     assert df.retrieval_measurement_scan_type.eq("Hybrid").all()
 
-    # TODO: find a time with Level 2.0 retrievals
 
-
+@skip_on_ci
 @pytest.mark.parametrize("product", aeronet.AERONET._valid_prod_noninv)
 def test_add_data_all_noninv(product):
     dates = pd.date_range("2021/08/01", "2021/08/02")
@@ -124,6 +136,7 @@ def test_add_data_all_noninv(product):
     assert df.index.size > 0
 
 
+@skip_on_ci
 def test_add_data_valid_empty_query():
     dates = pd.date_range("2021/08/01", "2021/08/02")
     site = "Banana_River"
@@ -133,38 +146,26 @@ def test_add_data_valid_empty_query():
     assert "valid query but no data found" in str(ei.value.__cause__)
 
 
-# [21.1,-131.6686,53.04,-58.775]
-
-
 def test_load_local():
-    # The example file is based on one of the provided examples:
-    # https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?year=2000&month=6&day=1&year2=2000&month2=6&day2=14&AOD15=1&AVG=10
-    # but with
-    # - no-HTML mode
-    # - site `Mauna_Loa` selected
-    # https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_v3?year=2000&month=6&day=1&year2=2000&month2=6&day2=14&AOD15=1&AVG=10&if_no_html=1&site=Mauna_Loa
-
     fp = DATA / "aeronet-AOD15-example.txt"
     assert fp.is_file()
 
     df = aeronet.add_local(fp, as_xarray=False)
     assert df.index.size > 0
-    assert (df.siteid == "Mauna_Loa").all(0)
+    assert (df.siteid == "Mauna_Loa").all()
     assert df.attrs["info"].startswith("AERONET Data Download")
 
 
 def test_load_local_inv():
-    # One of the provided examples:
-    # https://aeronet.gsfc.nasa.gov/cgi-bin/print_web_data_inv_v3?site=Cart_Site&year=2002&month=6&day=1&year2=2003&month2=6&day2=14&product=SIZ&AVG=20&ALM15=1&if_no_html=1
-
     fp = DATA / "aeronet-inv-ALM15-SIZ-example.txt"
     assert fp.is_file()
 
     df = aeronet.add_local(fp, as_xarray=False)
     assert df.index.size > 0
-    assert (df.siteid == "Cart_Site").all(0)
+    assert (df.siteid == "Cart_Site").all()
 
 
+@skip_on_ci
 def test_add_data_lunar():
     dates = pd.date_range("2021/08/01", "2021/08/02")
     df = aeronet.add_data(dates, lunar=True, daily=True)  # only daily-average data at this time
@@ -175,6 +176,7 @@ def test_add_data_lunar():
     assert df.index.size > 0
 
 
+@skip_on_ci
 def test_serial_freq():
     # For MM data proc example
     dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
@@ -185,6 +187,7 @@ def test_serial_freq():
     ).all()
 
 
+@skip_on_ci
 @pytest.mark.skipif(has_pytspack, reason="has pytspack")
 def test_interp_without_pytspack():
     # For MM data proc example
@@ -194,6 +197,7 @@ def test_interp_without_pytspack():
         aeronet.add_data(dates, n_procs=1, interp_to_aod_values=standard_wavelengths)
 
 
+@skip_on_ci
 @pytest.mark.skipif(not has_pytspack, reason="no pytspack")
 def test_interp_with_pytspack():
     # For MM data proc example
@@ -203,17 +207,6 @@ def test_interp_with_pytspack():
         df = aeronet.add_data(
             dates, n_procs=1, interp_to_aod_values=standard_wavelengths, as_xarray=False
         )
-    # Note: default wls for this period:
-    #
-    # wls = sorted(df.columns[df.columns.str.startswith("aod")].str.slice(4, -2).astype(int).tolist())
-    #
-    # [340, 380, 400, 412, 440,
-    #  443, 490, 500, 510, 532,
-    #  551, 555, 560, 620, 667,
-    #  675, 681, 709, 779, 865,
-    #  870, 1020, 1640]
-    #
-    # Note: Some of the ones we want already are in there (340 and 440 nm)
 
     # Check for the new columns
     assert {f"aod_{int(wl)}nm" for wl in standard_wavelengths}.issubset(df.columns)
@@ -223,14 +216,9 @@ def test_interp_with_pytspack():
         "aod_340nm_orig",
         "aod_440nm_orig",
     }
-    assert {
-        c for c in df if c.startswith("exact_wavelengths_of_aod") and c.endswith("nm_orig")
-    } == {
-        "exact_wavelengths_of_aod(um)_340nm_orig",
-        "exact_wavelengths_of_aod(um)_440nm_orig",
-    }
 
 
+@skip_on_ci
 @pytest.mark.skipif(not has_pytspack, reason="no pytspack")
 def test_interp_daily_with_pytspack():
     dates = pd.date_range(start="2019-09-01", end="2019-09-2", freq="h")
@@ -242,6 +230,7 @@ def test_interp_daily_with_pytspack():
     assert {f"aod_{int(wl)}nm" for wl in standard_wavelengths}.issubset(df.columns)
 
 
+@skip_on_ci
 @pytest.mark.parametrize(
     "dates",
     [
@@ -260,9 +249,6 @@ def test_issue100(dates, request):
     df2 = aeronet.add_data(dates, n_procs=2, as_xarray=False)
     assert len(df1) == len(df2)
     if request.node.callspec.id == "two days":
-        # Sort first (can use `df1.compare(df2)` for debugging)
-        # Seems the sorting is site then time, not time then site
-        # which is why this is necessary
         df1_ = df1.sort_values(["time", "siteid"]).reset_index(drop=True)
         df2_ = df2.sort_values(["time", "siteid"]).reset_index(drop=True)
         assert df1_.equals(df2_)

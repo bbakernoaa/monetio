@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -7,6 +8,21 @@ import xarray as xr
 from monetio.readers.aeronet import AERONETReader
 
 DATA = Path(__file__).parent / "data"
+
+
+@pytest.fixture
+def mock_valid_sites():
+    """Mock get_valid_sites to avoid network calls during tests."""
+    with patch("monetio.readers.aeronet.get_valid_sites") as mock:
+        mock.return_value = pd.DataFrame(
+            {
+                "siteid": ["Mauna_Loa", "SERC", "Cart_Site"],
+                "longitude": [-155.6, -76.5, -97.5],
+                "latitude": [19.5, 38.9, 36.6],
+                "elevation": [3397.0, 10.0, 315.0],
+            }
+        )
+        yield mock
 
 
 def test_aeronet_aero_protocol():
@@ -61,7 +77,7 @@ def test_aeronet_aero_protocol():
     xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
 
 
-def test_aeronet_build_urls():
+def test_aeronet_build_urls(mock_valid_sites):
     from monetio.readers.aeronet import build_urls
 
     dates = pd.date_range("2021-08-01", "2021-08-02", freq="D")
