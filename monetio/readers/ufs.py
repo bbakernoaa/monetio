@@ -197,6 +197,18 @@ class UFSReader(GriddedReader):
         if "surfpres_pa" in dset and "ak" in dset and "bk" in dset:
             dset["pres_pa_mid"] = _calc_pressure(dset)
 
+        # Resort z (Restore original sorting logic but keep it efficient)
+        if "z" in dset.coords:
+            z_vals = dset.z.values
+            if z_vals.size > 1 and np.all(np.diff(z_vals) > 0):
+                dset = dset.isel(z=slice(None, None, -1))
+                if "dz_m" in dset:
+                    dset["dz_m"] = dset["dz_m"] * -1.0
+        if "z_i" in dset.coords:
+            zi_vals = dset.z_i.values
+            if zi_vals.size > 1 and np.all(np.diff(zi_vals) > 0):
+                dset = dset.isel(z_i=slice(None, None, -1))
+
         if not surf_only and "dz_m" in dset and "surfalt_m" in dset:
             dset["alt_msl_m_full"] = _calc_hgt(dset)
 
@@ -241,7 +253,12 @@ class UFSReader(GriddedReader):
             dset = add_lazy_noy_a(dset, dict_sum)
         if "nox" in list_calc_sum:
             dset = add_lazy_nox(dset, dict_sum)
-        # Add others as needed...
+
+        # Time fix (Restore original time fixing logic to match baseline dtypes)
+        try:
+            dset["time"] = dset.indexes["time"].to_datetimeindex(unsafe=True)
+        except Exception:
+            pass
 
         # Clean up extra variables
         if var_list is not None and bool(list_remove_extra_only):
@@ -456,7 +473,6 @@ def _calc_pressure(dset: xr.Dataset) -> xr.DataArray:
         p_int2 = p_int1
 
     # Logarithmic interpolation for mid-layer pressure
-    # Use a small epsilon to avoid log(0)
     eps = 1e-10
     p_mid = (p_int2 - p_int1) / np.log(np.maximum(p_int2, eps) / np.maximum(p_int1, eps))
 

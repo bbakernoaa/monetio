@@ -93,13 +93,6 @@ class GMLOzonesondeReader(PointReader):
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
 
-            # Update history and metadata
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read GML Ozonesonde data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
-
             # Set variable attributes
             var_attrs = {
                 c.name: {"long_name": c.long_name, "units": c.units} for c in COL_INFO_L100
@@ -107,6 +100,13 @@ class GMLOzonesondeReader(PointReader):
             for var, attrs in var_attrs.items():
                 if var in ds.data_vars:
                     ds[var].attrs.update(attrs)
+
+            # Update history and metadata
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read GML Ozonesonde data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
 
             return ds
 
@@ -147,13 +147,11 @@ class GMLOzonesondeReader(PointReader):
                 # We want to unstack to (time, siteid, lev) if possible
                 # But since each profile might have different levels,
                 # we use 'lev' as a dimension.
-                # If there are multiple flights for the same time/site, we might need 'flight_number'
                 index_cols = ["time", "siteid"]
                 if "lev" in ds.coords:
                     index_cols.append("lev")
 
                 # Check for duplicates in index
-                # This is tricky for dask. For now we assume they are unique enough or unstack will handle.
                 ds = ds.set_index(node=index_cols).unstack("node")
 
                 # Rename siteid to node if it exists as a dimension
@@ -358,7 +356,7 @@ COL_INFO_L100 = [
     ColInfo("o3", "ozone mixing ratio", "ppmv", "99.999"),
     ColInfo("o3_int", "integrated ozone below", "atm-cm", "99.9990"),
     ColInfo("ptemp", "pump temperature", "degC", "999.9"),
-    ColInfo("o3_nd", "ozone number density", "10^11 cm-3", "999.999"),
+    ColInfo("o3_nd", "ozone number density", "10^11 cm-3", "99.9990"),
     ColInfo(
         "o3_res",
         "estimated total column ozone above",
