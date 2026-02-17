@@ -319,39 +319,23 @@ class ISH:
 
         if self.source == "aws":
             url = "s3://noaa-isd-pds/data"
-            for syear in unique_years.strftime("%Y"):
-                year_fnames = (
-                    sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-                )
-                for fname in year_fnames:
-                    furls.append(f"{url}/{syear}/{fname}")
-            return pd.Series(furls, name="name").to_frame()
         else:
             url = "https://www.ncei.noaa.gov/pub/data/noaa"
-            all_urls_list = []
-            for syear in unique_years.strftime("%Y"):
-                try:
-                    year_url_df = pd.read_html(f"{url}/{syear}/")[0]
-                    if "Name" in year_url_df.columns:
-                        names = year_url_df["Name"].iloc[2:-1].to_frame(name="name")
-                        all_urls_list.append(f"{url}/{syear}/" + names)
-                except Exception:
-                    pass
-            if all_urls_list:
-                all_urls = pd.concat(all_urls_list, ignore_index=True)
-            else:
-                all_urls = pd.DataFrame(columns=["name"])
 
-            for syear in unique_years.strftime("%Y"):
-                year_fnames = (
-                    sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-                )
-                for fname in year_fnames:
-                    furls.append(f"{url}/{syear}/{fname}")
+        for syear in unique_years.strftime("%Y"):
+            # USAF is 6 digits, WBAN is 5 digits
+            year_fnames = (
+                sites.usaf.astype(str).str.zfill(6)
+                + "-"
+                + sites.wban.astype(str).str.zfill(5)
+                + "-"
+                + syear
+                + ".gz"
+            )
+            for fname in year_fnames:
+                furls.append(f"{url}/{syear}/{fname}")
 
-            url_series = pd.Series(furls, name="name")
-            final_urls = pd.merge(url_series.to_frame(name="name"), all_urls, how="inner")
-            return final_urls
+        return pd.Series(furls, name="name").to_frame()
 
     def get_url_file_objs(self, fname):
         import gzip

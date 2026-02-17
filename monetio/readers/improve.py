@@ -76,7 +76,15 @@ class IMPROVEReader(PointReader):
             **driver_kwargs,
         )
 
-        if len(df) == 0:
+        # Determine backend
+        try:
+            import dask.dataframe as dd
+
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
+
+        if not is_dask and len(df) == 0:
             return df
 
         if add_meta:

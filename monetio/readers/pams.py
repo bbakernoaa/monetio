@@ -16,6 +16,10 @@ from .drivers import FileUtility
 
 @register_reader("pams")
 class PAMSReader(PointReader):
+    """
+    Reader for PAMS (Photochemical Assessment Monitoring Stations) data.
+    """
+
     def open_dataset(
         self,
         files: Union[str, List[str]],
@@ -71,7 +75,7 @@ class PAMSReader(PointReader):
 # -----------------------------------------------------------------------------
 
 
-def read_pams(filename):
+def read_pams(filename: str, **kwargs) -> pd.DataFrame:
     """
     Read a single PAMS JSON file.
 
@@ -79,14 +83,21 @@ def read_pams(filename):
     ----------
     filename : str
         File path or URL.
+    **kwargs : dict
+        Additional arguments.
 
     Returns
     -------
     pd.DataFrame
         The loaded data.
     """
+    # Determine storage options if S3
+    storage_options = kwargs.get("storage_options")
+    if filename.startswith("s3://") and storage_options is None:
+        storage_options = {"anon": True}
+
     fs = FileUtility.get_fs(filename)
-    with fs.open(filename, "r") as f:
+    with fs.open(filename, "r", transport_params=storage_options) as f:
         jsonf = json.load(f)
 
     dataf = jsonf.get("Data", [])
