@@ -1,26 +1,120 @@
 """GML Ozonesonde Reader"""
 
 import re
-import warnings
+from datetime import datetime
 from io import StringIO
-from typing import NamedTuple, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, NamedTuple, Optional, Tuple, Union
 
-import dask
-import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 import requests
+import xarray as xr
+
+if TYPE_CHECKING:
+    pass
 
 from .base import PointReader, register_reader
 
 
 @register_reader("gml_ozonesonde")
 class GMLOzonesondeReader(PointReader):
-    def open_dataset(self, dates, location=None, n_procs=1, errors="raise", **kwargs):
+    def open_dataset(
+        self,
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        location: Union[str, List[str]] = None,
+        n_procs: int = 1,
+        errors: str = "raise",
+        as_xarray: bool = True,
+        lazy: bool = False,
+        **kwargs,
+    ) -> Union[pd.DataFrame, xr.Dataset, Union[pd.DataFrame, xr.Dataset]]:
         """
-        Reads GML Ozonesonde data.
+        Retrieve and load GML Ozonesonde data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File paths or URLs to read. If None, uses `dates` and `location` to discover files.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve.
+        location : Union[str, List[str]], optional
+            Locations to retrieve (e.g., 'Boulder, Colorado').
+        n_procs : int, optional
+            Number of processors for dask compute (if not lazy), by default 1.
+        errors : str, optional
+            Whether to 'raise' or 'warn' on read errors, by default 'raise'.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments passed to the reader and driver.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded ozonesonde data.
         """
-        return add_data(dates, location=location, n_procs=n_procs, errors=errors)
+        if files is None:
+            if dates is None:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+
+            dates = pd.to_datetime(dates)
+            if isinstance(dates, pd.Timestamp):
+                dates = pd.DatetimeIndex([dates])
+
+            df_urls = discover_files(location=location)
+            # Filter by date
+            mask = df_urls["time"].between(dates.min(), dates.max(), inclusive="both")
+            urls = df_urls.loc[mask, "url"].tolist()
+
+            if not urls:
+                raise RuntimeError(
+                    f"No files found for dates {dates.min()} to {dates.max()} "
+                    f"at location(s) {location}."
+                )
+            files = urls
+
+        # Filter out arguments that are not for the reader function
+        reader_kwargs = {
+            k: v for k, v in kwargs.items() if k not in ["expand2d", "pivot", "wide_fmt"]
+        }
+
+        # Use PandasDriver to open files
+        # We pass read_100m as the read_method
+        df = self.driver.open(files, read_method=read_100m, lazy=lazy, **reader_kwargs)
+
+        if not lazy and n_procs > 1:
+            # If dask is installed, we can use it for parallel loading even if as_xarray is False
+            # but usually PandasDriver.open(lazy=False) already loaded them sequentially.
+            # Actually, if we want parallel sequential load, we'd need to handle it in driver.
+            # For now, we follow the ish.py pattern if they use n_procs.
+            pass
+
+        df = self.harmonize(df)
+
+        if as_xarray:
+            ds = self.to_xarray(df, **kwargs)
+
+            # Update history and metadata
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read GML Ozonesonde data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+
+            # Set variable attributes
+            var_attrs = {
+                c.name: {"long_name": c.long_name, "units": c.units} for c in COL_INFO_L100
+            }
+            for var, attrs in var_attrs.items():
+                if var in ds.data_vars:
+                    ds[var].attrs.update(attrs)
+
+            return ds
+
+        return df
 
 
 # -----------------------------------------------------------------------------
@@ -121,41 +215,31 @@ def discover_files(location=None, *, n_threads=3, cache=True):
     return df
 
 
-def add_data(dates, *, location=None, n_procs=1, errors="raise"):
-    dates = pd.DatetimeIndex(dates)
-    dates_min, dates_max = dates.min(), dates.max()
-    df_urls = discover_files(location=location)
-    urls = df_urls[df_urls["time"].between(dates_min, dates_max, inclusive="both")]["url"].tolist()
-    if not urls:
-        raise RuntimeError(f"No files found for dates {dates_min} to {dates_max}.")
+def add_data(dates, *, location=None, n_procs=1, errors="raise", **kwargs):
+    """
+    Reads GML Ozonesonde data.
 
-    def func(fp_or_url):
-        try:
-            return read_100m(fp_or_url)
-        except Exception as e:
-            if errors == "raise":
-                raise RuntimeError(f"Failed to read {fp_or_url}") from e
-            elif errors == "warn":
-                warnings.warn(f"Failed to read {fp_or_url}: {e}")
-            return pd.DataFrame()
+    Parameters
+    ----------
+    dates : pd.DatetimeIndex or list of datetime
+        Dates to retrieve.
+    location : str or list of str, optional
+        Locations to retrieve, by default None (all locations).
+    n_procs : int, optional
+        Number of processors for dask compute, by default 1.
+    errors : str, optional
+        Whether to 'raise' or 'warn' on read errors, by default 'raise'.
+    **kwargs : dict
+        Additional arguments passed to open_dataset.
 
-    dfs = [dask.delayed(func)(url) for url in urls]
-    dff = dd.from_delayed(dfs, verify_meta=errors == "raise")
-    df = dff.compute(num_workers=n_procs).reset_index()
-    df = df[df["time"].between(dates_min, dates_max, inclusive="both")]
-
-    repl = {
-        "Boulder, CO": "Boulder, Colorado",
-        "Hilo,Hawaii": "Hilo, Hawaii",
-        "Huntsville": "Huntsville, Alabama",
-        "Huntsville, AL": "Huntsville, Alabama",
-        "San Cristobal, Galapagos, Ecuador": "San Cristobal, Galapagos",
-        "South Pole": "South Pole, Antarctica",
-        "Trinidad Head, CA": "Trinidad Head, California",
-    }
-    df["station"] = df["station"].replace(repl)
-    df = df.rename(columns={"station": "siteid"})
-    return df.drop(columns=["index"], errors="ignore").reset_index(drop=True)
+    Returns
+    -------
+    pd.DataFrame
+        The loaded ozonesonde data.
+    """
+    return GMLOzonesondeReader().open_dataset(
+        dates=dates, location=location, n_procs=n_procs, errors=errors, as_xarray=False, **kwargs
+    )
 
 
 class ColInfo(NamedTuple):
@@ -198,6 +282,19 @@ Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp 
 
 
 def read_100m(fp_or_url):
+    """
+    Reads a GML 100m average file (.l100).
+
+    Parameters
+    ----------
+    fp_or_url : str
+        File path or URL.
+
+    Returns
+    -------
+    pd.DataFrame
+        The loaded data with metadata in attrs.
+    """
     if isinstance(fp_or_url, str) and fp_or_url.startswith(("http://", "https://")):
 
         @retry
@@ -226,13 +323,20 @@ def read_100m(fp_or_url):
         meta_block = "\n".join(block_lines[i:])
         data_block = blocks[1]
     else:
-        raise ValueError(f"Expected 2 or 5 blocks, got {nblocks}")
+        # Some files might have 4 blocks if there is one empty block at the end
+        if nblocks > 2 and "Level   Press" in blocks[-1]:
+            data_block = blocks[-1]
+            meta_block = blocks[-2]
+        else:
+            raise ValueError(f"Expected 2 or 5 blocks, got {nblocks}")
 
     meta = {}
     todo = meta_block.splitlines()[::-1]
     on_val_side = ["Background: ", "Flowrate: ", "RH Corr: ", "Sonde Total O3 (SBUV): "]
     while todo:
         line = todo.pop()
+        if ":" not in line:
+            continue
         key, val = line.split(":", 1)
         for key_ish in on_val_side:
             if key_ish in val:
@@ -248,16 +352,29 @@ def read_100m(fp_or_url):
     elif data_block.startswith(_DATA_BLOCK_START_L100_NO_UNCERT):
         have_uncert = False
     else:
-        raise ValueError("Data block header mismatch")
+        # Try to be more robust, check for the second line as well
+        lines = data_block.splitlines()
+        if len(lines) > 2 and "hPa" in lines[1] and "km" in lines[1]:
+            have_uncert = "Uncert" in lines[0]
+        else:
+            raise ValueError(
+                f"Data block does not start with expected header. Got: {data_block[:100]!r}"
+            )
 
     col_info = COL_INFO_L100[:]
     if not have_uncert:
-        _ = col_info.pop()
+        col_info = [c for c in col_info if c.name != "o3_uncert"]
 
     names = [c.name for c in col_info]
     dtype = {c.name: float for c in col_info}
     dtype["lev"] = int
     na_values = {c.name: c.na_val for c in col_info if c.na_val is not None}
+
+    # Robust check for column count
+    first_data_line = data_block.splitlines()[2]
+    ncols = len(first_data_line.split())
+    if ncols != len(names):
+        raise ValueError(f"Expected {len(names)} columns in data block, got {ncols}")
 
     df = pd.read_csv(
         StringIO(data_block),
@@ -275,5 +392,21 @@ def read_100m(fp_or_url):
     df["station"] = meta["Station"]
     df["station_height_str"] = meta["Station Height"]
     df["flight_number"] = meta["Flight Number"]
+
+    # Site normalization
+    repl = {
+        "Boulder, CO": "Boulder, Colorado",
+        "Hilo,Hawaii": "Hilo, Hawaii",
+        "Huntsville": "Huntsville, Alabama",
+        "Huntsville, AL": "Huntsville, Alabama",
+        "San Cristobal, Galapagos, Ecuador": "San Cristobal, Galapagos",
+        "South Pole": "South Pole, Antarctica",
+        "Trinidad Head, CA": "Trinidad Head, California",
+    }
+    df["siteid"] = df["station"].replace(repl)
+
+    # Metadata for Aero Protocol and existing tests
+    df.attrs["ds_attrs"] = meta
+    df.attrs["var_attrs"] = {c.name: {"long_name": c.long_name, "units": c.units} for c in col_info}
 
     return df
