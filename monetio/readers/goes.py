@@ -1,152 +1,200 @@
 """GOES Reader"""
 
+import datetime
+from typing import List, Union
+
+import numpy as np
 import pandas as pd
-import s3fs
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .sat_utils import add_time_coord, standardize_satellite_coords, update_history
 
 
 @register_reader("goes")
 class GOESReader(GriddedReader):
-    def open_dataset(self, date=None, filename=None, satellite="16", product=None, **kwargs):
+    """
+    Reader for GOES-R Series (GOES-16, 17, 18) ABI data.
+    Supports local files and S3 (via s3fs).
+    """
+
+    def open_dataset(
+        self,
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
+        satellite: str = "16",
+        product: str = "ABI-L2-AODF",
+        **kwargs,
+    ) -> xr.Dataset:
         """
-        Reads GOES data (S3 or local).
+        Reads GOES data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File path(s) or URL(s).
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve. If files is None, this is used to build URLs.
+        satellite : str, optional
+            Satellite identifier (e.g., '16', '17', '18'). Default is '16'.
+        product : str, optional
+            GOES product (e.g., 'ABI-L2-AODF'). Default is 'ABI-L2-AODF'.
+        **kwargs : dict
+            Additional arguments passed to XarrayDriver.open.
+
+        Returns
+        -------
+        xr.Dataset
+            The GOES dataset.
         """
-        g = GOES()
-        if filename is None:
-            # S3 mode
-            if date is None or product is None:
-                raise ValueError(
-                    "Please provide a date and product to be able to retrieve data from Amazon S3"
-                )
-            ds = g.open_amazon_file(date=date, satellite=satellite, product=product)
+        if files is None:
+            if dates is None:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+            files = self.build_urls(dates, satellite=satellite, product=product)
+
+        if "preprocess" not in kwargs:
+            kwargs["preprocess"] = goes_preprocess
+
+        if "engine" not in kwargs:
+            kwargs["engine"] = "h5netcdf"
+
+        ds = super().open_dataset(files, **kwargs)
+
+        # Update history
+        ds = update_history(ds, f"Read GOES-{satellite} {product} data.")
+
+        return ds
+
+    def build_urls(
+        self,
+        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
+        satellite: str = "16",
+        product: str = "ABI-L2-AODF",
+    ) -> List[str]:
+        """
+        Build S3 URLs for GOES data based on dates.
+
+        Parameters
+        ----------
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+            Dates to retrieve.
+        satellite : str, optional
+            Satellite identifier ('16', '17', '18').
+        product : str, optional
+            GOES product.
+
+        Returns
+        -------
+        List[str]
+            List of S3 URLs.
+        """
+        import s3fs
+
+        if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
+            dates = pd.DatetimeIndex([pd.to_datetime(dates)])
         else:
-            # Local mode
-            ds = g.open_local(filename)
+            dates = pd.to_datetime(dates)
 
-        return ds
+        fs = s3fs.S3FileSystem(anon=True)
+        bucket = f"noaa-goes{satellite}"
+
+        urls = []
+        for d in dates:
+            # GOES S3 structure: <product>/<year>/<day_of_year>/<hour>/
+            prefix = f"{bucket}/{product}/{d.strftime('%Y/%j/%H')}/"
+            try:
+                found = fs.ls(prefix)
+                if not found:
+                    continue
+
+                # Find the file closest to the requested time
+                file_dates = [
+                    pd.to_datetime(f.split("_")[-1].split(".")[0][1:], format="%Y%j%H%M%S%f")
+                    for f in found
+                ]
+                idx = np.argmin([abs(fd - d) for fd in file_dates])
+                urls.append(f"s3://{found[idx]}")
+            except (FileNotFoundError, ValueError):
+                continue
+
+        return sorted(list(set(urls)))
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/sat/goes.py
-# -----------------------------------------------------------------------------
+def goes_preprocess(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Preprocess GOES dataset: calculate grid and standardize coordinates.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset.
+    """
+    # 1. Standardize dimensions and coordinates
+    ds = standardize_satellite_coords(ds)
+
+    # 2. Add time coordinate if not present
+    if "time" not in ds.coords:
+        ds = add_time_coord(ds, time_attr="time_coverage_start")
+
+    # 3. Calculate Latitude/Longitude (Lazy)
+    if "latitude" not in ds.coords and "goes_imager_projection" in ds.variables:
+        ds = _add_goes_latlon(ds)
+
+    return ds
 
 
-class GOES:
-    def __init__(self):
-        self.date = None
-        self.satellite = "16"
-        self.product = "ABI-L2-AODF"
-        self.baseurl = f"s3://noaa-goes{self.satellite}/"
-        self.url = f"{self.baseurl}"
-        self.filename = None
-        self.fs = None
+def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Calculate latitude and longitude for GOES data lazily.
+    """
+    from pyproj import CRS, Proj
 
-    def _update_baseurl(self):
-        self.baseurl = f"s3://noaa-goes{self.satellite}/"
+    proj_var = ds.goes_imager_projection
+    proj_dict = proj_var.attrs.copy()
 
-    def get_products(self):
-        # Requires s3fs
-        if self.fs is None:
-            self._set_s3fs()
-        products = [value.split("/")[-1] for value in self.fs.ls(self.baseurl)[:-1]]
-        return products
+    # Ensure all attributes are scalars
+    for k, v in proj_dict.items():
+        if isinstance(v, (list, np.ndarray)):
+            proj_dict[k] = v[0]
 
-    def date_to_url(self):
-        date = pd.Timestamp(self.date)
-        date_url_bit = date.strftime("%Y/%j/%H/")
-        self.url = f"{self.url}{date_url_bit}"
+    crs = CRS.from_cf(proj_dict)
+    ds.attrs["projection"] = crs.to_wkt()
+    proj = Proj(crs)
 
-    def _get_files(self, url=None):
-        try:
-            files = self.fs.ls(url)
-            if len(files) < 1:
-                raise ValueError
-            else:
-                return files
-        except ValueError:
-            print("Files not available for product and date")
-            return []
+    satellite_height = proj_var.perspective_point_height
 
-    def _get_closest_date(self, files=[]):
-        if not files:
-            return None
-        file_dates = [pd.to_datetime(f.split("_")[-1][:-4], format="c%Y%j%H%M%S") for f in files]
-        date = pd.Timestamp(self.date)
-        nearest_date = min(file_dates, key=lambda x: abs(x - date))
-        nearest_date_str = nearest_date.strftime("c%Y%j%H%M%S")
-        found_file = [f for f in files if nearest_date_str in f][0]
-        return found_file
-
-    def _set_s3fs(self):
-        self.fs = s3fs.S3FileSystem(anon=True)
-
-    def _product_exists(self, product):
-        try:
-            if self.fs is None:
-                self._set_s3fs()
-            products = self.get_products()
-            if product not in products:
-                raise ValueError
-            else:
-                return product
-        except ValueError:
-            print("Product: ", product, "not found")
-            return None
-
-    def open_amazon_file(self, date=None, product=None, satellite="16"):
-        self.date = pd.Timestamp(date)
-        self.satellite = satellite
-        self._update_baseurl()
-        self._set_s3fs()
-        self.product = self._product_exists(product)
-        if not self.product:
-            return xr.Dataset()
-
-        self.url = f"{self.baseurl}{self.product}/"
-        self.date_to_url()
-
-        files = self._get_files(url=self.url)
-        f = self._get_closest_date(files=files)
-        if not f:
-            return xr.Dataset()
-
-        # s3fs open returns a file-like object
-        fo = self.fs.open(f)
-        out = xr.open_dataset(fo, engine="h5netcdf")
-        out = self._get_grid(out)
-        return out
-
-    def _get_grid(self, ds):
-        from numpy import meshgrid, ndarray
-        from pyproj import CRS, Proj
-
-        proj_dict = ds.goes_imager_projection.attrs
-        for i in proj_dict.keys():
-            if isinstance(proj_dict[i], ndarray):
-                proj_dict[i] = proj_dict[i][0]
-        crs = CRS.from_cf(proj_dict)
-        ds.attrs["projection"] = crs.to_wkt()
-        proj = Proj(crs)
-        satellite_height = ds.goes_imager_projection.perspective_point_height
-        xx, yy = meshgrid(ds.x.values * satellite_height, ds.y.values * satellite_height)
+    def _calc_latlon(x, y):
+        # x and y are in radians in GOES files
+        xx, yy = np.meshgrid(x * satellite_height, y * satellite_height)
         lon, lat = proj(xx, yy, inverse=True)
-        ds["latitude"] = (("y", "x"), lat)
-        ds["longitude"] = (("y", "x"), lon)
-        ds["longitude"] = ds.longitude.where(ds.longitude < 400).fillna(1e30)
-        ds["latitude"] = ds.latitude.where(ds.latitude < 100).fillna(1e30)
-        ds = ds.set_coords(["latitude", "longitude"])
-        return ds
+        # Handle out of disk values
+        lon = np.where(lon < 400, lon, np.nan)
+        lat = np.where(lat < 100, lat, np.nan)
+        return lat.astype(np.float32), lon.astype(np.float32)
 
-    def open_local(self, f):
-        # Local file
-        # We can use FileUtility.get_fs logic if we want to be consistent, but original used direct s3fs for remote
-        # For local, assume f is path
-        from .drivers import FileUtility
+    if hasattr(ds.x.data, "dask") or hasattr(ds.y.data, "dask"):
+        # Dask path
+        lat, lon = xr.apply_ufunc(
+            _calc_latlon,
+            ds.x,
+            ds.y,
+            input_core_dims=[["x"], ["y"]],
+            output_core_dims=[["y", "x"], ["y", "x"]],
+            dask="parallelized",
+            output_dtypes=[np.float32, np.float32],
+        )
+    else:
+        # Eager path
+        lat, lon = _calc_latlon(ds.x.values, ds.y.values)
 
-        fs = FileUtility.get_fs(f)
-        fo = fs.open(f)
-        out = xr.open_dataset(fo, engine="h5netcdf")
-        out = self._get_grid(out)
-        return out
+    ds = ds.assign_coords(
+        latitude=(("y", "x"), lat, {"units": "degrees_north", "standard_name": "latitude"}),
+        longitude=(("y", "x"), lon, {"units": "degrees_east", "standard_name": "longitude"}),
+    )
+
+    return ds

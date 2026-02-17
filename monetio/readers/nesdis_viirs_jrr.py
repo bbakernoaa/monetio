@@ -7,7 +7,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import add_time_coord, standardize_satellite_coords
+from .sat_utils import add_time_coord, standardize_satellite_coords, update_history
 
 
 @register_reader("nesdis_viirs_jrr")
@@ -63,14 +63,7 @@ class VIIRSJRRAODReader(GriddedReader):
         ds = super().open_dataset(files, **kwargs)
 
         # Update history
-        history = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
-            "Read NESDIS VIIRS JRR AOD data."
-        )
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read NESDIS VIIRS JRR AOD data.")
 
         return ds
 

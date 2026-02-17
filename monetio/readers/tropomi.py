@@ -1,6 +1,5 @@
 """TROPOMI Reader"""
 
-import datetime
 import warnings
 from typing import List, Optional, Union
 
@@ -8,7 +7,7 @@ import numpy as np
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import standardize_satellite_coords
+from .sat_utils import standardize_satellite_coords, update_history
 
 
 @register_reader("tropomi")
@@ -100,11 +99,7 @@ class TROPOMIReader(GriddedReader):
         ds = xr.merge(dsets, compat="no_conflicts")
 
         # Update history
-        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read TROPOMI data."
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read TROPOMI data.")
 
         return ds
 

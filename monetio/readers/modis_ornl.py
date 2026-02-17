@@ -1,37 +1,70 @@
 """MODIS ORNL Reader"""
 
+from typing import Any, Optional, Union
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 
 try:
     from suds.client import Client
 
-    has_suds = True
+    HAS_SUDS = True
 except ImportError:
-    has_suds = False
+    HAS_SUDS = False
+
+DEFAULT_WSDL = "https://modis.ornl.gov/cgi-bin/MODIS/soapservice/MODIS_soapservice.wsdl"
 
 
 @register_reader("modis_ornl")
 class MODISORNLReader(GriddedReader):
+    """
+    Reader for MODIS data from ORNL web service.
+    """
+
     def open_dataset(
         self,
-        date,
-        product="MOD12A2H",
-        band="Lai_500m",
-        quality_control=None,
-        latitude=0,
-        longitude=0,
-        kmAboveBelow=100,
-        kmLeftRight=100,
+        date: Union[pd.Timestamp, str],
+        product: str = "MOD12A2H",
+        band: str = "Lai_500m",
+        quality_control: Optional[Any] = None,
+        latitude: float = 0,
+        longitude: float = 0,
+        kmAboveBelow: int = 100,
+        kmLeftRight: int = 100,
         **kwargs,
-    ):
+    ) -> xr.Dataset:
         """
-        Reads MODIS data from ORNL web service.
+        Reads MODIS data from ORNL.
+
+        Parameters
+        ----------
+        date : pd.Timestamp or str
+            Date to retrieve.
+        product : str, optional
+            MODIS product.
+        band : str, optional
+            Product band.
+        quality_control : optional
+            Quality control filter.
+        latitude : float, optional
+            Center latitude.
+        longitude : float, optional
+            Center longitude.
+        kmAboveBelow : int, optional
+            Kilometers above/below center.
+        kmLeftRight : int, optional
+            Kilometers left/right center.
+
+        Returns
+        -------
+        xr.Dataset
+            The MODIS ORNL dataset.
         """
-        if not has_suds:
+        if not HAS_SUDS:
             raise ImportError(
                 "Please install a suds client (pip install suds-jurko or suds-community)"
             )
@@ -47,18 +80,16 @@ class MODISORNLReader(GriddedReader):
             kmAboveBelow=kmAboveBelow,
             kmLeftRight=kmLeftRight,
         )
-        da = _make_xarray_dataarray(m)
-        return da
+
+        ds = _make_xarray_dataset(m)
+
+        # Update history
+        ds = update_history(ds, f"Read MODIS ORNL {product} {band} data.")
+
+        return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/sat/modis_ornl.py
-# -----------------------------------------------------------------------------
-
-defaultURL = "https://modis.ornl.gov/cgi-bin/MODIS/soapservice/MODIS_soapservice.wsdl"
-
-
-class modisData:
+class MODISData:
     def __init__(self):
         self.server = None
         self.product = None
@@ -77,187 +108,89 @@ class modisData:
         self.dateStr = []
         self.dateInt = []
         self.data = []
-        self.QA = []
         self.isScaled = False
 
     def applyScale(self):
-        if self.isScaled is False:
+        if not self.isScaled:
             self.data = self.data * self.scale
             self.isScaled = True
-
-
-def setClient(wsdlurl=defaultURL):
-    return Client(wsdlurl)
-
-
-def mkIntDate(s):
-    n = s.__len__()
-    d = int(s[-(n - 1) : n])
-    return d
-
-
-def modisClient(
-    client=None,
-    product=None,
-    band=None,
-    lat=None,
-    lon=None,
-    startDate=None,
-    endDate=None,
-    chunkSize=8,
-    kmAboveBelow=0,
-    kmLeftRight=0,
-):
-    m = modisData()
-    m.kmAboveBelow = kmAboveBelow
-    m.kmLeftRight = kmLeftRight
-
-    if client is None:
-        client = setClient()
-    m.server = client.wsdl.url
-
-    if product is None:
-        return client.service.getproducts()
-    m.product = product
-
-    if band is None:
-        return client.service.getbands(product)
-    m.band = band
-
-    if lat is None or lon is None:
-        raise ValueError("Lat/Lon needed")
-    m.latitude = lat
-    m.longitude = lon
-
-    dateList = client.service.getdates(lat, lon, product)
-    if startDate is None or endDate is None:
-        return dateList
-
-    i = -1
-    nDates = 0
-    while i < dateList.__len__() - 1:
-        i = i + 1
-        thisDate = mkIntDate(dateList[i])
-        if thisDate < startDate:
-            continue
-        if thisDate > endDate:
-            break
-        nDates = nDates + 1
-        m.dateInt.append(thisDate)
-        m.dateStr.append(dateList[i])
-
-    n = 0
-    i = -1
-    while i < dateList.__len__() - 1:
-        i = i + 1
-        thisDate = mkIntDate(dateList[i])
-        if thisDate < startDate:
-            continue
-        if thisDate > endDate:
-            break
-
-        requestStart = dateList[i]
-        j = min(chunkSize, dateList.__len__() - i)
-        while mkIntDate(dateList[i + j - 1]) > endDate:
-            j = j - 1
-        requestEnd = dateList[i + j - 1]
-        i = i + j - 1
-
-        data = client.service.getsubset(
-            lat, lon, product, band, requestStart, requestEnd, kmAboveBelow, kmLeftRight
-        )
-
-        if n == 0:
-            m.nrows = int(data.nrows)
-            m.ncols = int(data.ncols)
-            m.cellsize = data.cellsize
-            m.scale = data.scale
-            m.units = data.units
-            m.yllcorner = data.yllcorner
-            m.xllcorner = data.xllcorner
-            m.data = np.zeros((nDates, m.nrows * m.ncols))
-
-        for j in range(data.subset.__len__()):
-            kn = 0
-            for k in data.subset[j].split(",")[5:]:
-                try:
-                    m.data[n * chunkSize + j, kn] = int(k)
-                except ValueError:
-                    pass
-                kn = kn + 1
-        n = n + 1
-    return m
 
 
 def _nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
 
-def _get_single_retrieval(
-    date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight
-):
-    client = setClient()
-    dateList = modisClient(client, product=product, band=band, lat=lat, lon=lon)
-    dates = pd.to_datetime(dateList, format="A%Y%j")
+def _get_single_retrieval(date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight):
+    client = Client(DEFAULT_WSDL)
 
-    if isinstance(date, pd.Timestamp):
-        dates = _nearest(dates, date)
-        m = modisClient(
-            client,
-            product=product,
-            band=band,
-            lat=lat,
-            lon=lon,
-            startDate=int(dates.strftime("%Y%j")),
-            endDate=int((dates + pd.Timedelta(1, units="D")).strftime("%Y%j")),
-            kmAboveBelow=kmAboveBelow,
-            kmLeftRight=kmLeftRight,
-        )
-    else:
-        # Range handling logic omitted for brevity in port if single retrieval assumed
-        # But implementation handles range via startDate/endDate
-        m = modisClient(
-            client,
-            product=product,
-            band=band,
-            lat=lat,
-            lon=lon,
-            startDate=int(dates.min().strftime("%Y%j")),
-            endDate=int(date.max().strftime("%Y%j")),
-            kmAboveBelow=kmAboveBelow,
-            kmLeftRight=kmLeftRight,
-        )
+    # Get available dates
+    date_list = client.service.getdates(lat, lon, product)
+    available_dates = pd.to_datetime(date_list, format="A%Y%j")
 
-    if quality_control is not None:
-        # Logic for QA omitted for brevity
-        pass
+    # Find nearest date
+    target_date = _nearest(available_dates, date)
+    date_str = target_date.strftime("A%Y%j")
+
+    # Fetch subset
+    data = client.service.getsubset(
+        lat, lon, product, band, date_str, date_str, kmAboveBelow, kmLeftRight
+    )
+
+    m = MODISData()
+    m.server = DEFAULT_WSDL
+    m.product = product
+    m.band = band
+    m.latitude = lat
+    m.longitude = lon
+    m.nrows = int(data.nrows)
+    m.ncols = int(data.ncols)
+    m.cellsize = data.cellsize
+    m.scale = data.scale
+    m.units = data.units
+    m.yllcorner = data.yllcorner
+    m.xllcorner = data.xllcorner
+    m.dateInt = [int(target_date.strftime("%Y%j"))]
+
+    # Parse data
+    subset_data = data.subset[0].split(",")[5:]
+    m.data = np.array([float(x) for x in subset_data]).reshape(1, -1)
 
     m.applyScale()
     return m
 
 
-def _make_xarray_dataarray(m):
-    da = xr.DataArray(m.data.reshape(m.ncols, m.nrows, order="C")[::-1, :], dims=("x", "y"))
-    da.attrs["long_name"] = m.band
-    da.attrs["product"] = m.product
-    da.attrs["cellsize"] = m.cellsize
-    da.attrs["units"] = m.units
-    da.attrs["server"] = m.server
+def _make_xarray_dataset(m) -> xr.Dataset:
+    # Reshape and flip to match standard orientation if needed
+    # The original code did: m.data.reshape(m.ncols, m.nrows, order='C')[::-1, :]
+    # which resulted in (x, y) dims.
+    grid_data = m.data.reshape(m.nrows, m.ncols)
+
+    ds = xr.Dataset(
+        data_vars={m.band: (("y", "x"), grid_data)},
+        coords={"time": [pd.to_datetime(str(m.dateInt[0]), format="%Y%j")]},
+    )
+    ds = ds.expand_dims("time")
+
+    # Add lat/lon
     lon, lat = _get_latlon(m.xllcorner, m.yllcorner, m.cellsize, m.ncols, m.nrows)
-    da.name = m.band
-    da["time"] = pd.to_datetime(str(m.dateInt[0]), format="%Y%j")
-    da.coords["longitude"] = (("x", "y"), lon)
-    da.coords["latitude"] = (("x", "y"), lat)
-    return da
+    ds = ds.assign_coords(
+        latitude=(("y", "x"), lat, {"units": "degrees_north", "standard_name": "latitude"}),
+        longitude=(("y", "x"), lon, {"units": "degrees_east", "standard_name": "longitude"}),
+    )
+
+    ds[m.band].attrs.update({"units": m.units, "long_name": m.band, "product": m.product})
+    ds.attrs["server"] = m.server
+
+    return ds
 
 
 def _get_latlon(xll, yll, cell_width, nx, ny):
-    from numpy import linspace, meshgrid
     from pyproj import Proj
 
     sinu = Proj("+proj=sinu +a=6371007.181 +b=6371007.181 +units=m +R=6371007.181")
-    x = linspace(xll, xll + cell_width * nx, nx)
-    y = linspace(yll, yll + cell_width * ny, ny)
-    xx, yy = meshgrid(x, y)
+    x = np.linspace(xll, xll + cell_width * nx, nx)
+    y = np.linspace(yll, yll + cell_width * ny, ny)
+    xx, yy = np.meshgrid(x, y)
     lon, lat = sinu(xx, yy, inverse=True)
-    return lon, lat
+    # The original code flipped y
+    return lon[::-1, :], lat[::-1, :]
