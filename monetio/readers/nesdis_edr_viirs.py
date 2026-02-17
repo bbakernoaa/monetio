@@ -67,7 +67,9 @@ class NESDISEDRVIIRSReader(GriddedReader):
 
         return ds
 
-    def download_data(self, date: pd.Timestamp, resolution: str = "high", datapath: str = ".") -> str:
+    def download_data(
+        self, date: pd.Timestamp, resolution: str = "high", datapath: str = "."
+    ) -> str:
         import ftplib
 
         year = date.strftime("%Y")

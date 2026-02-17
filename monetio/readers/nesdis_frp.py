@@ -70,7 +70,9 @@ class NESDISFRPReader(GriddedReader):
 
         return ds
 
-    def download_data(self, date: pd.Timestamp, ftype: str = "meanFRP", datapath: str = ".") -> List[str]:
+    def download_data(
+        self, date: pd.Timestamp, ftype: str = "meanFRP", datapath: str = "."
+    ) -> List[str]:
         yyyymmdd = date.strftime("%Y%m%d")
         url_ftype = f"&files={ftype}."
 
@@ -89,7 +91,9 @@ class NESDISFRPReader(GriddedReader):
 
         return files
 
-    def read_tile(self, fname: str, tile: int = 1, res: str = "C384", dtype: str = "f4") -> xr.DataArray:
+    def read_tile(
+        self, fname: str, tile: int = 1, res: str = "C384", dtype: str = "f4"
+    ) -> xr.DataArray:
         from scipy.io import FortranFile
 
         try:

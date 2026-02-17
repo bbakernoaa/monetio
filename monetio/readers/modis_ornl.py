@@ -120,7 +120,9 @@ def _nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
 
-def _get_single_retrieval(date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight):
+def _get_single_retrieval(
+    date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight
+):
     client = Client(DEFAULT_WSDL)
 
     # Get available dates
