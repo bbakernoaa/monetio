@@ -114,14 +114,18 @@ class OpenAQReader(PointReader):
         )
 
         # Post-processing
-        df = self._post_process(df, dates=dates, wide_fmt=wide_fmt, n_procs=n_procs)
+        # We only perform wide_fmt here if NOT lazy, to avoid the hidden compute in _post_process
+        do_wide = wide_fmt and not lazy
+        df = self._post_process(df, dates=dates, wide_fmt=do_wide, n_procs=n_procs)
         df = self.harmonize(df)
 
+        if not lazy and hasattr(df, "compute"):
+            df = df.compute(num_workers=n_procs)
+
         if as_xarray:
-            # Determine expand2d from kwargs or default to False (since we already handled wide_fmt)
-            # Actually, to_xarray's expand2d also controls the (time, node) structure.
-            expand2d = kwargs.pop("expand2d", wide_fmt)
-            ds = self.to_xarray(df, expand2d=expand2d, **kwargs)
+            # Pop expand2d from kwargs if present to avoid multiple values error
+            exp2d = kwargs.pop("expand2d", wide_fmt)
+            ds = self.to_xarray(df, expand2d=exp2d, **kwargs)
 
             # Update history
             history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read OpenAQ data."
@@ -213,6 +217,9 @@ class OpenAQReader(PointReader):
         else:
             df = _get_siteid(df)
 
+        # Rename parameter/unit to variable/units for MONETIO consistency
+        df = df.rename(columns={"parameter": "variable", "unit": "units", "value": "obs"})
+
         # 2. Unit Conversions (Lazy friendly)
         ppm_to_ugm3 = {
             "o3": 1990,
@@ -229,10 +236,10 @@ class OpenAQReader(PointReader):
             if df_part.empty:
                 return df_part
             for vn, f in ppm_to_ugm3.items():
-                if "parameter" in df_part.columns and "unit" in df_part.columns:
-                    is_ug = (df_part.parameter == vn) & (df_part.unit == "µg/m³")
-                    df_part.loc[is_ug, "value"] /= f
-                    df_part.loc[is_ug, "unit"] = "ppm"
+                if "variable" in df_part.columns and "units" in df_part.columns:
+                    is_ug = (df_part.variable == vn) & (df_part.units == "µg/m³")
+                    df_part.loc[is_ug, "obs"] /= f
+                    df_part.loc[is_ug, "units"] = "ppm"
             return df_part
 
         if is_dask:
@@ -240,15 +247,21 @@ class OpenAQReader(PointReader):
         else:
             df = _convert_units(df)
 
-        if wide_fmt:
-            # Note: pivot forces compute on Dask
-            if is_dask:
-                import warnings
+        # Drop duplicates consistently for both paths to ensure reliable 2D expansion
+        subset = [
+            "time",
+            "latitude",
+            "longitude",
+            "siteid",
+            "variable",
+        ]
+        subset = [c for c in subset if c in df.columns]
+        df = df.drop_duplicates(subset=subset)
 
-                warnings.warn(
-                    "OpenAQReader: wide_fmt=True forces immediate computation of Dask DataFrame.",
-                    UserWarning,
-                )
+        if wide_fmt:
+            # Note: pivot forces compute on Dask.
+            # We already avoid this in open_dataset by setting do_wide=False if lazy=True.
+            if is_dask:
                 df = df.compute(num_workers=n_procs)
 
             index = [
@@ -268,17 +281,50 @@ class OpenAQReader(PointReader):
             ]
             index = [c for c in index if c in df.columns]
 
-            # Drop duplicates before pivot
-            df = df.drop_duplicates(subset=index + ["parameter"])
+            df = df.pivot_table(values="obs", index=index, columns="variable").reset_index()
 
-            df = df.pivot_table(values="value", index=index, columns="parameter").reset_index()
+            # Add units columns to match long_to_wide behavior
+            # (In long_to_wide, it's done by merging with units_map)
+            # For OpenAQ, we have specific renaming logic that we want to preserve
+            # but also keep it consistent with the lazy Xarray path if possible.
 
-            # Rename columns
             non_molec_params = ["pm1", "pm25", "pm4", "pm10", "bc"]
             df = df.rename(columns={p: f"{p}_ugm3" for p in non_molec_params}, errors="ignore")
             df = df.rename(columns={p: f"{p}_ppm" for p in ppm_to_ugm3}, errors="ignore")
 
         return df
+
+    def to_xarray(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs
+    ) -> xr.Dataset:
+        """
+        Overridden to ensure consistent variable naming between eager and lazy paths.
+        """
+        ds = super().to_xarray(df, expand2d=expand2d, **kwargs)
+
+        if expand2d:
+            # If it was expanded via ds_to_2d, it will have O3, PM25 etc. as data vars
+            # and O3_unit, PM25_unit etc. as well.
+            # We want to rename them to O3_ppm, PM25_ugm3 to match eager _post_process.
+            ppm_vars = ["o3", "co", "no2", "no", "so2", "ch4", "co2", "nox"]
+            ugm3_vars = ["pm1", "pm25", "pm4", "pm10", "bc"]
+
+            rename_dict = {}
+            for v in ppm_vars:
+                if v in ds.data_vars:
+                    rename_dict[v] = f"{v}_ppm"
+                    if f"{v}_unit" in ds.data_vars:
+                        ds = ds.drop_vars(f"{v}_unit")
+            for v in ugm3_vars:
+                if v in ds.data_vars:
+                    rename_dict[v] = f"{v}_ugm3"
+                    if f"{v}_unit" in ds.data_vars:
+                        ds = ds.drop_vars(f"{v}_unit")
+
+            if rename_dict:
+                ds = ds.rename(rename_dict)
+
+        return ds
 
 
 def build_urls(dates: Union[pd.DatetimeIndex, List[datetime], datetime, str]) -> List[str]:
@@ -308,11 +354,12 @@ def build_urls(dates: Union[pd.DatetimeIndex, List[datetime], datetime, str]) ->
     # Get available days from S3
     try:
         folders = fs.ls(s3bucket)
-        days_available = [folder.split("/")[-1] for folder in folders]
-        dates_available = pd.to_datetime(days_available, format=r"%Y-%m-%d", errors="coerce")
     except Exception as e:
         logger.error(f"Failed to list S3 bucket {s3bucket}: {e}")
-        return []
+        raise
+
+    days_available = [folder.split("/")[-1] for folder in folders]
+    dates_available = pd.to_datetime(days_available, format=r"%Y-%m-%d", errors="coerce")
 
     dates_requested = pd.Series(dates).floor("D").drop_duplicates()
     dates_have = dates_requested[dates_requested.isin(dates_available)]
@@ -357,7 +404,7 @@ def read_openaq_json(fn: str, storage_options: dict = None, **kwargs) -> pd.Data
         df = pd.read_json(fn, lines=True, storage_options=storage_options)
     except Exception as e:
         logger.debug(f"Failed to read OpenAQ JSON {fn}: {e}")
-        return pd.DataFrame()
+        raise
 
     if df.empty:
         return df

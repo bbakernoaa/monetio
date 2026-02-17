@@ -91,9 +91,9 @@ def test_openaq_long_format(tmp_path):
     # Test Eager Mode (Long format)
     df_eager = reader.open_dataset(files=[str(f)], wide_fmt=False, as_xarray=False, lazy=False)
     assert isinstance(df_eager, pd.DataFrame)
-    assert "parameter" in df_eager.columns
-    assert df_eager.loc[0, "parameter"] == "pm25"
-    assert df_eager.loc[0, "value"] == 10.0
+    assert "variable" in df_eager.columns
+    assert df_eager.loc[0, "variable"] == "pm25"
+    assert df_eager.loc[0, "obs"] == 10.0
 
     # Test Lazy Mode (Long format)
     df_lazy = reader.open_dataset(files=[str(f)], wide_fmt=False, as_xarray=False, lazy=True)

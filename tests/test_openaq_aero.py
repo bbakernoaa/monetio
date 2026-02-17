@@ -38,18 +38,16 @@ def test_openaq_eager_lazy(tmp_path):
 
         # Eager Mode
         ds_eager = reader.open_dataset(
-            dates="2023-01-01", wide_fmt=True, as_xarray=True, lazy=False, expand2d=False
+            dates="2023-01-01", wide_fmt=True, as_xarray=True, lazy=False
         )
         assert isinstance(ds_eager, xr.Dataset)
         assert "pm25_ugm3" in ds_eager.data_vars
         assert ds_eager.pm25_ugm3.values[0] == 10.0
-        assert ds_eager.coords["siteid"].values[0].startswith("TS_")
+        # siteid is renamed to node during 2D expansion
+        assert ds_eager.coords["node"].values[0].startswith("TS_")
 
         # Lazy Mode
-        # Note: wide_fmt=True will force compute in my implementation too, with a warning.
-        ds_lazy = reader.open_dataset(
-            dates="2023-01-01", wide_fmt=True, as_xarray=True, lazy=True, expand2d=False
-        )
+        ds_lazy = reader.open_dataset(dates="2023-01-01", wide_fmt=True, as_xarray=True, lazy=True)
         assert isinstance(ds_lazy, xr.Dataset)
 
         # Assert identical values
