@@ -51,6 +51,20 @@ class TROPOMIReader(GriddedReader):
         -------
         xr.Dataset
             The TROPOMI dataset.
+
+        Examples
+        --------
+        Open standard NO2 product with support data for pressure:
+        >>> reader = TROPOMIReader()
+        >>> ds = reader.open_dataset(
+        ...     files="S5P_OFFL_L2_NO2_*.nc",
+        ...     group=[
+        ...         "PRODUCT",
+        ...         "PRODUCT/SUPPORT_DATA/INPUT_DATA",
+        ...         "PRODUCT/SUPPORT_DATA/GEOLOCATIONS"
+        ...     ],
+        ...     qa_threshold=0.75
+        ... )
         """
         if "preprocess" not in kwargs:
             from functools import partial
