@@ -2,7 +2,7 @@
 ISH Reader Redirection
 """
 
-from ..readers.ish import ISH, ISHReader  # noqa: F401
+from ..readers.ish import ISH, ISHReader, read_ish_file  # noqa: F401
 
 
 def add_data(
@@ -19,11 +19,12 @@ def add_data(
     request_timeout=10,
     request_retries=4,
     verbose=False,
+    source="aws",
     as_xarray=True,
 ):
     """Retrieve and load ISH data."""
     return ISHReader().open_dataset(
-        dates,
+        dates=dates,
         box=box,
         country=country,
         state=state,
@@ -35,5 +36,6 @@ def add_data(
         request_timeout=request_timeout,
         request_retries=request_retries,
         verbose=verbose,
+        source=source,
         as_xarray=as_xarray,
     )

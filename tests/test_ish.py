@@ -165,11 +165,10 @@ def test_ish_read_url_direct():
 
 
 def test_ish_small_timeout_fails():
-    dates = pd.date_range("2020-09-01", "2020-09-02")
-    site = "72224400358"  # "College Park AP"
+    url = "https://www.ncei.noaa.gov/pub/data/noaa/2020/722244-00358-2020.gz"
 
     with pytest.raises(RuntimeError, match="^Failed to connect"):
-        ish.add_data(dates, site=site, request_timeout=1e-6, request_retries=0)
+        ish.read_ish_file(url, request_timeout=1e-6, request_retries=0)
 
 
 def test_ish_bad_retries_error():
