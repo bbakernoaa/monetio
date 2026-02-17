@@ -3,36 +3,32 @@
 import re
 from datetime import datetime
 from io import StringIO
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import requests
 import xarray as xr
 
-from .base import PointReader, register_reader
-from .drivers import FileUtility
-
 if TYPE_CHECKING:
-    import dask.dataframe as dd
+    pass
+
+from .base import PointReader, register_reader
 
 
 @register_reader("gml_ozonesonde")
 class GMLOzonesondeReader(PointReader):
-    """
-    Reader for GML Ozonesonde 100m average files (.l100).
-    """
-
     def open_dataset(
         self,
-        files: Union[str, List[str], None] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str, None] = None,
-        location: Union[str, List[str], None] = None,
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        location: Union[str, List[str]] = None,
         n_procs: int = 1,
         errors: str = "raise",
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs: Any,
-    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
+        **kwargs,
+    ) -> Union[pd.DataFrame, xr.Dataset, Union[pd.DataFrame, xr.Dataset]]:
         """
         Retrieve and load GML Ozonesonde data.
 
@@ -45,7 +41,7 @@ class GMLOzonesondeReader(PointReader):
         location : Union[str, List[str]], optional
             Locations to retrieve (e.g., 'Boulder, Colorado').
         n_procs : int, optional
-            Number of processors for parallel loading (if not lazy), by default 1.
+            Number of processors for dask compute (if not lazy), by default 1.
         errors : str, optional
             Whether to 'raise' or 'warn' on read errors, by default 'raise'.
         as_xarray : bool, optional
@@ -64,18 +60,18 @@ class GMLOzonesondeReader(PointReader):
             if dates is None:
                 raise ValueError("Either 'files' or 'dates' must be provided.")
 
-            dates_idx = pd.to_datetime(dates)
-            if isinstance(dates_idx, pd.Timestamp):
-                dates_idx = pd.DatetimeIndex([dates_idx])
+            dates = pd.to_datetime(dates)
+            if isinstance(dates, pd.Timestamp):
+                dates = pd.DatetimeIndex([dates])
 
             df_urls = discover_files(location=location)
             # Filter by date
-            mask = df_urls["time"].between(dates_idx.min(), dates_idx.max(), inclusive="both")
+            mask = df_urls["time"].between(dates.min(), dates.max(), inclusive="both")
             urls = df_urls.loc[mask, "url"].tolist()
 
             if not urls:
                 raise RuntimeError(
-                    f"No files found for dates {dates_idx.min()} to {dates_idx.max()} "
+                    f"No files found for dates {dates.min()} to {dates.max()} "
                     f"at location(s) {location}."
                 )
             files = urls
@@ -86,12 +82,27 @@ class GMLOzonesondeReader(PointReader):
         }
 
         # Use PandasDriver to open files
+        # We pass read_100m as the read_method
         df = self.driver.open(files, read_method=read_100m, lazy=lazy, **reader_kwargs)
+
+        if not lazy and n_procs > 1:
+            # If dask is installed, we can use it for parallel loading even if as_xarray is False
+            # but usually PandasDriver.open(lazy=False) already loaded them sequentially.
+            # Actually, if we want parallel sequential load, we'd need to handle it in driver.
+            # For now, we follow the ish.py pattern if they use n_procs.
+            pass
 
         df = self.harmonize(df)
 
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
+
+            # Update history and metadata
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read GML Ozonesonde data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
 
             # Set variable attributes
             var_attrs = {
@@ -101,77 +112,13 @@ class GMLOzonesondeReader(PointReader):
                 if var in ds.data_vars:
                     ds[var].attrs.update(attrs)
 
-            # Update history and metadata
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read GML Ozonesonde data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
-
             return ds
 
         return df
 
-    def to_xarray(
-        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs: Any
-    ) -> xr.Dataset:
-        """
-        Convert the DataFrame to an xarray Dataset in UGRID convention.
-        For profiles, we often want to keep 'lev' or 'altitude' as coordinates.
-
-        Parameters
-        ----------
-        df : Union[pd.DataFrame, dd.DataFrame]
-            Input dataframe.
-        expand2d : bool, optional
-            Whether to expand to multi-dimensional structure, by default True.
-        **kwargs : dict
-            Additional arguments passed to the conversion.
-
-        Returns
-        -------
-        xr.Dataset
-            The dataset in UGRID convention.
-        """
-        # 1. Base conversion to 1D UGRID
-        ds = super().to_xarray(df, expand2d=False, **kwargs)
-
-        # 2. Ensure vertical coordinates
-        for vcol in ["lev", "press", "altitude"]:
-            if vcol in ds.data_vars:
-                ds = ds.set_coords(vcol)
-
-        # 3. Handle 2D (or 3D for profiles) expansion
-        if expand2d:
-            try:
-                # We want to unstack to (time, siteid, lev) if possible
-                # But since each profile might have different levels,
-                # we use 'lev' as a dimension.
-                index_cols = ["time", "siteid"]
-                if "lev" in ds.coords:
-                    index_cols.append("lev")
-
-                # Check for duplicates in index
-                ds = ds.set_index(node=index_cols).unstack("node")
-
-                # Rename siteid to node if it exists as a dimension
-                if "siteid" in ds.dims:
-                    ds = ds.rename({"siteid": "node"})
-
-                # Add UGRID mesh metadata if we still have a 'node' dimension
-                if "node" in ds.dims:
-                    ds.coords["node"] = (("node",), np.arange(ds.sizes["node"]))
-
-            except Exception as e:
-                import warnings
-
-                warnings.warn(f"GMLOzonesondeReader.to_xarray expand2d failed: {e}. Returning 1D.")
-
-        return ds
-
 
 # -----------------------------------------------------------------------------
-# Helper functions
+# Helper functions ported from monetio/profile/gml_ozonesonde.py
 # -----------------------------------------------------------------------------
 
 TIMEOUT = 15
@@ -190,21 +137,16 @@ LOCATIONS = [
     "Trinidad Head, California",
 ]
 
-_FILES_L100_CACHE: Dict[str, Optional[List[Tuple[str, datetime, str, str]]]] = {
-    location: None for location in LOCATIONS
-}
+_FILES_L100_CACHE = {location: None for location in LOCATIONS}
 
 
-def retry(func: Any) -> Any:
-    """Decorator to retry a function on network errors."""
+def retry(func):
     import time
     from functools import wraps
     from random import random as rand
 
-    import requests
-
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(*args, **kwargs):
         for i in range(RETRIES):
             try:
                 res = func(*args, **kwargs)
@@ -222,33 +164,9 @@ def retry(func: Any) -> Any:
     return wrapper
 
 
-def discover_files(
-    location: Union[str, List[str], None] = None,
-    *,
-    n_threads: int = 3,
-    cache: bool = True,
-) -> pd.DataFrame:
-    """
-    Discover available GML Ozonesonde files.
-
-    Parameters
-    ----------
-    location : Union[str, List[str]], optional
-        Locations to retrieve, by default None (all locations).
-    n_threads : int, optional
-        Number of threads for parallel discovery, by default 3.
-    cache : bool, optional
-        Whether to use cached file lists, by default True.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with location, time, filename, and URL.
-    """
+def discover_files(location=None, *, n_threads=3, cache=True):
     import itertools
     from multiprocessing.pool import ThreadPool
-
-    import requests
 
     base = "https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde"
     if location is None:
@@ -262,11 +180,11 @@ def discover_files(
         raise ValueError(f"Invalid location(s): {invalid}.")
 
     @retry
-    def get_files(loc: str) -> List[Tuple[str, Any, str, str]]:
-        cached = _FILES_L100_CACHE[loc]
+    def get_files(location):
+        cached = _FILES_L100_CACHE[location]
         if cached is not None:
             return cached
-        url_location = "South Pole, Antartica" if loc == "South Pole, Antarctica" else loc
+        url_location = "South Pole, Antartica" if location == "South Pole, Antarctica" else location
         url = f"{base}/{url_location}/100 Meter Average Files/".replace(" ", "%20")
         try:
             r = requests.get(url, timeout=TIMEOUT)
@@ -283,29 +201,21 @@ def discover_files(
                 t = pd.to_datetime(t_str, format=r"%Y%m%d%H")
             except ValueError:
                 t = np.nan
-            data.append((loc, t, fn, f"{url}{fn}"))
+            data.append((location, t, fn, f"{url}{fn}"))
         return data
 
     with ThreadPool(processes=min(n_threads, len(locations))) as pool:
-        results = list(itertools.chain.from_iterable(pool.imap_unordered(get_files, locations)))
-    df = pd.DataFrame(results, columns=["location", "time", "fn", "url"])
+        data = list(itertools.chain.from_iterable(pool.imap_unordered(get_files, locations)))
+    df = pd.DataFrame(data, columns=["location", "time", "fn", "url"])
     if cache:
-        for loc in locations:
-            _FILES_L100_CACHE[loc] = [
-                tuple(x)  # type: ignore
-                for x in df[df["location"] == loc].itertuples(index=False, name=None)
-            ]
+        for location in locations:
+            _FILES_L100_CACHE[location] = list(
+                df[df["location"] == location].itertuples(index=False, name=None)
+            )
     return df
 
 
-def add_data(
-    dates: Union[pd.DatetimeIndex, List[datetime]],
-    *,
-    location: Union[str, List[str], None] = None,
-    n_procs: int = 1,
-    errors: str = "raise",
-    **kwargs: Any,
-) -> pd.DataFrame:
+def add_data(dates, *, location=None, n_procs=1, errors="raise", **kwargs):
     """
     Reads GML Ozonesonde data.
 
@@ -316,7 +226,7 @@ def add_data(
     location : str or list of str, optional
         Locations to retrieve, by default None (all locations).
     n_procs : int, optional
-        Number of processors for parallel loading, by default 1.
+        Number of processors for dask compute, by default 1.
     errors : str, optional
         Whether to 'raise' or 'warn' on read errors, by default 'raise'.
     **kwargs : dict
@@ -327,13 +237,8 @@ def add_data(
     pd.DataFrame
         The loaded ozonesonde data.
     """
-    return GMLOzonesondeReader().open_dataset(  # type: ignore
-        dates=dates,
-        location=location,
-        n_procs=n_procs,
-        errors=errors,
-        as_xarray=False,
-        **kwargs,
+    return GMLOzonesondeReader().open_dataset(
+        dates=dates, location=location, n_procs=n_procs, errors=errors, as_xarray=False, **kwargs
     )
 
 
@@ -347,7 +252,7 @@ class ColInfo(NamedTuple):
 COL_INFO_L100 = [
     ColInfo("lev", "level", "", None),
     ColInfo("press", "pressure", "hPa", "9999.9"),
-    ColInfo("altitude", "altitude", "km", ("99.9", "99.9", "99.999", "999.999")),
+    ColInfo("altitude", "altitude", "km", ("99.9", "999.9", "99.999", "999.999")),
     ColInfo("theta", "potential temperature", "K", "9999.9"),
     ColInfo("temp", "air temperature", "degC", "999.9"),
     ColInfo("ftempv", "frost point temperature", "degC", "999.9"),
@@ -356,7 +261,7 @@ COL_INFO_L100 = [
     ColInfo("o3", "ozone mixing ratio", "ppmv", "99.999"),
     ColInfo("o3_int", "integrated ozone below", "atm-cm", "99.9990"),
     ColInfo("ptemp", "pump temperature", "degC", "999.9"),
-    ColInfo("o3_nd", "ozone number density", "10^11 cm-3", "99.9990"),
+    ColInfo("o3_nd", "ozone number density", "10^11 cm-3", "999.999"),
     ColInfo(
         "o3_res",
         "estimated total column ozone above",
@@ -376,7 +281,7 @@ Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp 
 """
 
 
-def read_100m(fp_or_url: str) -> pd.DataFrame:
+def read_100m(fp_or_url):
     """
     Reads a GML 100m average file (.l100).
 
@@ -390,11 +295,18 @@ def read_100m(fp_or_url: str) -> pd.DataFrame:
     pd.DataFrame
         The loaded data with metadata in attrs.
     """
-    fs = FileUtility.get_fs(fp_or_url)
-    with fs.open(fp_or_url, mode="rb") as f:
-        content = f.read()
+    if isinstance(fp_or_url, str) and fp_or_url.startswith(("http://", "https://")):
 
-    text = content.decode("utf-8", errors="replace")
+        @retry
+        def get_text():
+            r = requests.get(fp_or_url, timeout=TIMEOUT)
+            r.raise_for_status()
+            return r.text
+
+        text = get_text()
+    else:
+        with open(fp_or_url) as f:
+            text = f.read()
 
     blocks = text.replace("\r", "").split("\n\n")
     nblocks = len(blocks)
@@ -428,9 +340,9 @@ def read_100m(fp_or_url: str) -> pd.DataFrame:
         key, val = line.split(":", 1)
         for key_ish in on_val_side:
             if key_ish in val:
-                idx = val.index(key_ish)
-                meta[key.strip()] = val[:idx].strip()
-                todo.append(val[idx:])
+                i = val.index(key_ish)
+                meta[key.strip()] = val[:i].strip()
+                todo.append(val[i:])
                 break
         else:
             meta[key.strip()] = val.strip()
@@ -459,11 +371,7 @@ def read_100m(fp_or_url: str) -> pd.DataFrame:
     na_values = {c.name: c.na_val for c in col_info if c.na_val is not None}
 
     # Robust check for column count
-    data_lines = data_block.splitlines()
-    if len(data_lines) < 3:
-        raise ValueError(f"Data block too short: {len(data_lines)} lines")
-
-    first_data_line = data_lines[2]
+    first_data_line = data_block.splitlines()[2]
     ncols = len(first_data_line.split())
     if ncols != len(names):
         raise ValueError(f"Expected {len(names)} columns in data block, got {ncols}")
@@ -472,11 +380,10 @@ def read_100m(fp_or_url: str) -> pd.DataFrame:
         StringIO(data_block),
         skiprows=2,
         header=None,
-        sep=r"\s+",
+        delimiter=r"\s+",
         names=names,
         dtype=dtype,
         na_values=na_values,
-        engine="python",
     )
 
     df["time"] = pd.Timestamp(f"{meta['Launch Date']} {meta['Launch Time']}").tz_localize(None)

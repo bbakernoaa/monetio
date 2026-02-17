@@ -11,8 +11,8 @@ def standardize_satellite_coords(
     ds: xr.Dataset,
     lat_name: str = "Latitude",
     lon_name: str = "Longitude",
-    y_dim: Union[str, List[str]] = ["Rows", "scanline", "nlat", "lat"],
-    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel", "nlon", "lon"],
+    y_dim: Union[str, List[str]] = ["Rows", "scanline", "nlat", "lat", "nscan"],
+    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel", "nlon", "lon", "nstep"],
     z_dim: Union[str, List[str]] = ["Levels", "layer", "level"],
 ) -> xr.Dataset:
     """
