@@ -33,7 +33,7 @@ def test_openaq_eager_lazy(tmp_path):
 
     from unittest.mock import patch
 
-    with patch("monetio.readers.openaq.OPENAQ.build_urls", return_index=True) as mock_urls:
+    with patch("monetio.readers.openaq.build_urls") as mock_urls:
         mock_urls.return_value = [str(f)]
 
         # Eager Mode
