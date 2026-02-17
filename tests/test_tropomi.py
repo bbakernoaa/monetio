@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from monetio.readers.tropomi import tropomi_preprocess
+from monetio.readers.tropomi import TROPOMIReader, tropomi_preprocess
 
 
 @pytest.mark.parametrize("lazy", [True, False])
@@ -42,10 +42,11 @@ def test_tropomi_preprocess(lazy):
     assert ds_out.time.size == 3
     assert ds_out.nitrogendioxide_tropospheric_column.dims == ("time", "x")
 
-    # Check time values
+    # Check time values with robust precision handling
     expected_times = [ref_time + pd.Timedelta(milliseconds=ms) for ms in delta_times]
     pd.testing.assert_index_equal(
-        pd.DatetimeIndex(ds_out.time.values), pd.DatetimeIndex(expected_times)
+        pd.DatetimeIndex(ds_out.time.values).astype("datetime64[ns]"),
+        pd.DatetimeIndex(expected_times).astype("datetime64[ns]"),
     )
 
     if lazy:
@@ -102,7 +103,6 @@ def test_tropomi_enhanced_features(lazy):
 
     # 2. Check Pressure
     assert "pres_pa_mid" in ds_out.data_vars
-    # Dimension order depends on broadcast, but usually z is first if a/b were (z, v)
     assert "z" in ds_out.pres_pa_mid.dims
     assert "time" in ds_out.pres_pa_mid.dims
     assert "x" in ds_out.pres_pa_mid.dims
@@ -113,3 +113,51 @@ def test_tropomi_enhanced_features(lazy):
 
     if lazy:
         assert ds_out.pres_pa_mid.chunks is not None
+
+
+def test_tropomi_multi_group(tmp_path, monkeypatch):
+    # Simulate multi-group file opening using mocked XarrayDriver
+    # PRODUCT group
+    ds_prod = xr.Dataset(
+        {"no2": (("scanline", "ground_pixel"), np.ones((3, 4), dtype=np.float32))},
+        coords={
+            "latitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
+            "longitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
+            "time": ((), np.datetime64("2023-01-01")),
+        },
+    )
+    # INPUT_DATA group
+    ds_input = xr.Dataset(
+        {
+            "surface_pressure": (
+                ("scanline", "ground_pixel"),
+                np.full((3, 4), 101325.0, dtype=np.float32),
+            )
+        }
+    )
+
+    class MockDriver:
+        def open(self, files, **kwargs):
+            group = kwargs.get("group")
+            if group == "PRODUCT":
+                return ds_prod
+            if group == "PRODUCT/SUPPORT_DATA/INPUT_DATA":
+                return ds_input
+            return xr.Dataset()
+
+    # We need to monkeypatch the driver instance in TROPOMIReader
+    reader = TROPOMIReader()
+    monkeypatch.setattr(reader, "driver", MockDriver())
+
+    # Open both groups
+    ds_merged = reader.open_dataset(
+        ["fake_file.nc"],
+        group=["PRODUCT", "PRODUCT/SUPPORT_DATA/INPUT_DATA"],
+        calculate_pressure=False,
+    )
+
+    assert "no2" in ds_merged.data_vars
+    assert "surface_pressure" in ds_merged.data_vars
+    assert ds_merged.no2.shape == (3, 4)
+    assert ds_merged.surface_pressure.shape == (3, 4)
+    assert "time" in ds_merged.coords

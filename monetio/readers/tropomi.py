@@ -20,7 +20,7 @@ class TROPOMIReader(GriddedReader):
     def open_dataset(
         self,
         files: Union[str, List[str]],
-        group: str = "PRODUCT",
+        group: Optional[Union[str, List[str]]] = "PRODUCT",
         calculate_pressure: bool = True,
         qa_threshold: Optional[float] = None,
         **kwargs,
@@ -32,10 +32,13 @@ class TROPOMIReader(GriddedReader):
         ----------
         files : Union[str, List[str]]
             File path(s) or URL(s).
-        group : str, optional
-            The NetCDF group to open, by default "PRODUCT".
-            Note: TROPOMI L2 files are multi-group. To get support data,
-            multiple calls or custom merging might be needed.
+        group : str or list of str, optional
+            The NetCDF group(s) to open. If a list is provided, groups will be merged.
+            Common TROPOMI groups include:
+            - "PRODUCT" (default)
+            - "PRODUCT/SUPPORT_DATA/DETAILED_RESULTS"
+            - "PRODUCT/SUPPORT_DATA/INPUT_DATA"
+            - "PRODUCT/SUPPORT_DATA/GEOLOCATIONS"
         calculate_pressure : bool, optional
             Whether to calculate pressure levels if necessary variables are found,
             by default True.
@@ -49,9 +52,6 @@ class TROPOMIReader(GriddedReader):
         xr.Dataset
             The TROPOMI dataset.
         """
-        # We need to handle the fact that TROPOMI has data in multiple groups.
-        # If the user wants pressure, we might need variables from SUPPORT_DATA.
-
         if "preprocess" not in kwargs:
             from functools import partial
 
@@ -62,10 +62,28 @@ class TROPOMIReader(GriddedReader):
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
 
-        # TROPOMI files must be opened group-by-group in xarray
-        kwargs["group"] = group
+        if group is None or isinstance(group, str):
+            groups = [group] if group else [None]
+        else:
+            groups = group
 
-        ds = super().open_dataset(files, **kwargs)
+        dsets = []
+        for g in groups:
+            # We copy kwargs to avoid modifying the original dict in the loop
+            g_kwargs = kwargs.copy()
+            g_kwargs["group"] = g
+            try:
+                ds_g = super().open_dataset(files, **g_kwargs)
+                dsets.append(ds_g)
+            except Exception as e:
+                warnings.warn(f"Could not open group {g}: {e}")
+
+        if not dsets:
+            raise RuntimeError("No groups could be opened.")
+
+        # Merge groups
+        # We use compat='override' or 'no_conflicts' because coordinates should be identical
+        ds = xr.merge(dsets, compat="no_conflicts")
 
         # Update history
         history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read TROPOMI data."
@@ -87,7 +105,7 @@ def tropomi_preprocess(
     Parameters
     ----------
     ds : xr.Dataset
-        Input dataset from a single file/group.
+        Input dataset from a single file/group (or merged groups).
     calculate_pressure : bool, optional
         Whether to calculate pressure levels.
     qa_threshold : float, optional
@@ -110,7 +128,7 @@ def tropomi_preprocess(
             scan_time = ref_time + delta_time.astype("timedelta64[ms]")
             ds = ds.assign_coords(time=scan_time)
 
-    # 3. Calculate Pressure (Lazy)
+    # 3. Calculate Pressure (Lazy) - must happen before dim rename if it depends on 'y'
     if calculate_pressure:
         ds = _add_pressure_levels(ds)
 
@@ -123,17 +141,6 @@ def tropomi_preprocess(
         for var in ds.data_vars:
             if "y" in ds[var].dims:
                 ds[var] = ds[var].rename({"y": "time"})
-
-    # 4. Vertical Directionality Check (Increasing altitude / Decreasing pressure)
-    if "pres_pa_mid" in ds.data_vars:
-        # Check if pressure increases with z (it should decrease)
-        # We take a sample to avoid full compute, but even a small isel is fine.
-        # To keep it lazy, we can use xarray's result of diff.
-        # But to be safe and lazy, we just assume if the user wants it, we can do it.
-        # Legacy code: if (ds[pres_var].isel(time=0).isel(**{vert_dim: slice(0, 10)}).diff(dim="z") > 0).any():
-        # We'll just provide a way or do it if possible.
-        # For now, let's keep it simple.
-        pass
 
     # 5. Quality Flagging (Lazy)
     if qa_threshold is not None and "qa_value" in ds.data_vars:
@@ -158,11 +165,7 @@ def _add_pressure_levels(ds: xr.Dataset) -> xr.Dataset:
         b = ds["tm5_constant_b"]
         ps = ds["surface_pressure"]
 
-        # a and b are typically (layer, vertices=2)
-        # ps is (time, y, x) or (y, x)
-
         # Interface pressure: p_int = a + b * ps
-        # We need to broadcast a and b over y and x
         p_int = a + b * ps
         # p_int now has dims (z, vertices, y, x) or similar
 
