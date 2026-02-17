@@ -1,30 +1,70 @@
 """OpenAQ Reader"""
 
+import hashlib
 import json
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Union
 
 import dask
-import dask.dataframe as dd
 import numpy as np
 import pandas as pd
+import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .base import PointReader, register_reader
 
 
 @register_reader("openaq")
 class OpenAQReader(PointReader):
-    def open_dataset(self, dates, n_procs=1, wide_fmt=True, as_xarray=True, lazy=False, **kwargs):
+    def open_dataset(
+        self,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        n_procs: int = 1,
+        wide_fmt: bool = True,
+        as_xarray: bool = True,
+        lazy: bool = False,
+        **kwargs,
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Reads OpenAQ data from S3.
+        Retrieve and load OpenAQ data.
+
+        Parameters
+        ----------
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+            Dates to retrieve.
+        n_procs : int, optional
+            Number of processors for dask compute (if not lazy), by default 1.
+        wide_fmt : bool, optional
+            Whether to return data in wide format, by default True.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded OpenAQ data.
         """
         a = OPENAQ()
         df = a.add_data(dates, num_workers=n_procs, wide_fmt=wide_fmt, lazy=lazy)
 
-        if lazy:
-            return df
-
         df = self.harmonize(df)
+
         if as_xarray:
-            return self.to_xarray(df)
+            ds = self.to_xarray(df, **kwargs)
+
+            # Update history
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read OpenAQ data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
 
         return df
 
@@ -275,7 +315,10 @@ class OPENAQ:
         return urls
 
     def add_data(self, dates, *, num_workers=1, wide_fmt=True, lazy=False):
-        import hashlib
+        try:
+            import dask.dataframe as dd
+        except ImportError:
+            dd = None
 
         dates = pd.to_datetime(dates)
         if isinstance(dates, pd.Timestamp):
@@ -283,31 +326,59 @@ class OPENAQ:
         dates = dates.sort_values()
 
         urls = self.build_urls(dates)
-        dfs = [dask.delayed(self.read)(url) for url in urls]
-        if not dfs:
+        if not urls:
+            if lazy and dd:
+                return dd.from_pandas(pd.DataFrame(), npartitions=1)
             return pd.DataFrame()
 
-        df_lazy = dd.from_delayed(dfs)
+        dfs = [dask.delayed(self.read)(url) for url in urls]
+        df = dd.from_delayed(dfs)
 
-        if lazy:
-            return df_lazy
-
-        df = df_lazy.compute(num_workers=num_workers)
-
+        # 1. Time Filtering (Lazy friendly)
         df = df.loc[(df.time >= dates.min()) & (df.time <= dates.max())]
 
-        # SITE ID
-        def do_hash(b):
-            return hashlib.sha1(b).hexdigest()
+        # 2. SITE ID (Lazy friendly)
+        def _get_siteid(df_part):
+            to_hash = (
+                df_part.location
+                + " "
+                + df_part.latitude.astype(str)
+                + " "
+                + df_part.longitude.astype(str)
+            )
+            df_part["siteid"] = (
+                df_part.country
+                + "_"
+                + to_hash.str.encode("utf-8")
+                .apply(lambda b: hashlib.sha1(b).hexdigest() if pd.notnull(b) else "nan")
+                .str.slice(0, 7)
+            )
+            return df_part
 
-        to_hash = df.location + " " + df.latitude.astype(str) + " " + df.longitude.astype(str)
-        df["siteid"] = df.country + "_" + to_hash.str.encode("utf-8").apply(do_hash).str.slice(0, 7)
+        df = df.map_partitions(_get_siteid)
+
+        # 3. Unit Conversions (Lazy friendly)
+        def _convert_units(df_part):
+            for vn, f in self.PPM_TO_UGM3.items():
+                is_ug = (df_part.parameter == vn) & (df_part.unit == "µg/m³")
+                df_part.loc[is_ug, "value"] /= f
+                df_part.loc[is_ug, "unit"] = "ppm"
+            return df_part
+
+        df = df.map_partitions(_convert_units)
+
+        if not lazy:
+            df = df.compute(num_workers=num_workers)
 
         if wide_fmt:
-            for vn, f in self.PPM_TO_UGM3.items():
-                is_ug = (df.parameter == vn) & (df.unit == "µg/m³")
-                df.loc[is_ug, "value"] /= f
-                df.loc[is_ug, "unit"] = "ppm"
+            # Note: pivot_table forces compute if it's a Dask DataFrame
+            if hasattr(df, "compute") and not isinstance(df, pd.DataFrame):
+                import warnings
+
+                warnings.warn(
+                    "OpenAQReader: wide_fmt=True forces immediate computation of Dask DataFrame."
+                )
+                df = df.compute(num_workers=num_workers)
 
             index = [
                 "time",

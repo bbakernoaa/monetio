@@ -274,6 +274,7 @@ class OpenAQAWSReader(PointReader):
         find_paths=True,
         n_procs=1,
         as_xarray=True,
+        lazy=False,
         **kwargs,
     ):
         """Add OpenAQ data from AWS Open Data."""
@@ -304,11 +305,24 @@ class OpenAQAWSReader(PointReader):
             ("units", str),
             ("value", float),
         ]
-        df = dd.from_map(func, urls, meta=meta).compute(num_workers=n_procs)
+        df = dd.from_map(func, urls, meta=meta)
+
+        if not lazy:
+            df = df.compute(num_workers=n_procs)
 
         df = self.harmonize(df)
         if as_xarray:
-            return self.to_xarray(df)
+            ds = self.to_xarray(df, **kwargs)
+
+            # Update history
+            from datetime import datetime
+
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read OpenAQ AWS data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
 
         return df
 
@@ -321,6 +335,7 @@ def add_data(
     provider=None,
     find_paths=True,
     n_procs=1,
+    **kwargs,
 ):
     """Helper for Aero Protocol consistency."""
     return OpenAQAWSReader().open_dataset(
@@ -330,4 +345,5 @@ def add_data(
         provider=provider,
         find_paths=find_paths,
         n_procs=n_procs,
+        **kwargs,
     )

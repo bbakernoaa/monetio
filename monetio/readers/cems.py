@@ -1,51 +1,97 @@
 """CEMS Reader"""
 
-import datetime
-import os
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Union
 
 import pandas as pd
+import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .base import PointReader, register_reader
+
+
+class CEMS:
+    """Legacy CEMS class for backward compatibility."""
+
+    pass
 
 
 @register_reader("cems")
 class CEMSReader(PointReader):
     def open_dataset(
         self,
-        rdate=None,
-        states=["md"],
-        download=False,
-        verbose=True,
-        files=None,
-        as_xarray=True,
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        states: Union[str, List[str]] = "md",
+        n_procs: int = 1,
+        as_xarray: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ):
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Reads CEMS data.
+        Retrieve and load CEMS data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File paths or URLs to read. If None, uses `dates` and `states` to discover files.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve.
+        states : Union[str, List[str]], optional
+            States to retrieve (e.g., 'md'), by default 'md'.
+        n_procs : int, optional
+            Number of processors for dask compute (if not lazy), by default 1.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments passed to the reader and driver.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded CEMS data.
         """
-        c = CEMS()
+        if files is None:
+            if dates is None:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
 
-        if files:
-            # If explicit files are provided
-            if isinstance(files, (str, pd.Timestamp)) or not hasattr(files, "__iter__"):
-                files = [files]
+            dates = pd.to_datetime(dates)
+            if isinstance(dates, pd.Timestamp):
+                dates = pd.DatetimeIndex([dates])
 
-            dfs = []
-            for f in files:
-                df = c.load(f, verbose=verbose)
-                dfs.append(df)
+            if isinstance(states, str):
+                states = [states]
 
-            if not dfs:
-                df = pd.DataFrame()
-            else:
-                df = pd.concat(dfs)
+            # Discovery logic
+            files = []
+            for dt in dates.floor("MS").unique():
+                for st in states:
+                    files.append(build_url(dt, st))
 
-        else:
-            df = c.add_data(rdate, states=states, download=download, verbose=verbose)
+        # Filter out arguments that are not for the reader function
+        reader_kwargs = {
+            k: v for k, v in kwargs.items() if k not in ["expand2d", "pivot", "wide_fmt"]
+        }
+
+        df = self.driver.open(files, read_method=read_cems, lazy=lazy, **reader_kwargs)
 
         df = self.harmonize(df)
+
         if as_xarray:
-            return self.to_xarray(df)
+            ds = self.to_xarray(df, **kwargs)
+
+            # Update history
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CEMS data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+
+            return ds
 
         return df
 
@@ -55,29 +101,17 @@ class CEMSReader(PointReader):
 # -----------------------------------------------------------------------------
 
 
-def getdegrees(degrees, minutes, seconds):
-    return degrees + minutes / 60.0 + seconds / 3600.00
+def build_url(date, state):
+    """
+    Build CEMS URL for a given date and state.
+    """
+    url = "ftp://newftp.epa.gov/DmDnLoad/emissions/hourly/monthly/"
+    url += date.strftime("%Y") + "/"
+    fname = date.strftime("%Y") + state.lower() + date.strftime("%m") + ".zip"
+    return url + fname
 
 
-def addmonth(dt):
-    month = dt.month + 1
-    year = dt.year
-    day = dt.day
-    hour = dt.hour
-    if month > 12:
-        year = dt.year + 1
-        month = month - 12
-        if day == 31 and month in [4, 6, 9, 11]:
-            day = 30
-        if month == 2 and day in [29, 30, 31]:
-            if year % 4 == 0:
-                day = 29
-            else:
-                day = 28
-    return datetime.datetime(year, month, day, hour)
-
-
-def get_date_fmt(date, verbose=False):
+def get_date_fmt(date):
     temp = date.split("-")
     if len(temp[0]) == 4:
         fmt = "%Y-%m-%d %H"
@@ -86,129 +120,57 @@ def get_date_fmt(date, verbose=False):
     return fmt
 
 
-class CEMS:
-    def __init__(self):
-        self.efile = None
-        self.url = "ftp://newftp.epa.gov/DmDnLoad/emissions/"
-        self.lb2kg = 0.453592
-        self.info = "Data from continuous emission monitoring systems (CEMS)\n"
-        self.df = pd.DataFrame()
-        self.namehash = {}
+def read_cems(efile, **kwargs):
+    """
+    Read a single CEMS file.
+    """
+    dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0)
+    columns = list(dftemp.columns.values)
 
-    def add_data(self, rdate, states=["md"], download=False, verbose=True):
-        if isinstance(states, str):
-            states = [states]
-        if isinstance(rdate, list):
-            r1 = rdate[0]
-            r2 = rdate[1]
-            rdatelist = [r1]
-            done = False
-            iii = 0
-            while not done:
-                r3 = addmonth(rdatelist[-1])
-                if r3 <= r2:
-                    rdatelist.append(r3)
-                else:
-                    done = True
-                if iii > 100:
-                    done = True
-                iii += 1
+    # Standardize column names
+    rcolumn = []
+    for ccc in columns:
+        cl = ccc.lower()
+        if "facility" in cl and "name" in cl:
+            rcolumn.append("facility_name")
+        elif "orispl" in cl:
+            rcolumn.append("orispl_code")
+        elif "facility" in cl and "id" in cl:
+            rcolumn.append("fac_id")
+        elif "so2" in cl and "lbs" in cl and "rate" not in cl:
+            rcolumn.append("so2_lbs")
+        elif "nox" in cl and "lbs" in cl and "rate" not in cl:
+            rcolumn.append("nox_lbs")
+        elif "co2" in cl and "short" in cl and "tons" in cl:
+            rcolumn.append("co2_short_tons")
+        elif "date" in cl:
+            rcolumn.append("date")
+        elif "hour" in cl:
+            rcolumn.append("hour")
+        elif "lat" in cl:
+            rcolumn.append("latitude")
+        elif "lon" in cl:
+            rcolumn.append("longitude")
+        elif "state" in cl:
+            rcolumn.append("state_name")
         else:
-            rdatelist = [rdate]
-        for rd in rdatelist:
-            if verbose:
-                print("getting data", rd)
-            for st in states:
-                url = self.retrieve(rd, st, download=download, verbose=verbose)
-                self.load(url, verbose=verbose)
-        return self.df
+            rcolumn.append(ccc.strip().lower())
+    dftemp.columns = rcolumn
 
-    def retrieve(self, rdate, state, download=True, verbose=False):
-        efile = "empty"
-        ftpsite = self.url
-        ftpsite += "hourly/"
-        ftpsite += "monthly/"
-        ftpsite += rdate.strftime("%Y") + "/"
-        fname = rdate.strftime("%Y") + state + rdate.strftime("%m") + ".zip"
-        if not download:
-            efile = ftpsite + fname
-        if not os.path.isfile(fname):
-            # CEMS requires manual download usually due to FTP issues or explicit requests
-            # Original code warns about download not supported
-            efile = ftpsite + fname
-            print("WARNING: Downloading file not supported at this time")
-            print(efile)
-        else:
-            print("file exists " + fname)
-            efile = fname
-        self.info += "File retrieved :" + efile + "\n"
-        return efile
+    dfmt = get_date_fmt(dftemp["date"].iloc[0])
+    # Vectorized time construction
+    dt_str = dftemp["date"].astype(str) + " " + dftemp["hour"].astype(str)
+    dftemp["time"] = pd.to_datetime(dt_str, format=dfmt)
+    dftemp = dftemp.rename(columns={"time": "time_local"})
+    # For Aero Protocol, we need a 'time' column (UTC)
+    # CEMS data is local time, and usually doesn't have offset info easily accessible in the file.
+    # We set time = time_local for now, or use timezonefinder if we had lat/lon.
+    dftemp["time"] = dftemp["time_local"]
 
-    def columns_rename(self, columns, verbose=False):
-        rcolumn = []
-        for ccc in columns:
-            if "facility" in ccc.lower() and "name" in ccc.lower():
-                rcolumn = self.rename(ccc, "facility_name", rcolumn, verbose)
-            elif "orispl" in ccc.lower():
-                rcolumn = self.rename(ccc, "orispl_code", rcolumn, verbose)
-            elif "facility" in ccc.lower() and "id" in ccc.lower():
-                rcolumn = self.rename(ccc, "fac_id", rcolumn, verbose)
-            elif "so2" in ccc.lower() and "lbs" in ccc.lower() and "rate" not in ccc.lower():
-                rcolumn = self.rename(ccc, "so2_lbs", rcolumn, verbose)
-            elif "nox" in ccc.lower() and "lbs" in ccc.lower() and "rate" not in ccc.lower():
-                rcolumn = self.rename(ccc, "nox_lbs", rcolumn, verbose)
-            elif "co2" in ccc.lower() and "short" in ccc.lower() and "tons" in ccc.lower():
-                rcolumn = self.rename(ccc, "co2_short_tons", rcolumn, verbose)
-            elif "date" in ccc.lower():
-                rcolumn = self.rename(ccc, "date", rcolumn, verbose)
-            elif "hour" in ccc.lower():
-                rcolumn = self.rename(ccc, "hour", rcolumn, verbose)
-            elif "lat" in ccc.lower():
-                rcolumn = self.rename(ccc, "latitude", rcolumn, verbose)
-            elif "lon" in ccc.lower():
-                rcolumn = self.rename(ccc, "longitude", rcolumn, verbose)
-            elif "state" in ccc.lower():
-                rcolumn = self.rename(ccc, "state_name", rcolumn, verbose)
-            else:
-                rcolumn.append(ccc.strip().lower())
-        return rcolumn
+    dftemp = dftemp.drop(columns=["date", "hour", "year"], errors="ignore")
 
-    def rename(self, ccc, newname, rcolumn, verbose):
-        self.namehash[newname] = ccc
-        rcolumn.append(newname)
-        if verbose:
-            print(ccc + " to " + newname)
-        return rcolumn
+    # siteid construction
+    if "orispl_code" in dftemp.columns:
+        dftemp["siteid"] = dftemp["orispl_code"].astype(str)
 
-    def add_info(self, dftemp):
-        # Placeholder for metadata merging (cemsinfo.csv)
-        # Original code read a local CSV in `monetio/data`
-        # We assume it might fail if file missing
-        return dftemp
-
-    def load(self, efile, verbose=True):
-        dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0)
-        columns = list(dftemp.columns.values)
-        columns = self.columns_rename(columns, verbose)
-        dftemp.columns = columns
-
-        dfmt = get_date_fmt(dftemp["date"][0], verbose=verbose)
-        dftime = dftemp.apply(
-            lambda x: datetime.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt),
-            axis=1,
-        )
-        dftemp = pd.concat([dftime, dftemp], axis=1)
-        dftemp.rename(columns={0: "time local"}, inplace=True)
-        dftemp.drop(["date", "hour"], axis=1, inplace=True)
-
-        dftemp = self.add_info(dftemp)
-
-        if "year" in columns:
-            dftemp.drop(["year"], axis=1, inplace=True)
-
-        if self.df.empty:
-            self.df = dftemp
-        else:
-            self.df = pd.concat([self.df, dftemp])  # Fixed append
-
-        return dftemp
+    return dftemp

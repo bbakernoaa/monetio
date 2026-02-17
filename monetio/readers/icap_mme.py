@@ -1,5 +1,8 @@
 """ICAP-MME Reader"""
 
+from datetime import datetime
+from typing import List, Union
+
 import pandas as pd
 import xarray as xr
 
@@ -11,42 +14,60 @@ from .drivers import FileUtility
 class ICAPMMEReader(GriddedReader):
     def open_dataset(
         self,
-        files=None,  # if local
-        dates=None,  # if downloading
-        product="MMC",
-        data_var="dustaod550",
-        download=False,
-        verbose=True,
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        product: str = "MMC",
+        data_var: str = "dustaod550",
+        download: bool = False,
         **kwargs,
-    ):
+    ) -> xr.Dataset:
         """
-        Open ICAP-MME data.
-        Supports opening by dates (downloads from FTP/HTTPS) or local files.
-        """
-        if files is not None:
-            return self.driver.open(files, **kwargs)
+        Retrieve and load ICAP-MME data.
 
-        if dates is not None:
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File paths or URLs to read. If None, uses `dates` to discover files.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve.
+        product : str, optional
+            ICAP product (e.g., 'MMC', 'C4', 'MME'), by default 'MMC'.
+        data_var : str, optional
+            Data variable (e.g., 'dustaod550'), by default 'dustaod550'.
+        download : bool, optional
+            Whether to download files to local directory, by default False.
+        **kwargs : dict
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        xr.Dataset
+            The loaded ICAP-MME data.
+        """
+        if files is None:
+            if dates is None:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+
+            urls, fnames = build_urls(dates, filetype=product, data_var=data_var)
             if download:
-                return open_mfdataset_icap(
-                    dates,
-                    product=product,
-                    data_var=data_var,
-                    download=True,
-                    verbose=verbose,
-                    **kwargs,
-                )
+                files = []
+                for url, fname in zip(urls, fnames):
+                    files.append(str(retrieve(url, fname, download=True)))
             else:
-                return open_mfdataset_icap(
-                    dates,
-                    product=product,
-                    data_var=data_var,
-                    download=False,
-                    verbose=verbose,
-                    **kwargs,
-                )
+                files = urls.tolist()
 
-        raise ValueError("Must provide 'files' or 'dates'.")
+        ds = self.driver.open(files, **kwargs)
+
+        ds = self.harmonize(ds)
+
+        # Update history
+        history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ICAP-MME data."
+        if "history" in ds.attrs:
+            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+        else:
+            ds.attrs["history"] = history
+
+        return ds
 
 
 # -----------------------------------------------------------------------------

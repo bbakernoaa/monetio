@@ -1,7 +1,5 @@
 """TOLNet Reader"""
 
-import os
-
 import pandas as pd
 import xarray as xr
 
@@ -11,25 +9,75 @@ from .drivers import FileUtility
 
 @register_reader("tolnet")
 class TOLNetReader(GriddedReader):
-    def open_dataset(self, files, **kwargs):
+    def open_dataset(self, files, **kwargs) -> xr.Dataset:
         """
-        Reads TOLNet HDF5 files.
+        Retrieve and load TOLNet data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File paths or URLs to read.
+        **kwargs : dict
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        xr.Dataset
+            The loaded TOLNet data.
         """
-        # Expand paths
+        # We use XarrayDriver for lazy loading if possible, but TOLNet has custom HDF5 structure.
+        # For now, we wrap the custom loading in a lazy-friendly way if n_procs > 1 or similar.
+        # But XarrayDriver.open uses xr.open_mfdataset which is preferred.
+        # However, TOLNet needs custom preprocessing.
+
+        def preprocess(ds):
+            return ds  # Placeholder if we used xr.open_dataset engine
+
+        # TOLNet HDF5 isn't standard CF, so we use our custom reader via PandasDriver-like logic
+        # but returning Datasets.
+        # Actually, let's keep it simple for now and just use the unified driver if we can,
+        # or refactor the loop to be more Aero Protocol friendly.
+
         file_list = FileUtility.expand_paths(files)
 
-        dsets = []
-        t = TOLNet()
-        for i in file_list:
-            dsets.append(t.add_data(i))
-
-        if not dsets:
+        if not file_list:
             return xr.Dataset()
 
-        if len(dsets) == 1:
-            return dsets[0]
+        import dask
+
+        @dask.delayed
+        def load_one(f):
+            return read_tolnet(f)
+
+        if len(file_list) > 1:
+            dsets = [load_one(f) for f in file_list]
+            # We don't want to compute yet if we want to be lazy,
+            # but xr.concat needs actual objects or we use something else.
+            # PointReader handled this via dask.dataframe.
+            # For Gridded, we usually rely on xr.open_mfdataset.
+
+            # If we want bit-perfect lazy matching, we should use xr.open_mfdataset
+            # with a custom engine or preprocess.
+
+            # Since TOLNet is custom, we'll compute it for now to match original behavior
+            # but make it faster with dask if requested.
+            dsets = dask.compute(*dsets)
+            ds = xr.concat(dsets, dim="time")
         else:
-            return xr.concat(dsets, dim="time")
+            ds = read_tolnet(file_list[0])
+
+        ds = self.harmonize(ds)
+
+        # Update history
+        from datetime import datetime
+
+        history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read TOLNet data."
+        if "history" in ds.attrs:
+            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+        else:
+            ds.attrs["history"] = history
+
+        return ds
 
 
 # -----------------------------------------------------------------------------
@@ -37,37 +85,18 @@ class TOLNetReader(GriddedReader):
 # -----------------------------------------------------------------------------
 
 
-class TOLNet:
-    def __init__(self):
-        self.objtype = "TOLNET"
-        self.cwd = os.getcwd()
-        self.dates = pd.date_range(start="2017-09-25", end="2017-09-26", freq="h")
-        self.dset = None
-        self.daily = False
+def read_tolnet(fname):
+    """
+    Read a single TOLNet HDF5 file.
+    """
+    from h5py import File
+    from numpy import array, ndarray
 
-    def add_data(self, fname):
-        from h5py import File
-
-        # FileUtility logic for HDF5?
-        # h5py can take a file-like object (bytes)
-
-        fs = FileUtility.get_fs(fname)
-        # h5py requires seekable file
-        f_obj = fs.open(fname, "rb")
-
+    fs = FileUtility.get_fs(fname)
+    with fs.open(fname, "rb") as f_obj:
         f = File(f_obj, "r")
         atts = f["INSTRUMENT_ATTRIBUTES"]
         data = f["DATA"]
-        self.dset = self.make_xarray_dataset(data, atts)
-        f.close()
-        # f_obj auto closed? Maybe not.
-        f_obj.close()
-
-        return self.dset
-
-    @staticmethod
-    def make_xarray_dataset(data, atts):
-        from numpy import array, ndarray
 
         alt = data["ALT"][:].squeeze()
         altvars = [
@@ -127,4 +156,4 @@ class TOLNet:
         except Exception:
             pass
 
-        return dataset
+    return dataset
