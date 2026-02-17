@@ -25,6 +25,8 @@ class FileUtility:
             return fsspec.filesystem("s3", anon=True)
         elif path.startswith("http://") or path.startswith("https://"):
             return fsspec.filesystem("http")
+        elif path.startswith("ftp://"):
+            return fsspec.filesystem("ftp")
         return fsspec.filesystem("file")
 
     @staticmethod
