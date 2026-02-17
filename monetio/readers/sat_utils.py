@@ -13,6 +13,7 @@ def standardize_satellite_coords(
     lon_name: str = "Longitude",
     y_dim: Union[str, List[str]] = ["Rows", "scanline"],
     x_dim: Union[str, List[str]] = ["Columns", "ground_pixel"],
+    z_dim: Union[str, List[str]] = ["Levels", "layer"],
 ) -> xr.Dataset:
     """
     Standardize satellite swath/gridded coordinates and dimensions.
@@ -48,6 +49,10 @@ def standardize_satellite_coords(
     for x in x_dim:
         if x in ds.dims:
             rename_dict[x] = "x"
+            break
+    for z in z_dim:
+        if z in ds.dims:
+            rename_dict[z] = "z"
             break
 
     if rename_dict:
