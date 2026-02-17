@@ -51,6 +51,47 @@ def test_eps_preprocess(lazy):
         assert ds_out.aod_550.chunks is not None
 
 
+def test_jrr_daily_aggregation():
+    # Simulate multiple granules for a single day
+    ds1 = xr.Dataset(
+        {"AOD550": (("Rows", "Columns"), np.full((10, 10), 0.5, dtype=np.float32))},
+        coords={
+            "Latitude": (("Rows", "Columns"), np.zeros((10, 10), dtype=np.float32)),
+            "Longitude": (("Rows", "Columns"), np.zeros((10, 10), dtype=np.float32)),
+        },
+        attrs={"time_coverage_start": "2023-01-01T00:00:00Z"},
+    )
+    ds2 = xr.Dataset(
+        {"AOD550": (("Rows", "Columns"), np.full((10, 10), 1.5, dtype=np.float32))},
+        coords={
+            "Latitude": (("Rows", "Columns"), np.zeros((10, 10), dtype=np.float32)),
+            "Longitude": (("Rows", "Columns"), np.zeros((10, 10), dtype=np.float32)),
+        },
+        attrs={"time_coverage_start": "2023-01-01T12:00:00Z"},
+    )
+
+    # Preprocess both
+    p1 = viirs_jrr_preprocess(ds1)
+    p2 = viirs_jrr_preprocess(ds2)
+
+    # Concatenate (simulating open_mfdataset behavior)
+    ds_combined = xr.concat([p1, p2], dim="time")
+
+    assert ds_combined.sizes["time"] == 2
+    assert "aod_550" in ds_combined.data_vars
+
+    # Global daily average
+    # All pixels in granule 1 are 0.5, all in granule 2 are 1.5.
+    # Total mean should be 1.0
+    global_mean = ds_combined.aod_550.mean()
+    assert float(global_mean) == pytest.approx(1.0)
+
+    # Daily resample
+    daily_mean = ds_combined.aod_550.resample(time="1D").mean()
+    assert daily_mean.sizes["time"] == 1
+    assert float(daily_mean.isel(time=0).mean()) == pytest.approx(1.0)
+
+
 @pytest.mark.parametrize("lazy", [True, False])
 def test_jrr_preprocess(lazy):
     # Create dummy dataset based on observed JRR structure
