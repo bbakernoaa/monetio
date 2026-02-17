@@ -123,6 +123,11 @@ _READER_MODULES = {
     "modis_ornl": ".readers.modis_ornl",
     "nasa_modis": ".readers.nasa_modis",
     "nesdis_frp": ".readers.nesdis_frp",
+    "omps": ".readers.omps",
+    "mopitt": ".readers.mopitt",
+    "tempo": ".readers.tempo",
+    "tropomi": ".readers.tropomi",
+    "nesdis_viirs_jrr": ".readers.nesdis_viirs_jrr",
 }
 
 

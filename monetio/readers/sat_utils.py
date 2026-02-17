@@ -11,9 +11,9 @@ def standardize_satellite_coords(
     ds: xr.Dataset,
     lat_name: str = "Latitude",
     lon_name: str = "Longitude",
-    y_dim: Union[str, List[str]] = ["Rows", "scanline"],
-    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel"],
-    z_dim: Union[str, List[str]] = ["Levels", "layer"],
+    y_dim: Union[str, List[str]] = ["Rows", "scanline", "nlat", "lat", "nscan"],
+    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel", "nlon", "lon", "nstep"],
+    z_dim: Union[str, List[str]] = ["Levels", "layer", "level"],
 ) -> xr.Dataset:
     """
     Standardize satellite swath/gridded coordinates and dimensions.
@@ -91,6 +91,30 @@ def standardize_satellite_coords(
     if "longitude" in ds.variables:
         ds["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
 
+    return ds
+
+
+def update_history(ds: xr.Dataset, message: str) -> xr.Dataset:
+    """
+    Update the 'history' attribute of a dataset.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    message : str
+        Message to add to history.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with updated history.
+    """
+    history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {message}"
+    if "history" in ds.attrs:
+        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+    else:
+        ds.attrs["history"] = history
     return ds
 
 

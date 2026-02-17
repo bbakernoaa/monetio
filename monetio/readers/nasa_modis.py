@@ -1,74 +1,82 @@
 """NASA MODIS Reader"""
 
+from typing import List, Union
+
 import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .sat_utils import standardize_satellite_coords, update_history
 
 
 @register_reader("nasa_modis")
 class NASAMODISReader(GriddedReader):
-    def open_dataset(self, files, **kwargs):
+    """
+    Reader for NASA MODIS HDF files.
+    """
+
+    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
         """
         Reads NASA MODIS swath data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path(s) or URL(s).
+        **kwargs : dict
+            Additional arguments passed to XarrayDriver.open.
+
+        Returns
+        -------
+        xr.Dataset
+            The NASA MODIS dataset.
         """
-        # Expand paths via driver logic but we open file by file due to specific logic
-        # Actually, GriddedReader driver can open them.
-        # But we need _get_swath_from_fname logic on each file.
+        if "preprocess" not in kwargs:
+            kwargs["preprocess"] = nasa_modis_preprocess
 
-        # If multiple files, we likely want to concat? Or return list?
-        # Standard open_mfdataset might not work if they are swath (not gridded same way)?
+        ds = super().open_dataset(files, **kwargs)
 
-        # Original logic was 'open_single_file'.
+        # Update history
+        ds = update_history(ds, "Read NASA MODIS data.")
 
-        # Let's iterate files.
-        # Use FileUtility from drivers if needed, or rely on user passing valid list.
-        from .drivers import FileUtility
-
-        file_list = FileUtility.expand_paths(files)
-
-        dsets = []
-        for f in file_list:
-            ds = open_single_file(f)
-            dsets.append(ds)
-
-        if not dsets:
-            return xr.Dataset()
-
-        if len(dsets) == 1:
-            return dsets[0]
-        else:
-            return xr.concat(dsets, dim="time")
+        return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/sat/nasa_modis.py
-# -----------------------------------------------------------------------------
+def nasa_modis_preprocess(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Preprocess NASA MODIS dataset: standardize and assign coordinates.
+    """
+    from ..grids import get_modis_latlon_from_swath_hv, get_sinu_area_def
 
+    # Standardize dimensions
+    ds = standardize_satellite_coords(
+        ds, y_dim=["YDim:MOD_Grid_BRDF", "y"], x_dim=["XDim:MOD_Grid_BRDF", "x"]
+    )
 
-def _get_swath_from_fname(fname):
-    vert_grid_num = fname.split(".")[-4].split("v")[-1]
-    hori_grid_num = fname.split(".")[-4].split("v")[0].split("h")[-1]
-    return hori_grid_num, vert_grid_num
+    # Extract tile info from filename if possible
+    # We might need the original filename, but ds might not have it easily accessible here
+    # if it's already opened. However, often it's in attributes.
+    fname = ds.attrs.get("file_name", "")
+    if not fname and "history" in ds.attrs:
+        # Sometimes it's in history
+        pass
 
+    # If we don't have filename, we might be in trouble for h, v
+    # But usually NASA MODIS files have global attributes
+    h = ds.attrs.get("HORIZONTALTILENUMBER")
+    v = ds.attrs.get("VERTICALTILENUMBER")
 
-def _get_time_from_fname(fname):
-    u = pd.Series([fname.split(".")[-2]])
-    date = pd.to_datetime(u, format="%Y%j%H%M%S")[0]
-    return date
+    if h is not None and v is not None:
+        ds = get_modis_latlon_from_swath_hv(h, v, ds)
+        ds.attrs["area"] = get_sinu_area_def(ds)
 
+    # Handle Time
+    if "time" not in ds.coords:
+        # Try to get time from attributes or filename
+        range_start = ds.attrs.get("RANGEBEGINNINGDATE")
+        time_start = ds.attrs.get("RANGEBEGINNINGTIME")
+        if range_start and time_start:
+            ds["time"] = pd.to_datetime(f"{range_start} {time_start}")
+            ds = ds.expand_dims("time")
 
-def open_single_file(fname):
-    from monetio.grids import get_modis_latlon_from_swath_hv, get_sinu_area_def
-
-    h, v = _get_swath_from_fname(fname)
-    timestamp = _get_time_from_fname(fname)
-    try:
-        dset = xr.open_dataset(fname, engine="h5netcdf")
-    except Exception:
-        dset = xr.open_dataset(fname)
-    dset = dset.rename({"XDim:MOD_Grid_BRDF": "x", "YDim:MOD_Grid_BRDF": "y"})
-    dset = get_modis_latlon_from_swath_hv(h, v, dset)
-    dset.attrs["area"] = get_sinu_area_def(dset)
-    dset["time"] = timestamp
-    return dset
+    return ds
