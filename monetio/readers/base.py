@@ -211,10 +211,6 @@ class PointReader(BaseReader):
         coords = [c for c in ["time", "siteid", "latitude", "longitude"] if c in ds.data_vars]
         ds = ds.set_coords(coords)
 
-        # Ensure node coordinate is a simple integer range for both
-        if "node" in ds.dims:
-            ds.coords["node"] = (("node",), np.arange(ds.sizes["node"]))
-
         # 4. Standard Path (Consistently try 2D expansion by default)
         # The user requested 2D UGRID as default.
         if expand2d:
@@ -224,6 +220,12 @@ class PointReader(BaseReader):
 
         # Add UGRID metadata
         if "node" in ds.dims:
+            # Ensure node coordinate is a simple integer range for both
+            # but preserve siteid if it was used as the node index (2D case)
+            if "siteid" not in ds.coords and not np.issubdtype(ds.node.dtype, np.number):
+                ds = ds.assign_coords(siteid=(("node",), ds.node.values))
+            ds.coords["node"] = (("node",), np.arange(ds.sizes["node"]))
+
             ds["mesh"] = xr.DataArray(
                 data=np.int32(0),
                 attrs={

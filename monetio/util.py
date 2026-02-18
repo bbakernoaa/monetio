@@ -601,6 +601,11 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
             # To handle multiple data vars consistently, we set MultiIndex and unstack
             # We use drop=True to avoid keeping the old 'node' coordinate which is now a MultiIndex
             ds_idx = ds.set_index(node=["time", "siteid", "variable"])
+
+            # Ensure entries are unique before unstacking
+            if "node" in ds_idx.coords:
+                ds_idx = ds_idx.drop_duplicates("node")
+
             ds_unstacked = ds_idx.unstack("node")
 
             # 2. Extract 'obs' and pivot it by 'variable'
@@ -641,7 +646,13 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
 
         else:
             # Simple expansion path
-            ds2d = ds.set_index(node=["time", "siteid"]).unstack("node")
+            ds_idx = ds.set_index(node=["time", "siteid"])
+
+            # Ensure entries are unique before unstacking
+            if "node" in ds_idx.coords:
+                ds_idx = ds_idx.drop_duplicates("node")
+
+            ds2d = ds_idx.unstack("node")
 
         # In MONET 2D convention, 'siteid' becomes the second dimension,
         # but we rename it to 'node' for UGRID compliance.
