@@ -556,7 +556,7 @@ def force_object_strings(df):
         return df
 
 
-def ds_to_2d(ds, pivot=True):
+def ds_to_2d(ds, pivot=True, fixed_location=False):
     """
     Lazily transform a 1D UGRID dataset into a 2D (time, node) dataset.
     If 'variable' is present in coordinates and pivot=True, it also pivots the data variables.
@@ -567,6 +567,8 @@ def ds_to_2d(ds, pivot=True):
         Input 1D dataset with 'time' and 'siteid' coordinates.
     pivot : bool, optional
         Whether to pivot by 'variable' column if present, by default True.
+    fixed_location : bool, optional
+        Whether to enforce fixed latitude/longitude/elevation per node, by default False.
 
     Returns
     -------
@@ -645,6 +647,18 @@ def ds_to_2d(ds, pivot=True):
         # but we rename it to 'node' for UGRID compliance.
         if "siteid" in ds2d.dims:
             ds2d = ds2d.rename({"siteid": "node"})
+
+        if fixed_location:
+            # Enforce fixed locations by averaging over time (ignoring NaNs)
+            # This fixes issues where missing time steps result in NaN lat/lon
+            for coord in ["latitude", "longitude", "elevation"]:
+                if coord in ds2d.coords:
+                    if "time" in ds2d[coord].dims and "node" in ds2d[coord].dims:
+                        try:
+                            # Use mean to reduce time dimension, ignoring NaNs
+                            ds2d.coords[coord] = ds2d[coord].mean(dim="time", skipna=True)
+                        except Exception:
+                            pass
 
         if "history" in ds2d.attrs:
             ds2d.attrs["history"] = f"{ds2d.attrs['history']}\n{history}"

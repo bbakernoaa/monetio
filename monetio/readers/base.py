@@ -79,6 +79,8 @@ class PointReader(BaseReader):
     Base class for point/tabular data (Observations) that utilizes PandasDriver.
     """
 
+    fixed_location = True
+
     def __init__(self):
         self.driver = PandasDriver()
 
@@ -218,7 +220,7 @@ class PointReader(BaseReader):
         if expand2d:
             # We pass kwargs to allow control over pivoting (wide_fmt or pivot)
             pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
-            ds = ds_to_2d(ds, pivot=pivot)
+            ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
 
         # Add UGRID metadata
         if "node" in ds.dims:

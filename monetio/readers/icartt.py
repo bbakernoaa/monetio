@@ -122,6 +122,8 @@ def read_icartt(filename: str, **kwargs) -> pd.DataFrame:
 class ICARTTReader(PointReader):
     """ICARTT Data Reader."""
 
+    fixed_location = False
+
     def open_dataset(
         self,
         files: str | list[str],
