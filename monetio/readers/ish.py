@@ -450,7 +450,7 @@ class ISHReader(PointReader):
                 from ..util import ds_to_2d
 
                 pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
-                ds = ds_to_2d(ds, pivot=pivot)
+                ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
 
                 # Identify metadata variables to preserve
                 metadata = xr.Dataset()
@@ -483,7 +483,7 @@ class ISHReader(PointReader):
                     from ..util import ds_to_2d
 
                     pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
-                    ds = ds_to_2d(ds, pivot=pivot)
+                    ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
                     if (
                         "siteid" not in ds.coords
                         and "siteid" not in ds.data_vars
