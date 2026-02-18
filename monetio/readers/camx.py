@@ -1,199 +1,381 @@
 """CAMx Reader"""
 
-import xarray as xr
-from numpy import array, concatenate
-from pandas import Series, to_datetime
+import datetime
+from functools import partial
+from typing import List, Union
 
-from monetio.grids import get_latlon_ioapi, grid_from_dataset
+import numpy as np
+import pandas as pd
+import xarray as xr
+from pandas import Series
+
+from monetio.grids import grid_from_dataset
 
 from .base import GriddedReader, register_reader
+from .camx_specs import COARSE, DIAGNOSTICS, FINE, NOY_GAS, POC, DiagnosticSpec
 
 
 @register_reader("camx")
 class CAMxReader(GriddedReader):
+    """
+    Reader for CAMx model output files.
+    """
+
     def open_dataset(
         self,
-        files,
-        earth_radius=6370000,
-        convert_to_ppb=True,
-        drop_duplicates=False,
+        files: Union[str, List[str]],
+        earth_radius: float = 6370000,
+        convert_to_ppb: bool = True,
+        drop_duplicates: bool = False,
         **kwargs,
-    ):
+    ) -> xr.Dataset:
         """
-        Reads CAMx files using pseudonetcdf.
-        """
+        Reads CAMx netCDF files.
 
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path, list of paths, or glob pattern.
+        earth_radius : float, optional
+            Earth radius in meters, by default 6370000.
+        convert_to_ppb : bool, optional
+            Convert gas species from ppmV to ppbV, by default True.
+        drop_duplicates : bool, optional
+            Drop duplicate time steps within each file, by default False.
+        **kwargs : dict
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        xr.Dataset
+            The processed CAMx dataset.
+        """
         # Set default backend kwargs for CAMx if not present
         if "engine" not in kwargs:
             kwargs["engine"] = "pseudonetcdf"
-        if "backend_kwargs" not in kwargs:
-            kwargs["backend_kwargs"] = {"format": "uamiv"}
+            if "backend_kwargs" not in kwargs:
+                kwargs["backend_kwargs"] = {"format": "uamiv"}
 
-        # Pass preprocess to driver
-        kwargs["preprocess"] = camx_preprocess
+        # 1. Setup preprocessing
+        if "preprocess" not in kwargs:
+            kwargs["preprocess"] = partial(
+                camx_preprocess,
+                earth_radius=earth_radius,
+                convert_to_ppb=convert_to_ppb,
+                drop_duplicates=drop_duplicates,
+            )
+
+        # 2. Open the dataset using standard xarray (via XarrayDriver)
+        if "combine" not in kwargs:
+            kwargs["combine"] = "nested"
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "time"
 
         ds = self.driver.open(files, **kwargs)
 
-        # Post-processing
+        # 3. Finalize
+        if drop_duplicates:
+            ds = ds.drop_duplicates("time")
 
-        # get the grid information
-        grid = grid_from_dataset(ds, earth_radius=earth_radius)
+        ds = self.harmonize(ds)
 
-        # assign attributes for dataset and all DataArrays
-        ds = ds.assign_attrs({"proj4_srs": grid})
-        for i in ds.variables:
-            ds[i] = ds[i].assign_attrs({"proj4_srs": grid})
-            for j in ds[i].attrs:
-                if isinstance(ds[i].attrs[j], str):
-                    ds[i].attrs[j] = ds[i].attrs[j].strip()
-            # Original code added 'area' attribute to variables, but setting coords is better
-            # ds[i] = ds[i].assign_attrs({"area": area_def})
-
-        # ds = ds.assign_attrs(area=area_def) # This might not be serializable to netcdf easily, but internal use is fine.
-
-        # get the times
-        ds = _get_times(ds)
-
-        # get the lat lon
-        ds = _get_latlon(ds, grid)
-
-        # get Predefined mapping tables for observations
-        ds = _predefined_mapping_tables(ds)
-
-        # rename dimensions
-        ds = ds.rename({"COL": "x", "ROW": "y", "LAY": "z"})
+        # Update history
+        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CAMx data."
+        if "history" in ds.attrs:
+            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+        else:
+            ds.attrs["history"] = history
 
         return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/models/camx.py
-# -----------------------------------------------------------------------------
+def camx_preprocess(
+    ds: xr.Dataset,
+    *,
+    earth_radius: float = 6370000,
+    convert_to_ppb: bool = True,
+    drop_duplicates: bool = False,
+) -> xr.Dataset:
+    """
+    Preprocess function for a single CAMx file.
 
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input CAMx dataset.
+    earth_radius : float, optional
+        Earth radius in meters, by default 6370000.
+    convert_to_ppb : bool, optional
+        Convert gas species to ppbV, by default True.
+    drop_duplicates : bool, optional
+        Drop duplicate time steps, by default False.
 
-def camx_preprocess(dset):
-    dset = add_lazy_pm25(dset)
-    dset = add_lazy_pm10(dset)
-    dset = add_lazy_pm_coarse(dset)
-    dset = add_lazy_noy(dset)
-    dset = add_lazy_nox(dset)
-    return dset
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset.
+    """
+    # 1. Add lazy diagnostic variables
+    for name, spec in DIAGNOSTICS.items():
+        ds = add_lazy_diagnostic(ds, name, spec)
 
+    # 2. Grid and Coordinates
+    grid = grid_from_dataset(ds, earth_radius=earth_radius)
+    if grid:
+        ds = ds.assign_attrs({"proj4_srs": grid})
+        ds = _get_latlon(ds, grid)
 
-def _get_times(d):
-    # Check dimensions exist before accessing
-    if "TFLAG" not in d.variables:
-        return d
+        # Also assign proj4_srs to all data variables for compatibility
+        for var in ds.data_vars:
+            ds[var].attrs["proj4_srs"] = grid
 
-    idims = len(d.TFLAG.dims)
-    if idims == 2:
-        tflag1 = Series(d["TFLAG"][:, 0]).astype(str).str.zfill(7)
-        tflag2 = Series(d["TFLAG"][:, 1]).astype(str).str.zfill(6)
+    # 3. Time
+    if "TFLAG" in ds.variables:
+        ds = _get_times(ds, drop_duplicates=drop_duplicates)
+
+    # 4. Units and Formatting
+    if convert_to_ppb:
+        ds = _convert_to_ppb(ds)
+    ds = _format_units(ds)
+
+    # 5. Rename dimensions
+    rename_dict = {}
+    if "COL" in ds.dims:
+        rename_dict["COL"] = "x"
+    if "ROW" in ds.dims:
+        rename_dict["ROW"] = "y"
+    if "LAY" in ds.dims:
+        rename_dict["LAY"] = "z"
+    if rename_dict:
+        ds = ds.rename(rename_dict)
+
+    # 6. Predefined mapping tables (backward compatibility)
+    ds = _predefined_mapping_tables(ds)
+
+    # 7. Scientific Hygiene: Strip whitespace from all string attributes
+    for var in ds.variables:
+        for attr, val in ds[var].attrs.items():
+            if isinstance(val, str):
+                ds[var].attrs[attr] = val.strip()
+
+    # Update history
+    history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Preprocessed CAMx data."
+    if "history" in ds.attrs:
+        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
     else:
-        tflag1 = Series(d["TFLAG"][:, 0, 0]).astype(str).str.zfill(7)
-        tflag2 = Series(d["TFLAG"][:, 0, 1]).astype(str).str.zfill(6)
-    date = to_datetime([i + j for i, j in zip(tflag1, tflag2)], format="%Y%j%H%M%S")
-    indexdates = Series(date).drop_duplicates(keep="last").index.values
-    d = d.isel(TSTEP=indexdates)
-    d["TSTEP"] = date[indexdates]
-    return d.rename({"TSTEP": "time"})
+        ds.attrs["history"] = history
+
+    return ds
 
 
-def _get_latlon(dset, proj4_srs):
-    lon, lat = get_latlon_ioapi(dset, proj4_srs)
+def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.Dataset:
+    """
+    Adds a lazy diagnostic variable to the dataset if constituent variables exist.
 
-    dset["longitude"] = xr.DataArray(lon, dims=["ROW", "COL"])
-    dset["latitude"] = xr.DataArray(lat, dims=["ROW", "COL"])
-    dset = dset.assign_coords(longitude=dset.longitude, latitude=dset.latitude)
-    return dset
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    name : str
+        Name of the diagnostic variable.
+    spec : DiagnosticSpec
+        Specification for the diagnostic (from camx_specs).
 
+    Returns
+    -------
+    xr.Dataset
+        Dataset with diagnostic added if possible.
+    """
+    # Special cases for CAMx pre-existing totals
+    if name == "PM25" and "PM25_TOT" in ds.data_vars:
+        ds["PM25"] = ds["PM25_TOT"]
+        return ds
+    if name == "PM10" and "PM_TOT" in ds.data_vars:
+        ds["PM10"] = ds["PM_TOT"]
+        return ds
 
-def add_lazy_pm25(d):
-    keys = Series([i for i in d.variables])
-    allvars = Series(fine)
-    if "PM25_TOT" in keys.values:
-        d["PM25"] = d["PM25_TOT"]  # Removed .chunk() as standard open handles chunks
+    available_vars = [v for v in spec.variables if v in ds.data_vars]
+    if not available_vars:
+        return ds
+
+    # If weights are provided, they must match the full variable list in spec
+    if spec.weights is not None:
+        weights_map = dict(zip(spec.variables, spec.weights))
+        weights = [weights_map[v] for v in available_vars]
     else:
-        index = allvars.isin(keys)
-        newkeys = allvars.loc[index]
-        d["PM25"] = add_multiple_lazy(d, newkeys)
-        d["PM25"] = d["PM25"].assign_attrs({"name": "PM2.5", "long_name": "PM2.5"})
-    return d
+        weights = [1.0] * len(available_vars)
+
+    # Compute lazy sum
+    new_var = ds[available_vars[0]] * weights[0]
+    for i in range(1, len(available_vars)):
+        new_var = new_var + ds[available_vars[i]] * weights[i]
+
+    ds[name] = new_var.assign_attrs(
+        {"units": spec.units, "name": spec.name, "long_name": spec.long_name}
+    )
+    return ds
 
 
-def can_do(index):
-    if index.max():
-        return True
-    else:
-        return False
+def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
+    """
+    Extracts and assigns time coordinate from TFLAG lazily.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    drop_duplicates : bool, optional
+        Whether to drop duplicate time steps, by default False.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 'time' coordinate.
+    """
+    tflag = ds.TFLAG
+    # CAMx TFLAG can be (TSTEP, DATE_TIME) or (TSTEP, VAR, DATE_TIME)
+    if tflag.ndim == 3:
+        tflag = tflag.isel(VAR=0, drop=True)
+
+    # Handle dimension names (COL is used for DATE_TIME in pseudonetcdf format)
+    # Actually it is usually TSTEP and something else.
+    # In _get_times from legacy: d["TFLAG"][:, 0]
+    # So the last dimension is the DATE_TIME one.
+    dt_dim = tflag.dims[-1]
+
+    def _parse_camx_times(yyyymmdd, hhmmss):
+        s1 = str(yyyymmdd).zfill(7)
+        s2 = str(hhmmss).zfill(6)
+        return pd.to_datetime(s1 + s2, format="%Y%j%H%M%S").to_datetime64()
+
+    dates = xr.apply_ufunc(
+        _parse_camx_times,
+        tflag.isel(**{dt_dim: 0}),
+        tflag.isel(**{dt_dim: 1}),
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[np.dtype("datetime64[ns]")],
+    )
+
+    if drop_duplicates:
+        dates_computed = dates.compute()
+        unique_indices = Series(dates_computed).drop_duplicates(keep="last").index.values
+        ds = ds.isel(TSTEP=unique_indices)
+        dates = dates.isel(TSTEP=unique_indices)
+
+    ds = ds.assign_coords(TSTEP=dates)
+    ds = ds.rename({"TSTEP": "time"})
+    return ds
 
 
-def add_lazy_pm10(d):
-    keys = Series([i for i in d.variables])
-    allvars = Series(concatenate([fine, coarse]))
-    if "PM_TOT" in keys.values:
-        d["PM10"] = d["PM_TOT"]
-    else:
-        index = allvars.isin(keys)
-        if can_do(index):
-            newkeys = allvars.loc[index]
-            d["PM10"] = add_multiple_lazy(d, newkeys)
-            d["PM10"] = d["PM10"].assign_attrs(
-                {"name": "PM10", "long_name": "Particulate Matter < 10 microns"}
-            )
-    return d
+def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
+    """
+    Assigns latitude and longitude coordinates lazily.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    proj4_srs : str
+        The PROJ4 projection string.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 'latitude' and 'longitude' coordinates.
+    """
+    from pyproj import Proj
+
+    # 1. Generate 1D x and y values
+    x = np.linspace(
+        ds.XORIG + ds.XCELL * 0.5,
+        ds.XORIG + (ds.NCOLS - 0.5) * ds.XCELL,
+        ds.NCOLS,
+    )
+    y = np.linspace(
+        ds.YORIG + ds.YCELL * 0.5,
+        ds.YORIG + (ds.NROWS - 0.5) * ds.YCELL,
+        ds.NROWS,
+    )
+
+    # 2. Broadcast to 2D
+    yv, xv = xr.broadcast(xr.DataArray(y, dims="ROW"), xr.DataArray(x, dims="COL"))
+
+    # 3. Apply projection lazily
+    def _proj_inv(x_val, y_val, p_srs):
+        p = Proj(p_srs)
+        return p(x_val, y_val, inverse=True)
+
+    lon, lat = xr.apply_ufunc(
+        _proj_inv,
+        xv,
+        yv,
+        proj4_srs,
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float, float],
+        output_core_dims=[(), ()],
+    )
+
+    ds = ds.assign_coords(
+        longitude=lon.assign_attrs(
+            {"long_name": "Longitude", "units": "degree_east", "standard_name": "longitude"}
+        ),
+        latitude=lat.assign_attrs(
+            {"long_name": "Latitude", "units": "degree_north", "standard_name": "latitude"}
+        ),
+    )
+    return ds
 
 
-def add_lazy_pm_coarse(d):
-    keys = Series([i for i in d.variables])
-    allvars = Series(coarse)
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        d["PM_COARSE"] = add_multiple_lazy(d, newkeys)
-        d["PM_COARSE"] = d["PM_COARSE"].assign_attrs(
-            {"name": "PM_COARSE", "long_name": "Coarse Mode Particulate Matter"}
-        )
-    return d
+def _convert_to_ppb(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Converts gas species units from ppmV to ppbV.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with converted units.
+    """
+    for i in ds.data_vars:
+        if "units" in ds[i].attrs:
+            if "ppm" in ds[i].attrs["units"].lower():
+                ds[i] = ds[i] * 1000.0
+                ds[i].attrs["units"] = "ppbV"
+    return ds
 
 
-def add_lazy_noy(d):
-    keys = Series([i for i in d.variables])
-    allvars = Series(noy_gas)
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        d["NOy"] = add_multiple_lazy(d, newkeys)
-        d["NOy"] = d["NOy"].assign_attrs({"name": "NOy", "long_name": "NOy"})
-    return d
+def _format_units(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Formats unit strings for particulate matter.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with formatted unit strings.
+    """
+    for i in ds.data_vars:
+        if "units" in ds[i].attrs:
+            if "micrograms" in ds[i].attrs["units"].lower() or "ug" in ds[i].attrs["units"].lower():
+                ds[i].attrs["units"] = r"$\mu g m^{-3}$"
+    return ds
 
 
-def add_lazy_nox(d):
-    keys = Series([i for i in d.variables])
-    allvars = Series(["NO", "NOX"])
-    index = allvars.isin(keys)
-    if can_do(index):
-        newkeys = allvars.loc[index]
-        d["NOx"] = add_multiple_lazy(d, newkeys)
-        d["NOx"] = d["NOx"].assign_attrs({"name": "NOx", "long_name": "NOx"})
-    return d
-
-
-def add_multiple_lazy(dset, variables, weights=None):
-    from numpy import ones
-
-    if weights is None:
-        weights = ones(len(variables))
-    variables = variables.values
-    new = dset[variables[0]].copy() * weights[0]
-    for i, j in zip(variables[1:], weights[1:]):
-        new = new + dset[i] * j
-    return new
-
-
-def _predefined_mapping_tables(dset):
-    to_improve = {}
-    to_nadp = {}
+def _predefined_mapping_tables(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Adds mapping tables for backward compatibility.
+    """
+    # Ported from legacy code
     to_aqs = {
         "OZONE": ["O3"],
         "PM2.5": ["PM25"],
@@ -215,7 +397,7 @@ def _predefined_mapping_tables(dset):
             "CRPX",
             "OPAN",
         ],
-        "NOX": ["NO", "NO2"],
+        "NOX": ["NO", "NOX"],
         "SO2": ["SO2"],
         "NO": ["NO"],
         "NO2": ["NO2"],
@@ -235,99 +417,55 @@ def _predefined_mapping_tables(dset):
         "NAf": ["NA"],
         "NH4f": ["PNH4"],
     }
-    to_airnow = {
-        "OZONE": ["O3"],
-        "PM2.5": ["PM25"],
-        "CO": ["CO"],
-        "NOY": [
-            "NO",
-            "NO2",
-            "NO3",
-            "N2O5",
-            "HONO",
-            "HNO3",
-            "PAN",
-            "PANX",
-            "PNA",
-            "NTR",
-            "CRON",
-            "CRN2",
-            "CRNO",
-            "CRPX",
-            "OPAN",
-        ],
-        "NOX": ["NO", "NO2"],
-        "SO2": ["SO2"],
-        "NO": ["NO"],
-        "NO2": ["NO2"],
-        "SO4f": ["PSO4"],
-        "PM10": ["PM10"],
-        "NO3f": ["PNO3"],
-        "ECf": ["PEC"],
-        "OCf": ["OC"],
-        "ETHANE": ["ETHA"],
-        "BENZENE": ["BENZENE"],
-        "TOLUENE": ["TOL"],
-        "ISOPRENE": ["ISOP"],
-        "O-XYLENE": ["XYL"],
-        "WS": ["WSPD10"],
-        "TEMP": ["TEMP2"],
-        "WD": ["WDIR10"],
-        "NAf": ["NA"],
-        "NH4f": ["PNH4"],
-    }
-    to_crn = {}
-    to_aeronet = {}
-    to_cems = {}
+    # Duplicate for AirNow
+    to_airnow = to_aqs.copy()
+
     mapping_tables = {
-        "improve": to_improve,
+        "improve": {},
         "aqs": to_aqs,
         "airnow": to_airnow,
-        "crn": to_crn,
-        "cems": to_cems,
-        "nadp": to_nadp,
-        "aeronet": to_aeronet,
+        "crn": {},
+        "cems": {},
+        "nadp": {},
+        "aeronet": {},
     }
-    dset = dset.assign_attrs({"mapping_tables": mapping_tables})
-    return dset
+    ds = ds.assign_attrs({"mapping_tables": mapping_tables})
+    return ds
 
 
-# Arrays
-coarse = array(["CPRM", "CCRS"])
-fine = array(
-    [
-        "NA",
-        "PSO4",
-        "PNO3",
-        "PNH4",
-        "PH2O",
-        "PCL",
-        "PEC",
-        "FPRM",
-        "FCRS",
-        "SOA1",
-        "SOA2",
-        "SOA3",
-        "SOA4",
-    ]
-)
-noy_gas = array(
-    [
-        "NO",
-        "NO2",
-        "NO3",
-        "N2O5",
-        "HONO",
-        "HNO3",
-        "PAN",
-        "PANX",
-        "PNA",
-        "NTR",
-        "CRON",
-        "CRN2",
-        "CRNO",
-        "CRPX",
-        "OPAN",
-    ]
-)
-poc = array(["SOA1", "SOA2", "SOA3", "SOA4"])
+# Legacy aliases for backward compatibility
+fine = FINE
+coarse = COARSE
+noy_gas = NOY_GAS
+poc = POC
+
+
+def add_lazy_pm25(ds):
+    return add_lazy_diagnostic(ds, "PM25", DIAGNOSTICS["PM25"])
+
+
+def add_lazy_pm10(ds):
+    return add_lazy_diagnostic(ds, "PM10", DIAGNOSTICS["PM10"])
+
+
+def add_lazy_pm_coarse(ds):
+    return add_lazy_diagnostic(ds, "PM_COARSE", DIAGNOSTICS["PM_COARSE"])
+
+
+def add_lazy_noy(ds):
+    return add_lazy_diagnostic(ds, "NOy", DIAGNOSTICS["NOy"])
+
+
+def add_lazy_nox(ds):
+    return add_lazy_diagnostic(ds, "NOx", DIAGNOSTICS["NOx"])
+
+
+def add_multiple_lazy(dset, variables, weights=None):
+    from numpy import ones
+
+    if weights is None:
+        weights = ones(len(variables))
+    new = dset[variables[0]] * weights[0]
+    for i in range(1, len(variables)):
+        new = new + dset[variables[i]] * weights[i]
+    return new
