@@ -203,19 +203,19 @@ def _clean_col(
 
 def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
     """
-    Read a single ISH (Integrated Surface Hourly) file.
+        Read a single ISH (Integrated Surface Hourly) file.
 
-    Parameters
-    ----------
-    fname : str
-        File path or URL.
-    **kwargs : dict
-        Additional arguments.
+        Parameters
+        ----------
+        fname : str
+            File path or URL.
+        **kwargs : dict
+            Additional arguments.
 
-    Returns
--------
-    pd.DataFrame
-        The loaded data.
+        Returns
+    -------
+        pd.DataFrame
+            The loaded data.
     """
     import fsspec
 
@@ -316,45 +316,45 @@ class ISHReader(PointReader):
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Retrieve and load ISH (Integrated Surface Hourly) data following the Aero Protocol.
+                Retrieve and load ISH (Integrated Surface Hourly) data following the Aero Protocol.
 
-        Parameters
-        ----------
-        files : Union[str, List[str]], optional
-            File path, list of paths, or glob pattern.
-        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
-            Dates to retrieve if files are not provided.
-        box : List[float], optional
-            Bounding box [latmin, lonmin, latmax, lonmax].
-        country : str, optional
-            Country code to filter sites.
-        state : str, optional
-            State code to filter sites.
-        site : str, optional
-            Specific station ID to filter.
-        resample : bool, optional
-            Whether to resample data to a regular window, by default True.
-        window : str, optional
-            Resampling window (e.g., 'h'), by default 'h'.
-        download : bool, optional
-            Whether to download files (if source is ncdc), by default False.
-        n_procs : int, optional
-            Number of processors for dask compute (if not lazy), by default 1.
-        verbose : bool, optional
-            Whether to print verbose output, by default False.
-        source : str, optional
-            Data source: 'ncdc' or 'aws', by default 'ncdc'.
-        as_xarray : bool, optional
-            Whether to return an xarray.Dataset, by default True.
-        lazy : bool, optional
-            Whether to return a dask-backed object, by default False.
-        **kwargs : dict
-            Additional arguments.
+                Parameters
+                ----------
+                files : Union[str, List[str]], optional
+                    File path, list of paths, or glob pattern.
+                dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+                    Dates to retrieve if files are not provided.
+                box : List[float], optional
+                    Bounding box [latmin, lonmin, latmax, lonmax].
+                country : str, optional
+                    Country code to filter sites.
+                state : str, optional
+                    State code to filter sites.
+                site : str, optional
+                    Specific station ID to filter.
+                resample : bool, optional
+                    Whether to resample data to a regular window, by default True.
+                window : str, optional
+                    Resampling window (e.g., 'h'), by default 'h'.
+                download : bool, optional
+                    Whether to download files (if source is ncdc), by default False.
+                n_procs : int, optional
+                    Number of processors for dask compute (if not lazy), by default 1.
+                verbose : bool, optional
+                    Whether to print verbose output, by default False.
+                source : str, optional
+                    Data source: 'ncdc' or 'aws', by default 'ncdc'.
+                as_xarray : bool, optional
+                    Whether to return an xarray.Dataset, by default True.
+                lazy : bool, optional
+                    Whether to return a dask-backed object, by default False.
+                **kwargs : dict
+                    Additional arguments.
 
-        Returns
--------
-        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
-            The loaded ISH data.
+                Returns
+        -------
+                Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+                    The loaded ISH data.
         """
         # Regression fix: check multiple subsets
         if sum([box is not None, country is not None, state is not None, site is not None]) > 1:
