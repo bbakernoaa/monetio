@@ -1,7 +1,8 @@
 """ISH Reader"""
 
+import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -13,110 +14,13 @@ if TYPE_CHECKING:
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 
-
-@register_reader("ish")
-class ISHReader(PointReader):
-    def open_dataset(
-        self,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
-        box: List[float] = None,
-        country: str = None,
-        state: str = None,
-        site: str = None,
-        resample: bool = True,
-        window: str = "h",
-        download: bool = False,
-        n_procs: int = 1,
-        request_timeout: int = 10,
-        request_retries: int = 4,
-        verbose: bool = False,
-        source: str = "ncdc",
-        as_xarray: bool = True,
-        lazy: bool = False,
-        **kwargs,
-    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
-        """
-        Retrieve and load ISH (Integrated Surface Hourly) data.
-
-        Parameters
-        ----------
-        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
-            Dates to retrieve.
-        box : List[float], optional
-            Bounding box [latmin, lonmin, latmax, lonmax].
-        country : str, optional
-            Country code to filter sites.
-        state : str, optional
-            State code to filter sites.
-        site : str, optional
-            Specific station ID to filter.
-        resample : bool, optional
-            Whether to resample data to a regular window, by default True.
-        window : str, optional
-            Resampling window (e.g., 'h'), by default 'h'.
-        download : bool, optional
-            Whether to download files (if source is ncdc), by default False.
-        n_procs : int, optional
-            Number of processors for dask compute, by default 1.
-        request_timeout : int, optional
-            Timeout for HTTP requests in seconds, by default 10.
-        request_retries : int, optional
-            Number of retries for HTTP requests, by default 4.
-        verbose : bool, optional
-            Whether to print verbose output, by default False.
-        source : str, optional
-            Data source: 'ncdc' or 'aws', by default 'ncdc'.
-        as_xarray : bool, optional
-            Whether to return an xarray.Dataset, by default True.
-        lazy : bool, optional
-            Whether to return a dask-backed object, by default False.
-        **kwargs : dict
-            Additional arguments.
-
-        Returns
-        -------
-        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
-            The loaded ISH data.
-        """
-        ish = ISH()
-        df = ish.add_data(
-            dates,
-            box=box,
-            country=country,
-            state=state,
-            site=site,
-            resample=resample,
-            window=window,
-            download=download,
-            n_procs=n_procs,
-            request_timeout=request_timeout,
-            request_retries=request_retries,
-            verbose=verbose,
-            source=source,
-            lazy=lazy,
-        )
-
-        df = self.harmonize(df)
-        if as_xarray:
-            ds = self.to_xarray(df)
-            # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ISH data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
-            return ds
-
-        return df
-
-
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/obs/ish.py
-# -----------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
 
 
 class ISH:
-    _VAR_INFO = [
+    """Helper class for ISH data retrieval."""
+
+    VAR_INFO = [
         ("varlength", "i2", 4),
         ("station_id", "S11", 11),
         ("date", "i4", 8),
@@ -148,125 +52,26 @@ class ISH:
         ("p", "i4", 5),
         ("p_quality", "S1", 1),
     ]
-    DTYPES = [(name, dtype) for name, dtype, _ in _VAR_INFO]
-    WIDTHS = [width for _, _, width in _VAR_INFO]
+
+    DTYPES = [(name, dtype) for name, dtype, _ in VAR_INFO]
+    WIDTHS = [width for _, _, width in VAR_INFO]
 
     def __init__(self):
         self.history_file = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
         self.history = None
-        self.df = None
         self.dates = None
         self.verbose = False
         self.source = "ncdc"
 
-    @staticmethod
-    def _clean_column(series, missing=9999, multiplier=1):
-        series = series.apply(float)
-        series[series == missing] = np.nan
-        return series // multiplier
+    def read_ish_history(self, dates: Optional[pd.DatetimeIndex] = None):
+        """
+        Read the ISH history file.
 
-    @staticmethod
-    def _clean_column_by_name(frame, name, *args, **kwargs):
-        frame[name] = ISH._clean_column(frame[name], *args, **kwargs)
-        return frame
-
-    @staticmethod
-    def _clean(frame):
-        if frame.empty:
-            for name, _, _ in ISH._VAR_INFO:
-                if name not in frame.columns:
-                    frame[name] = pd.Series(dtype=object)
-            frame["time"] = pd.Series(dtype="datetime64[ns]")
-            return frame
-
-        frame["time"] = [
-            pd.Timestamp(f"{date:08}{htime:04}")
-            for date, htime in zip(frame["date"], frame["htime"])
-        ]
-        frame.drop(["date", "htime"], axis=1, inplace=True)
-        frame.set_index("time", drop=True, inplace=True)
-        frame = ISH._clean_column_by_name(frame, "wdir", missing=999)
-        frame = ISH._clean_column_by_name(frame, "ws", multiplier=10)
-        frame = ISH._clean_column_by_name(frame, "ceiling", missing=99999)
-        frame = ISH._clean_column_by_name(frame, "vsb", missing=999999)
-        frame = ISH._clean_column_by_name(frame, "vsb", missing=99999)
-        frame = ISH._clean_column_by_name(frame, "t", multiplier=10, missing=9999)
-        frame = ISH._clean_column_by_name(frame, "dpt", multiplier=10, missing=9999)
-        frame = ISH._clean_column_by_name(frame, "p", multiplier=10, missing=99999)
-        return frame
-
-    @staticmethod
-    def _decode_bytes(df):
-        if df.empty:
-            return df
-        bytes_cols = []
-        for col in df.columns:
-            if df[col].dtype == object:
-                non_null = df[col].dropna()
-                if not non_null.empty and isinstance(non_null.iloc[0], (bytes, np.bytes_)):
-                    bytes_cols.append(col)
-
-        if bytes_cols:
-            with pd.option_context("mode.chained_assignment", None):
-                for col in bytes_cols:
-                    df[col] = df[col].str.decode("utf-8")
-        return df
-
-    def read_data_frame(self, url_or_file, *, request_timeout=10, request_retries=4):
-        if not request_retries >= 0:
-            raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
-
-        if isinstance(url_or_file, str) and url_or_file.startswith("http"):
-            url_or_file = url_or_file.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
-            url_or_file = url_or_file.replace("/pub/pub/", "/pub/")
-
-            import gzip
-            import io
-
-            import requests
-
-            tries = 0
-            while tries - 1 < request_retries:
-                try:
-                    r = requests.get(url_or_file, timeout=request_timeout, stream=True)
-                    r.raise_for_status()
-                except requests.exceptions.RequestException as e:
-                    tries += 1
-                    if tries - 1 == request_retries:
-                        raise RuntimeError(
-                            f"Failed to connect to server for URL {url_or_file}. "
-                            f"timeout={request_timeout}, retries={request_retries}."
-                        ) from e
-                else:
-                    break
-
-            with gzip.open(io.BytesIO(r.content), "rb") as f:
-                frame_as_array = np.genfromtxt(f, delimiter=self.WIDTHS, dtype=self.DTYPES)
-        else:
-            fs = FileUtility.get_fs(url_or_file)
-            compression = "gzip" if url_or_file.endswith(".gz") else None
-            with fs.open(url_or_file, "rb", compression=compression) as f:
-                frame_as_array = np.genfromtxt(f, delimiter=self.WIDTHS, dtype=self.DTYPES)
-
-        frame = pd.DataFrame.from_records(np.atleast_1d(frame_as_array))
-        df = self._clean(frame)
-        df.drop(["latitude", "longitude"], axis=1, inplace=True, errors="ignore")
-
-        if self.dates is not None and not df.empty:
-            index = (df.index >= self.dates.min()) & (df.index <= self.dates.max())
-            df = df.loc[index, :]
-
-        df = ISH._decode_bytes(df)
-        df = df.reset_index()
-
-        # Ensure all non-numeric columns are object for dask consistency
-        for col in df.columns:
-            if not pd.api.types.is_numeric_dtype(df[col].dtype) and col != "time":
-                df[col] = df[col].astype(object)
-
-        return df
-
-    def read_ish_history(self, dates=None):
+        Parameters
+        ----------
+        dates : pd.DatetimeIndex, optional
+            Dates to filter the history, by default None.
+        """
         if dates is None:
             dates = self.dates
         fname = self.history_file
@@ -302,13 +107,36 @@ class ISH:
         self.history["station_id"] = self.history.usaf + self.history.wban
         self.history.rename(columns={"lat": "latitude", "lon": "longitude"}, inplace=True)
 
-    def subset_sites(self, latmin=32.65, lonmin=-113.3, latmax=34.5, lonmax=-110.4):
+    def subset_sites(
+        self,
+        latmin: float = 32.65,
+        lonmin: float = -113.3,
+        latmax: float = 34.5,
+        lonmax: float = -110.4,
+    ) -> pd.DataFrame:
+        """
+        Subset sites by bounding box.
+        """
         latindex = (self.history.latitude >= latmin) & (self.history.latitude <= latmax)
         lonindex = (self.history.longitude >= lonmin) & (self.history.longitude <= lonmax)
         dfloc = self.history.loc[latindex & lonindex, :]
         return dfloc
 
-    def build_urls(self, dates=None, sites=None):
+    def read_data_frame(self, url_or_file, **kwargs):
+        """
+        Legacy method for backward compatibility.
+        """
+        df = read_ish_file(url_or_file, **kwargs)
+        return df
+
+    def build_urls(
+        self,
+        dates: Optional[pd.DatetimeIndex] = None,
+        sites: Optional[pd.DataFrame] = None,
+    ) -> pd.DataFrame:
+        """
+        Construct ISH URLs.
+        """
         if dates is None:
             dates = self.dates
         if sites is None:
@@ -358,110 +186,345 @@ class ISH:
                 pass
         return objs
 
-    def add_data(
+
+def _clean_col(
+    series: pd.Series, missing_vals: Union[float, List[float]], multiplier: float = 1.0
+) -> pd.Series:
+    """
+    Clean a numeric column by replacing missing values with NaN and applying a multiplier.
+    """
+    if not isinstance(missing_vals, (list, tuple)):
+        missing_vals = [missing_vals]
+    series = series.astype(float)
+    for mv in missing_vals:
+        series = series.where(series != mv, np.nan)
+    return series / multiplier
+
+
+def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
+    """
+    Read a single ISH (Integrated Surface Hourly) file.
+
+    Parameters
+    ----------
+    fname : str
+        File path or URL.
+    **kwargs : dict
+        Additional arguments.
+
+    Returns
+    -------
+    pd.DataFrame
+        The loaded data.
+    """
+    import fsspec
+
+    # Regression fix: check valid retries
+    request_retries = kwargs.get("request_retries", 4)
+    if request_retries < 0:
+        raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
+
+    request_timeout = kwargs.get("request_timeout", 10)
+
+    compression = "gzip" if str(fname).endswith(".gz") else None
+
+    # Implement a simple retry loop for legacy compatibility in tests
+    frame_as_array = None
+    tries = 0
+    while tries <= request_retries:
+        try:
+            if str(fname).startswith("http") or str(fname).startswith("ftp"):
+                import io
+
+                import requests
+
+                r = requests.get(fname, timeout=request_timeout, stream=True)
+                r.raise_for_status()
+                content = r.content
+                if compression == "gzip":
+                    import gzip
+
+                    with gzip.open(io.BytesIO(content), "rb") as f:
+                        frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
+                else:
+                    frame_as_array = np.genfromtxt(
+                        io.BytesIO(content), delimiter=ISH.WIDTHS, dtype=ISH.DTYPES
+                    )
+            else:
+                with fsspec.open(fname, "rb", compression=compression) as f:
+                    frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
+            break
+        except Exception as e:
+            tries += 1
+            if tries > request_retries:
+                if "timeout" in str(e).lower() or "connect" in str(e).lower() or tries > 1:
+                    raise RuntimeError(f"Failed to connect to server for URL {fname}.") from e
+                logger.warning(f"Could not read {fname}: {e}")
+                return pd.DataFrame()
+
+    if frame_as_array is None:
+        return pd.DataFrame()
+
+    df = pd.DataFrame.from_records(np.atleast_1d(frame_as_array))
+
+    if df.empty:
+        return df
+
+    # Vectorized cleaning
+    # Time construction
+    dt_str = df["date"].astype(str).str.zfill(8) + df["htime"].astype(str).str.zfill(4)
+    df["time"] = pd.to_datetime(dt_str, format="%Y%m%d%H%M", errors="coerce")
+    df = df.dropna(subset=["time"])
+
+    # Decode bytes
+    for col, dtype in ISH.DTYPES:
+        if "S" in str(dtype) and col in df.columns:
+            df[col] = df[col].str.decode("utf-8").str.strip()
+
+    # Numeric cleaning
+    df["wdir"] = _clean_col(df["wdir"], 999)
+    df["ws"] = _clean_col(df["ws"], 9999, multiplier=10.0)
+    df["ceiling"] = _clean_col(df["ceiling"], 99999)
+    df["vsb"] = _clean_col(df["vsb"], [99999, 999999])
+    df["t"] = _clean_col(df["t"], 9999, multiplier=10.0)
+    df["dpt"] = _clean_col(df["dpt"], 9999, multiplier=10.0)
+    df["p"] = _clean_col(df["p"], 99999, multiplier=10.0)
+
+    df = df.drop(columns=["date", "htime", "latitude", "longitude"], errors="ignore")
+
+    return df
+
+
+@register_reader("ish")
+class ISHReader(PointReader):
+    def open_dataset(
         self,
-        dates,
-        box=None,
-        country=None,
-        state=None,
-        site=None,
-        resample=True,
-        window="h",
-        download=False,
-        n_procs=1,
-        request_timeout=10,
-        request_retries=4,
-        verbose=False,
-        source="ncdc",
-        lazy=False,
-    ):
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
+        box: Optional[List[float]] = None,
+        country: Optional[str] = None,
+        state: Optional[str] = None,
+        site: Optional[str] = None,
+        resample: bool = True,
+        window: str = "h",
+        download: bool = False,
+        n_procs: int = 1,
+        verbose: bool = False,
+        source: str = "ncdc",
+        as_xarray: bool = True,
+        lazy: bool = False,
+        **kwargs,
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
+        """
+        Retrieve and load ISH (Integrated Surface Hourly) data following the Aero Protocol.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File path, list of paths, or glob pattern.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve if files are not provided.
+        box : List[float], optional
+            Bounding box [latmin, lonmin, latmax, lonmax].
+        country : str, optional
+            Country code to filter sites.
+        state : str, optional
+            State code to filter sites.
+        site : str, optional
+            Specific station ID to filter.
+        resample : bool, optional
+            Whether to resample data to a regular window, by default True.
+        window : str, optional
+            Resampling window (e.g., 'h'), by default 'h'.
+        download : bool, optional
+            Whether to download files (if source is ncdc), by default False.
+        n_procs : int, optional
+            Number of processors for dask compute (if not lazy), by default 1.
+        verbose : bool, optional
+            Whether to print verbose output, by default False.
+        source : str, optional
+            Data source: 'ncdc' or 'aws', by default 'ncdc'.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded ISH data.
+        """
+        # Regression fix: check multiple subsets
         if sum([box is not None, country is not None, state is not None, site is not None]) > 1:
             raise ValueError("Only one of `box`, `country`, `state`, or `site` can be used")
-        if not request_retries >= 0:
-            raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
 
-        self.dates = pd.to_datetime(dates)
-        self.verbose = verbose
-        self.source = source
+        ish = ISH()
+        ish.source = source
 
-        if self.history is None:
-            self.read_ish_history()
-        dfloc = self.history.copy()
+        if files is None and dates is not None:
+            dates = pd.to_datetime(dates)
+            if ish.history is None:
+                ish.read_ish_history(dates=dates)
+            dfloc_urls = ish.history.copy()
 
-        if box is not None:
-            dfloc = self.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
-        elif country is not None:
-            dfloc = dfloc.loc[dfloc.ctry == country, :]
-        elif state is not None:
-            dfloc = dfloc.loc[dfloc.state == state, :]
-        elif site is not None:
-            dfloc = dfloc.loc[dfloc.station_id == site, :]
-
-        urls = self.build_urls(sites=dfloc)
-        if urls.empty:
-            raise ValueError("No data URLs found")
-
-        # Robust meta for dask
-        meta = None
-        for u in urls.name:
-            try:
-                sample_df = self.read_data_frame(
-                    u, request_timeout=request_timeout, request_retries=request_retries
+            if box is not None:
+                dfloc_urls = ish.subset_sites(
+                    latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3]
                 )
-                if not sample_df.empty:
-                    meta = sample_df.iloc[:0].copy()
-                    break
-            except Exception:
-                continue
+            elif country is not None:
+                dfloc_urls = dfloc_urls.loc[dfloc_urls.ctry == country, :]
+            elif state is not None:
+                dfloc_urls = dfloc_urls.loc[dfloc_urls.state == state, :]
+            elif site is not None:
+                dfloc_urls = dfloc_urls.loc[dfloc_urls.station_id == site, :]
 
-        if meta is None:
-            try:
-                sample_df = self.read_data_frame(
-                    urls.name.iloc[0],
-                    request_timeout=request_timeout,
-                    request_retries=request_retries,
-                )
-                meta = sample_df.iloc[:0].copy()
-            except Exception:
-                meta = None
+            urls = ish.build_urls(dates=dates, sites=dfloc_urls)
+            if urls.empty:
+                raise ValueError("No data URLs found")
+            files = urls.name.tolist()
 
-        import dask
-        import dask.dataframe as dd
-
-        def func(url_or_file):
-            return self.read_data_frame(
-                url_or_file, request_timeout=request_timeout, request_retries=request_retries
-            )
+        if files is None:
+            raise ValueError("Must provide either 'files' or 'dates'.")
 
         if download:
-            objs = self.get_url_file_objs(urls.name)
-            dfs = [dask.delayed(func)(f) for f in objs]
+            files = ish.get_url_file_objs(files)
+
+        # Use driver directly to avoid extra harmonize calls that might clash
+        df = self.driver.open(files, read_method=read_ish_file, lazy=lazy, **kwargs)
+
+        # Filtering by date if requested
+        if dates is not None:
+            dates = pd.to_datetime(dates)
+            df = df.loc[(df.time >= dates.min()) & (df.time <= dates.max())]
+
+        # Construct siteid
+        if "station_id" in df.columns:
+            df["siteid"] = df["station_id"]
+
+        # Merge with metadata
+        if ish.history is None:
+            ish.read_ish_history()
+        dfloc = ish.history.copy()
+
+        if lazy:
+            import dask.dataframe as dd
+
+            df = df.assign(siteid=df.siteid.astype(object))
+            dfloc_dask = dd.from_pandas(
+                dfloc.rename(columns={"station_id": "siteid"}), npartitions=1
+            ).assign(siteid=lambda x: x.siteid.astype(object))
+            df = df.merge(dfloc_dask, on="siteid", how="left")
         else:
-            dfs = [dask.delayed(func)(f) for f in urls.name]
+            df["siteid"] = df["siteid"].astype(object)
+            df = df.merge(dfloc.rename(columns={"station_id": "siteid"}), on="siteid", how="left")
 
-        self.df = dd.from_delayed(dfs, meta=meta)
+        df = df.rename(columns={"ctry": "country"})
 
-        if not lazy:
-            self.df = self.df.compute(num_workers=n_procs)
+        df = self.harmonize(df)
+
+        if not lazy and hasattr(df, "compute"):
+            df = df.compute(num_workers=n_procs)
+
+        if as_xarray:
+            # We first convert to 1D
+            ds = self.to_xarray(df, expand2d=False, **kwargs)
+
+            # Metadata variables to preserve
+            meta_coords = [
+                "country",
+                "state",
+                "station name",
+                "elev(m)",
+                "latitude",
+                "longitude",
+                "siteid",
+                "usaf",
+                "wban",
+            ]
+
+            if resample:
+                # Backend-agnostic resampling in xarray
+                # To preserve per-site data, we expand to 2D (time, node) before resampling
+                from ..util import ds_to_2d
+
+                pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
+                ds = ds_to_2d(ds, pivot=pivot)
+
+                # Identify metadata variables to preserve
+                metadata = xr.Dataset()
+                for c in meta_coords:
+                    if c in ds.coords or c in ds.data_vars:
+                        val = ds[c]
+                        if "time" in val.dims:
+                            val = val.isel(time=0, drop=True)
+                        metadata[c] = val
+
+                try:
+                    ds = ds.sortby("time").resample(time=window).mean(numeric_only=True)
+                except Exception:
+                    ds = ds.sortby("time").resample(time=window).mean()
+
+                # Restore metadata
+                for c in metadata.data_vars:
+                    ds[c] = metadata[c]
+                for c in metadata.coords:
+                    ds.coords[c] = metadata.coords[c]
+                if "siteid" not in ds.coords and "siteid" not in ds.data_vars and "node" in ds.dims:
+                    ds.coords["siteid"] = (("node",), ds.node.values)
+
+                ds = ds.set_coords([c for c in meta_coords if c in ds.data_vars])
+
+            else:
+                # Now expand to 2D if requested (default is True in PointReader)
+                expand2d = kwargs.get("expand2d", True)
+                if expand2d:
+                    from ..util import ds_to_2d
+
+                    pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
+                    ds = ds_to_2d(ds, pivot=pivot)
+                    if (
+                        "siteid" not in ds.coords
+                        and "siteid" not in ds.data_vars
+                        and "node" in ds.dims
+                    ):
+                        ds.coords["siteid"] = (("node",), ds.node.values)
+
+            # Update history
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ISH data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
 
         if resample:
             if not lazy:
-                if not self.df.empty:
-                    self.df.index = self.df.time
-                    numeric_cols = self.df.select_dtypes(include=["number"]).columns
-                    group_cols = ["station_id"]
-                    self.df = (
-                        self.df[group_cols + list(numeric_cols)]
-                        .groupby("station_id")
+                if not df.empty:
+                    df = (
+                        df.set_index("time")
+                        .groupby("siteid")
                         .resample(window)
-                        .mean()
+                        .mean(numeric_only=True)
                         .reset_index()
                     )
+                    # Re-join metadata
+                    meta_to_restore = dfloc.rename(
+                        columns={"ctry": "country", "station_id": "siteid"}
+                    )
+                    # Avoid duplicate columns during merge
+                    cols_to_drop = [
+                        c for c in meta_to_restore.columns if c in df.columns and c != "siteid"
+                    ]
+                    df = df.drop(columns=cols_to_drop)
+                    df = df.merge(meta_to_restore, on="siteid", how="left")
             else:
                 import warnings
 
-                warnings.warn("ISHReader: Resampling is currently not supported in lazy mode.")
+                warnings.warn(
+                    "ISHReader: Resampling is currently not supported for lazy DataFrames. "
+                    "Convert to xarray (as_xarray=True) for lazy resampling."
+                )
 
-        self.df = self.df.merge(dfloc, on="station_id", how="left")
-        self.df = self.df.rename(columns={"station_id": "siteid", "ctry": "country"})
-        return self.df
+        return df

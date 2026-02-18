@@ -23,7 +23,7 @@ def add_data(
 ):
     """Retrieve and load ISH data."""
     return ISHReader().open_dataset(
-        dates,
+        dates=dates,
         box=box,
         country=country,
         state=state,
