@@ -99,6 +99,8 @@ _READER_MODULES = {
     "prepchem": ".readers.prepchem",
     "raqms": ".readers.raqms",
     "ufs": ".readers.ufs",
+    "wrfchem": ".readers.wrfchem",
+    "grib2": ".readers.grib2",
     # Obs
     "airnow": ".readers.airnow",
     "aeronet": ".readers.aeronet",
@@ -140,7 +142,7 @@ def load(source: str, files=None, **kwargs):
         df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
 
     Available sources:
-        Models: cmaq, camx, fv3chem, hysplit, hytraj, icap_mme, ncep_grib, pardump, prepchem, raqms, ufs
+        Models: cmaq, camx, fv3chem, hysplit, hytraj, icap_mme, ncep_grib, pardump, prepchem, raqms, ufs, wrfchem, grib2
         Obs: airnow, aeronet, aqs, cems, crn, improve, ish, ish_lite, nadp, openaq, pams
         Profile: icartt, tolnet, geoms, gml_ozonesonde
         Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp
