@@ -90,6 +90,7 @@ class PointReader(BaseReader):
         read_method: str = "read_csv",
         as_xarray: bool = True,
         lazy: bool = False,
+        meta: Union[pd.DataFrame, pd.Series, dict, tuple, None] = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -105,6 +106,8 @@ class PointReader(BaseReader):
             If True, return an xarray.Dataset, by default True.
         lazy : bool, optional
             If True, return a dask-backed object, by default False.
+        meta : pd.DataFrame, pd.Series, dict, or tuple, optional
+            Dask metadata to use for lazy loading, by default None.
         **kwargs : dict
             Additional arguments passed to the reader and driver.
 
@@ -113,7 +116,7 @@ class PointReader(BaseReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded dataset.
         """
-        df = self.driver.open(files, read_method=read_method, lazy=lazy, **kwargs)
+        df = self.driver.open(files, read_method=read_method, lazy=lazy, meta=meta, **kwargs)
 
         df = self.harmonize(df)
 
