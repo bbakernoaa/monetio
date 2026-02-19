@@ -597,12 +597,19 @@ def read_aeronet_csv(
                 source.readline().decode("utf-8", errors="replace").strip() for _ in range(10)
             ]
             source.seek(0)
-        else:
-            fs = FileUtility.get_fs(str(fn))
-            with fs.open(str(fn), mode="rb") as f:
+        elif isinstance(fn, str) or hasattr(fn, "__fspath__"):
+            fn_str = str(fn)
+            fs = FileUtility.get_fs(fn_str)
+            # Defensive check: avoid opening directories or invalid paths
+            if not fn_str.startswith("http") and hasattr(fs, "isfile") and not fs.isfile(fn_str):
+                raise IOError(f"{fn_str} is not a file or is inaccessible")
+
+            with fs.open(fn_str, mode="rb") as f:
                 header_lines = [
                     f.readline().decode("utf-8", errors="replace").strip() for _ in range(10)
                 ]
+        else:
+            raise ValueError(f"Invalid source type: {type(fn)}")
     except Exception as e:
         warnings.warn(f"Failed to read header of {fn}: {e}")
         if meta_df is not None:
@@ -723,7 +730,15 @@ def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray
     """Interpolate AOD to new wavelengths."""
     try:
         import pytspack
-    except ImportError:
+
+        # Check if actually usable (fixes Windows CI issue where symbols are missing)
+        # Some versions/platforms might have the module but not the shared library symbols
+        try:
+            pytspack.TsPack()
+        except (RuntimeError, AttributeError):
+            # Fallback check for older versions
+            pytspack.tspsi([0.0, 1.0], [0.0, 1.0])
+    except (ImportError, RuntimeError, AttributeError, TypeError):
         # Re-raise as RuntimeError to match expected behavior in tests
         raise RuntimeError("You must install pytspack before using this function.")
 
