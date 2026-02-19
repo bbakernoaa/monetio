@@ -239,12 +239,12 @@ class AERONETReader(PointReader):
 
         # Consistent with legacy: drop exact duplicates
         if hasattr(df, "drop_duplicates"):
-             df = df.drop_duplicates()
-        elif hasattr(df, "head"): # dask?
-             # For dask, drop_duplicates is expensive, but for consistency we might want it.
-             # In monetio legacy it only used joblib/serial so it was eager.
-             # We'll do it eager-style for now.
-             pass
+            df = df.drop_duplicates()
+        elif hasattr(df, "head"):  # dask?
+            # For dask, drop_duplicates is expensive, but for consistency we might want it.
+            # In monetio legacy it only used joblib/serial so it was eager.
+            # We'll do it eager-style for now.
+            pass
 
         # Force string columns to object for Pandas 3.0 compatibility
         df = force_object_strings(df)
@@ -870,7 +870,7 @@ class AERONET:
             self.url,
             inv_type=self.inv_type,
             interp_to_aod_values=self.new_aod_values,
-            n_procs=1, # Legacy always serial for single URL
+            n_procs=1,  # Legacy always serial for single URL
         )
         if self.df.empty:
             # Matches old behavior for some tests
@@ -902,6 +902,7 @@ class AERONET:
         self.siteid = siteid
         if dates is None:  # get the current day
             from datetime import datetime
+
             now = datetime.utcnow()
             self.dates = pd.date_range(start=now.date(), end=now, freq="H")
         else:
@@ -922,7 +923,7 @@ class AERONET:
             self.read_aeronet()
         except Exception as e:
             if "valid query but no data found" in str(e):
-                 raise
+                raise
             raise Exception(
                 f"loading from URL {self.url!r} failed. "
                 "If using `siteid`, check that the site is valid."
@@ -1001,6 +1002,7 @@ class AERONET:
     def _lines_from_url(self, *, n=10):
         """Read n lines from URL (legacy diagnostic)."""
         from itertools import islice
+
         if isinstance(self.url, str) and self.url.startswith("http"):
             import requests
 
