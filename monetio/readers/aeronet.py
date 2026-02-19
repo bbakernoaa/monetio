@@ -206,6 +206,16 @@ class AERONETReader(PointReader):
         Standardize column names and types.
         """
         df = super().harmonize(df)
+
+        # Consistent with legacy: drop exact duplicates
+        if hasattr(df, "drop_duplicates"):
+             df = df.drop_duplicates()
+        elif hasattr(df, "head"): # dask?
+             # For dask, drop_duplicates is expensive, but for consistency we might want it.
+             # In monetio legacy it only used joblib/serial so it was eager.
+             # We'll do it eager-style for now.
+             pass
+
         # Force string columns to object for Pandas 3.0 compatibility
         df = force_object_strings(df)
         return df
@@ -774,23 +784,83 @@ class AERONET:
             self.url,
             inv_type=self.inv_type,
             interp_to_aod_values=self.new_aod_values,
+            n_procs=1, # Legacy always serial for single URL
         )
         if self.df.empty:
             # Matches old behavior for some tests
             raise Exception("valid query but no data found")
 
-    def add_data(self, **kwargs):
-        """Add data (legacy)."""
-        # Determine if we should return xarray or dataframe
-        # In legacy mode, if not specified, return dataframe
-        as_xarray = kwargs.get("as_xarray", False)
-        kwargs["as_xarray"] = False
-        df = AERONETReader().open_dataset(**kwargs)
-        if df.empty:
-            raise Exception("valid query but no data found")
-        self.df = df
-        if as_xarray:
-            return AERONETReader().to_xarray(df, **kwargs)
+        # Legacy behavior: set index to time if single site
+        if self.df.siteid.unique().size == 1:
+            self.df.set_index("time", inplace=True)
+
+    def add_data(
+        self,
+        dates=None,
+        product="AOD15",
+        *,
+        inv_type=None,
+        siteid=None,
+        latlonbox=None,
+        daily=False,
+        lunar=False,
+        #
+        # post-proc
+        freq=None,
+        detect_dust=False,
+        interp_to_aod_values=None,
+        **kwargs,
+    ):
+        """Add data (legacy method)."""
+        self.latlonbox = latlonbox
+        self.siteid = siteid
+        if dates is None:  # get the current day
+            from datetime import datetime
+            now = datetime.utcnow()
+            self.dates = pd.date_range(start=now.date(), end=now, freq="H")
+        else:
+            self.dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
+
+        if product is not None:
+            self.prod = product.upper()
+        else:
+            self.prod = product
+
+        self.inv_type = inv_type
+        self.daily = 20 if daily else 10
+        self.lunar = 1 if lunar else 0
+        self.new_aod_values = interp_to_aod_values
+
+        self.build_url()
+        try:
+            self.read_aeronet()
+        except Exception as e:
+            if "valid query but no data found" in str(e):
+                 raise
+            raise Exception(
+                f"loading from URL {self.url!r} failed. "
+                "If using `siteid`, check that the site is valid."
+            ) from e
+
+        if freq is not None:
+            self.df = (
+                self.df.reset_index()
+                .set_index("time")
+                .groupby("siteid")
+                .resample(freq)
+                .mean(numeric_only=True)
+                .reset_index()
+            )
+            # Restore index if it was single site
+            if self.df.siteid.unique().size == 1:
+                self.df.set_index("time", inplace=True)
+
+        if detect_dust:
+            self.dust_detect()
+
+        if self.new_aod_values is not None:
+            self.calc_new_aod_values()
+
         return self.df
 
     def dust_detect(self):
@@ -798,10 +868,64 @@ class AERONET:
         if self.df is not None:
             self.df = _dust_detect(self.df)
 
+    def calc_550nm(self):
+        """Extract AOD at 550nm using power law (Cesnulyte et al 2014)."""
+        if self.df is not None:
+            # Need to ensure we're looking at the right format
+            # If time is index, reset it for calculation then restore
+            if self.df.index.name == "time":
+                self.df = self.df.reset_index()
+                restore_index = True
+            else:
+                restore_index = False
+
+            self.df["aod_550nm"] = self.df["aod_500nm"] * (550.0 / 500.0) ** (
+                -self.df["440-870_angstrom_exponent"]
+            )
+
+            if restore_index:
+                self.df.set_index("time", inplace=True)
+
     def calc_new_aod_values(self):
         """Calculate new AOD values."""
         if self.df is not None and self.new_aod_values is not None:
-            self.df = _calc_new_aod_values(self.df, self.new_aod_values)
+            # Check for time index
+            if self.df.index.name == "time":
+                self.df = _calc_new_aod_values(self.df.reset_index(), self.new_aod_values)
+                self.df.set_index("time", inplace=True)
+            else:
+                self.df = _calc_new_aod_values(self.df, self.new_aod_values)
+
+    def set_daterange(self, begin="", end=""):
+        """Set daterange."""
+        dates = pd.date_range(start=begin, end=end, freq="H")
+        self.dates = dates
+
+    @staticmethod
+    def _aeronet_aod_and_nu(row):
+        import pandas as pd
+
+        aod_columns = [aod_column for aod_column in row.index if "aod_" in aod_column]
+        wv = [float(aod_column.replace("aod_", "").replace("nm", "")) for aod_column in aod_columns]
+        aods = row[aod_columns]
+        a = pd.DataFrame({"aod": aods}).reset_index()
+        a["wv"] = wv
+        return a.dropna()
+
+    def _lines_from_url(self, *, n=10):
+        """Read n lines from URL (legacy diagnostic)."""
+        from itertools import islice
+        if isinstance(self.url, str) and self.url.startswith("http"):
+            import requests
+
+            r = requests.get(self.url, stream=True)
+            r.raise_for_status()
+            s = "\n".join(islice(r.iter_lines(decode_unicode=True), n))
+        else:
+            with open(self.url) as f:
+                s = "\n".join(islice(f, n))
+
+        return s
 
 
 def _parallel_aeronet_call(**kwargs):
