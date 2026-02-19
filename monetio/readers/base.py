@@ -208,7 +208,7 @@ class PointReader(BaseReader):
                 ds = ds.rename({"index": "node"})
 
         # Set standard coordinates
-        coords = [c for c in ["time", "siteid", "latitude", "longitude"] if c in ds.data_vars]
+        coords = [c for c in ["time", "siteid", "latitude", "longitude", "elevation"] if c in ds.data_vars]
         ds = ds.set_coords(coords)
 
         # Ensure node coordinate is a simple integer range for both

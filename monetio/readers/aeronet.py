@@ -205,6 +205,7 @@ class AERONETReader(PointReader):
         """
         Standardize column names and types.
         """
+        df = super().harmonize(df)
         # Force string columns to object for Pandas 3.0 compatibility
         df = force_object_strings(df)
         return df
@@ -789,7 +790,7 @@ class AERONET:
             raise Exception("valid query but no data found")
         self.df = df
         if as_xarray:
-            return AERONETReader().to_xarray(df)
+            return AERONETReader().to_xarray(df, **kwargs)
         return self.df
 
     def dust_detect(self):

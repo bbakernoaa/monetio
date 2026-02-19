@@ -657,17 +657,27 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
         # In MONET 2D convention, 'siteid' becomes the second dimension,
         # but we rename it to 'node' for UGRID compliance.
         if "siteid" in ds2d.dims:
+            # Preserve siteid as a coordinate while renaming dimension to node for UGRID compliance
+            # siteids = ds2d.siteid.values  # Store values for restoration
             ds2d = ds2d.rename({"siteid": "node"})
+            # After renaming, node contains site IDs. Add siteid back as coord.
+            ds2d.coords["siteid"] = (("node",), ds2d.node.values)
 
         if fixed_location:
             # Enforce fixed locations by averaging over time (ignoring NaNs)
             # This fixes issues where missing time steps result in NaN lat/lon
             for coord in ["latitude", "longitude", "elevation"]:
-                if coord in ds2d.coords:
+                if coord in ds2d.coords or coord in ds2d.data_vars:
                     if "time" in ds2d[coord].dims and "node" in ds2d[coord].dims:
                         try:
                             # Use mean to reduce time dimension, ignoring NaNs
-                            ds2d.coords[coord] = ds2d[coord].mean(dim="time", skipna=True)
+                            fixed_coord = ds2d[coord].mean(dim="time", skipna=True)
+                            if coord in ds2d.coords:
+                                ds2d.coords[coord] = fixed_coord
+                            else:
+                                # Convert data var to coordinate after fixing
+                                ds2d = ds2d.set_coords(coord)
+                                ds2d.coords[coord] = fixed_coord
                         except Exception:
                             pass
 
