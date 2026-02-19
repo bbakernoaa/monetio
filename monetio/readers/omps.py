@@ -7,7 +7,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import standardize_satellite_coords, update_history
+from .sat_utils import apply_lazy_conversion, standardize_satellite_coords, update_history
 
 
 @register_reader("omps")
@@ -60,19 +60,24 @@ class OMPSReader(GriddedReader):
 
 def omps_preprocess(ds: xr.Dataset, product: str = "nmto3_l2") -> xr.Dataset:
     """
-    Preprocess OMPS dataset.
+    Preprocess OMPS dataset using Aero Protocol.
 
     Parameters
     ----------
     ds : xr.Dataset
         Input dataset.
     product : str, optional
-        Product type.
+        Product type, by default "nmto3_l2".
 
     Returns
     -------
     xr.Dataset
         Processed dataset.
+
+    Examples
+    --------
+    >>> ds = reader.open_dataset(files, product='nmto3_l2')
+    >>> ds = omps_preprocess(ds, product='nmto3_l2')
     """
     if product == "nmto3_l2":
         ds = _preprocess_nmto3_l2(ds)
@@ -86,7 +91,19 @@ def omps_preprocess(ds: xr.Dataset, product: str = "nmto3_l2") -> xr.Dataset:
 
 
 def _preprocess_nmto3_l2(ds: xr.Dataset) -> xr.Dataset:
-    """Preprocess OMPS Level 2 Nadir Mapper Total Ozone."""
+    """
+    Preprocess OMPS Level 2 Nadir Mapper Total Ozone.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset with standard names and lazily converted time.
+    """
     # Group names might be present if opened with xarray directly without group specification,
     # but typically we expect them to be at root or in specific groups.
     # If using h5netcdf, we might need to handle groups.
@@ -140,15 +157,8 @@ def _preprocess_nmto3_l2(ds: xr.Dataset) -> xr.Dataset:
         def _convert_time(t):
             return pd.to_datetime(t, unit="s", origin=ref_date)
 
-        if hasattr(ds["time_raw"].data, "dask"):
-            ds["time"] = xr.apply_ufunc(
-                _convert_time,
-                ds["time_raw"],
-                dask="parallelized",
-                output_dtypes=["datetime64[ns]"],
-            )
-        else:
-            ds["time"] = _convert_time(ds["time_raw"].values)
+        # Use Aero Protocol standardized utility for lazy conversion
+        ds["time"] = apply_lazy_conversion(ds["time_raw"], _convert_time, "datetime64[ns]")
 
         ds = ds.set_coords("time")
         if "time_raw" in ds.variables:
@@ -174,11 +184,26 @@ def _preprocess_nmto3_l2(ds: xr.Dataset) -> xr.Dataset:
     # L2 OMPS uses (nscan, nstep) or similar.
     # We'll let standardize_satellite_coords handle it if we add common names.
 
+    # Update history
+    ds = update_history(ds, "Preprocessed OMPS L2 data.")
+
     return ds
 
 
 def _preprocess_nmto3_l3(ds: xr.Dataset) -> xr.Dataset:
-    """Preprocess OMPS Level 3 Nadir Mapper Total Ozone."""
+    """
+    Preprocess OMPS Level 3 Nadir Mapper Total Ozone.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset with standard names and 2D coordinates.
+    """
     root_mapping = {
         "Latitude": "lat",
         "Longitude": "lon",
@@ -220,5 +245,8 @@ def _preprocess_nmto3_l3(ds: xr.Dataset) -> xr.Dataset:
         if "cloud_fraction" in ds.variables:
             mask = mask & (ds["cloud_fraction"] <= 0.3)
         ds["ozone_column"] = ds["ozone_column"].where(mask)
+
+    # Update history
+    ds = update_history(ds, "Preprocessed OMPS L3 data.")
 
     return ds
