@@ -602,7 +602,7 @@ def read_aeronet_csv(
             fs = FileUtility.get_fs(fn_str)
             # Defensive check: avoid opening directories or invalid paths
             if not fn_str.startswith("http") and hasattr(fs, "isfile") and not fs.isfile(fn_str):
-                raise IOError(f"{fn_str} is not a file or is inaccessible")
+                raise OSError(f"{fn_str} is not a file or is inaccessible")
 
             with fs.open(fn_str, mode="rb") as f:
                 header_lines = [

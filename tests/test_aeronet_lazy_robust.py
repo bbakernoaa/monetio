@@ -1,5 +1,4 @@
-# Mock pytspack if not present
-import importlib.util
+
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -7,17 +6,15 @@ import dask.dataframe as dd
 import numpy as np
 import pytest
 
-if importlib.util.find_spec("pytspack") is None:
-    mock_pytspack = MagicMock()
-    mock_pytspack.TsPack.return_value.interpolate.return_value = lambda wv: np.full(len(wv), 0.07)
-    sys.modules["pytspack"] = mock_pytspack
-
 from monetio.readers.aeronet import AERONETReader
-
 
 @pytest.mark.parametrize("lazy", [True, False])
 def test_aeronet_metadata_robustness(lazy):
     """Test that AERONET reader is robust to empty or bad files when using lazy loading."""
+
+    # Mock pytspack for this test to verify interpolation logic even if not installed
+    mock_pytspack = MagicMock()
+    mock_pytspack.TsPack.return_value.interpolate.return_value = lambda wv: np.full(len(wv), 0.07)
 
     good_content = b"""AERONET Data
 Version 3
@@ -47,7 +44,8 @@ Time(hh:mm:ss),Date(dd:mm:yyyy),Site,Latitude,Longitude,AOD_440nm,AOD_675nm,AOD_
         resp.raise_for_status.return_value = None
         return resp
 
-    with patch("requests.Session.get", side_effect=mock_get):
+    with patch("requests.Session.get", side_effect=mock_get), \
+         patch.dict(sys.modules, {"pytspack": mock_pytspack}):
         reader = AERONETReader()
 
         # Test loading a mix of good, empty and bad URLs
