@@ -143,7 +143,9 @@ class AERONETReader(PointReader):
         # Determine meta for Dask to ensure consistency and avoid early computes
         meta = None
         if use_dask:
-            for f in files:
+            # Ensure files is a list for iteration
+            files_list = FileUtility.expand_paths(files)
+            for f in files_list:
                 try:
                     # We call read_aeronet_csv directly to get a template DataFrame
                     meta = read_aeronet_csv(
@@ -719,14 +721,13 @@ def _dust_detect(df: pd.DataFrame) -> pd.DataFrame:
 
 def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray]) -> pd.DataFrame:
     """Interpolate AOD to new wavelengths."""
+    try:
+        import pytspack
+    except ImportError:
+        # Re-raise as RuntimeError to match expected behavior in tests
+        raise RuntimeError("You must install pytspack before using this function.")
 
     def _tspack_aod_interp(row, new_wv):
-        try:
-            import pytspack
-        except ImportError:
-            # Re-raise as RuntimeError to match expected behavior in tests
-            raise RuntimeError("You must install pytspack before using this function.")
-
         aod_columns = [c for c in row.index if c.startswith("aod_") and c.endswith("nm")]
         aods = row[aod_columns]
         wv = [float(c.replace("aod_", "").replace("nm", "")) for c in aod_columns]
