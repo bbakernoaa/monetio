@@ -135,6 +135,37 @@ class AERONETReader(PointReader):
 
         # Define per-file preprocessing
         storage_options = kwargs.get("storage_options", {})
+
+        # Use base class to open
+        # If n_procs > 1 and not lazy, we use dask to parallelize the load then compute
+        use_dask = lazy or (n_procs > 1)
+
+        # Determine meta for Dask to ensure consistency and avoid early computes
+        meta = None
+        if use_dask:
+            # Ensure files is a list for iteration
+            files_list = FileUtility.expand_paths(files)
+            for f in files_list:
+                try:
+                    # We call read_aeronet_csv directly to get a template DataFrame
+                    meta = read_aeronet_csv(
+                        f,
+                        inv_type=inv_type,
+                        interp_to_aod_values=interp_to_aod_values,
+                        detect_dust=detect_dust,
+                        storage_options=storage_options,
+                        retries=retries,
+                        backoff_factor=backoff_factor,
+                        **kwargs,
+                    )
+                    if not meta.empty:
+                        meta = meta.iloc[:0]  # Just the columns/dtypes
+                        break
+                except Exception:
+                    continue
+            if meta is not None and meta.empty and len(meta.columns) == 0:
+                meta = None
+
         read_func = partial(
             read_aeronet_csv,
             inv_type=inv_type,
@@ -143,17 +174,16 @@ class AERONETReader(PointReader):
             storage_options=storage_options,
             retries=retries,
             backoff_factor=backoff_factor,
+            meta_df=meta,
             **kwargs,
         )
 
-        # Use base class to open
-        # If n_procs > 1 and not lazy, we use dask to parallelize the load then compute
-        use_dask = lazy or (n_procs > 1)
         df = super().open_dataset(
             files,
             read_method=read_func,
             as_xarray=False,
             lazy=use_dask,
+            meta=meta,
             **kwargs,
         )
 
@@ -512,6 +542,7 @@ def read_aeronet_csv(
     interp_to_aod_values: Optional[Union[List[float], np.ndarray]] = None,
     detect_dust: bool = False,
     storage_options: Optional[dict] = None,
+    meta_df: Optional[pd.DataFrame] = None,
     **kwargs,
 ) -> pd.DataFrame:
     """
@@ -563,6 +594,8 @@ def read_aeronet_csv(
                 raise
 
             warnings.warn(f"Failed to fetch {fn}: {e}")
+            if meta_df is not None:
+                return meta_df.iloc[:0]
             return pd.DataFrame()
     else:
         source = fn
@@ -575,45 +608,61 @@ def read_aeronet_csv(
                 source.readline().decode("utf-8", errors="replace").strip() for _ in range(10)
             ]
             source.seek(0)
-        else:
-            fs = FileUtility.get_fs(str(fn))
-            with fs.open(str(fn), mode="rb") as f:
+        elif isinstance(fn, str) or hasattr(fn, "__fspath__"):
+            fn_str = str(fn)
+            fs = FileUtility.get_fs(fn_str)
+            # Defensive check: avoid opening directories or invalid paths
+            if not fn_str.startswith("http") and hasattr(fs, "isfile") and not fs.isfile(fn_str):
+                raise OSError(f"{fn_str} is not a file or is inaccessible")
+
+            with fs.open(fn_str, mode="rb") as f:
                 header_lines = [
                     f.readline().decode("utf-8", errors="replace").strip() for _ in range(10)
                 ]
+        else:
+            raise ValueError(f"Invalid source type: {type(fn)}")
     except Exception as e:
         warnings.warn(f"Failed to read header of {fn}: {e}")
+        if meta_df is not None:
+            return meta_df.iloc[:0]
         return pd.DataFrame()
 
     header_text = "\n".join(header_lines)
-    if "<html>" in header_text:
-        # Invalid query
-        return pd.DataFrame()
-
-    if len([line for line in header_lines if line]) < 2:
-        # Might be "valid query but no data found"
-        return pd.DataFrame()
-
     is_inv = "Inversion" in header_text or inv_type is not None
     skiprows = 5 if not is_inv else 6
 
-    try:
-        df = pd.read_csv(
-            source,
-            engine="python",
-            header="infer",
-            skiprows=skiprows,
-            na_values=-999,
-            storage_options=storage_options,
-        )
-    except Exception as e:
-        warnings.warn(f"Error parsing CSV from {fn}: {e}")
-        return pd.DataFrame()
+    if "<html>" in header_text or len([line for line in header_lines if line]) < 2:
+        # Invalid query or no data found. Return empty with columns if possible.
+        if meta_df is not None:
+            return meta_df.iloc[:0]
+        try:
+            cols = [c.strip().lower() for c in header_lines[skiprows].split(",")]
+            df = pd.DataFrame(columns=cols)
+        except Exception:
+            return pd.DataFrame()
+    else:
+        try:
+            df = pd.read_csv(
+                source,
+                engine="python",
+                header="infer",
+                skiprows=skiprows,
+                na_values=-999,
+                storage_options=storage_options,
+            )
+            df = df.rename(columns=str.lower)
+        except Exception as e:
+            warnings.warn(f"Error parsing CSV from {fn}: {e}")
+            if meta_df is not None:
+                return meta_df.iloc[:0]
+            try:
+                cols = [c.strip().lower() for c in header_lines[skiprows].split(",")]
+                df = pd.DataFrame(columns=cols)
+            except Exception:
+                return pd.DataFrame()
 
-    if df.empty:
-        return df
-
-    df = df.rename(columns=str.lower).copy()
+    # Do not return early if df.empty, to ensure consistent columns for Dask
+    df = df.copy()
 
     # Handle time
     date_col = [c for c in df.columns if "date(" in c]
@@ -621,12 +670,13 @@ def read_aeronet_csv(
     if date_col and time_col:
         df["time"] = pd.to_datetime(
             df[date_col[0]] + " " + df[time_col[0]], format=r"%d:%m:%Y %H:%M:%S", errors="coerce"
-        )
+        ).astype("datetime64[ns]")
         df = df.drop(columns=[date_col[0], time_col[0]])
 
     # Standard names
     df = df.rename(
         columns={
+            "site": "siteid",
             "aeronet_site": "siteid",
             "aeronet_aeronet_site": "siteid",
             "site_latitude(degrees)": "latitude",
@@ -641,7 +691,19 @@ def read_aeronet_csv(
     # Apply Aero Protocol Scientific Hygiene
     if "latitude" in df.columns and "longitude" in df.columns:
         df = df.dropna(subset=["latitude", "longitude"])
-    df = df.dropna(axis=1, how="all")
+
+    if df.empty:
+        # Ensure consistent dtypes for Dask metadata
+        for c in df.columns:
+            if "time" in c:
+                df[c] = pd.to_datetime(df[c]).astype("datetime64[ns]")
+            elif c in ["siteid", "site"]:
+                df[c] = df[c].astype(object)
+            else:
+                try:
+                    df[c] = pd.to_numeric(df[c])
+                except Exception:
+                    pass
 
     if hasattr(df, "attrs"):
         df.attrs["info"] = header_text
@@ -654,6 +716,9 @@ def read_aeronet_csv(
     if interp_to_aod_values is not None:
         df = _calc_new_aod_values(df, interp_to_aod_values)
 
+    # Ensure consistent dtypes for Dask metadata
+    df = force_object_strings(df)
+
     return df.copy()
 
 
@@ -661,19 +726,34 @@ def _dust_detect(df: pd.DataFrame) -> pd.DataFrame:
     """Detect dust based on AOD and Angstrom exponent."""
     if "aod_1020nm" in df.columns and "440-870_angstrom_exponent" in df.columns:
         df["dust"] = (df["aod_1020nm"] > 0.3) & (df["440-870_angstrom_exponent"] < 0.6)
+    elif "dust" not in df.columns:
+        # Ensure 'dust' column exists for Dask metadata consistency
+        df["dust"] = np.array([False] * len(df), dtype=bool)
+
+    # Consistently use object or boolean dtype to support NaNs if needed,
+    # but here we'll stick to bool/object consistency for Dask
+    if "dust" in df.columns:
+        df["dust"] = df["dust"].astype(object)
     return df
 
 
 def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray]) -> pd.DataFrame:
     """Interpolate AOD to new wavelengths."""
+    try:
+        import pytspack
+
+        # Check if actually usable (fixes Windows CI issue where symbols are missing)
+        # Some versions/platforms might have the module but not the shared library symbols
+        try:
+            pytspack.TsPack()
+        except (RuntimeError, AttributeError):
+            # Fallback check for older versions
+            pytspack.tspsi([0.0, 1.0], [0.0, 1.0])
+    except (ImportError, RuntimeError, AttributeError, TypeError):
+        # Re-raise as RuntimeError to match expected behavior in tests
+        raise RuntimeError("You must install pytspack before using this function.")
 
     def _tspack_aod_interp(row, new_wv):
-        try:
-            import pytspack
-        except ImportError:
-            # Re-raise as RuntimeError to match expected behavior in tests
-            raise RuntimeError("You must install pytspack before using this function.")
-
         aod_columns = [c for c in row.index if c.startswith("aod_") and c.endswith("nm")]
         aods = row[aod_columns]
         wv = [float(c.replace("aod_", "").replace("nm", "")) for c in aod_columns]
@@ -698,8 +778,14 @@ def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray
     new_wv = np.asarray(new_wv)
     # Copy to avoid fragmentation warning when adding many columns
     df = df.copy()
-    out = df.apply(_tspack_aod_interp, axis=1, result_type="expand", new_wv=new_wv)
     names = "aod_" + pd.Series(new_wv.astype(int).astype(str)) + "nm"
+
+    if df.empty:
+        for name in names:
+            df[name] = np.array([], dtype=float)
+        return df
+
+    out = df.apply(_tspack_aod_interp, axis=1, result_type="expand", new_wv=new_wv)
     out.columns = names.values
 
     dup_names = list(set(df.columns) & set(out.columns))

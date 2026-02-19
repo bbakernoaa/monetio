@@ -133,6 +133,11 @@ def goes_preprocess(ds: xr.Dataset) -> xr.Dataset:
     -------
     xr.Dataset
         Processed dataset.
+
+    Examples
+    --------
+    >>> ds = reader.open_dataset(files)
+    >>> ds = goes_preprocess(ds)
     """
     # 1. Standardize dimensions and coordinates
     ds = standardize_satellite_coords(ds)
@@ -145,12 +150,25 @@ def goes_preprocess(ds: xr.Dataset) -> xr.Dataset:
     if "latitude" not in ds.coords and "goes_imager_projection" in ds.variables:
         ds = _add_goes_latlon(ds)
 
+    # Update history
+    ds = update_history(ds, "Preprocessed GOES data.")
+
     return ds
 
 
 def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     """
-    Calculate latitude and longitude for GOES data lazily.
+    Calculate latitude and longitude for GOES data lazily using Aero Protocol.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset containing 'x', 'y' and 'goes_imager_projection'.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 'latitude' and 'longitude' coordinates added.
     """
     from pyproj import CRS, Proj
 
@@ -177,24 +195,23 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
         lat = np.where(lat < 100, lat, np.nan)
         return lat.astype(np.float32), lon.astype(np.float32)
 
-    if hasattr(ds.x.data, "dask") or hasattr(ds.y.data, "dask"):
-        # Dask path
-        lat, lon = xr.apply_ufunc(
-            _calc_latlon,
-            ds.x,
-            ds.y,
-            input_core_dims=[["x"], ["y"]],
-            output_core_dims=[["y", "x"], ["y", "x"]],
-            dask="parallelized",
-            output_dtypes=[np.float32, np.float32],
-        )
-    else:
-        # Eager path
-        lat, lon = _calc_latlon(ds.x.values, ds.y.values)
+    # Use Aero Protocol standardized approach: unified apply_ufunc for both backends.
+    # We use allow_rechunk=True to handle cases where x/y are chunked, as they are
+    # core dimensions for the projection calculation.
+    lat, lon = xr.apply_ufunc(
+        _calc_latlon,
+        ds.x,
+        ds.y,
+        input_core_dims=[["x"], ["y"]],
+        output_core_dims=[["y", "x"], ["y", "x"]],
+        dask="parallelized",
+        output_dtypes=[np.float32, np.float32],
+        dask_gufunc_kwargs={"allow_rechunk": True},
+    )
 
     ds = ds.assign_coords(
-        latitude=(("y", "x"), lat, {"units": "degrees_north", "standard_name": "latitude"}),
-        longitude=(("y", "x"), lon, {"units": "degrees_east", "standard_name": "longitude"}),
+        latitude=lat.assign_attrs({"units": "degrees_north", "standard_name": "latitude"}),
+        longitude=lon.assign_attrs({"units": "degrees_east", "standard_name": "longitude"}),
     )
 
     return ds

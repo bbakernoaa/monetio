@@ -173,6 +173,7 @@ class PandasDriver:
         files: Union[str, List[str]],
         read_method: Union[str, callable] = "read_csv",
         lazy: bool = False,
+        meta: Union[pd.DataFrame, pd.Series, dict, tuple, None] = None,
         **kwargs,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         file_list = FileUtility.expand_paths(files)
@@ -206,7 +207,7 @@ class PandasDriver:
             if not delayed_dfs:
                 return dd.from_pandas(pd.DataFrame(), npartitions=1)
 
-            return dd.from_delayed(delayed_dfs)
+            return dd.from_delayed(delayed_dfs, meta=meta)
 
         data_frames = []
         # Reuse our filesystem logic

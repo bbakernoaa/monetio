@@ -3,11 +3,10 @@
 import warnings
 from typing import List, Optional, Union
 
-import numpy as np
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import standardize_satellite_coords, update_history
+from .sat_utils import lazy_index_along_axis, standardize_satellite_coords, update_history
 
 
 @register_reader("tropomi")
@@ -160,6 +159,9 @@ def tropomi_preprocess(
             if var != "qa_value":
                 ds[var] = ds[var].where(qa >= qa_threshold)
 
+    # Update history
+    ds = update_history(ds, "Preprocessed TROPOMI data.")
+
     return ds
 
 
@@ -190,25 +192,9 @@ def _add_pressure_levels(ds: xr.Dataset) -> xr.Dataset:
                 # Ensure itrop is within bounds and integer
                 itrop_valid = itrop.where((itrop >= 0) & (itrop < ds.sizes["z"]), 0).astype(int)
 
-                if hasattr(itrop_valid.data, "dask"):
-                    # Dask path: pick from z dimension lazily
-                    def _index_3d(arr, idx):
-                        return np.take_along_axis(arr, idx[np.newaxis, ...], axis=0).squeeze(axis=0)
+                # Use Aero Protocol standardized utility for lazy indexing
+                ds["troppres"] = lazy_index_along_axis(p_mid, itrop_valid, dim="z")
 
-                    ds["troppres"] = xr.apply_ufunc(
-                        _index_3d,
-                        p_mid.chunk({"z": -1}),
-                        itrop_valid,
-                        input_core_dims=[["z"], []],
-                        output_core_dims=[[]],
-                        dask="parallelized",
-                        output_dtypes=[p_mid.dtype],
-                    )
-                else:
-                    # Eager path: use standard Xarray indexing
-                    ds["troppres"] = p_mid.isel(z=itrop_valid)
-                    if "z" in ds["troppres"].coords:
-                        ds["troppres"] = ds["troppres"].drop_vars("z")
                 ds["troppres"].attrs.update({"units": "Pa", "long_name": "tropopause pressure"})
             except Exception as e:
                 warnings.warn(f"Could not calculate tropopause pressure: {e}")
