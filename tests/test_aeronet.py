@@ -361,10 +361,15 @@ def test_serial_freq():
 
 @pytest.mark.skipif(has_pytspack, reason="has pytspack")
 def test_interp_without_pytspack():
+    import sys
+    from unittest.mock import patch
+
     fp = DATA / "aeronet-AOD15-example.txt"
     standard_wavelengths = np.array([0.34, 0.44, 0.55, 0.66, 0.86, 1.63, 11.1]) * 1000
-    with pytest.raises(RuntimeError, match="You must install pytspack"):
-        aeronet.add_local(fp, interp_to_aod_values=standard_wavelengths)
+    # Explicitly mock pytspack as missing to avoid interference from other tests
+    with patch.dict(sys.modules, {"pytspack": None}):
+        with pytest.raises(RuntimeError, match="You must install pytspack"):
+            aeronet.add_local(fp, interp_to_aod_values=standard_wavelengths)
 
 
 @pytest.mark.skipif(not has_pytspack, reason="no pytspack")

@@ -1,4 +1,3 @@
-
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -7,6 +6,7 @@ import numpy as np
 import pytest
 
 from monetio.readers.aeronet import AERONETReader
+
 
 @pytest.mark.parametrize("lazy", [True, False])
 def test_aeronet_metadata_robustness(lazy):
@@ -44,8 +44,9 @@ Time(hh:mm:ss),Date(dd:mm:yyyy),Site,Latitude,Longitude,AOD_440nm,AOD_675nm,AOD_
         resp.raise_for_status.return_value = None
         return resp
 
-    with patch("requests.Session.get", side_effect=mock_get), \
-         patch.dict(sys.modules, {"pytspack": mock_pytspack}):
+    with patch("requests.Session.get", side_effect=mock_get), patch.dict(
+        sys.modules, {"pytspack": mock_pytspack}
+    ):
         reader = AERONETReader()
 
         # Test loading a mix of good, empty and bad URLs
