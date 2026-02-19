@@ -13,10 +13,10 @@ import xarray as xr
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
-from monetio.obs.epa_util import read_monitor_file
 from monetio.util import force_object_strings, long_to_wide
 
 from .base import PointReader, register_reader
+from .epa_utils import read_monitor_file
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,18 @@ class AQSReader(PointReader):
             **kwargs,
         )
 
-        if len(df) == 0:
+        # Handle empty case without triggering compute on Dask
+        try:
+            import dask.dataframe as dd
+
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
+
+        if is_dask:
+            if df.npartitions == 0:
+                return df
+        elif len(df) == 0:
             return df
 
         # Filter dates
@@ -129,7 +140,7 @@ class AQSReader(PointReader):
 
         df = self.harmonize(df)
 
-        if not lazy and hasattr(df, "compute"):
+        if not lazy and is_dask:
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
@@ -215,7 +226,7 @@ class AQS:
             else:
                 newc = ccc_clean.lower().replace(" ", "_")
             if verbose:
-                print(f"{ccc} renamed {newc}")
+                logger.debug(f"{ccc} renamed {newc}")
             rcolumn.append(newc)
         return rcolumn
 
@@ -357,13 +368,12 @@ class AQS:
         import requests
 
         if not os.path.isfile(fname):
-            print(f"\n Retrieving: {fname}")
-            print(url)
+            logger.info(f"Retrieving: {fname} from {url}")
             r = requests.get(url)
             with open(fname, "wb") as f:
                 f.write(r.content)
         else:
-            print(f"\n File Exists: {fname}")
+            logger.info(f"File Exists: {fname}")
 
     def add_metadata(
         self, df: Union[pd.DataFrame, "dd.DataFrame"], daily: bool = False, network: str = None
