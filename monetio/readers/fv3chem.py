@@ -1,20 +1,34 @@
 """FV3-CHEM Reader"""
 
+import datetime
 from glob import glob
+from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 from numpy import sort
-from pandas import Timedelta, to_datetime
 
 from .base import GriddedReader, register_reader
 
 
 @register_reader("fv3chem")
 class FV3ChemReader(GriddedReader):
-    def open_dataset(self, files, **kwargs):
+    def open_dataset(self, files: Union[str, List[str]], **kwargs: Optional[dict]) -> xr.Dataset:
         """
         Open a single dataset or multiple files from fv3chem outputs (nemsio or grib2).
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path, list of paths, or glob pattern.
+        **kwargs : dict
+            Additional arguments passed to the driver and driver.open.
+
+        Returns
+        -------
+        xr.Dataset
+            The processed FV3-Chem dataset.
         """
         # We manually handle file expansion here because of the nemsio/grib logic
         # However, the driver also expands paths.
@@ -61,9 +75,31 @@ class FV3ChemReader(GriddedReader):
         elif grib:
             ds = _fix_grib2(ds)
 
-        return self.harmonize(ds)
+        ds = self.harmonize(ds)
 
-    def _check_file_type(self, names):
+        # Update history
+        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read FV3-Chem data."
+        if "history" in ds.attrs:
+            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+        else:
+            ds.attrs["history"] = history
+
+        return ds
+
+    def _check_file_type(self, names: List[str]) -> tuple:
+        """
+        Check if files are nemsio or grib2 format.
+
+        Parameters
+        ----------
+        names : List[str]
+            List of filenames.
+
+        Returns
+        -------
+        tuple
+            (names, nemsio_flag, grib_flag)
+        """
         nemsios = [True for i in names if "nemsio" in i]
         gribs = [True for i in names if "grb2" in i or "grib2" in i or "grb" in i]
         grib = False
@@ -80,88 +116,128 @@ class FV3ChemReader(GriddedReader):
 # -----------------------------------------------------------------------------
 
 
-def _fix_time_nemsio(f, fname):
-    time = None
+def _fix_time_nemsio(ds: xr.Dataset, fname: Union[str, List[str]]) -> xr.Dataset:
+    """
+    Parse and fix time coordinate for NEMSIO-derived NetCDF files.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        The dataset to fix.
+    fname : Union[str, List[str]]
+        Filename(s) used to extract forecast hour.
+
+    Returns
+    -------
+    xr.Dataset
+        The dataset with corrected time.
+    """
     # If fname is a list, we handle it.
     is_multi = isinstance(fname, (list, tuple, np.ndarray)) and len(fname) > 1
 
-    if "time" in f.coords and f.time.size > 1 and is_multi:
-        # This logic seems to assume one time per file usually?
-        # Original code: zip(f.time.to_index(), fname)
-        # This implies f.time length equals fname length?
-        # If open_mfdataset concatenated them, f.time has all times.
-        # We need to be careful.
-        pass
-
-    # Re-implementing logic carefully.
-    # The original logic extracted hour from filename and added to time index?
-    # Or replaced time index?
-
+    # Extract hour from filename(s)
     # "atmf" in i -> "...atmf003..." -> hour = 3.
-
-    # If we have a dataset f opened from multiple files, f.time should have the concatenation.
-    # The logic below seems to reconstruct time from filenames.
+    def _get_hour(fn):
+        try:
+            hour_str = [i for i in fn.split(".") if "atmf" in i][0][-3:]
+            return int(hour_str)
+        except (IndexError, ValueError):
+            return 0
 
     if is_multi:
-        tarray = []
-        # If f.time matches fname length (one time per file)
-        if f.time.size == len(fname):
-            # Try to use existing time index if possible, but original code ignores it mostly
-            # except as a base? "t + tdelta"
-            # But "t" comes from f.time.to_index().
-            times = f.time.values
-            for t, fn in zip(times, fname):
-                try:
-                    hour_str = [i for i in fn.split(".") if "atmf" in i][0][-3:]
-                    hour = int(hour_str)
-                    tdelta = Timedelta(hour, unit="h")
-                    tarray.append(pd.Timestamp(t) + tdelta)  # Assuming t is base time?
-                except Exception:
-                    tarray.append(t)
-            time = to_datetime(tarray)
-            f["time"] = time
+        # If ds.time matches fname length (one time per file)
+        if "time" in ds.dims and ds.sizes["time"] == len(fname):
+            hours = [_get_hour(fn) for fn in fname]
+            tdeltas = [pd.Timedelta(h, unit="h") for h in hours]
+
+            # Use xarray arithmetic to add timedeltas lazily
+            # If we have multiple files with different offsets,
+            # we can create a DataArray of timedeltas and add it.
+            tdelta_da = xr.DataArray(tdeltas, dims="time")
+            ds["time"] = ds.time + tdelta_da
     else:
         # Single file
         fn = fname[0] if isinstance(fname, (list, tuple)) else fname
-        try:
-            hour_str = [i for i in fn.split(".") if "atmf" in i][0][-3:]
-            hour = int(hour_str)
-            tdelta = Timedelta(hour, unit="h")
-            # f.time might be size > 1 if single file has multiple times?
-            # Original: time = f.time.to_index() + tdelta
-            f["time"] = f.time.to_index() + tdelta
-        except Exception:
-            pass
+        hour = _get_hour(fn)
+        if hour > 0:
+            ds["time"] = ds.time + pd.Timedelta(hour, unit="h")
 
-    return f
+    return ds
 
 
-def _fix_nemsio(f):
-    f = _rename_func(f, {})
+def _fix_nemsio(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Fix NEMSIO-derived NetCDF files by renaming and calculating height.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        The dataset to fix.
+
+    Returns
+    -------
+    xr.Dataset
+        The fixed dataset.
+    """
+    ds = _rename_func(ds, {})
     try:
-        f["geohgt"] = _calc_nemsio_hgt(f)
+        if "hgtsfc" in ds.variables and "delz" in ds.variables:
+            ds["geohgt"] = _calc_nemsio_hgt(ds)
     except Exception:
-        pass  # print("geoht calculation not completed")
-    return f
+        pass
+    return ds
 
 
-def _rename_func(f, rename_dict):
-    final_dict = {}
-    for i in f.data_vars.keys():
-        if "midlayer" in i:
-            rename_dict[i] = i.split("midlayer")[0]
-    for i in rename_dict.keys():
-        if i in f.data_vars.keys():
-            final_dict[i] = rename_dict[i]
-    f = f.rename(final_dict)
-    try:
-        f = f.rename({"pp25": "pm25", "pp10": "pm10"})
-    except ValueError:
-        pass  # print("PM25 and PM10 are not available")
-    return f
+def _rename_func(ds: xr.Dataset, rename_dict: dict) -> xr.Dataset:
+    """
+    Rename variables based on patterns and a mapping dictionary.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        The dataset to rename variables in.
+    rename_dict : dict
+        Explicit rename mapping.
+
+    Returns
+    -------
+    xr.Dataset
+        The dataset with renamed variables.
+    """
+    final_dict = rename_dict.copy()
+    # Pattern based renaming: '...midlayer' -> '...'
+    pattern_renames = {i: i.split("midlayer")[0] for i in ds.data_vars if "midlayer" in i}
+    final_dict.update(pattern_renames)
+
+    # Filter to only existing variables
+    actual_rename = {k: v for k, v in final_dict.items() if k in ds.variables}
+
+    # Add specific ones
+    if "pp25" in ds.variables:
+        actual_rename["pp25"] = "pm25"
+    if "pp10" in ds.variables:
+        actual_rename["pp10"] = "pm10"
+
+    if actual_rename:
+        ds = ds.rename(actual_rename)
+
+    return ds
 
 
-def _fix_grib2(f):
+def _fix_grib2(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Fix GRIB2 files by renaming variables and handling coordinates.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        The dataset to fix.
+
+    Returns
+    -------
+    xr.Dataset
+        The fixed dataset.
+    """
     rename_dict = {
         "AOTK_aerosol_EQ_Total_Aerosol_aerosol_size_LT_2eM05_aerosol_wavelength_GE_5D45eM07_LE_5D65eM07_entireatmosphere": "pm25aod550",
         "AOTK_aerosol_EQ_Dust_Dry_aerosol_size_LT_2eM05_aerosol_wavelength_GE_5D45eM07_LE_5D65eM07_entireatmosphere": "dust25aod550",
@@ -236,48 +312,74 @@ def _fix_grib2(f):
         "AOTK_aerosol_EQ_Total_Aerosol_aerosol_size_LT_2eM05_aerosol_wavelength_GE_1D1eM05_LE_1D12eM05_entireatmosphere": "pm25aod11000",
     }
 
-    f = _rename_func(f, rename_dict)
+    ds = _rename_func(ds, rename_dict)
 
     # Check if 'latitude'/'longitude' exist already or need renaming from lat_0/lon_0
     # Grib2 often has lat_0, lon_0
+    rename_coords = {}
+    if "latitude" not in ds.coords:
+        if "lat_0" in ds.coords:
+            rename_coords["lat_0"] = "latitude"
+            rename_coords["lon_0"] = "longitude"
+        elif "lat" in ds.coords:
+            rename_coords["lat"] = "latitude"
+            rename_coords["lon"] = "longitude"
 
-    if "latitude" not in f.coords:
-        if "lat_0" in f.coords:
-            f = f.rename({"lat_0": "latitude", "lon_0": "longitude"})
-        elif "lat" in f.coords:
-            f = f.rename({"lat": "latitude", "lon": "longitude"})
+    if rename_coords:
+        ds = ds.rename(rename_coords)
 
     # Create 2D grid if 1D (Meshgrid)
-    # The original code did manual meshgrid logic.
-    if f.latitude.ndim == 1 and f.longitude.ndim == 1:
-        from numpy import meshgrid
-
-        # Original logic implies lat/lon were 1D arrays of unique values?
-        # "f['latitude'] = range(len(f.latitude))" -> this suggests original coords were 1D
-        # NOTE: XarrayDriver typically gives what xarray gives.
-        # If we want to replicate exactly:
-        lat_vals = f.latitude.values
-        lon_vals = f.longitude.values
-
+    if (
+        "latitude" in ds.coords
+        and "longitude" in ds.coords
+        and ds.latitude.ndim == 1
+        and ds.longitude.ndim == 1
+    ):
         # Rename dims to y, x if not present
-        if "lat_0" in f.dims:
-            f = f.rename({"lat_0": "y", "lon_0": "x"})
-        elif "latitude" in f.dims:  # If we renamed coords above
-            f = f.rename({"latitude": "y", "longitude": "x"})
+        rename_dims = {}
+        if "lat_0" in ds.dims:
+            rename_dims["lat_0"] = "y"
+            rename_dims["lon_0"] = "x"
+        elif "latitude" in ds.dims:
+            rename_dims["latitude"] = "y"
+            rename_dims["longitude"] = "x"
 
-        lon, lat = meshgrid(lon_vals, lat_vals)
-        f["longitude"] = (("y", "x"), lon)
-        f["latitude"] = (("y", "x"), lat)
-        f = f.set_coords(["latitude", "longitude"])
+        if rename_dims:
+            ds = ds.rename(rename_dims)
 
-    return f
+        # Use broadcast to create 2D arrays lazily
+        # After renaming dims, coords might also be renamed if they shared the name
+        lat_name = "y" if "y" in ds.coords else "latitude"
+        lon_name = "x" if "x" in ds.coords else "longitude"
+
+        lon_2d, lat_2d = xr.broadcast(ds[lon_name], ds[lat_name])
+        ds["longitude"] = lon_2d
+        ds["latitude"] = lat_2d
+        ds = ds.set_coords(["latitude", "longitude"])
+
+    return ds
 
 
-def _calc_nemsio_hgt(f):
-    sfc = f.hgtsfc
-    dz = f.delz
-    z = dz + sfc
-    z = z.rolling(z=len(f.z), min_periods=1).sum()
+def _calc_nemsio_hgt(ds: xr.Dataset) -> xr.DataArray:
+    """
+    Calculate geopotential height for NEMSIO-derived NetCDF files.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        The dataset containing surface height and layer thickness.
+
+    Returns
+    -------
+    xr.DataArray
+        The calculated geopotential height.
+    """
+    sfc = ds.hgtsfc
+    dz = ds.delz
+    # Level 0 height = sfc + dz[0]
+    # Level 1 height = Level 0 + dz[1] = sfc + dz[0] + dz[1]
+    # Correct lazy logic: sfc + dz.cumsum()
+    z = dz.cumsum(dim="z") + sfc
     z.name = "geohgt"
     z.attrs["long_name"] = "Geopotential Height"
     z.attrs["units"] = "m"
