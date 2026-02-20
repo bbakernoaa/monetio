@@ -1,0 +1,164 @@
+"""MONETIO Command Line Interface."""
+
+import click
+import pandas as pd
+import xarray as xr
+
+import monetio
+
+
+def parse_dates(dates):
+    """Parse dates from CLI input."""
+    if not dates:
+        return None
+    # Support 'start:end' range
+    if len(dates) == 1 and ":" in dates[0]:
+        try:
+            start, end = dates[0].split(":")
+            return pd.date_range(start, end)
+        except Exception as e:
+            raise click.BadParameter(f"Invalid date range format: {dates[0]}. Error: {e}")
+    # Otherwise return list
+    return list(dates)
+
+
+def handle_save(obj, output, as_pandas):
+    """Handle saving the loaded data object."""
+    if output:
+        if as_pandas or isinstance(obj, (pd.DataFrame, pd.Series)):
+            # Handle dask dataframe
+            if hasattr(obj, "compute"):
+                obj = obj.compute()
+            # Handle xarray dataset to pandas
+            if isinstance(obj, xr.Dataset):
+                obj = obj.to_dataframe().reset_index()
+
+            obj.to_csv(output, index=False)
+            click.echo(f"Saved to {output} (CSV)")
+        else:
+            if isinstance(obj, pd.DataFrame):
+                click.echo("Error: Cannot save DataFrame as NetCDF. Use --as-pandas for CSV.")
+                return
+            obj.to_netcdf(output)
+            click.echo(f"Saved to {output} (NetCDF)")
+    else:
+        # Just print a summary if no output file specified
+        click.echo(obj)
+
+
+@click.group()
+def cli():
+    """MONETIO Command Line Interface for atmospheric data."""
+    pass
+
+
+def common_options(f):
+    """Decorator for common CLI options."""
+    f = click.option(
+        "--dates",
+        "-d",
+        multiple=True,
+        help="Date or date range (e.g., '2023-01-01' or '2023-01-01:2023-01-05').",
+    )(f)
+    f = click.option("--output", "-o", help="Output file path.")(f)
+    f = click.option("--n-procs", default=1, help="Number of processors for parallel loading.")(f)
+    f = click.option("--lazy", is_flag=True, help="Use Dask for lazy loading.")(f)
+    f = click.option("--as-pandas", is_flag=True, help="Process and save as CSV (Pandas).")(f)
+    return f
+
+
+@cli.command()
+@common_options
+@click.option("--siteid", help="AERONET site ID.")
+@click.option("--product", default="AOD15", help="AERONET product (e.g., 'AOD15', 'SDA20').")
+@click.option("--daily", is_flag=True, help="Load daily averages.")
+@click.option("--inv-type", help="Inversion type (e.g., 'ALM15').")
+def aeronet(dates, output, n_procs, lazy, as_pandas, siteid, product, daily, inv_type):
+    """Retrieve and process AERONET data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading AERONET data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "aeronet",
+        dates=d,
+        siteid=siteid,
+        product=product,
+        daily=daily,
+        inv_type=inv_type,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
+@common_options
+@click.option("--daily", is_flag=True, help="Load daily data.")
+@click.option(
+    "--wide-fmt/--long-fmt",
+    default=True,
+    help="Whether to return data in wide format (pollutants as columns).",
+)
+def airnow(dates, output, n_procs, lazy, as_pandas, daily, wide_fmt):
+    """Retrieve and process AirNow data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading AirNow data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "airnow",
+        dates=d,
+        daily=daily,
+        wide_fmt=wide_fmt,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
+@common_options
+@click.option("--param", "-p", multiple=True, help="AQS parameter(s) to retrieve.")
+@click.option("--daily", is_flag=True, help="Load daily data.")
+@click.option("--network", help="Filter by network name.")
+def aqs(dates, output, n_procs, lazy, as_pandas, param, daily, network):
+    """Retrieve and process EPA AQS data."""
+    d = parse_dates(dates)
+    p = list(param) if param else None
+    click.echo(f"Loading AQS data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "aqs",
+        dates=d,
+        param=p,
+        daily=daily,
+        network=network,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
+@common_options
+@click.option(
+    "--wide-fmt/--long-fmt",
+    default=True,
+    help="Whether to return data in wide format.",
+)
+def openaq(dates, output, n_procs, lazy, as_pandas, wide_fmt):
+    """Retrieve and process OpenAQ data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading OpenAQ data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "openaq",
+        dates=d,
+        wide_fmt=wide_fmt,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+if __name__ == "__main__":
+    cli()
