@@ -229,14 +229,20 @@ class PointReader(BaseReader):
 
         # Add UGRID metadata
         if "node" in ds.dims:
-            ds["mesh"] = xr.DataArray(
-                data=np.int32(0),
-                attrs={
-                    "cf_role": "mesh_topology",
-                    "topology_dimension": 0,
-                    "node_coordinates": "longitude latitude",
-                },
-            )
+            node_coords = []
+            for c in ["longitude", "latitude", "elevation"]:
+                if c in ds.coords:
+                    node_coords.append(c)
+
+            if node_coords:
+                ds["mesh"] = xr.DataArray(
+                    data=np.int32(0),
+                    attrs={
+                        "cf_role": "mesh_topology",
+                        "topology_dimension": 0,
+                        "node_coordinates": " ".join(node_coords),
+                    },
+                )
 
             if "latitude" in ds.coords:
                 ds.coords["latitude"].attrs.update(
@@ -246,10 +252,20 @@ class PointReader(BaseReader):
                 ds.coords["longitude"].attrs.update(
                     {"units": "degrees_east", "standard_name": "longitude"}
                 )
+            if "elevation" in ds.coords:
+                ds.coords["elevation"].attrs.update(
+                    {"units": "m", "standard_name": "height_above_mean_sea_level"}
+                )
 
             for var in ds.data_vars:
                 if "node" in ds[var].dims:
                     ds[var].attrs.update({"mesh": "mesh", "location": "node"})
+
+        # Add Global Attributes
+        if "Conventions" not in ds.attrs:
+            ds.attrs["Conventions"] = "CF-1.8 UGRID-1.0"
+        elif "UGRID-1.0" not in ds.attrs["Conventions"]:
+            ds.attrs["Conventions"] += " UGRID-1.0"
 
         # Update history
         history = (

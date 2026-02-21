@@ -38,8 +38,8 @@ def test_pams_eager_lazy(tmp_path):
     assert isinstance(ds_eager, xr.Dataset)
     assert "obs" in ds_eager.data_vars
     assert ds_eager.obs.values[0] == 10.0
-    # siteid is renamed to node during 2D expansion
-    assert ds_eager.coords["node"].values[0] == "010010001"
+    # siteid is renamed to node during 2D expansion, but preserved as siteid coord
+    assert ds_eager.coords["siteid"].values[0] == "010010001"
 
     # Test Lazy Mode
     ds_lazy = reader.open_dataset(files=[str(f)], as_xarray=True, lazy=True)
