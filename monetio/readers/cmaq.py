@@ -314,10 +314,41 @@ def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     )
 
     # 2. Broadcast to 2D (ensure ROW is first dim)
-    yv, xv = xr.broadcast(xr.DataArray(y, dims="ROW"), xr.DataArray(x, dims="COL"))
+    xda = xr.DataArray(x, dims="COL")
+    yda = xr.DataArray(y, dims="ROW")
+
+    if hasattr(ds, "chunks") and ds.chunks:
+        # Use chunks from dataset if available
+        xda = xda.chunk({"COL": ds.chunks.get("COL", "auto")})
+        yda = yda.chunk({"ROW": ds.chunks.get("ROW", "auto")})
+
+    yv, xv = xr.broadcast(yda, xda)
 
     # 3. Apply projection lazily
-    def _proj_inv(x_val, y_val, p_srs):
+    def _proj_inv(x_val: np.ndarray, y_val: np.ndarray, p_srs: str) -> tuple:
+        """
+        Vectorized inverse projection wrapper.
+
+        Parameters
+        ----------
+        x_val : np.ndarray
+            X coordinates in meters.
+        y_val : np.ndarray
+            Y coordinates in meters.
+        p_srs : str
+            PROJ4 projection string.
+
+        Returns
+        -------
+        tuple
+            (longitude, latitude) arrays.
+        """
+        # Ensure p_srs is a string if it came as an array
+        if isinstance(p_srs, (np.ndarray, np.generic)):
+            p_srs = p_srs.item()
+        if hasattr(p_srs, "decode"):
+            p_srs = p_srs.decode()
+
         p = Proj(p_srs)
         return p(x_val, y_val, inverse=True)
 
@@ -326,7 +357,6 @@ def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
         xv,
         yv,
         proj4_srs,
-        vectorize=True,
         dask="parallelized",
         output_dtypes=[float, float],
         output_core_dims=[(), ()],
@@ -340,6 +370,17 @@ def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
             {"long_name": "Latitude", "units": "degree_north", "standard_name": "latitude"}
         ),
     )
+
+    # Update history
+    history = (
+        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
+        "Generated Latitude/Longitude coordinates."
+    )
+    if "history" in ds.attrs:
+        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+    else:
+        ds.attrs["history"] = history
+
     return ds
 
 
