@@ -8,13 +8,14 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import add_time_coord
+from .sat_utils import add_time_coord, standardize_satellite_coords, update_history
 
 
 @register_reader("nesdis_eps_viirs")
 class NESDISEPSVIIRSReader(GriddedReader):
     """
     Reader for NESDIS EPS VIIRS (Enterprise Processing System) AOT data.
+    Available on NOAA STAR FTP.
     """
 
     def open_dataset(
@@ -48,19 +49,13 @@ class NESDISEPSVIIRSReader(GriddedReader):
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = nesdis_eps_viirs_preprocess
 
+        if "engine" not in kwargs:
+            kwargs["engine"] = "h5netcdf"
+
         ds = super().open_dataset(files, **kwargs)
 
-        # Standardize naming and attributes
-        ds = self.harmonize(ds)
-
         # Update history
-        history = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read NESDIS EPS VIIRS data."
-        )
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read NESDIS EPS VIIRS data.")
 
         return ds
 
@@ -97,65 +92,55 @@ class NESDISEPSVIIRSReader(GriddedReader):
             urls.append(url)
         return urls
 
-    def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
-        """
-        Harmonize the dataset (placeholder for common transformations).
-        """
-        return ds
-
 
 def nesdis_eps_viirs_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """
-    Preprocess NESDIS EPS VIIRS dataset: assign coordinates and rename dimensions.
+    Preprocess NESDIS EPS VIIRS dataset: assign coordinates and standardize.
 
     Parameters
     ----------
     ds : xr.Dataset
-        Input dataset from a single file.
+        Input dataset.
 
     Returns
     -------
     xr.Dataset
         Processed dataset.
     """
-    # 1. Identify grid size
+    # 1. Standardize dimensions and coordinates
+    ds = standardize_satellite_coords(ds)
+
+    # 2. Identify grid size and generate coordinates if needed
     # EPS files typically have nlat=720, nlon=1440
-    nlat = ds.sizes.get("nlat", 720)
-    nlon = ds.sizes.get("nlon", 1440)
+    if "latitude" not in ds.variables:
+        nlat = ds.sizes.get("y", 720)
+        nlon = ds.sizes.get("x", 1440)
 
-    # 2. Generate coordinates
-    lon_min = -179.875
-    lon_max = -1.0 * lon_min
-    lat_min = -89.875
-    lat_max = -1.0 * lat_min
-    lons = np.linspace(lon_min, lon_max, nlon)
-    lats = np.linspace(lat_max, lat_min, nlat)  # EPS uses descending latitudes (lat_max to lat_min)
+        lon_min = -179.875
+        lon_max = -1.0 * lon_min
+        lat_min = -89.875
+        lat_max = -1.0 * lat_min
+        lons = np.linspace(lon_min, lon_max, nlon)
+        # EPS uses descending latitudes (lat_max to lat_min)
+        lats = np.linspace(lat_max, lat_min, nlat)
 
-    # 3. Rename dimensions
-    rename_dict = {}
-    if "nlat" in ds.dims:
-        rename_dict["nlat"] = "y"
-    if "nlon" in ds.dims:
-        rename_dict["nlon"] = "x"
-    if rename_dict:
-        ds = ds.rename(rename_dict)
+        lon2d, lat2d = np.meshgrid(lons, lats)
+        ds = ds.assign_coords(
+            latitude=(("y", "x"), lat2d, {"units": "degrees_north", "standard_name": "latitude"}),
+            longitude=(("y", "x"), lon2d, {"units": "degrees_east", "standard_name": "longitude"}),
+        )
 
-    # 4. Assign lat/lon
-    lon2d, lat2d = np.meshgrid(lons, lats)
-    ds = ds.assign_coords(
-        latitude=(("y", "x"), lat2d, {"units": "degrees_north", "standard_name": "latitude"}),
-        longitude=(("y", "x"), lon2d, {"units": "degrees_east", "standard_name": "longitude"}),
-    )
-
-    # 5. Extract time from global attributes
-    ds = add_time_coord(ds, time_attr="time_coverage_start")
+    # 3. Handle Time
+    if "time" not in ds.coords:
+        ds = add_time_coord(ds, time_attr="time_coverage_start")
     if "time" not in ds.coords:
         ds = add_time_coord(ds, time_attr="DATE")
 
-    # 6. Final cleaning and standardization
+    # 4. Final cleaning and standardization
     if "aot_ip_out" in ds.data_vars:
         ds = ds.rename({"aot_ip_out": "aod_550"})
-        ds["aod_550"] = ds["aod_550"].where(ds["aod_550"] > 0)
+        # Mask invalid values (e.g., negative)
+        ds["aod_550"] = ds["aod_550"].where(ds["aod_550"] >= 0)
         ds["aod_550"].attrs.update(
             {
                 "long_name": "Aerosol Optical Thickness at 550nm",

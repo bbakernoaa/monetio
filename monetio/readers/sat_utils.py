@@ -1,19 +1,97 @@
 """Satellite Reader Utilities"""
 
 import datetime
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
+import numpy as np
 import pandas as pd
 import xarray as xr
+
+
+def lazy_index_along_axis(data: xr.DataArray, index: xr.DataArray, dim: str) -> xr.DataArray:
+    """
+    Index a dimension using another DataArray lazily, handling both Eager and Dask.
+    Fixes the 'vindex does not support indexing with dask objects' limitation.
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        DataArray to index. Must have dimension `dim`.
+    index : xr.DataArray
+        DataArray of indices.
+    dim : str
+        Dimension name to index along.
+
+    Returns
+    -------
+    xr.DataArray
+        The indexed DataArray.
+    """
+
+    def _index_func(arr, idx):
+        # In apply_ufunc with input_core_dims=[[dim], []], the core dimension
+        # is moved to the last axis of arr.
+        # arr shape: (..., dim_size)
+        # idx shape: (...)
+        idx_expanded = idx[..., np.newaxis]
+        return np.take_along_axis(arr, idx_expanded, axis=-1).squeeze(axis=-1)
+
+    return xr.apply_ufunc(
+        _index_func,
+        data,
+        index,
+        input_core_dims=[[dim], []],
+        output_core_dims=[[]],
+        dask="parallelized",
+        output_dtypes=[data.dtype],
+        dask_gufunc_kwargs={"allow_rechunk": True},
+    )
+
+
+def apply_lazy_conversion(
+    data: xr.DataArray, func: Callable, output_dtype: Union[str, np.dtype, type]
+) -> xr.DataArray:
+    """
+    Apply a conversion function lazily to a DataArray using Aero Protocol.
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        Input DataArray.
+    func : Callable
+        Function to apply. Should work on NumPy arrays.
+    output_dtype : Union[str, np.dtype, type]
+        Expected output dtype.
+
+    Returns
+    -------
+    xr.DataArray
+        Converted DataArray.
+    """
+
+    def _wrapped_func(x):
+        res = func(x)
+        # Ensure result is a NumPy array to avoid issues with Dask/Xarray
+        # (e.g. DatetimeIndex causing transpose errors)
+        if hasattr(res, "to_numpy"):
+            return res.to_numpy()
+        return np.asarray(res)
+
+    return xr.apply_ufunc(
+        _wrapped_func,
+        data,
+        dask="parallelized",
+        output_dtypes=[output_dtype],
+    )
 
 
 def standardize_satellite_coords(
     ds: xr.Dataset,
     lat_name: str = "Latitude",
     lon_name: str = "Longitude",
-    y_dim: Union[str, List[str]] = ["Rows", "scanline"],
-    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel"],
-    z_dim: Union[str, List[str]] = ["Levels", "layer"],
+    y_dim: Union[str, List[str]] = ["Rows", "scanline", "nlat", "lat", "nscan"],
+    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel", "nlon", "lon", "nstep"],
+    z_dim: Union[str, List[str]] = ["Levels", "layer", "level"],
 ) -> xr.Dataset:
     """
     Standardize satellite swath/gridded coordinates and dimensions.
@@ -91,6 +169,30 @@ def standardize_satellite_coords(
     if "longitude" in ds.variables:
         ds["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
 
+    return ds
+
+
+def update_history(ds: xr.Dataset, message: str) -> xr.Dataset:
+    """
+    Update the 'history' attribute of a dataset.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    message : str
+        Message to add to history.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with updated history.
+    """
+    history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {message}"
+    if "history" in ds.attrs:
+        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+    else:
+        ds.attrs["history"] = history
     return ds
 
 

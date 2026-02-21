@@ -19,7 +19,7 @@ def add_data(
     interp_to_aod_values=None,
     n_procs=1,
     verbose=10,
-    as_xarray=True,
+    as_xarray=False,
     **kwargs,
 ):
     """Retrieve and load AERONET data."""
@@ -35,7 +35,6 @@ def add_data(
         detect_dust=detect_dust,
         interp_to_aod_values=interp_to_aod_values,
         n_procs=n_procs,
-        verbose=verbose,
         as_xarray=as_xarray,
         **kwargs,
     )
@@ -47,7 +46,7 @@ def add_local(
     freq=None,
     detect_dust=False,
     interp_to_aod_values=None,
-    as_xarray=True,
+    as_xarray=False,
     **kwargs,
 ):
     """Read a local AERONET file."""

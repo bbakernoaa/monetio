@@ -7,42 +7,178 @@ https://docs.openaq.org/aws/about
 
 import logging
 import warnings
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Union
 
 import pandas as pd
+import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .base import PointReader, register_reader
 
 logger = logging.getLogger(__name__)
 
 
-def read(fp):
-    """Read OpenAQ archive data from a file-like object.
+@register_reader("openaq_aws")
+class OpenAQAWSReader(PointReader):
+    """OpenAQ AWS Archive Reader"""
+
+    def open_dataset(
+        self,
+        files: Union[str, List[str]] = None,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        siteid: Union[str, List[str]] = None,
+        country: Union[str, List[str]] = None,
+        provider: Union[str, List[str]] = None,
+        find_paths: bool = True,
+        wide_fmt: bool = False,
+        n_procs: int = 1,
+        as_xarray: bool = True,
+        lazy: bool = False,
+        **kwargs,
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
+        """
+        Add OpenAQ data from AWS Open Data.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File path, list of paths, or glob pattern.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve if files are not provided.
+        siteid : Union[str, List[str]], optional
+            Site ID(s) to filter by.
+        country : Union[str, List[str]], optional
+            Country code(s) to filter by.
+        provider : Union[str, List[str]], optional
+            Provider name(s) to filter by.
+        find_paths : bool, optional
+            Whether to find paths via S3 listing (slow), by default True.
+        wide_fmt : bool, optional
+            Whether to return data in wide format, by default False.
+        n_procs : int, optional
+            Number of processors for dask compute, by default 1.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        **kwargs : dict
+            Additional arguments.
+
+        Returns
+        -------
+        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+            The loaded dataset.
+        """
+
+        # For backward compatibility, if the first argument looks like dates, swap them.
+        if (
+            files is not None
+            and dates is None
+            and isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp, list, str))
+        ):
+            if isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp)):
+                dates = files
+                files = None
+            elif isinstance(files, list) and len(files) > 0 and isinstance(files[0], datetime):
+                dates = files
+                files = None
+
+        read_func = read_openaq_aws_csv
+
+        if files is None and dates is not None:
+            dates = _to_datetime_index(dates).dropna()
+            if dates.empty:
+                raise ValueError("must provide at least one datetime-like")
+
+            if find_paths:
+                paths = get_paths(dates, siteid=siteid, country=country, provider=provider)
+                files = [f"s3://{p}" for p in paths]
+            else:
+                if siteid is None:
+                    raise ValueError("must provide `siteid` when `find_paths` is false")
+                files = build_urls(dates, siteid)
+                read_func = read_openaq_aws_csv_robust
+
+        if not files:
+            # Handle empty
+            if lazy:
+                import dask.dataframe as dd
+
+                df = dd.from_pandas(pd.DataFrame(), npartitions=1)
+            else:
+                df = pd.DataFrame()
+            if as_xarray:
+                return xr.Dataset()
+            return df
+
+        # Use base class to open
+        df = super().open_dataset(
+            files,
+            read_method=read_func,
+            as_xarray=False,
+            lazy=lazy,
+            **kwargs,
+        )
+
+        # Post-processing
+        df = self.harmonize(df)
+
+        if wide_fmt:
+            from ..util import long_to_wide
+
+            df = long_to_wide(df)
+
+        if not lazy and hasattr(df, "compute"):
+            df = df.compute(num_workers=n_procs)
+
+        if as_xarray:
+            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
+
+            # Update history
+            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read OpenAQ AWS data."
+            if "history" in ds.attrs:
+                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+            else:
+                ds.attrs["history"] = history
+            return ds
+
+        return df
+
+
+def read_openaq_aws_csv(fp: str, **kwargs) -> pd.DataFrame:
+    """
+    Read OpenAQ archive data from a file-like object.
 
     Parameters
     ----------
-    fp : str or path-like or file-like
-        OpenAQ archive data, suitable for passing to ``pd.read_csv``.
+    fp : str
+        File path or URL.
+    **kwargs : dict
+        Additional arguments passed to pd.read_csv.
 
     Returns
     -------
     pd.DataFrame
         OpenAQ archive data.
     """
-
     df = pd.read_csv(
         fp,
         dtype={
             0: str,  # location_id
-            1: str,  # sensor_id or sensors_id ??
+            1: str,  # sensor_id
             2: str,  # location
             3: str,  # datetime
             4: float,  # lat
             5: float,  # lon
             6: str,  # parameter
-            7: str,  # unit or units ??
+            7: str,  # unit
             8: float,  # value
         },
         parse_dates=["datetime"],
+        **kwargs,
     )
 
     # Normalize to web API column names
@@ -61,9 +197,30 @@ def read(fp):
 
     # Convert to UTC, non-localized
     if not df.empty:
-        df["time"] = df["time"].dt.tz_convert("UTC").dt.tz_localize(None)
+        if df["time"].dt.tz is not None:
+            df["time"] = df["time"].dt.tz_convert("UTC").dt.tz_localize(None)
 
     return df
+
+
+def read_openaq_aws_csv_robust(fp: str, **kwargs) -> pd.DataFrame:
+    """Try to read a file, returning empty DF if not found."""
+    try:
+        return read_openaq_aws_csv(fp, **kwargs)
+    except FileNotFoundError:
+        return pd.DataFrame(
+            columns=[
+                "siteid",
+                "sensor_id",
+                "location",
+                "time",
+                "latitude",
+                "longitude",
+                "parameter",
+                "units",
+                "value",
+            ]
+        )
 
 
 def _maybe_to_list(x, *, not_none=False):
@@ -216,7 +373,7 @@ def get_locations(*, provider=None, country=None):
     return df
 
 
-def _build_urls(dates, sites, *, protocol="s3"):
+def build_urls(dates, sites, *, protocol="s3"):
     """Naively build URLs for OpenAQ archive data on AWS."""
     dates = _to_datetime_index(dates)
     sites = _maybe_to_list(sites, not_none=True)
@@ -240,91 +397,24 @@ def _build_urls(dates, sites, *, protocol="s3"):
     return urls
 
 
-def _maybe_read(fp):
-    """Try to read a file, returning empty DF if not found."""
-    try:
-        return read(fp)
-    except FileNotFoundError:
-        return pd.DataFrame(
-            columns=[
-                "siteid",
-                "sensor_id",
-                "location",
-                "time",
-                "latitude",
-                "longitude",
-                "parameter",
-                "units",
-                "value",
-            ]
-        )
+# -----------------------------------------------------------------------------
+# Legacy Compatibility
+# -----------------------------------------------------------------------------
 
 
-@register_reader("openaq_aws")
-class OpenAQAWSReader(PointReader):
-    """OpenAQ AWS Archive Reader"""
+def read(fp, **kwargs):
+    """Legacy wrapper."""
+    return read_openaq_aws_csv(fp, **kwargs)
 
-    def open_dataset(
-        self,
-        dates,
-        *,
-        siteid=None,
-        country=None,
-        provider=None,
-        find_paths=True,
-        n_procs=1,
-        as_xarray=True,
-        lazy=False,
-        **kwargs,
-    ):
-        """Add OpenAQ data from AWS Open Data."""
-        import dask.dataframe as dd
 
-        dates = _to_datetime_index(dates).dropna()
-        if dates.empty:
-            raise ValueError("must provide at least one datetime-like")
+def _maybe_read(fp, **kwargs):
+    """Legacy wrapper."""
+    return read_openaq_aws_csv_robust(fp, **kwargs)
 
-        if find_paths:
-            paths = get_paths(dates, siteid=siteid, country=country, provider=provider)
-            urls = [f"s3://{p}" for p in paths]
-            func = read
-        else:
-            if siteid is None:
-                raise ValueError("must provide `siteid` when `find_paths` is false")
-            urls = _build_urls(dates, siteid)
-            func = _maybe_read
 
-        meta = [
-            ("siteid", str),
-            ("sensor_id", str),
-            ("location", str),
-            ("time", "datetime64[ns]"),
-            ("latitude", float),
-            ("longitude", float),
-            ("parameter", str),
-            ("units", str),
-            ("value", float),
-        ]
-        df = dd.from_map(func, urls, meta=meta)
-
-        if not lazy:
-            df = df.compute(num_workers=n_procs)
-
-        df = self.harmonize(df)
-        if as_xarray:
-            ds = self.to_xarray(df, **kwargs)
-
-            # Update history
-            from datetime import datetime
-
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read OpenAQ AWS data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
-            return ds
-
-        return df
+def _build_urls(dates, sites, **kwargs):
+    """Legacy wrapper."""
+    return build_urls(dates, sites, **kwargs)
 
 
 def add_data(
@@ -334,6 +424,7 @@ def add_data(
     country=None,
     provider=None,
     find_paths=True,
+    wide_fmt=False,
     n_procs=1,
     **kwargs,
 ):
@@ -344,6 +435,8 @@ def add_data(
         country=country,
         provider=provider,
         find_paths=find_paths,
+        wide_fmt=wide_fmt,
         n_procs=n_procs,
+        as_xarray=False,  # Return DataFrame by default for add_data legacy
         **kwargs,
     )

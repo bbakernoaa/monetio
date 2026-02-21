@@ -44,6 +44,9 @@ dependencies = [
     "pyproj"
 ]
 
+[project.scripts]
+monetio = "monetio.cli:cli"
+
 [tool.setuptools.dynamic]
 version = {attr = "monetio.__version__"}
 

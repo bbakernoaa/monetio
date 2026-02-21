@@ -1,4 +1,8 @@
-import xarray as xr
+"""
+Chimere Reader. Redirection to monetio.readers.chimere
+"""
+
+from ..readers.chimere import ChimereReader
 
 
 def open_mfdataset(files, var_list=None, surf_only=False, **kwargs):
@@ -17,40 +21,6 @@ def open_mfdataset(files, var_list=None, surf_only=False, **kwargs):
         Chimere model dataset in standard format for use
         in MELODIES-MONET
     """
-    if not isinstance(files, (list, tuple)):
-        files = [files]
-
-    datasets = []
-    for file in files:
-        try:
-            datasets.append(xr.open_dataset(file, engine="h5netcdf"))
-        except Exception:
-            datasets.append(xr.open_dataset(file))
-
-    # get the data_vars wanted
-    if var_list is None:
-        var_list = []
-
-    drop_data_vars = set(list(datasets[0].data_vars)) - set(var_list)
-
-    for n, ds in enumerate(datasets):
-        datasets[n] = ds.drop_vars(drop_data_vars, errors="ignore")
-
-    xrds = xr.concat(datasets, "time_counter")
-
-    xrds = xrds.rename(
-        {
-            "nav_lat": "latitude",
-            "nav_lon": "longitude",
-            "time_counter": "time",
-            "bottom_top": "z",
-        }
+    return ChimereReader().open_dataset(
+        files=files, var_list=var_list, surf_only=surf_only, **kwargs
     )
-
-    if surf_only:
-        xrds = xrds.isel(z=0).expand_dims("z", axis=1)
-
-    xrds = xrds.reset_coords()
-    xrds = xrds.set_coords(["latitude", "longitude"])
-
-    return xrds

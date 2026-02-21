@@ -545,18 +545,20 @@ def force_object_strings(df):
         # For Dask, we use assign to ensure metadata is updated
         # and we explicitly cast to object.
         for col in df.columns:
-            if pd.api.types.is_string_dtype(df[col]):
+            # We use .dtype to avoid triggering is_all_strings(df[col])
+            # which would call len(df[col]) and trigger a compute.
+            if pd.api.types.is_string_dtype(df[col].dtype):
                 df = df.assign(**{col: df[col].astype(object)})
         return df
     else:
         df = df.copy()
         for col in df.columns:
-            if pd.api.types.is_string_dtype(df[col]):
+            if pd.api.types.is_string_dtype(df[col].dtype):
                 df[col] = df[col].astype(object)
         return df
 
 
-def ds_to_2d(ds, pivot=True):
+def ds_to_2d(ds, pivot=True, fixed_location=False):
     """
     Lazily transform a 1D UGRID dataset into a 2D (time, node) dataset.
     If 'variable' is present in coordinates and pivot=True, it also pivots the data variables.
@@ -567,6 +569,8 @@ def ds_to_2d(ds, pivot=True):
         Input 1D dataset with 'time' and 'siteid' coordinates.
     pivot : bool, optional
         Whether to pivot by 'variable' column if present, by default True.
+    fixed_location : bool, optional
+        Whether to enforce fixed latitude/longitude/elevation per node, by default False.
 
     Returns
     -------
@@ -599,6 +603,11 @@ def ds_to_2d(ds, pivot=True):
             # To handle multiple data vars consistently, we set MultiIndex and unstack
             # We use drop=True to avoid keeping the old 'node' coordinate which is now a MultiIndex
             ds_idx = ds.set_index(node=["time", "siteid", "variable"])
+
+            # Ensure entries are unique before unstacking
+            if "node" in ds_idx.coords:
+                ds_idx = ds_idx.drop_duplicates("node")
+
             ds_unstacked = ds_idx.unstack("node")
 
             # 2. Extract 'obs' and pivot it by 'variable'
@@ -639,12 +648,42 @@ def ds_to_2d(ds, pivot=True):
 
         else:
             # Simple expansion path
-            ds2d = ds.set_index(node=["time", "siteid"]).unstack("node")
+            ds_idx = ds.set_index(node=["time", "siteid"])
+
+            # Ensure entries are unique before unstacking
+            if "node" in ds_idx.coords:
+                ds_idx = ds_idx.drop_duplicates("node")
+
+            ds2d = ds_idx.unstack("node")
 
         # In MONET 2D convention, 'siteid' becomes the second dimension,
         # but we rename it to 'node' for UGRID compliance.
         if "siteid" in ds2d.dims:
+            # Preserve siteid as a coordinate while renaming dimension to node for UGRID compliance
             ds2d = ds2d.rename({"siteid": "node"})
+            # Now 'node' has siteid values.
+            # We want 'node' to be 0...N-1 and 'siteid' to be a coordinate of 'node'.
+            siteids = ds2d.node.values
+            ds2d.coords["siteid"] = (("node",), siteids)
+            ds2d.coords["node"] = (("node",), np.arange(ds2d.sizes["node"]))
+
+        if fixed_location:
+            # Enforce fixed locations by averaging over time (ignoring NaNs)
+            # This fixes issues where missing time steps result in NaN lat/lon
+            for coord in ["latitude", "longitude", "elevation"]:
+                if coord in ds2d.coords or coord in ds2d.data_vars:
+                    if "time" in ds2d[coord].dims and "node" in ds2d[coord].dims:
+                        try:
+                            # Use mean to reduce time dimension, ignoring NaNs
+                            fixed_coord = ds2d[coord].mean(dim="time", skipna=True)
+                            if coord in ds2d.coords:
+                                ds2d.coords[coord] = fixed_coord
+                            else:
+                                # Convert data var to coordinate after fixing
+                                ds2d = ds2d.set_coords(coord)
+                                ds2d.coords[coord] = fixed_coord
+                        except Exception:
+                            pass
 
         if "history" in ds2d.attrs:
             ds2d.attrs["history"] = f"{ds2d.attrs['history']}\n{history}"

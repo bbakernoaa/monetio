@@ -79,6 +79,8 @@ class PointReader(BaseReader):
     Base class for point/tabular data (Observations) that utilizes PandasDriver.
     """
 
+    fixed_location = True
+
     def __init__(self):
         self.driver = PandasDriver()
 
@@ -88,6 +90,7 @@ class PointReader(BaseReader):
         read_method: str = "read_csv",
         as_xarray: bool = True,
         lazy: bool = False,
+        meta: Union[pd.DataFrame, pd.Series, dict, tuple, None] = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -103,6 +106,8 @@ class PointReader(BaseReader):
             If True, return an xarray.Dataset, by default True.
         lazy : bool, optional
             If True, return a dask-backed object, by default False.
+        meta : pd.DataFrame, pd.Series, dict, or tuple, optional
+            Dask metadata to use for lazy loading, by default None.
         **kwargs : dict
             Additional arguments passed to the reader and driver.
 
@@ -111,7 +116,7 @@ class PointReader(BaseReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded dataset.
         """
-        df = self.driver.open(files, read_method=read_method, lazy=lazy, **kwargs)
+        df = self.driver.open(files, read_method=read_method, lazy=lazy, meta=meta, **kwargs)
 
         df = self.harmonize(df)
 
@@ -206,7 +211,9 @@ class PointReader(BaseReader):
                 ds = ds.rename({"index": "node"})
 
         # Set standard coordinates
-        coords = [c for c in ["time", "siteid", "latitude", "longitude"] if c in ds.data_vars]
+        coords = [
+            c for c in ["time", "siteid", "latitude", "longitude", "elevation"] if c in ds.data_vars
+        ]
         ds = ds.set_coords(coords)
 
         # Ensure node coordinate is a simple integer range for both
@@ -218,18 +225,24 @@ class PointReader(BaseReader):
         if expand2d:
             # We pass kwargs to allow control over pivoting (wide_fmt or pivot)
             pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
-            ds = ds_to_2d(ds, pivot=pivot)
+            ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
 
         # Add UGRID metadata
         if "node" in ds.dims:
-            ds["mesh"] = xr.DataArray(
-                data=np.int32(0),
-                attrs={
-                    "cf_role": "mesh_topology",
-                    "topology_dimension": 0,
-                    "node_coordinates": "longitude latitude",
-                },
-            )
+            node_coords = []
+            for c in ["longitude", "latitude", "elevation"]:
+                if c in ds.coords:
+                    node_coords.append(c)
+
+            if node_coords:
+                ds["mesh"] = xr.DataArray(
+                    data=np.int32(0),
+                    attrs={
+                        "cf_role": "mesh_topology",
+                        "topology_dimension": 0,
+                        "node_coordinates": " ".join(node_coords),
+                    },
+                )
 
             if "latitude" in ds.coords:
                 ds.coords["latitude"].attrs.update(
@@ -239,10 +252,20 @@ class PointReader(BaseReader):
                 ds.coords["longitude"].attrs.update(
                     {"units": "degrees_east", "standard_name": "longitude"}
                 )
+            if "elevation" in ds.coords:
+                ds.coords["elevation"].attrs.update(
+                    {"units": "m", "standard_name": "height_above_mean_sea_level"}
+                )
 
             for var in ds.data_vars:
                 if "node" in ds[var].dims:
                     ds[var].attrs.update({"mesh": "mesh", "location": "node"})
+
+        # Add Global Attributes
+        if "Conventions" not in ds.attrs:
+            ds.attrs["Conventions"] = "CF-1.8 UGRID-1.0"
+        elif "UGRID-1.0" not in ds.attrs["Conventions"]:
+            ds.attrs["Conventions"] += " UGRID-1.0"
 
         # Update history
         history = (

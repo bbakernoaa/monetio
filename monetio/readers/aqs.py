@@ -1,5 +1,6 @@
 """AQS Reader"""
 
+import logging
 import warnings
 from datetime import datetime
 from functools import partial
@@ -12,10 +13,12 @@ import xarray as xr
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
-from monetio.obs.epa_util import read_monitor_file
 from monetio.util import force_object_strings, long_to_wide
 
 from .base import PointReader, register_reader
+from .epa_utils import read_monitor_file
+
+logger = logging.getLogger(__name__)
 
 
 @register_reader("aqs")
@@ -107,7 +110,18 @@ class AQSReader(PointReader):
             **kwargs,
         )
 
-        if len(df) == 0:
+        # Handle empty case without triggering compute on Dask
+        try:
+            import dask.dataframe as dd
+
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
+
+        if is_dask:
+            if df.npartitions == 0:
+                return df
+        elif len(df) == 0:
             return df
 
         # Filter dates
@@ -126,7 +140,7 @@ class AQSReader(PointReader):
 
         df = self.harmonize(df)
 
-        if not lazy and hasattr(df, "compute"):
+        if not lazy and is_dask:
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
@@ -212,7 +226,7 @@ class AQS:
             else:
                 newc = ccc_clean.lower().replace(" ", "_")
             if verbose:
-                print(f"{ccc} renamed {newc}")
+                logger.debug(f"{ccc} renamed {newc}")
             rcolumn.append(newc)
         return rcolumn
 
@@ -245,8 +259,9 @@ class AQS:
             df = pd.read_csv(
                 url,
                 low_memory=False,
+                encoding="ISO-8859-1",
             )
-            # Handle dates manually
+            # Vectorized Time construction
             if "Date GMT" in df.columns and "Time GMT" in df.columns:
                 df["time"] = pd.to_datetime(df["Date GMT"] + " " + df["Time GMT"])
             if "Date Local" in df.columns and "Time Local" in df.columns:
@@ -256,6 +271,7 @@ class AQS:
             # Remove duplicate time_local if it was created from 'Time Local'
             df = df.loc[:, ~df.columns.duplicated()]
 
+        # Vectorized siteid construction
         df["siteid"] = (
             df.state_code.astype(str).str.zfill(2)
             + df.county_code.astype(str).str.zfill(3)
@@ -307,26 +323,42 @@ class AQS:
         return url, fname
 
     def build_urls(self, params: List[str], dates, daily: bool = False) -> tuple:
-        """Build multiple URLs for given parameters and dates."""
+        """Build multiple URLs for given parameters and dates in parallel."""
+        import concurrent.futures
+
         import requests
 
         years = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates))).year.unique().astype(str)
         urls = []
         fnames = []
-        for i in params:
-            for y in years:
-                url, fname = self.build_url(i, y, daily=daily)
-                try:
-                    with requests.get(url, stream=True, timeout=10) as r:
-                        if r.status_code == 200:
-                            content_length = int(r.headers.get("Content-Length", 0))
-                            if content_length > 500:
-                                urls.append(url)
-                                fnames.append(fname)
-                            else:
-                                print(f"File is Empty. Not Processing {url}")
-                except Exception:
-                    pass
+
+        def check_url(p_y):
+            p, y = p_y
+            url, fname = self.build_url(p, y, daily=daily)
+            try:
+                # Use GET with stream=True as a head-like request
+                with requests.get(url, stream=True, timeout=10) as r:
+                    if r.status_code == 200:
+                        content_length = int(r.headers.get("Content-Length", 0))
+                        if content_length > 500:
+                            return url, fname
+                        else:
+                            logger.info(f"File is Empty. Not Processing {url}")
+            except Exception:
+                pass
+            return None
+
+        # Prepare list of (param, year) pairs
+        to_check = [(p, y) for p in params for y in years]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            results = list(executor.map(check_url, to_check))
+
+        for res in results:
+            if res:
+                urls.append(res[0])
+                fnames.append(res[1])
+
         return urls, fnames
 
     def retrieve(self, url: str, fname: str):
@@ -336,13 +368,12 @@ class AQS:
         import requests
 
         if not os.path.isfile(fname):
-            print(f"\n Retrieving: {fname}")
-            print(url)
+            logger.info(f"Retrieving: {fname} from {url}")
             r = requests.get(url)
             with open(fname, "wb") as f:
                 f.write(r.content)
         else:
-            print(f"\n File Exists: {fname}")
+            logger.info(f"File Exists: {fname}")
 
     def add_metadata(
         self, df: Union[pd.DataFrame, "dd.DataFrame"], daily: bool = False, network: str = None

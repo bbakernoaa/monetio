@@ -11,6 +11,8 @@ from .drivers import FileUtility
 
 @register_reader("hytraj")
 class HYTRAJReader(PointReader):
+    fixed_location = False
+
     def open_dataset(self, files, taglist=None, renumber=False, verbose=False, **kwargs):
         """
         Reads HYTRAJ tdump files.

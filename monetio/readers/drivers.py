@@ -90,6 +90,11 @@ class XarrayDriver:
 
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
+
+        # Handle 'lazy' keyword which is common in Aero Protocol but not xr.open_dataset
+        if "lazy" in xr_kwargs:
+            use_dask = xr_kwargs.pop("lazy")
+
         if use_dask and "chunks" not in xr_kwargs:
             xr_kwargs["chunks"] = {}
 
@@ -168,6 +173,7 @@ class PandasDriver:
         files: Union[str, List[str]],
         read_method: Union[str, callable] = "read_csv",
         lazy: bool = False,
+        meta: Union[pd.DataFrame, pd.Series, dict, tuple, None] = None,
         **kwargs,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         file_list = FileUtility.expand_paths(files)
@@ -201,7 +207,7 @@ class PandasDriver:
             if not delayed_dfs:
                 return dd.from_pandas(pd.DataFrame(), npartitions=1)
 
-            return dd.from_delayed(delayed_dfs)
+            return dd.from_delayed(delayed_dfs, meta=meta)
 
         data_frames = []
         # Reuse our filesystem logic

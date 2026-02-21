@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, List, Union
 
 import pandas as pd
 
-from ..obs.epa_util import read_monitor_file
 from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .epa_utils import read_monitor_file
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
@@ -76,7 +76,18 @@ class IMPROVEReader(PointReader):
             **driver_kwargs,
         )
 
-        if len(df) == 0:
+        # Determine backend
+        try:
+            import dask.dataframe as dd
+
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
+
+        if is_dask:
+            if df.npartitions == 0:
+                return df
+        elif len(df) == 0:
             return df
 
         if add_meta:
@@ -168,11 +179,15 @@ def read_improve_file(fname: str, delimiter: str = "\t", **kwargs) -> pd.DataFra
 
     # Find the data section
     skiprows = 0
-    with fs.open(fname, "r") as f:
-        for i, line in enumerate(f):
-            if line.strip() == "Data":
-                skiprows = i + 1
-                break
+    try:
+        with fs.open(fname, "r") as f:
+            for i, line in enumerate(f):
+                if line.strip() == "Data":
+                    skiprows = i + 1
+                    break
+    except Exception:
+        # Fallback or let pd.read_csv fail if file is truly broken
+        pass
 
     # Read the CSV - only pass valid read_csv kwargs if they exist in kwargs
     # For now, we pop the ones we know might be there from open_dataset but are not for read_csv

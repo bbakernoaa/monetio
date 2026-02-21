@@ -1,9 +1,15 @@
+import os
 from urllib.error import HTTPError
 
 import pandas as pd
 import pytest
 
 from monetio import openaq
+
+# Skip on CI because OpenAQ S3 access can be unreliable
+skip_on_ci = pytest.mark.skipif(
+    os.environ.get("CI", "false").lower() == "true", reason="Skipped on CI"
+)
 
 # openaq._URL_CAP_RANDOM_SAMPLE = True
 openaq._URL_CAP = 4
@@ -19,10 +25,11 @@ forbidden_error = pytest.mark.xfail(
 )  # 403
 
 
+@skip_on_ci
 @permission_error
 def test_openaq_first_date():
     dates = FIRST_DAY
-    df = openaq.add_data(dates)
+    df = openaq.add_data(dates, as_xarray=False)
     assert not df.empty
     assert df.siteid.nunique() == 1
     assert (df.country == "CN").all() and ((df.time_local - df.time) == pd.Timedelta(hours=8)).all()
@@ -36,10 +43,11 @@ def test_openaq_first_date():
     assert df.pm25_ugm3.gt(0).all()
 
 
+@skip_on_ci
 @permission_error
 def test_openaq_long_fmt():
     dates = FIRST_DAY
-    df = openaq.add_data(dates, wide_fmt=False)
+    df = openaq.add_data(dates, wide_fmt=False, as_xarray=False)
 
     assert not df.empty
 
@@ -48,6 +56,7 @@ def test_openaq_long_fmt():
     assert "pm25" in df.parameter.values
 
 
+@skip_on_ci
 @forbidden_error
 @pytest.mark.parametrize(
     "url",
@@ -73,13 +82,14 @@ def test_read(url):
     assert df.averagingPeriod.dropna().gt(pd.Timedelta(0)).all()
 
 
+@skip_on_ci
 @permission_error
 def test_openaq_2023():
     # Period from Jordan's NRT example (#130)
     # There are many files in this period (~ 100?)
     # Disable cap setting to test whole set of files
     # NOTE: possible to get empty df with the random URL selection
-    df = openaq.add_data(["2023-09-04 00:00", "2023-09-04 23:00"], n_procs=2)
+    df = openaq.add_data(["2023-09-04 00:00", "2023-09-04 23:00"], n_procs=2, as_xarray=False)
 
     assert len(df) > 0
 

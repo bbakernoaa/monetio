@@ -11,6 +11,8 @@ from .drivers import FileUtility
 
 @register_reader("pardump")
 class PardumpReader(PointReader):
+    fixed_location = False
+
     def open_dataset(self, files, drange=None, century=2000, verbose=False, **kwargs):
         """
         Reads HYSPLIT PARDUMP binary files.
