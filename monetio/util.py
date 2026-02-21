@@ -660,10 +660,12 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
         # but we rename it to 'node' for UGRID compliance.
         if "siteid" in ds2d.dims:
             # Preserve siteid as a coordinate while renaming dimension to node for UGRID compliance
-            # siteids = ds2d.siteid.values  # Store values for restoration
             ds2d = ds2d.rename({"siteid": "node"})
-            # After renaming, node contains site IDs. Add siteid back as coord.
-            ds2d.coords["siteid"] = (("node",), ds2d.node.values)
+            # Now 'node' has siteid values.
+            # We want 'node' to be 0...N-1 and 'siteid' to be a coordinate of 'node'.
+            siteids = ds2d.node.values
+            ds2d.coords["siteid"] = (("node",), siteids)
+            ds2d.coords["node"] = (("node",), np.arange(ds2d.sizes["node"]))
 
         if fixed_location:
             # Enforce fixed locations by averaging over time (ignoring NaNs)
