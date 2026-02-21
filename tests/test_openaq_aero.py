@@ -43,8 +43,8 @@ def test_openaq_eager_lazy(tmp_path):
         assert isinstance(ds_eager, xr.Dataset)
         assert "pm25_ugm3" in ds_eager.data_vars
         assert ds_eager.pm25_ugm3.values[0] == 10.0
-        # siteid is renamed to node during 2D expansion
-        assert ds_eager.coords["node"].values[0].startswith("TS_")
+        # siteid is renamed to node during 2D expansion, but preserved as siteid coord
+        assert ds_eager.coords["siteid"].values[0].startswith("TS_")
 
         # Lazy Mode
         ds_lazy = reader.open_dataset(dates="2023-01-01", wide_fmt=True, as_xarray=True, lazy=True)

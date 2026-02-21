@@ -56,8 +56,8 @@ def test_openaq_eager_lazy(tmp_path):
     assert ds_eager.pm25_ugm3.values[0] == 10.0
     # O3 conversion: 50 / 1990
     assert np.isclose(ds_eager.o3_ppm.values[0], 50.0 / 1990.0)
-    # siteid is renamed to node during 2D expansion
-    assert ds_eager.coords["node"].values[0].startswith("TS_")
+    # siteid is renamed to node during 2D expansion, but preserved as siteid coord
+    assert ds_eager.coords["siteid"].values[0].startswith("TS_")
 
     # Test Lazy Mode (Wide format)
     ds_lazy = reader.open_dataset(files=[str(f)], wide_fmt=True, as_xarray=True, lazy=True)

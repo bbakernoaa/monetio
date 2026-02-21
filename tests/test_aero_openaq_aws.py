@@ -31,11 +31,8 @@ def test_openaq_aws_eager_lazy(tmp_path):
     assert isinstance(ds_eager, xr.Dataset)
     assert "value" in ds_eager.data_vars
     assert ds_eager.value.values[0] == 10.0
-    # siteid should be in coords or node
-    if "siteid" in ds_eager.coords:
-        assert ds_eager.coords["siteid"].values[0] == "2178"
-    else:
-        assert ds_eager.coords["node"].values[0] == "2178"
+    # siteid should be in coords
+    assert ds_eager.coords["siteid"].values[0] == "2178"
 
     # Test Lazy Mode
     ds_lazy = reader.open_dataset(files=[str(f)], as_xarray=True, lazy=True)
