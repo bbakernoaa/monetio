@@ -61,7 +61,7 @@ class ISH:
         self.history = None
         self.dates = None
         self.verbose = False
-        self.source = "ncdc"
+        self.source = "aws"
 
     def read_ish_history(self, dates: Optional[pd.DatetimeIndex] = None):
         """
@@ -169,19 +169,31 @@ class ISH:
         import gzip
         import shutil
 
-        import requests
-
         objs = []
         for iii in fname:
             try:
-                r2 = requests.get(iii, stream=True)
-                if r2.status_code != 404:
-                    temp = iii.split("/")[-1]
-                    out_name = "isd." + temp.replace(".gz", "")
+                temp = iii.split("/")[-1]
+                out_name = "isd." + temp.replace(".gz", "")
+
+                if str(iii).startswith("s3://"):
+                    fs = FileUtility.get_fs(iii)
+                    with fs.open(iii, "rb") as f_in:
+                        with open(out_name, "wb") as f_out:
+                            if iii.endswith(".gz"):
+                                with gzip.GzipFile(fileobj=f_in) as gz:
+                                    shutil.copyfileobj(gz, f_out)
+                            else:
+                                shutil.copyfileobj(f_in, f_out)
                     objs.append(out_name)
-                    with open(out_name, "wb") as fid:
-                        gzip_file = gzip.GzipFile(fileobj=r2.raw)
-                        shutil.copyfileobj(gzip_file, fid)
+                else:
+                    import requests
+
+                    r2 = requests.get(iii, stream=True)
+                    if r2.status_code != 404:
+                        objs.append(out_name)
+                        with open(out_name, "wb") as fid:
+                            gzip_file = gzip.GzipFile(fileobj=r2.raw)
+                            shutil.copyfileobj(gzip_file, fid)
             except Exception:
                 pass
         return objs
@@ -225,6 +237,7 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
         raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
 
     request_timeout = kwargs.get("request_timeout", 10)
+    storage_options = kwargs.get("storage_options", {})
 
     compression = "gzip" if str(fname).endswith(".gz") else None
 
@@ -251,7 +264,7 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
                         io.BytesIO(content), delimiter=ISH.WIDTHS, dtype=ISH.DTYPES
                     )
             else:
-                with fsspec.open(fname, "rb", compression=compression) as f:
+                with fsspec.open(fname, "rb", compression=compression, **storage_options) as f:
                     frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
             break
         except Exception as e:
@@ -310,7 +323,7 @@ class ISHReader(PointReader):
         download: bool = False,
         n_procs: int = 1,
         verbose: bool = False,
-        source: str = "ncdc",
+        source: str = "aws",
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
