@@ -18,7 +18,7 @@ class TROPOMIReader(GriddedReader):
     def open_dataset(
         self,
         files: Union[str, List[str]],
-        group: Optional[Union[str, List[str]]] = "PRODUCT",
+        group: Optional[Union[str, List[str]]] = None,
         calculate_pressure: bool = True,
         qa_threshold: Optional[float] = None,
         **kwargs,
@@ -32,11 +32,11 @@ class TROPOMIReader(GriddedReader):
             File path(s) or URL(s).
         group : str or list of str, optional
             The NetCDF group(s) to open. If a list is provided, groups will be merged.
-            Common TROPOMI groups include:
-            - "PRODUCT" (default)
-            - "PRODUCT/SUPPORT_DATA/DETAILED_RESULTS"
+            If None, common TROPOMI groups will be opened:
+            - "PRODUCT"
             - "PRODUCT/SUPPORT_DATA/INPUT_DATA"
             - "PRODUCT/SUPPORT_DATA/GEOLOCATIONS"
+            - "PRODUCT/SUPPORT_DATA/DETAILED_RESULTS"
         calculate_pressure : bool, optional
             Whether to calculate pressure levels if necessary variables are found,
             by default True.
@@ -52,32 +52,29 @@ class TROPOMIReader(GriddedReader):
 
         Examples
         --------
-        Open standard NO2 product with support data for pressure:
+        Open standard NO2 product:
         >>> reader = TROPOMIReader()
-        >>> ds = reader.open_dataset(
-        ...     files="S5P_OFFL_L2_NO2_*.nc",
-        ...     group=[
-        ...         "PRODUCT",
-        ...         "PRODUCT/SUPPORT_DATA/INPUT_DATA",
-        ...         "PRODUCT/SUPPORT_DATA/GEOLOCATIONS"
-        ...     ],
-        ...     qa_threshold=0.75
-        ... )
+        >>> ds = reader.open_dataset(files="S5P_OFFL_L2_NO2_*.nc", qa_threshold=0.75)
         """
-        if "preprocess" not in kwargs:
-            from functools import partial
+        if group is None:
+            groups = [
+                "PRODUCT",
+                "PRODUCT/SUPPORT_DATA/INPUT_DATA",
+                "PRODUCT/SUPPORT_DATA/GEOLOCATIONS",
+                "PRODUCT/SUPPORT_DATA/DETAILED_RESULTS",
+            ]
+        elif isinstance(group, str):
+            groups = [group]
+        else:
+            groups = group
 
-            kwargs["preprocess"] = partial(
-                tropomi_preprocess, calculate_pressure=calculate_pressure, qa_threshold=qa_threshold
-            )
+        # To ensure consistent dimensions and that all variables needed for
+        # preprocessing (e.g. pressure calculation) are available, we apply
+        # preprocessing AFTER merging all groups.
+        user_preprocess = kwargs.pop("preprocess", None)
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
-
-        if group is None or isinstance(group, str):
-            groups = [group] if group else [None]
-        else:
-            groups = group
 
         dsets = []
         for g in groups:
@@ -85,6 +82,7 @@ class TROPOMIReader(GriddedReader):
             g_kwargs = kwargs.copy()
             g_kwargs["group"] = g
             try:
+                # We open without the TROPOMI preprocess at this stage
                 ds_g = super().open_dataset(files, **g_kwargs)
                 dsets.append(ds_g)
             except Exception as e:
@@ -94,8 +92,16 @@ class TROPOMIReader(GriddedReader):
             raise RuntimeError("No groups could be opened.")
 
         # Merge groups
-        # We use compat='override' or 'no_conflicts' because coordinates should be identical
+        # We use compat='no_conflicts' as coordinates should be identical
         ds = xr.merge(dsets, compat="no_conflicts")
+
+        # Now apply TROPOMI preprocessing to the merged dataset
+        ds = tropomi_preprocess(
+            ds, calculate_pressure=calculate_pressure, qa_threshold=qa_threshold
+        )
+
+        if user_preprocess:
+            ds = user_preprocess(ds)
 
         # Update history
         ds = update_history(ds, "Read TROPOMI data.")
@@ -140,6 +146,17 @@ def tropomi_preprocess(
     if calculate_pressure:
         ds = _add_pressure_levels(ds)
 
+    # 4. Handle Altitude/Height
+    for h_var in ["altitude", "aerosol_mid_height", "height"]:
+        if h_var in ds.data_vars and "height_m_mid" not in ds.data_vars:
+            h_mid = ds[h_var].copy()
+            units = h_mid.attrs.get("units", "m")
+            if units == "km":
+                h_mid = h_mid * 1000.0
+                h_mid.attrs["units"] = "m"
+            ds["height_m_mid"] = h_mid.assign_attrs({"long_name": "mid-layer height"})
+            break
+
     if "time" in ds.coords and "time" not in ds.dims:
         if ds.coords["time"].dims == ("y",):
             ds = ds.swap_dims({"y": "time"})
@@ -168,9 +185,10 @@ def tropomi_preprocess(
 def _add_pressure_levels(ds: xr.Dataset) -> xr.Dataset:
     """
     Calculate mid-layer and interface pressure levels for TROPOMI lazily.
-    Supports NO2/HCHO (TM5) and CO style pressure definitions.
+    Supports NO2/HCHO (TM5), CO/CH4 style pressure definitions, and existing
+    pressure variables (O3 Profile, AER_LH).
     """
-    # NO2/HCHO style (TM5 constant a, b)
+    # 1. NO2/HCHO style (TM5 constant a, b)
     if all(v in ds.data_vars for v in ["tm5_constant_a", "tm5_constant_b", "surface_pressure"]):
         a = ds["tm5_constant_a"]
         b = ds["tm5_constant_b"]
@@ -190,7 +208,9 @@ def _add_pressure_levels(ds: xr.Dataset) -> xr.Dataset:
             itrop = ds["tm5_tropopause_layer_index"]
             try:
                 # Ensure itrop is within bounds and integer
-                itrop_valid = itrop.where((itrop >= 0) & (itrop < ds.sizes["z"]), 0).astype(int)
+                itrop_valid = itrop.where((itrop >= 0) & (itrop < ds.sizes.get("z", 1)), 0).astype(
+                    int
+                )
 
                 # Use Aero Protocol standardized utility for lazy indexing
                 ds["troppres"] = lazy_index_along_axis(p_mid, itrop_valid, dim="z")
@@ -199,13 +219,38 @@ def _add_pressure_levels(ds: xr.Dataset) -> xr.Dataset:
             except Exception as e:
                 warnings.warn(f"Could not calculate tropopause pressure: {e}")
 
-    # CO style
+    # 2. CO/CH4 style (pressure_levels interfaces)
     elif "pressure_levels" in ds.data_vars:
         p_int = ds["pressure_levels"]
-        # Interface pressure is directly provided
-        # Mid-layer pressure is average of adjacent interfaces
-        # We can use rolling mean if the dimension order is correct
-        p_mid = p_int.rolling(z=2).mean().dropna("z")
-        ds["pres_pa_mid"] = p_mid.assign_attrs({"units": "Pa", "long_name": "mid-layer pressure"})
+        # Find vertical dimension
+        v_dim = next((d for d in ["z", "level", "layer", "Levels"] if d in p_int.dims), None)
+        if v_dim:
+            # Interface pressure is directly provided
+            # Mid-layer pressure is average of adjacent interfaces
+            p_mid = p_int.rolling({v_dim: 2}).mean().dropna(v_dim)
+
+            # Ensure dimension name is 'z' for the result to match data variables
+            if "z" in ds.dims and ds.sizes["z"] == p_mid.sizes[v_dim]:
+                p_mid = p_mid.rename({v_dim: "z"})
+            elif v_dim != "z" and "z" not in ds.dims:
+                p_mid = p_mid.rename({v_dim: "z"})
+
+            ds["pres_pa_mid"] = p_mid.assign_attrs(
+                {"units": "Pa", "long_name": "mid-layer pressure"}
+            )
+
+    # 3. Existing pressure variables (e.g. O3 Profile, AER_LH)
+    for p_var in ["pressure", "aerosol_mid_pressure", "aerosol_pressure"]:
+        if p_var in ds.data_vars and "pres_pa_mid" not in ds.data_vars:
+            # Create a copy to avoid modifying the original variable's attributes directly
+            p_mid = ds[p_var].copy()
+            # Handle units (TROPOMI is usually Pa, but let's be safe)
+            units = p_mid.attrs.get("units", "Pa")
+            if units == "hPa":
+                p_mid = p_mid * 100.0
+                p_mid.attrs["units"] = "Pa"
+
+            ds["pres_pa_mid"] = p_mid.assign_attrs({"long_name": "mid-layer pressure"})
+            break
 
     return ds
