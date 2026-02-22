@@ -89,9 +89,10 @@ def standardize_satellite_coords(
     ds: xr.Dataset,
     lat_name: str = "Latitude",
     lon_name: str = "Longitude",
-    y_dim: Union[str, List[str]] = ["Rows", "scanline", "nlat", "lat", "nscan"],
-    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel", "nlon", "lon", "nstep"],
-    z_dim: Union[str, List[str]] = ["Levels", "layer", "level"],
+    y_dim: Union[str, List[str]] = ["Rows", "scanline", "nlat", "lat", "nscan", "nTimes"],
+    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel", "nlon", "lon", "nstep", "nIFOV"],
+    z_dim: Union[str, List[str]] = ["Levels", "layer", "level", "nLayer"],
+    time_name: str = "Time",
 ) -> xr.Dataset:
     """
     Standardize satellite swath/gridded coordinates and dimensions.
@@ -138,21 +139,28 @@ def standardize_satellite_coords(
 
     coord_rename = {}
     # Case insensitive search for lat/lon if not found exactly
+    # Try to find latitude/longitude
     actual_lat = None
-    if lat_name in ds.variables:
-        actual_lat = lat_name
-    else:
+    lat_names = [lat_name, "latitude", "lat", "LAT", "Latitude"]
+    for ln in lat_names:
+        if ln in ds.variables:
+            actual_lat = ln
+            break
+    if actual_lat is None:
         for v in ds.variables:
-            if v.lower() == lat_name.lower():
+            if v.lower() in ["latitude", "lat"]:
                 actual_lat = v
                 break
 
     actual_lon = None
-    if lon_name in ds.variables:
-        actual_lon = lon_name
-    else:
+    lon_names = [lon_name, "longitude", "lon", "LON", "Longitude"]
+    for ln in lon_names:
+        if ln in ds.variables:
+            actual_lon = ln
+            break
+    if actual_lon is None:
         for v in ds.variables:
-            if v.lower() == lon_name.lower():
+            if v.lower() in ["longitude", "lon"]:
                 actual_lon = v
                 break
 
@@ -164,10 +172,33 @@ def standardize_satellite_coords(
     if coord_rename:
         ds = ds.rename(coord_rename)
 
-    if "latitude" in ds.variables:
+    # Ensure they are coordinates
+    to_set = []
+    if "latitude" in ds.variables and "latitude" not in ds.coords:
+        to_set.append("latitude")
+    if "longitude" in ds.variables and "longitude" not in ds.coords:
+        to_set.append("longitude")
+    if to_set:
+        ds = ds.set_coords(to_set)
+
+    if "latitude" in ds.coords:
         ds["latitude"].attrs.update({"units": "degrees_north", "standard_name": "latitude"})
-    if "longitude" in ds.variables:
+    if "longitude" in ds.coords:
         ds["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
+
+    # Handle Time
+    if time_name in ds.variables and "time" not in ds.variables:
+        ds = ds.rename({time_name: "time"})
+    elif "time" not in ds.variables:
+        for v in ds.variables:
+            if v.lower() == "time":
+                ds = ds.rename({v: "time"})
+                break
+
+    if "time" in ds.variables and "time" not in ds.coords:
+        # If it's a coordinate-like variable, set it
+        if "time" in ds.dims or ds["time"].ndim == 1:
+            ds = ds.set_coords("time")
 
     return ds
 
@@ -194,6 +225,33 @@ def update_history(ds: xr.Dataset, message: str) -> xr.Dataset:
     else:
         ds.attrs["history"] = history
     return ds
+
+
+def jpss_time_to_datetime(
+    time_array: xr.DataArray, origin: str = "1958-01-01", unit: str = "us"
+) -> xr.DataArray:
+    """
+    Convert JPSS time (usually microseconds since 1958) to datetime64[ns].
+
+    Parameters
+    ----------
+    time_array : xr.DataArray
+        Input time array.
+    origin : str, optional
+        Origin date, by default "1958-01-01".
+    unit : str, optional
+        Time unit, by default "us" (microseconds).
+
+    Returns
+    -------
+    xr.DataArray
+        Time array in datetime64[ns].
+    """
+
+    def _convert(t):
+        return pd.to_datetime(t, unit=unit, origin=origin)
+
+    return apply_lazy_conversion(time_array, _convert, "datetime64[ns]")
 
 
 def add_time_coord(
