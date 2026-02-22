@@ -96,7 +96,9 @@ class TROPOMIReader(GriddedReader):
         ds = xr.merge(dsets, compat="no_conflicts")
 
         # Now apply TROPOMI preprocessing to the merged dataset
-        ds = tropomi_preprocess(ds, calculate_pressure=calculate_pressure, qa_threshold=qa_threshold)
+        ds = tropomi_preprocess(
+            ds, calculate_pressure=calculate_pressure, qa_threshold=qa_threshold
+        )
 
         if user_preprocess:
             ds = user_preprocess(ds)
