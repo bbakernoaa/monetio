@@ -282,8 +282,7 @@ def _fix_time(ds: xr.Dataset) -> xr.Dataset:
 
         # Update history
         history = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
-            "Optimized time parsing via Aero Protocol."
+            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Optimized time parsing."
         )
         if "history" in ds.attrs:
             ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"

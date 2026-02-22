@@ -1,4 +1,4 @@
-"""ICARTT Reader following the Aero Protocol."""
+"""ICARTT Reader ."""
 
 from __future__ import annotations
 

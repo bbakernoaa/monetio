@@ -42,9 +42,9 @@ import monetio as mio
 df = mio.load("airnow", files=dates)
 ```
 
-## The Aero Protocol
+## MONETIO standards
 
-MONETIO documentation and code follow the **Aero Protocol** for scientific pipeline code:
+MONETIO documentation and code follow the **monetio standards** for scientific pipeline code:
 
 1.  **Flexibility**: Lazy by default (using Dask/Xarray), Eager optional.
 2.  **Maintainability**: Comprehensive Type hints and NumPy-style docstrings.

@@ -36,7 +36,7 @@ class TOLNetReader(GriddedReader):
         # TOLNet HDF5 isn't standard CF, so we use our custom reader via PandasDriver-like logic
         # but returning Datasets.
         # Actually, let's keep it simple for now and just use the unified driver if we can,
-        # or refactor the loop to be more Aero Protocol friendly.
+        # or refactor the loop to be more backend-agnostic.
 
         file_list = FileUtility.expand_paths(files)
 

@@ -90,7 +90,7 @@ class ISHLiteReader(PointReader):
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Retrieve and load ISH (Integrated Surface Hourly) Lite data following the Aero Protocol.
+        Retrieve and load ISH (Integrated Surface Hourly) Lite data .
 
         Parameters
         ----------

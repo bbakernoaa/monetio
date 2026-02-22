@@ -405,7 +405,7 @@ def calc_13_category_usda_soil_type(
     if isinstance(result, xr.DataArray):
         history = (
             f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
-            "Calculated USDA soil type using Aero Protocol."
+            "Calculated USDA soil type backend-agnostic."
         )
         if "history" in result.attrs:
             result.attrs["history"] = f"{result.attrs['history']}\n{history}"
@@ -593,7 +593,7 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
     # Handle history
     history = (
         f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
-        "Expanded 1D UGRID to 2D (time, node) using Aero Protocol."
+        "Expanded 1D UGRID to 2D (time, node) backend-agnostic."
     )
 
     try:

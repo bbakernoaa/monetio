@@ -1,4 +1,4 @@
-"""Time parsing utilities for Aero Protocol."""
+"""Time parsing utilities."""
 
 import numpy as np
 import pandas as pd

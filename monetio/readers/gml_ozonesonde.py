@@ -405,7 +405,7 @@ def read_100m(fp_or_url):
     }
     df["siteid"] = df["station"].replace(repl)
 
-    # Metadata for Aero Protocol and existing tests
+    # Metadata and existing tests
     df.attrs["ds_attrs"] = meta
     df.attrs["var_attrs"] = {c.name: {"long_name": c.long_name, "units": c.units} for c in col_info}
 

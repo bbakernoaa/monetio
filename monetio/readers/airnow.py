@@ -36,7 +36,7 @@ class AirNowReader(PointReader):
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Retrieve and load AirNow data following the Aero Protocol.
+        Retrieve and load AirNow data .
 
         Parameters
         ----------

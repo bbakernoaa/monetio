@@ -192,7 +192,7 @@ def _add_pressure_levels(ds: xr.Dataset) -> xr.Dataset:
                 # Ensure itrop is within bounds and integer
                 itrop_valid = itrop.where((itrop >= 0) & (itrop < ds.sizes["z"]), 0).astype(int)
 
-                # Use Aero Protocol standardized utility for lazy indexing
+                # Use standardized utility for lazy indexing
                 ds["troppres"] = lazy_index_along_axis(p_mid, itrop_valid, dim="z")
 
                 ds["troppres"].attrs.update({"units": "Pa", "long_name": "tropopause pressure"})
