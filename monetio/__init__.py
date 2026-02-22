@@ -131,6 +131,7 @@ _READER_MODULES = {
     "tempo": ".readers.tempo",
     "tropomi": ".readers.tropomi",
     "nesdis_viirs_jrr": ".readers.nesdis_viirs_jrr",
+    "viirs_jrr": ".readers.nesdis_viirs_jrr",
 }
 
 
@@ -146,7 +147,7 @@ def load(source: str, files=None, **kwargs):
         Models: cmaq, camx, fv3chem, hysplit, hytraj, icap_mme, ncep_grib, pardump, prepchem, raqms, ufs, wrfchem, grib2
         Obs: airnow, aeronet, aqs, cems, crn, improve, ish, ish_lite, nadp, openaq, pams
         Profile: icartt, tolnet, geoms, gml_ozonesonde
-        Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp, omps, omps_nadir
+        Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp, omps, omps_nadir, viirs_jrr
     """
     if source not in READER_REGISTRY:
         if source in _READER_MODULES:
