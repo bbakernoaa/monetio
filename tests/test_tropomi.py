@@ -115,11 +115,87 @@ def test_tropomi_enhanced_features(lazy):
         assert ds_out.pres_pa_mid.chunks is not None
 
 
-def test_tropomi_multi_group(tmp_path, monkeypatch):
+def test_tropomi_co_style_pressure():
+    # Test CO style pressure calculation (pressure_levels interfaces)
+    ds = xr.Dataset(
+        {
+            "carbonmonoxide_total_column": (("scanline", "ground_pixel"), np.ones((3, 4))),
+            "pressure_levels": (("scanline", "ground_pixel", "level"), np.full((3, 4, 10), 1000.0)),
+            "averaging_kernel": (("scanline", "ground_pixel", "layer"), np.ones((3, 4, 9))),
+            "delta_time": (("scanline",), np.zeros(3, dtype="int32")),
+        },
+        coords={
+            "latitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
+            "longitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
+            "time": ((), np.datetime64("2023-01-01")),
+        },
+    )
+
+    ds_out = tropomi_preprocess(ds, calculate_pressure=True)
+
+    assert "pres_pa_mid" in ds_out.data_vars
+    assert ds_out.pres_pa_mid.dims == ("time", "x", "z")
+    assert ds_out.pres_pa_mid.shape == (3, 4, 9)
+
+
+def test_tropomi_profile_and_altitude():
+    # Test Ozone Profile style (direct pressure and altitude in km)
+    ds = xr.Dataset(
+        {
+            "ozone_profile": (("scanline", "ground_pixel", "level"), np.ones((3, 4, 33))),
+            "pressure": (("scanline", "ground_pixel", "level"), np.full((3, 4, 33), 500.0)),
+            "altitude": (
+                ("scanline", "ground_pixel", "level"),
+                np.full((3, 4, 33), 10.0),
+                {"units": "km"},
+            ),
+            "delta_time": (("scanline",), np.zeros(3, dtype="int32")),
+        },
+        coords={
+            "latitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
+            "longitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
+            "time": ((), np.datetime64("2023-01-01")),
+        },
+    )
+
+    ds_out = tropomi_preprocess(ds, calculate_pressure=True)
+
+    assert "pres_pa_mid" in ds_out.data_vars
+    assert "height_m_mid" in ds_out.data_vars
+    assert ds_out.height_m_mid.values[0, 0, 0] == 10000.0
+    assert ds_out.pres_pa_mid.dims == ("time", "x", "z")
+
+
+def test_tropomi_aerosol_layer_height():
+    # Test Aerosol Layer Height style
+    ds = xr.Dataset(
+        {
+            "aerosol_mid_pressure": (("scanline", "ground_pixel"), np.full((3, 4), 80000.0)),
+            "aerosol_mid_height": (("scanline", "ground_pixel"), np.full((3, 4), 2000.0)),
+            "delta_time": (("scanline",), np.zeros(3, dtype="int32")),
+        },
+        coords={
+            "latitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
+            "longitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
+            "time": ((), np.datetime64("2023-01-01")),
+        },
+    )
+
+    ds_out = tropomi_preprocess(ds, calculate_pressure=True)
+
+    assert "pres_pa_mid" in ds_out.data_vars
+    assert "height_m_mid" in ds_out.data_vars
+    assert ds_out.pres_pa_mid.dims == ("time", "x")
+
+
+def test_tropomi_multi_group(monkeypatch):
     # Simulate multi-group file opening using mocked XarrayDriver
     # PRODUCT group
     ds_prod = xr.Dataset(
-        {"no2": (("scanline", "ground_pixel"), np.ones((3, 4), dtype=np.float32))},
+        {
+            "no2": (("scanline", "ground_pixel"), np.ones((3, 4), dtype=np.float32)),
+            "delta_time": (("scanline",), np.array([0, 1000, 2000], dtype="int32")),
+        },
         coords={
             "latitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
             "longitude": (("scanline", "ground_pixel"), np.zeros((3, 4))),
@@ -158,6 +234,10 @@ def test_tropomi_multi_group(tmp_path, monkeypatch):
 
     assert "no2" in ds_merged.data_vars
     assert "surface_pressure" in ds_merged.data_vars
+    assert ds_merged.no2.dims == ("time", "x")
+    # surface_pressure should also have 'time' dim because it was merged before preprocess
+    assert ds_merged.surface_pressure.dims == ("time", "x")
     assert ds_merged.no2.shape == (3, 4)
     assert ds_merged.surface_pressure.shape == (3, 4)
     assert "time" in ds_merged.coords
+    assert ds_merged.time.size == 3
