@@ -162,7 +162,7 @@ def read_cems(efile, **kwargs):
     dt_str = dftemp["date"].astype(str) + " " + dftemp["hour"].astype(str)
     dftemp["time"] = pd.to_datetime(dt_str, format=dfmt)
     dftemp = dftemp.rename(columns={"time": "time_local"})
-    # For Aero Protocol, we need a 'time' column (UTC)
+    # For backend-agnostic loading, we need a 'time' column (UTC)
     # CEMS data is local time, and usually doesn't have offset info easily accessible in the file.
     # We set time = time_local for now, or use timezonefinder if we had lat/lon.
     dftemp["time"] = dftemp["time_local"]

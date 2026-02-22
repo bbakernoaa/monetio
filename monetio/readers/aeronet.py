@@ -1,4 +1,4 @@
-"""AERONET Reader following the Aero Protocol."""
+"""AERONET Reader ."""
 
 import warnings
 from datetime import datetime, timezone
@@ -42,7 +42,7 @@ class AERONETReader(PointReader):
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset]:
         """
-                Retrieve and load AERONET data following the Aero Protocol.
+                Retrieve and load AERONET data .
 
                 Parameters
                 ----------
@@ -688,7 +688,7 @@ def read_aeronet_csv(
         }
     )
 
-    # Apply Aero Protocol Scientific Hygiene
+    # Apply scientific hygiene
     if "latitude" in df.columns and "longitude" in df.columns:
         df = df.dropna(subset=["latitude", "longitude"])
 

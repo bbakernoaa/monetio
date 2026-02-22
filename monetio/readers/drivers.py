@@ -91,7 +91,7 @@ class XarrayDriver:
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
 
-        # Handle 'lazy' keyword which is common in Aero Protocol but not xr.open_dataset
+        # Handle 'lazy' keyword which is common in modern MONETIO readers but not xr.open_dataset
         if "lazy" in xr_kwargs:
             use_dask = xr_kwargs.pop("lazy")
 

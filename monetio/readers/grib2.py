@@ -64,7 +64,7 @@ class Grib2Reader(GriddedReader):
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """
-        Harmonize GRIB2 metadata to Aero Protocol standards.
+        Harmonize GRIB2 metadata to monetio standards.
 
         Parameters
         ----------

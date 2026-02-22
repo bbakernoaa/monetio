@@ -428,7 +428,7 @@ def add_data(
     n_procs=1,
     **kwargs,
 ):
-    """Helper for Aero Protocol consistency."""
+    """Helper for consistency."""
     return OpenAQAWSReader().open_dataset(
         dates=dates,
         siteid=siteid,

@@ -60,7 +60,7 @@ class OMPSReader(GriddedReader):
 
 def omps_preprocess(ds: xr.Dataset, product: str = "nmto3_l2") -> xr.Dataset:
     """
-    Preprocess OMPS dataset using Aero Protocol.
+    Preprocess OMPS dataset lazily.
 
     Parameters
     ----------
@@ -157,7 +157,7 @@ def _preprocess_nmto3_l2(ds: xr.Dataset) -> xr.Dataset:
         def _convert_time(t):
             return pd.to_datetime(t, unit="s", origin=ref_date)
 
-        # Use Aero Protocol standardized utility for lazy conversion
+        # Use standardized utility for lazy conversion
         ds["time"] = apply_lazy_conversion(ds["time_raw"], _convert_time, "datetime64[ns]")
 
         ds = ds.set_coords("time")

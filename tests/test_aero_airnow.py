@@ -8,7 +8,7 @@ from monetio.readers.airnow import AirNowReader
 def test_airnow_eager_vs_lazy():
     """
     Double-Check Test: Verify Eager (Pandas) and Lazy (Dask) results are identical.
-    Following the Aero Protocol.
+    following backend-agnostic standards.
     """
     # Use a date that is likely to have data and be stable
     dates = pd.date_range("2024-07-01 00:00", periods=1, freq="h")

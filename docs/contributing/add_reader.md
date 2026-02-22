@@ -68,7 +68,7 @@ Ensure your reader is listed in the docstring of the `load` function in `monetio
 
 ## Best Practices
 
-### Lazy Loading (The Aero Protocol)
+### Lazy Loading
 
 Readers should aim to be lazy by default. Use Xarray and Dask to avoid loading large datasets into memory until computation is requested.
 

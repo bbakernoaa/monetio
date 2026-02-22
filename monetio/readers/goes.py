@@ -158,7 +158,7 @@ def goes_preprocess(ds: xr.Dataset) -> xr.Dataset:
 
 def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     """
-    Calculate latitude and longitude for GOES data lazily using Aero Protocol.
+    Calculate latitude and longitude for GOES data lazily.
 
     Parameters
     ----------
@@ -195,7 +195,7 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
         lat = np.where(lat < 100, lat, np.nan)
         return lat.astype(np.float32), lon.astype(np.float32)
 
-    # Use Aero Protocol standardized approach: unified apply_ufunc for both backends.
+    # Use standardized approach: unified apply_ufunc for both backends.
     # We use allow_rechunk=True to handle cases where x/y are chunked, as they are
     # core dimensions for the projection calculation.
     lat, lon = xr.apply_ufunc(

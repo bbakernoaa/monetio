@@ -52,7 +52,7 @@ def apply_lazy_conversion(
     data: xr.DataArray, func: Callable, output_dtype: Union[str, np.dtype, type]
 ) -> xr.DataArray:
     """
-    Apply a conversion function lazily to a DataArray using Aero Protocol.
+    Apply a conversion function lazily to a DataArray backend-agnostic.
 
     Parameters
     ----------

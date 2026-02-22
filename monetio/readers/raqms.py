@@ -4,10 +4,10 @@ import datetime
 from typing import List, Optional, Union
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .time_utils import parse_wrf_times
 
 
 @register_reader("raqms")
@@ -254,38 +254,40 @@ def _fix_time(ds: xr.Dataset) -> xr.Dataset:
     """
     if "Times" in ds.variables:
         # Times is usually a character array (time, char_len)
-        # We want to convert it to datetime64 lazily if possible.
-        # But constructing strings and then datetimes is usually not lazy in Xarray
-        # unless we use apply_ufunc.
-        # For now, if it's small (one time per file), we might compute it,
-        # but the Aero Protocol says NO HIDDEN COMPUTES.
-
-        # Use apply_ufunc with vectorize=True to handle character arrays or strings lazily.
-        def _parse_raqms_times(times_val):
-            # times_val is a single value (string or bytes) due to vectorize=True
-            if hasattr(times_val, "decode"):
-                s = times_val.decode("utf-8").strip()
+        times_var = ds.Times
+        string_dim = [d for d in times_var.dims if d != "time"]
+        if not string_dim:
+            if times_var.ndim == 1:
+                # Assuming it's already a string array
+                input_core_dims = [[]]
             else:
-                s = str(times_val).strip()
+                return ds
+        else:
+            string_dim = string_dim[-1]
+            input_core_dims = [[string_dim]]
 
-            if not s:
-                return np.datetime64("NaT")
-            try:
-                return pd.to_datetime(s, format=r"%Y_%m_%d_%H:%M:%S").to_datetime64()
-            except Exception:
-                return np.datetime64("NaT")
-
-        # If it's dask, we use apply_ufunc to keep it lazy
+        # Use vectorized parser from time_utils
         time_values = xr.apply_ufunc(
-            _parse_raqms_times,
-            ds.Times,
-            vectorize=True,
+            parse_wrf_times,
+            times_var,
+            input_core_dims=input_core_dims,
+            output_core_dims=[[]],
+            vectorize=False,
             dask="parallelized",
             output_dtypes=[np.dtype("datetime64[ns]")],
         )
 
         ds = ds.assign_coords(time=time_values)
         ds = ds.drop_vars(["IDATE", "Times"], errors="ignore")
+
+        # Update history
+        history = (
+            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Optimized time parsing."
+        )
+        if "history" in ds.attrs:
+            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+        else:
+            ds.attrs["history"] = history
     return ds
 
 
