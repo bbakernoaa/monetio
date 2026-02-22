@@ -3,7 +3,7 @@ import pytest
 import xarray as xr
 
 from monetio.readers.nesdis_eps_viirs import NESDISEPSVIIRSReader, nesdis_eps_viirs_preprocess
-from monetio.readers.nesdis_viirs_jrr import VIIRSJRRAODReader, viirs_jrr_preprocess
+from monetio.readers.nesdis_viirs_jrr import VIIRSJRRReader, viirs_jrr_preprocess
 
 
 def test_eps_build_urls():
@@ -22,7 +22,7 @@ def test_jrr_build_urls(monkeypatch):
 
     monkeypatch.setattr("s3fs.S3FileSystem", lambda **kwargs: MockFS())
 
-    reader = VIIRSJRRAODReader()
+    reader = VIIRSJRRReader()
     urls = reader.build_urls("2023-01-01")
     assert len(urls) == 1
     assert urls[0] == "s3://noaa-nesdis-snpp-pds/VIIRS-JRR-AOD/2023/01/01/test_file.nc"

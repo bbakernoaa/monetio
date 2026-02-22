@@ -164,3 +164,7 @@ def viirs_jrr_preprocess(ds: xr.Dataset, product: str = "AOD") -> xr.Dataset:
         pass
 
     return ds
+
+
+# Legacy Alias
+VIIRSJRRAODReader = VIIRSJRRReader
