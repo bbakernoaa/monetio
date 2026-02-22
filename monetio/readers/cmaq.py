@@ -5,7 +5,6 @@ from functools import partial
 from typing import List, Union
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 from pandas import Series
 
@@ -13,6 +12,7 @@ from monetio.grids import grid_from_dataset
 
 from .base import GriddedReader, register_reader
 from .cmaq_specs import DIAGNOSTICS, DiagnosticSpec
+from .time_utils import parse_ioapi_times
 
 
 @register_reader("cmaq")
@@ -251,20 +251,19 @@ def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
         tflag = tflag.isel(VAR=0, drop=True)
 
     # Handle different possible names for DATE_TIME dimension (e.g. DATE_TIME or DATE-TIME)
-    dt_dim = [d for d in tflag.dims if "DATE" in str(d).upper() and "TIME" in str(d).upper()][0]
+    dt_dims = [d for d in tflag.dims if "DATE" in str(d).upper() and "TIME" in str(d).upper()]
+    if not dt_dims:
+        # Fallback to last dimension if none matched
+        dt_dim = tflag.dims[-1]
+    else:
+        dt_dim = dt_dims[0]
 
-    # Use apply_ufunc to construct dates lazily
-    def _parse_cmaq_times(yyyymmdd, hhmmss):
-        # Vectorized scalar operations
-        s1 = str(yyyymmdd).zfill(7)
-        s2 = str(hhmmss).zfill(6)
-        return pd.to_datetime(s1 + s2, format="%Y%j%H%M%S").to_datetime64()
-
+    # Use apply_ufunc to construct dates lazily using vectorized parser
     dates = xr.apply_ufunc(
-        _parse_cmaq_times,
+        parse_ioapi_times,
         tflag.isel(**{dt_dim: 0}),
         tflag.isel(**{dt_dim: 1}),
-        vectorize=True,
+        vectorize=False,
         dask="parallelized",
         output_dtypes=[np.dtype("datetime64[ns]")],
     )
@@ -280,6 +279,17 @@ def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
 
     ds = ds.assign_coords(TSTEP=dates)
     ds = ds.rename({"TSTEP": "time"})
+
+    # Update history
+    history = (
+        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
+        "Optimized time parsing via Aero Protocol."
+    )
+    if "history" in ds.attrs:
+        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+    else:
+        ds.attrs["history"] = history
+
     return ds
 
 

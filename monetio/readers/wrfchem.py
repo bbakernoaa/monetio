@@ -5,10 +5,10 @@ from functools import partial
 from typing import List, Optional, Union
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .time_utils import parse_wrf_times
 
 
 @register_reader("wrfchem")
@@ -203,34 +203,13 @@ def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
 
     string_dim = string_dim[-1]
 
-    def _parse_times_wrapped(times_arr):
-        # times_arr is the core dimension part (DateStrLen)
-        # We use a vectorized version to be safe
-        def _single_parse(t):
-            try:
-                # Handle bytes or strings
-                if hasattr(t, "tobytes"):
-                    s = t.tobytes().decode().strip().replace("_", " ")
-                else:
-                    s = (
-                        "".join([c.decode() if hasattr(c, "decode") else c for c in t])
-                        .strip()
-                        .replace("_", " ")
-                    )
-                return np.datetime64(pd.to_datetime(s))
-            except Exception:
-                return np.datetime64("NaT")
-
-        # If it's more than 1D (because of vectorize=True), np.apply_along_axis is called by apply_ufunc
-        return _single_parse(times_arr)
-
-    # To avoid the xarray broadcasting issue, let's try to ensure times_var is a DataArray with correct dims
+    # Use vectorized parser from time_utils
     parsed_times = xr.apply_ufunc(
-        _parse_times_wrapped,
+        parse_wrf_times,
         times_var,
         input_core_dims=[[string_dim]],
         output_core_dims=[[]],
-        vectorize=True,
+        vectorize=False,
         dask="parallelized",
         output_dtypes=[np.dtype("datetime64[ns]")],
     )
@@ -245,6 +224,16 @@ def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
         ds.coords["time"] = parsed_times
     else:
         ds["time"] = parsed_times
+
+    # Update history
+    history = (
+        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
+        "Optimized time parsing via Aero Protocol."
+    )
+    if "history" in ds.attrs:
+        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+    else:
+        ds.attrs["history"] = history
 
     return ds
 
