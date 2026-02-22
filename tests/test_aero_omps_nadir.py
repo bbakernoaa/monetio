@@ -77,3 +77,38 @@ def test_omps_nadir_nasa_fallback(product):
     assert "longitude" in ds_out.coords
     assert "ozone_column" in ds_out.data_vars
     assert "time" in ds_out.coords or "time" in ds_out.dims
+
+
+def test_omps_nadir_build_urls(monkeypatch):
+    class MockS3:
+        def glob(self, pattern):
+            if "OMPS_V8TOZ/2024/01/01/" in pattern:
+                return [
+                    "bucket/OMPS_V8TOZ/2024/01/01/file1.nc",
+                    "bucket/OMPS_V8TOZ/2024/01/01/file2.nc",
+                ]
+            return []
+
+    monkeypatch.setattr("s3fs.S3FileSystem", lambda **kwargs: MockS3())
+
+    reader = OMPSNadirReader()
+    urls = reader.build_urls("2024-01-01", satellite="snpp", product="v8toz")
+
+    assert len(urls) == 2
+    assert "s3://bucket/OMPS_V8TOZ/2024/01/01/file1.nc" in urls
+
+
+def test_omps_nadir_stitching(monkeypatch):
+    # Mock XarrayDriver to return a combined dataset
+    class MockDriver:
+        def open(self, files, **kwargs):
+            # Verify concat_dim and combine are passed
+            assert kwargs.get("concat_dim") == "time"
+            assert kwargs.get("combine") == "nested"
+            return xr.Dataset({"ozone": (("time", "y", "x"), np.ones((len(files), 5, 10)))})
+
+    reader = OMPSNadirReader()
+    monkeypatch.setattr(reader, "driver", MockDriver())
+
+    ds = reader.open_dataset(files=["file1.nc", "file2.nc"], product="v8toz")
+    assert ds.ozone.sizes["time"] == 2
