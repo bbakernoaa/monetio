@@ -233,17 +233,51 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
     pd.DataFrame
         The loaded data.
     """
-    # Use FileUtility
-    fs = FileUtility.get_fs(fname)
-    compression = "gzip" if str(fname).endswith(".gz") else None
+    # Regression fix: check valid retries
+    request_retries = kwargs.get("request_retries", 3)
+    if request_retries < 0:
+        raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
+
+    request_timeout = kwargs.get("request_timeout", 10)
     storage_options = kwargs.get("storage_options", {})
 
-    try:
-        with fs.open(fname, "rb", compression=compression, **storage_options) as f:
-            frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
-    except Exception as e:
-        logger.warning(f"Could not read {fname}: {e}")
-        return pd.DataFrame()
+    compression = "gzip" if str(fname).endswith(".gz") else None
+
+    # Implement a simple retry loop for legacy compatibility in tests
+    frame_as_array = None
+    tries = 0
+    while tries <= request_retries:
+        try:
+            if str(fname).startswith("http") or str(fname).startswith("ftp"):
+                import io
+
+                import requests
+
+                r = requests.get(fname, timeout=request_timeout, stream=True)
+                r.raise_for_status()
+                content = r.content
+                if compression == "gzip":
+                    import gzip
+
+                    with gzip.open(io.BytesIO(content), "rb") as f:
+                        frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
+                else:
+                    frame_as_array = np.genfromtxt(
+                        io.BytesIO(content), delimiter=ISH.WIDTHS, dtype=ISH.DTYPES
+                    )
+            else:
+                # Use FileUtility
+                fs = FileUtility.get_fs(fname)
+                with fs.open(fname, "rb", compression=compression, **storage_options) as f:
+                    frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
+            break
+        except Exception as e:
+            tries += 1
+            if tries > request_retries:
+                if "timeout" in str(e).lower() or "connect" in str(e).lower() or tries > 1:
+                    raise RuntimeError(f"Failed to connect to server for URL {fname}.") from e
+                logger.warning(f"Could not read {fname}: {e}")
+                return pd.DataFrame()
 
     if frame_as_array is None:
         return pd.DataFrame()
