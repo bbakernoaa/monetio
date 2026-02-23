@@ -1,6 +1,5 @@
 """CAMx Reader"""
 
-import datetime
 from functools import partial
 from typing import List, Union
 
@@ -12,6 +11,7 @@ from monetio.grids import grid_from_dataset
 
 from .base import GriddedReader, register_reader
 from .camx_specs import COARSE, DIAGNOSTICS, FINE, NOY_GAS, POC, DiagnosticSpec
+from .sat_utils import update_history
 from .time_utils import parse_ioapi_times
 
 
@@ -80,11 +80,7 @@ class CAMxReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CAMx data."
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read CAMx data.")
 
         return ds
 
@@ -159,11 +155,7 @@ def camx_preprocess(
                 ds[var].attrs[attr] = val.strip()
 
     # Update history
-    history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Preprocessed CAMx data."
-    if "history" in ds.attrs:
-        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-    else:
-        ds.attrs["history"] = history
+    ds = update_history(ds, "Preprocessed CAMx data.")
 
     return ds
 
@@ -263,11 +255,7 @@ def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
     ds = ds.rename({"TSTEP": "time"})
 
     # Update history
-    history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Optimized time parsing."
-    if "history" in ds.attrs:
-        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-    else:
-        ds.attrs["history"] = history
+    ds = update_history(ds, "Optimized time parsing.")
 
     return ds
 
@@ -361,14 +349,7 @@ def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     )
 
     # Update history
-    history = (
-        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
-        "Generated Latitude/Longitude coordinates."
-    )
-    if "history" in ds.attrs:
-        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-    else:
-        ds.attrs["history"] = history
+    ds = update_history(ds, "Generated Latitude/Longitude coordinates.")
 
     return ds
 

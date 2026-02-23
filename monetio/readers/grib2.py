@@ -1,11 +1,11 @@
 """Generalized GRIB2 Reader using grib2io"""
 
-import datetime
 from typing import List, Optional, Union
 
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 
 
 @register_reader("grib2")
@@ -54,11 +54,7 @@ class Grib2Reader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read GRIB2 data using {engine}."
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, f"Read GRIB2 data using {engine}.")
 
         return ds
 

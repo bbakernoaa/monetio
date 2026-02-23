@@ -6,6 +6,7 @@ from numpy import concatenate
 from pandas import Series
 
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 
 
 @register_reader("ufs")
@@ -235,6 +236,9 @@ class UFSReader(GriddedReader):
 
         if var_list is not None and bool(list_remove_extra_only):
             dset = dset.drop_vars(list_remove_extra_only, errors="ignore")
+
+        # Update history
+        dset = update_history(dset, "Read UFS-AQM data.")
 
         return dset
 

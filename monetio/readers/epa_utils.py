@@ -1,7 +1,6 @@
 """Utilities for EPA AQS and IMPROVE data."""
 
 import logging
-from datetime import datetime
 from functools import lru_cache
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -325,16 +324,9 @@ def convert_epa_unit(
         df[obscolumn] = df[obscolumn].mask(mask, df[obscolumn] / factor)
         df[unit_column] = df[unit_column].mask(mask, ppb)
 
-    # Update history if it exists
-    if hasattr(df, "attrs") and "history" in df.attrs:
-        history = (
-            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Converted {species} to {to_unit}."
-        )
-        df.attrs["history"] = f"{df.attrs['history']}\n{history}"
-    elif hasattr(df, "attrs"):
-        history = (
-            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Converted {species} to {to_unit}."
-        )
-        df.attrs["history"] = history
+    # Update history
+    from .sat_utils import update_history
+
+    df = update_history(df, f"Converted {species} to {to_unit}.")
 
     return df

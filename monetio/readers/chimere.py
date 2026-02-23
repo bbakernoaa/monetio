@@ -1,12 +1,12 @@
 """Chimere Reader"""
 
-import datetime
 from functools import partial
 from typing import List, Union
 
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 
 
 @register_reader("chimere")
@@ -58,11 +58,7 @@ class ChimereReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read Chimere data."
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read Chimere data.")
 
         return ds
 
@@ -116,10 +112,6 @@ def chimere_preprocess(
                 ds[var].attrs[attr] = val.strip()
 
     # Update history
-    history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Preprocessed Chimere data."
-    if "history" in ds.attrs:
-        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-    else:
-        ds.attrs["history"] = history
+    ds = update_history(ds, "Preprocessed Chimere data.")
 
     return ds

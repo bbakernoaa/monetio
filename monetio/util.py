@@ -620,6 +620,7 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
             if "units" in ds_unstacked.data_vars:
                 # Get one unit per variable per site (usually constant)
                 units_wide = ds_unstacked["units"].to_dataset(dim="variable")
+
                 # Rename columns to match MONET convention (e.g. OZONE_unit)
                 units_wide = units_wide.rename({v: f"{v}_unit" for v in units_wide.data_vars})
             else:

@@ -1,6 +1,5 @@
 """WRF-Chem Reader"""
 
-import datetime
 from functools import partial
 from typing import List, Optional, Union
 
@@ -8,6 +7,7 @@ import numpy as np
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 from .time_utils import parse_wrf_times
 
 
@@ -72,11 +72,7 @@ class WRFChemReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read WRF-Chem data."
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read WRF-Chem data.")
 
         return ds
 
@@ -172,13 +168,7 @@ def wrfchem_preprocess(
                 ds[var].attrs[attr] = val.strip()
 
     # Update history
-    history = (
-        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Preprocessed WRF-Chem data."
-    )
-    if "history" in ds.attrs:
-        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-    else:
-        ds.attrs["history"] = history
+    ds = update_history(ds, "Preprocessed WRF-Chem data.")
 
     return ds
 
@@ -226,11 +216,7 @@ def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
         ds["time"] = parsed_times
 
     # Update history
-    history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Optimized time parsing."
-    if "history" in ds.attrs:
-        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-    else:
-        ds.attrs["history"] = history
+    ds = update_history(ds, "Optimized time parsing.")
 
     return ds
 

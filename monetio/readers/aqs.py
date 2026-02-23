@@ -17,6 +17,7 @@ from monetio.util import force_object_strings, long_to_wide
 
 from .base import PointReader, register_reader
 from .epa_utils import read_monitor_file
+from .sat_utils import update_history
 
 logger = logging.getLogger(__name__)
 
@@ -146,11 +147,7 @@ class AQSReader(PointReader):
         if as_xarray:
             ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read AQS data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read AQS data.")
 
             return ds
 

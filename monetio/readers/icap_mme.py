@@ -8,6 +8,7 @@ import xarray as xr
 
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
+from .sat_utils import update_history
 
 
 @register_reader("icap_mme")
@@ -61,11 +62,7 @@ class ICAPMMEReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ICAP-MME data."
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read ICAP-MME data.")
 
         return ds
 

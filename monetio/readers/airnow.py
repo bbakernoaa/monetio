@@ -13,11 +13,11 @@ if TYPE_CHECKING:
     import dask.dataframe as dd
 from numpy import nan
 
-from monetio.obs.epa_util import read_monitor_file
-from monetio.readers.base import PointReader, register_reader
-from monetio.util import long_to_wide
-
+from ..util import force_object_strings, long_to_wide
+from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .epa_utils import read_monitor_file
+from .sat_utils import update_history
 
 
 @register_reader("airnow")
@@ -36,7 +36,7 @@ class AirNowReader(PointReader):
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Retrieve and load AirNow data .
+        Retrieve and load AirNow data.
 
         Parameters
         ----------
@@ -112,16 +112,63 @@ class AirNowReader(PointReader):
         if as_xarray:
             ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
 
+            if bad_utcoffset == "fix" and "utcoffset" in ds.variables:
+                ds = self._fix_utcoffset_xarray(ds)
+
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read AirNow data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read AirNow data.")
 
             return ds
 
         return df
+
+    def _fix_utcoffset_xarray(self, ds: xr.Dataset) -> xr.Dataset:
+        """
+        Fix UTC offsets in an Xarray Dataset using a vectorized approach.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            Input dataset.
+
+        Returns
+        -------
+        xr.Dataset
+            Dataset with fixed UTC offsets and updated local time.
+        """
+
+        def _get_uo_vec(lat, lon, current_uo):
+            # Only fix if current_uo is 0 and longitude is far from 0
+            # We use a vectorized wrapper
+            mask = (current_uo == 0) & (np.abs(lon) > 20)
+            if not np.any(mask):
+                return current_uo
+
+            res = current_uo.copy().astype(float)
+            # For masked indices, compute real offset
+            for i in np.where(mask.ravel())[0]:
+                idx = np.unravel_index(i, mask.shape)
+                res[idx] = get_utcoffset(lat[idx], lon[idx])
+            return res
+
+        new_uo = xr.apply_ufunc(
+            _get_uo_vec,
+            ds.latitude,
+            ds.longitude,
+            ds.utcoffset,
+            dask="parallelized",
+            output_dtypes=[float],
+        )
+
+        ds["utcoffset"] = new_uo
+
+        if "time_local" in ds.variables:
+            # Re-calculate local time if it was already there
+            # time_local = time + utcoffset
+            # Xarray handles the broadcasting
+            ds["time_local"] = ds.time + ds.utcoffset.astype("timedelta64[h]")
+
+        return ds
 
     def _post_process(
         self,
@@ -200,7 +247,16 @@ class AirNowReader(PointReader):
         df = df[[c for c in cols if c in df.columns]]
 
         df = df.drop_duplicates()
-        df = filter_bad_values(df, bad_utcoffset=bad_utcoffset)
+
+        # If we are going to return Xarray and using Dask, we defer the 'fix' to the Xarray stage
+        # where we have a better vectorized implementation.
+        # Otherwise, we do it here (using the optimized DataFrame path in filter_bad_values).
+        if is_dask and bad_utcoffset == "fix":
+            df_bad_utcoffset = "leave"
+        else:
+            df_bad_utcoffset = bad_utcoffset
+
+        df = filter_bad_values(df, bad_utcoffset=df_bad_utcoffset)
 
         if wide_fmt:
             # Warning: long_to_wide currently forces compute on Dask
@@ -357,7 +413,7 @@ def read_airnow_csv(
 
     dft["obs"] = dft.obs.astype(float)
     # Ensure siteid is object (str) to avoid nullable string issues in Dask/Pandas 3.0
-    dft["siteid"] = dft.siteid.str.zfill(9).astype(object)
+    dft["siteid"] = dft.siteid.astype(str).str.zfill(9).astype(object)
 
     if not daily and "utcoffset" in dft.columns:
         dft["utcoffset"] = dft.utcoffset.astype(int)
@@ -402,15 +458,19 @@ def filter_bad_values(
         elif bad_utcoffset == "fix":
             # TimezoneFinder is slow, so only call it for unique locations
             unique_locs = bad_rows.drop_duplicates(subset=["latitude", "longitude"])
-            tz_map = {
-                (lat, lon): get_utcoffset(lat, lon)
-                for lat, lon in zip(unique_locs.latitude, unique_locs.longitude)
-            }
-            s_offset = bad_rows.apply(
-                lambda row: tz_map.get((row.latitude, row.longitude)),
-                axis="columns",
-            )
-            df.loc[bad_rows.index, "utcoffset"] = s_offset
+            if not unique_locs.empty:
+                # Use vectorized-style approach even for DataFrame
+                # Convert to numpy for the map
+                lats = unique_locs.latitude.to_numpy()
+                lons = unique_locs.longitude.to_numpy()
+                offsets = np.array([get_utcoffset(la, lo) for la, lo in zip(lats, lons)])
+
+                # Create a mapping DataFrame
+                mapping = pd.DataFrame({"latitude": lats, "longitude": lons, "new_offset": offsets})
+
+                # Merge back to bad_rows
+                bad_rows_fixed = bad_rows.merge(mapping, on=["latitude", "longitude"], how="left")
+                df.loc[bad_rows.index, "utcoffset"] = bad_rows_fixed.new_offset.values
         elif bad_utcoffset == "leave":
             pass
         else:
@@ -498,14 +558,7 @@ def get_station_locations(
     # To avoid "boolean value of NA is ambiguous" and merge warnings,
     # we force string columns to 'object' (NumPy style) rather than nullable 'string'.
     # This ensures bit-perfect matching in tests and avoids Dask/Pandas 3.0 discrepancies.
-    def _force_object(df_in):
-        df_out = df_in.copy()
-        for col in df_out.columns:
-            if pd.api.types.is_string_dtype(df_out[col]):
-                df_out[col] = df_out[col].astype(object)
-        return df_out
-
-    monitor_df = _force_object(monitor_df.drop_duplicates(subset=["siteid"]))
+    monitor_df = force_object_strings(monitor_df.drop_duplicates(subset=["siteid"]))
 
     if is_dask:
         # Cast key to object on dask side too

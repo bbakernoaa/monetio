@@ -1,5 +1,4 @@
 import abc
-from datetime import datetime
 from typing import TYPE_CHECKING, List, Union
 
 import numpy as np
@@ -7,6 +6,7 @@ import pandas as pd
 import xarray as xr
 
 from ..util import ds_to_2d, force_object_strings
+from .sat_utils import update_history
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
@@ -268,13 +268,6 @@ class PointReader(BaseReader):
             ds.attrs["Conventions"] += " UGRID-1.0"
 
         # Update history
-        history = (
-            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
-            "Converted to xarray Dataset with UGRID convention."
-        )
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Converted to xarray Dataset with UGRID convention.")
 
         return ds

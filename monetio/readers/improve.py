@@ -1,6 +1,5 @@
 """IMPROVE Reader"""
 
-from datetime import datetime
 from functools import partial
 from typing import TYPE_CHECKING, List, Union
 
@@ -10,6 +9,7 @@ from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from .epa_utils import read_monitor_file
+from .sat_utils import update_history
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
@@ -98,11 +98,7 @@ class IMPROVEReader(PointReader):
         if as_xarray:
             ds = self.to_xarray(df, pivot=pivot, **kwargs)
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read IMPROVE data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read IMPROVE data.")
             return ds
 
         return df

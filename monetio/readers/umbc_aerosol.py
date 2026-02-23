@@ -1,6 +1,5 @@
 """UMBC Aerosol Reader (CL51)"""
 
-import datetime
 from typing import List, Union
 
 import numpy as np
@@ -8,6 +7,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 
 
 @register_reader("umbc_aerosol")
@@ -56,13 +56,7 @@ class UMBCAerosolReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read UMBC Aerosol data."
-        )
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read UMBC Aerosol data.")
 
         return ds
 
