@@ -4,6 +4,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
+pytestmark = pytest.mark.network
 import xarray as xr
 from filelock import FileLock
 

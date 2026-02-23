@@ -4,6 +4,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
+pytestmark = pytest.mark.network
 from filelock import FileLock
 
 from monetio.models._cesm_fv_mm import open_mfdataset

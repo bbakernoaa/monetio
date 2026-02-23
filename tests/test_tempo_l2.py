@@ -3,6 +3,8 @@ import warnings
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.network
 from filelock import FileLock
 
 from monetio.sat._tempo_l2_no2_mm import open_dataset

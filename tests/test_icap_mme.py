@@ -1,15 +1,15 @@
 import pytest
 
+pytestmark = pytest.mark.network
+
 from monetio.models.icap_mme import open_dataset, open_mfdataset
 
 
-@pytest.mark.network
 def test_open_dataset_bad_date():
     with pytest.raises(ValueError, match="File does not exist"):
         open_dataset("1990-08-01")
 
 
-@pytest.mark.network
 def test_open_dataset_invalid_param():
     date = "2019-08-01"
 
@@ -22,7 +22,6 @@ def test_open_dataset_invalid_param():
         open_mfdataset([date], data_var="asdf")
 
 
-@pytest.mark.network
 @pytest.mark.parametrize(
     "date,product,data_var",
     [
@@ -42,7 +41,6 @@ def test_open_dataset(tmp_path, monkeypatch, date, product, data_var):
     assert ds_dl.equals(ds)
 
 
-@pytest.mark.network
 def test_open_mfdataset(tmp_path, monkeypatch):
     dates = ["2023-08-01", "2023-08-02"]
     product = "C4"

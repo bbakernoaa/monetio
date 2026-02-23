@@ -3,6 +3,8 @@ from contextlib import contextmanager
 
 import pandas as pd
 import pytest
+
+pytestmark = pytest.mark.network
 import requests
 
 import monetio.obs.openaq_v2 as openaq
@@ -50,7 +52,6 @@ def check_error_code():
         raise AssertionError(f"expected HTTP Error {should_raise}") from e
 
 
-@pytest.mark.network
 @xfail_httperror
 def test_get_parameters():
     with check_error_code():
@@ -62,7 +63,6 @@ def test_get_parameters():
     assert "o3" in params.name.values
 
 
-@pytest.mark.network
 @xfail_httperror
 def test_get_locations():
     with check_error_code():
@@ -77,7 +77,6 @@ def test_get_locations():
     assert sites["longitude"].isnull().sum() == 0
 
 
-@pytest.mark.network
 @xfail_httperror
 def test_get_data_near_ncwcp_sites():
     sites = SITES_NEAR_NCWCP
@@ -93,7 +92,6 @@ def test_get_data_near_ncwcp_sites():
     assert not df.value.isna().all() and not df.value.lt(0).any()
 
 
-@pytest.mark.network
 @xfail_httperror
 def test_get_data_near_ncwcp_sites_wide():
     sites = SITES_NEAR_NCWCP
@@ -107,7 +105,6 @@ def test_get_data_near_ncwcp_sites_wide():
     assert not {"parameter", "value", "unit"} <= set(df.columns)
 
 
-@pytest.mark.network
 @xfail_httperror
 def test_get_data_near_ncwcp_search_radius():
     latlon = LATLON_NCWCP
@@ -123,7 +120,6 @@ def test_get_data_near_ncwcp_search_radius():
     assert df.entity.eq("Governmental Organization").all()
 
 
-@pytest.mark.network
 @xfail_httperror
 def test_get_data_near_ncwcp_sensor_type():
     latlon = LATLON_NCWCP
@@ -134,7 +130,6 @@ def test_get_data_near_ncwcp_sensor_type():
     assert df.sensor_type.eq("low-cost sensor").all()
 
 
-@pytest.mark.network
 @xfail_httperror
 def test_get_data_single_dt_single_site():
     site = 843
@@ -144,7 +139,6 @@ def test_get_data_single_dt_single_site():
     assert len(df) == 1
 
 
-@pytest.mark.network
 @xfail_httperror
 @pytest.mark.parametrize(
     "entity",
@@ -170,7 +164,6 @@ def test_get_data_near_ncwcp_entity(entity):
         25001,
     ],
 )
-@pytest.mark.network
 def test_get_data_bad_radius(radius):
     with pytest.raises(ValueError, match="invalid radius"):
         openaq.add_data(["2023-08-01", "2023-08-02"], search_radius={LATLON_NCWCP: radius})

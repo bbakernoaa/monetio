@@ -4,6 +4,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+pytestmark = pytest.mark.network
+
 from monetio import ish
 
 try:
