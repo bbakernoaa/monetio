@@ -10,6 +10,7 @@ import xarray as xr
 from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .sat_utils import update_history
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
@@ -172,14 +173,9 @@ class NADPReader(PointReader):
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
             # Update history for provenance
-            history = (
-                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: "
-                f"Merged with NADP ({network}) station metadata and harmonized."
+            ds = update_history(
+                ds, f"Merged with NADP ({network}) station metadata and harmonized."
             )
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
             return ds
 
         return df

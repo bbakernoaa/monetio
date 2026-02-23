@@ -1,12 +1,12 @@
 """RAQMS Reader"""
 
-import datetime
 from typing import List, Optional, Union
 
 import numpy as np
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 from .time_utils import parse_wrf_times
 
 
@@ -78,11 +78,7 @@ class RAQMSReader(GriddedReader):
         ds = self.driver.open(files, **kwargs)
 
         # 1. Update history
-        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read RAQMS data."
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read RAQMS data.")
 
         if var_list is not None:
             # Add required vars
@@ -281,13 +277,7 @@ def _fix_time(ds: xr.Dataset) -> xr.Dataset:
         ds = ds.drop_vars(["IDATE", "Times"], errors="ignore")
 
         # Update history
-        history = (
-            f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Optimized time parsing."
-        )
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Optimized time parsing.")
     return ds
 
 

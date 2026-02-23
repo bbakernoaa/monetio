@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     import dask.dataframe as dd
 
 from .base import PointReader, register_reader
+from .sat_utils import update_history
 
 
 class CEMS:
@@ -85,11 +86,7 @@ class CEMSReader(PointReader):
             ds = self.to_xarray(df, **kwargs)
 
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read CEMS data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read CEMS data.")
 
             return ds
 

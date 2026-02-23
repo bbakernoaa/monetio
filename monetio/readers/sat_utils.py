@@ -1,9 +1,12 @@
 """Satellite Reader Utilities"""
 
 import datetime
-from typing import Callable, List, Optional, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Union
 
 import numpy as np
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 import pandas as pd
 import xarray as xr
 
@@ -203,27 +206,35 @@ def standardize_satellite_coords(
     return ds
 
 
-def update_history(ds: xr.Dataset, message: str) -> xr.Dataset:
+def update_history(ds: Union[xr.Dataset, xr.DataArray, pd.DataFrame, "dd.DataFrame"], message: str):
     """
-    Update the 'history' attribute of a dataset.
+    Update the 'history' attribute of a dataset or dataframe backend-agnostic.
 
     Parameters
     ----------
-    ds : xr.Dataset
-        Input dataset.
+    ds : xarray.Dataset, xarray.DataArray, pandas.DataFrame, or dask.DataFrame
+        Input object.
     message : str
         Message to add to history.
 
     Returns
     -------
-    xr.Dataset
-        Dataset with updated history.
+    object
+        The input object with updated history.
     """
+    if not hasattr(ds, "attrs"):
+        # For dask objects that don't have attrs yet or other edge cases
+        return ds
+
     history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {message}"
-    if "history" in ds.attrs:
-        ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-    else:
-        ds.attrs["history"] = history
+    try:
+        if "history" in ds.attrs:
+            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
+        else:
+            ds.attrs["history"] = history
+    except (AttributeError, TypeError):
+        # Some dask-backed objects might have 'attrs' but it might be read-only or similar
+        pass
     return ds
 
 

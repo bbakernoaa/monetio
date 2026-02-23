@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .sat_utils import update_history
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,7 @@ class ISH:
         self,
         dates: Optional[pd.DatetimeIndex] = None,
         sites: Optional[pd.DataFrame] = None,
+        lite: bool = False,
     ) -> pd.DataFrame:
         """
         Construct ISH URLs.
@@ -145,7 +147,9 @@ class ISH:
         unique_years = pd.to_datetime(dates.year.unique(), format="%Y")
         furls = []
 
-        if self.source == "aws":
+        if lite:
+            url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite"
+        elif self.source == "aws":
             url = "s3://noaa-isd-pds/data"
         else:
             url = "https://www.ncei.noaa.gov/pub/data/noaa"
@@ -229,10 +233,8 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
     pd.DataFrame
         The loaded data.
     """
-    import fsspec
-
     # Regression fix: check valid retries
-    request_retries = kwargs.get("request_retries", 4)
+    request_retries = kwargs.get("request_retries", 3)
     if request_retries < 0:
         raise ValueError(f"`request_retries` must be >= 0, got {request_retries!r}")
 
@@ -264,7 +266,9 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
                         io.BytesIO(content), delimiter=ISH.WIDTHS, dtype=ISH.DTYPES
                     )
             else:
-                with fsspec.open(fname, "rb", compression=compression, **storage_options) as f:
+                # Use FileUtility
+                fs = FileUtility.get_fs(fname)
+                with fs.open(fname, "rb", compression=compression, **storage_options) as f:
                     frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
             break
         except Exception as e:
@@ -505,11 +509,7 @@ class ISHReader(PointReader):
                         ds.coords["siteid"] = (("node",), ds.node.values)
 
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ISH data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read ISH data.")
             return ds
 
         if resample:

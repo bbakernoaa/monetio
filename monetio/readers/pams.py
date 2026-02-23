@@ -1,7 +1,6 @@
 """PAMS Reader"""
 
 import json
-from datetime import datetime
 from typing import TYPE_CHECKING, List, Union
 
 import pandas as pd
@@ -12,6 +11,7 @@ if TYPE_CHECKING:
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .sat_utils import update_history
 
 
 @register_reader("pams")
@@ -59,11 +59,7 @@ class PAMSReader(PointReader):
             ds = self.to_xarray(df, **kwargs)
 
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read PAMS data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read PAMS data.")
 
             return ds
 

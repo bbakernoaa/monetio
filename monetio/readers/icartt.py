@@ -11,6 +11,7 @@ import xarray as xr
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .sat_utils import update_history
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
@@ -166,11 +167,7 @@ class ICARTTReader(PointReader):
                     pass
 
             # Update history
-            history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ICARTT data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read ICARTT data.")
             return ds
 
         return df

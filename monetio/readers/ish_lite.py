@@ -14,9 +14,11 @@ if TYPE_CHECKING:
 from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .ish import ISH
+from .sat_utils import update_history
 
 
-def read_ish_lite_file(fname: str) -> pd.DataFrame:
+def read_ish_lite_file(fname: str, **kwargs) -> pd.DataFrame:
     """
     Read a single ISH Lite file.
 
@@ -50,8 +52,9 @@ def read_ish_lite_file(fname: str) -> pd.DataFrame:
     # Use FileUtility
     fs = FileUtility.get_fs(fname)
     compression = "gzip" if fname.endswith(".gz") else None
+    storage_options = kwargs.get("storage_options", {})
 
-    with fs.open(fname, "rb", compression=compression) as f:
+    with fs.open(fname, "rb", compression=compression, **storage_options) as f:
         df = pd.read_csv(
             f,
             sep=r"\s+",
@@ -143,7 +146,7 @@ class ISHLiteReader(PointReader):
             elif site is not None:
                 dfloc = dfloc.loc[dfloc.station_id == site, :]
 
-            urls = ish.build_urls(dates=dates, sites=dfloc)
+            urls = ish.build_urls(dates=dates, sites=dfloc, lite=True)
             if urls.empty:
                 raise ValueError("No data URLs found")
             files = urls.name.tolist()
@@ -216,11 +219,7 @@ class ISHLiteReader(PointReader):
                     ds = ds.resample(time=window).mean()
 
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read ISH Lite data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read ISH Lite data.")
             return ds
 
         if resample:
@@ -282,96 +281,3 @@ def add_data(
         lazy=lazy,
         **kwargs,
     )
-
-
-class ISH:
-    """Helper class for ISH Lite data retrieval."""
-
-    def __init__(self):
-        self.history_file = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
-        self.history = None
-        self.dates = None
-        self.verbose = False
-
-    def read_ish_history(self, dates: Optional[pd.DatetimeIndex] = None):
-        """
-        Read the ISH history file.
-
-        Parameters
-        ----------
-        dates : pd.DatetimeIndex, optional
-            Dates to filter the history, by default None.
-        """
-        if dates is None:
-            dates = self.dates
-        fname = self.history_file
-
-        fs = FileUtility.get_fs(fname)
-        try:
-            with fs.open(fname, "r") as f:
-                self.history = pd.read_csv(
-                    f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str}
-                )
-        except Exception:
-            alt = fname.replace("www1.ncdc.noaa.gov", "www.ncei.noaa.gov")
-            if alt != fname:
-                fs_alt = FileUtility.get_fs(alt)
-                with fs_alt.open(alt, "r") as f:
-                    self.history = pd.read_csv(
-                        f, parse_dates=["BEGIN", "END"], dtype={"USAF": str, "WBAN": str}
-                    )
-                self.history_file = alt
-            else:
-                raise
-
-        self.history.columns = [i.lower() for i in self.history.columns]
-        if dates is not None:
-            index1 = (self.history.end >= dates.min()) & (self.history.begin <= dates.max())
-            self.history = self.history.loc[index1, :]
-        self.history = self.history.dropna(subset=["lat", "lon"])
-        self.history.loc[:, "usaf"] = self.history.usaf.astype("str").str.zfill(6)
-        self.history.loc[:, "wban"] = self.history.wban.astype("str").str.zfill(5)
-        self.history["station_id"] = self.history.usaf + self.history.wban
-        self.history.rename(columns={"lat": "latitude", "lon": "longitude"}, inplace=True)
-
-    def subset_sites(
-        self,
-        latmin: float = 32.65,
-        lonmin: float = -113.3,
-        latmax: float = 34.5,
-        lonmax: float = -110.4,
-    ) -> pd.DataFrame:
-        """
-        Subset sites by bounding box.
-        """
-        latindex = (self.history.latitude >= latmin) & (self.history.latitude <= latmax)
-        lonindex = (self.history.longitude >= lonmin) & (self.history.longitude <= lonmax)
-        dfloc = self.history.loc[latindex & lonindex, :]
-        return dfloc
-
-    def build_urls(
-        self,
-        dates: Optional[pd.DatetimeIndex] = None,
-        sites: Optional[pd.DataFrame] = None,
-    ) -> pd.DataFrame:
-        """
-        Construct ISH Lite URLs.
-        """
-        if dates is None:
-            dates = self.dates
-        if sites is None:
-            sites = self.history
-
-        unique_years = pd.to_datetime(dates.year.unique(), format="%Y")
-        furls = []
-        url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite"
-
-        # Assume availability
-        for syear in unique_years.strftime("%Y"):
-            year_fnames = (
-                sites.usaf.astype(str) + "-" + sites.wban.astype(str) + "-" + syear + ".gz"
-            )
-            for fname in year_fnames:
-                furls.append(f"{url}/{syear}/{fname}")
-
-        return pd.Series(furls, name="name").to_frame()

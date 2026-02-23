@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from .sat_utils import update_history
+
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
@@ -128,11 +130,7 @@ class OpenAQReader(PointReader):
             ds = self.to_xarray(df, expand2d=exp2d, **kwargs)
 
             # Update history
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read OpenAQ data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read OpenAQ data.")
             return ds
 
         return df

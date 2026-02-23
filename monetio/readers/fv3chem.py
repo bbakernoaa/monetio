@@ -1,6 +1,5 @@
 """FV3-CHEM Reader"""
 
-import datetime
 from glob import glob
 from typing import List, Optional, Union
 
@@ -10,6 +9,7 @@ import xarray as xr
 from numpy import sort
 
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 
 
 @register_reader("fv3chem")
@@ -78,11 +78,7 @@ class FV3ChemReader(GriddedReader):
         ds = self.harmonize(ds)
 
         # Update history
-        history = f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read FV3-Chem data."
-        if "history" in ds.attrs:
-            ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-        else:
-            ds.attrs["history"] = history
+        ds = update_history(ds, "Read FV3-Chem data.")
 
         return ds
 

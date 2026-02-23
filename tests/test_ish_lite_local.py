@@ -58,6 +58,7 @@ def test_ish_lite_reader_eager(mock_ish_lite_file, mock_history_file, monkeypatc
         self.history = None
         self.dates = None
         self.verbose = False
+        self.source = "local"
 
     monkeypatch.setattr(ish_lite.ISH, "__init__", mock_init)
 
@@ -66,7 +67,7 @@ def test_ish_lite_reader_eager(mock_ish_lite_file, mock_history_file, monkeypatc
     monkeypatch.setattr(
         ish_lite.ISH,
         "build_urls",
-        lambda self, dates, sites: pd.DataFrame({"name": [mock_ish_lite_file]}),
+        lambda self, dates, sites, lite=False: pd.DataFrame({"name": [mock_ish_lite_file]}),
     )
 
     # Test as_xarray=False
@@ -92,12 +93,13 @@ def test_ish_lite_reader_lazy(mock_ish_lite_file, mock_history_file, monkeypatch
         self.history = None
         self.dates = None
         self.verbose = False
+        self.source = "local"
 
     monkeypatch.setattr(ish_lite.ISH, "__init__", mock_init)
     monkeypatch.setattr(
         ish_lite.ISH,
         "build_urls",
-        lambda self, dates, sites: pd.DataFrame({"name": [mock_ish_lite_file]}),
+        lambda self, dates, sites, lite=False: pd.DataFrame({"name": [mock_ish_lite_file]}),
     )
 
     dates = pd.date_range("2020-09-01", "2020-09-02")
@@ -128,12 +130,13 @@ def test_ish_lite_resample_eager(mock_ish_lite_file, mock_history_file, monkeypa
         self.history = None
         self.dates = None
         self.verbose = False
+        self.source = "local"
 
     monkeypatch.setattr(ish_lite.ISH, "__init__", mock_init)
     monkeypatch.setattr(
         ish_lite.ISH,
         "build_urls",
-        lambda self, dates, sites: pd.DataFrame({"name": [mock_ish_lite_file]}),
+        lambda self, dates, sites, lite=False: pd.DataFrame({"name": [mock_ish_lite_file]}),
     )
 
     dates = pd.date_range("2020-09-01", "2020-09-02")
@@ -153,12 +156,13 @@ def test_ish_lite_resample_lazy(mock_ish_lite_file, mock_history_file, monkeypat
         self.history = None
         self.dates = None
         self.verbose = False
+        self.source = "local"
 
     monkeypatch.setattr(ish_lite.ISH, "__init__", mock_init)
     monkeypatch.setattr(
         ish_lite.ISH,
         "build_urls",
-        lambda self, dates, sites: pd.DataFrame({"name": [mock_ish_lite_file]}),
+        lambda self, dates, sites, lite=False: pd.DataFrame({"name": [mock_ish_lite_file]}),
     )
 
     dates = pd.date_range("2020-09-01", "2020-09-02")

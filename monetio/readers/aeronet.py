@@ -16,6 +16,7 @@ import xarray as xr
 from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .sat_utils import update_history
 
 
 @register_reader("aeronet")
@@ -217,13 +218,7 @@ class AERONETReader(PointReader):
             ds = self.to_xarray(df, **kwargs)
 
             # Update history
-            history = (
-                f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}: Read AERONET data."
-            )
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read AERONET data.")
 
             return ds
 

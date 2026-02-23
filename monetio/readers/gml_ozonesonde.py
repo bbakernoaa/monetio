@@ -10,6 +10,8 @@ import pandas as pd
 import requests
 import xarray as xr
 
+from .sat_utils import update_history
+
 if TYPE_CHECKING:
     pass
 
@@ -98,11 +100,7 @@ class GMLOzonesondeReader(PointReader):
             ds = self.to_xarray(df, **kwargs)
 
             # Update history and metadata
-            history = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: Read GML Ozonesonde data."
-            if "history" in ds.attrs:
-                ds.attrs["history"] = f"{ds.attrs['history']}\n{history}"
-            else:
-                ds.attrs["history"] = history
+            ds = update_history(ds, "Read GML Ozonesonde data.")
 
             # Set variable attributes
             var_attrs = {
