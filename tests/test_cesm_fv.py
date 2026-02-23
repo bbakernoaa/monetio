@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.network
 from filelock import FileLock
 
 from monetio.models._cesm_fv_mm import open_mfdataset
@@ -18,18 +17,24 @@ def retrieve_test_file():
 
     # Download to tests/data if not already present
     p = HERE / "data" / fn
-    if not p.is_file():
+    if not p.is_file() or p.stat().st_size < 1000:
         warnings.warn(f"Downloading test file {fn} for CESM-FV test")
         import requests
 
-        r = requests.get(
-            "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
-            + f"example_model_data/cesmfv_example/{fn}",
-            stream=True,
-        )
-        r.raise_for_status()
-        with open(p, "wb") as f:
-            f.write(r.content)
+        try:
+            r = requests.get(
+                "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
+                + f"example_model_data/cesmfv_example/{fn}",
+                stream=True,
+                timeout=30,
+            )
+            r.raise_for_status()
+            with open(p, "wb") as f:
+                f.write(r.content)
+        except Exception as e:
+            if os.environ.get("CI"):
+                pytest.skip(f"Failed to download {fn} in CI: {e}")
+            raise
 
     return p
 

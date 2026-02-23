@@ -1,6 +1,5 @@
 import pytest
 
-pytestmark = pytest.mark.network
 
 from monetio.models.icap_mme import open_dataset, open_mfdataset
 

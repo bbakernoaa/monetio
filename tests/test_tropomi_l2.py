@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-pytestmark = pytest.mark.network
 from filelock import FileLock
 
 from monetio.sat._tropomi_l2_no2_mm import open_dataset, read_trpdataset

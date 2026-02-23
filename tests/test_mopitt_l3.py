@@ -5,7 +5,6 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-pytestmark = pytest.mark.network
 from filelock import FileLock
 
 from monetio.sat._mopitt_l3_mm import get_start_time, load_variable, open_dataset

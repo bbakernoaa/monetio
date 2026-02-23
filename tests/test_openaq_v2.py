@@ -4,7 +4,6 @@ from contextlib import contextmanager
 import pandas as pd
 import pytest
 
-pytestmark = pytest.mark.network
 import requests
 
 import monetio.obs.openaq_v2 as openaq

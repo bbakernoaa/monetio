@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import pytest
 
-pytestmark = pytest.mark.network
 
 import monetio.obs.openaq_v3 as openaq
 
