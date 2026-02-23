@@ -4,6 +4,7 @@ import pytest
 from monetio import aqs
 
 
+@pytest.mark.network
 def test_aqs_daily_long():
     # For MM data proc example
     dates = pd.date_range(start="2019-08-01", end="2019-08-31", freq="D")
@@ -22,6 +23,7 @@ def test_aqs_daily_long():
     assert ((t.dt.year == 2019) & (t.dt.month == 8)).all()
 
 
+@pytest.mark.network
 def test_aqs_daily_wide():
     dates = pd.date_range(start="2019-08-01", end="2019-08-31", freq="D")
     df = aqs.add_data(

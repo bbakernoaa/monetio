@@ -34,6 +34,7 @@ def columns_all_snake_case(df):
     return all(df.columns.str.fullmatch(r"[a-z_]+"))
 
 
+@pytest.mark.network
 def test_get_parameters():
     params = openaq.get_parameters()
     assert columns_all_snake_case(params)
@@ -44,6 +45,7 @@ def test_get_parameters():
     assert "o3" in params.name.values
 
 
+@pytest.mark.network
 def test_get_locations():
     sites = openaq.get_locations()
     assert columns_all_snake_case(sites)
@@ -66,12 +68,14 @@ def test_get_locations():
     assert {"pm25", "o3"} <= unique_params
 
 
+@pytest.mark.network
 def test_get_sensors():
     df = openaq.get_sensors("3832")
     assert columns_all_snake_case(df)
     assert df.parameter.tolist() == ["so2", "o3"]
 
 
+@pytest.mark.network
 @pytest.mark.parametrize(
     "product",
     [
@@ -108,6 +112,7 @@ def test_add_data_sensor_ids(product):
         raise AssertionError
 
 
+@pytest.mark.network
 @pytest.mark.parametrize(
     "product",
     [
@@ -149,6 +154,7 @@ def test_add_data_sensor_limit(product):
     )
 
 
+@pytest.mark.network
 def test_get_data_single_dt_single_site():
     site = "843"
     dates = "2023-08-01"

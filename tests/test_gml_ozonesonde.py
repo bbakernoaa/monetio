@@ -6,6 +6,7 @@ from monetio import gml_ozonesonde
 uses_get_files = pytest.mark.xdist_group(name="get-files")
 
 
+@pytest.mark.network
 @uses_get_files
 def test_discover_files():
     files = gml_ozonesonde.discover_files(n_threads=2)
@@ -13,6 +14,7 @@ def test_discover_files():
     assert set(files["location"].unique()) == set(gml_ozonesonde.LOCATIONS)
 
 
+@pytest.mark.network
 def test_read_100m():
     url = r"https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/Boulder,%20Colorado/100%20Meter%20Average%20Files/bu1043_2023_12_27_17.l100"
     df = gml_ozonesonde.read_100m(url)
@@ -29,6 +31,7 @@ def test_read_100m():
     assert df.attrs["ds_attrs"]["Sonde Total O3 (SBUV)"] == "325 (62) DU"
 
 
+@pytest.mark.network
 @pytest.mark.parametrize(
     "url",
     [
@@ -43,6 +46,7 @@ def test_read_100m_nonstd(url):
     assert len(df) > 0
 
 
+@pytest.mark.network
 def test_read_100m_bad_data_line():
     url = r"https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/San%20Cristobal,%20Galapagos/100%20Meter%20Average%20Files/sc204_2002_01_31_12.l100"
     # Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp  O3 # DN O3 Res
@@ -54,6 +58,7 @@ def test_read_100m_bad_data_line():
         _ = gml_ozonesonde.read_100m(url)
 
 
+@pytest.mark.network
 def test_read_100m_bad_header_line():
     url = r"https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde/Boulder,%20Colorado/100%20Meter%20Average%20Files/bu913_2021_08_10_16.l100"
     # Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp  O3 # DN O3 Res   Ftemp   Water
@@ -63,6 +68,7 @@ def test_read_100m_bad_header_line():
         _ = gml_ozonesonde.read_100m(url)
 
 
+@pytest.mark.network
 @uses_get_files
 def test_add_data():
     dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="H")
@@ -78,6 +84,7 @@ def test_add_data():
     assert df["siteid"].nunique() == latlon.nunique()
 
 
+@pytest.mark.network
 @uses_get_files
 def test_add_data_location_sel():
     dates = pd.date_range("2023-01-01", "2023-01-31 23:59", freq="H")
@@ -102,6 +109,7 @@ def test_add_data_invalid_location(location):
         _ = gml_ozonesonde.add_data(dates, location=location)
 
 
+@pytest.mark.network
 @uses_get_files
 def test_same_location_and_launch_time():
     # Two files with same file time and launch time:
