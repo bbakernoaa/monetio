@@ -20,17 +20,19 @@ from .sat_utils import update_history
 
 def read_ish_lite_file(fname: str, **kwargs) -> pd.DataFrame:
     """
-    Read a single ISH Lite file.
+    Read a single ISH (Integrated Surface Hourly) Lite file.
 
     Parameters
     ----------
     fname : str
-        File path or URL.
+        File path, URL, or fsspec-compatible path.
+    **kwargs : dict
+        Additional arguments passed to fsspec.open.
 
     Returns
     -------
     pd.DataFrame
-        The loaded data.
+        The loaded data in long format.
     """
     from numpy import nan
 
@@ -93,7 +95,7 @@ class ISHLiteReader(PointReader):
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Retrieve and load ISH (Integrated Surface Hourly) Lite data .
+        Retrieve and load ISH (Integrated Surface Hourly) Lite data.
 
         Parameters
         ----------
@@ -120,14 +122,21 @@ class ISHLiteReader(PointReader):
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
-            Whether to return a dask-backed object, by default False.
+            Whether to return a dask-backed object (dask.dataframe or xarray with dask),
+            by default False.
         **kwargs : dict
-            Additional arguments.
+            Additional arguments passed to the driver or to_xarray.
 
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded ISH Lite data.
+
+        Examples
+        --------
+        >>> from monetio.readers.ish_lite import ISHLiteReader
+        >>> reader = ISHLiteReader()
+        >>> ds = reader.open_dataset(dates='2021-08-01', site='72406093721')
         """
         ish = ISH()
 
@@ -197,9 +206,12 @@ class ISHLiteReader(PointReader):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
-            ds = self.to_xarray(df, **kwargs)
+            from ..util import ds_to_2d
 
-            # Preserve metadata in coordinates during resampling
+            # We first convert to 1D UGRID
+            ds = self.to_xarray(df, expand2d=False, **kwargs)
+
+            # Metadata variables to preserve
             meta_coords = [
                 "country",
                 "state",
@@ -208,15 +220,59 @@ class ISHLiteReader(PointReader):
                 "latitude",
                 "longitude",
                 "siteid",
+                "usaf",
+                "wban",
             ]
-            ds = ds.set_coords([c for c in meta_coords if c in ds.data_vars])
 
             if resample:
                 # Backend-agnostic resampling in xarray
+                # To preserve per-site data, we expand to 2D (time, node) before resampling
+                pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
+                ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
+
+                # Identify metadata variables to preserve (those that don't vary with time)
+                metadata = xr.Dataset()
+                for c in meta_coords:
+                    if c in ds.coords or c in ds.data_vars:
+                        val = ds[c]
+                        if "time" in val.dims:
+                            # If it varies with time, we take the first value per node
+                            val = val.isel(time=0, drop=True)
+                        metadata[c] = val
+
                 try:
-                    ds = ds.resample(time=window).mean(numeric_only=True)
-                except TypeError:
-                    ds = ds.resample(time=window).mean()
+                    ds = ds.sortby("time").resample(time=window).mean(numeric_only=True)
+                except Exception:
+                    ds = ds.sortby("time").resample(time=window).mean()
+
+                # Restore metadata
+                for c in metadata.data_vars:
+                    ds[c] = metadata[c]
+                for c in metadata.coords:
+                    ds.coords[c] = metadata.coords[c]
+
+                # Ensure siteid is correctly linked to node if it's the dimension
+                if "siteid" not in ds.coords and "siteid" not in ds.data_vars and "node" in ds.dims:
+                    ds.coords["siteid"] = (("node",), ds.node.data)
+
+                # Update history for resampling
+                ds = update_history(ds, f"Resampled ISH Lite data to {window} window.")
+
+            else:
+                # Now expand to 2D if requested (default is True in PointReader)
+                expand2d = kwargs.get("expand2d", True)
+                if expand2d:
+                    pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
+                    ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
+                    if (
+                        "siteid" not in ds.coords
+                        and "siteid" not in ds.data_vars
+                        and "node" in ds.dims
+                    ):
+                        ds.coords["siteid"] = (("node",), ds.node.data)
+
+            # Ensure metadata are coordinates
+            ds = ds.set_coords([c for c in meta_coords if c in ds.variables])
 
             # Update history
             ds = update_history(ds, "Read ISH Lite data.")
@@ -265,7 +321,39 @@ def add_data(
     **kwargs,
 ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
     """
-    Backward-compatible wrapper for ISHLiteReader.open_dataset.
+    Retrieve and load ISH Lite data (backward-compatible wrapper).
+
+    Parameters
+    ----------
+    dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+        Dates to retrieve.
+    box : List[float], optional
+        Bounding box [latmin, lonmin, latmax, lonmax].
+    country : str, optional
+        Country code.
+    state : str, optional
+        State code.
+    site : str, optional
+        Station ID.
+    resample : bool, optional
+        Whether to resample, by default False.
+    window : str, optional
+        Resampling window, by default 'h'.
+    n_procs : int, optional
+        Number of processors, by default 1.
+    verbose : bool, optional
+        Verbose output, by default False.
+    as_xarray : bool, optional
+        Return xarray.Dataset, by default True.
+    lazy : bool, optional
+        Return dask-backed object, by default False.
+    **kwargs : dict
+        Additional arguments.
+
+    Returns
+    -------
+    Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+        The loaded ISH Lite data.
     """
     return ISHLiteReader().open_dataset(
         dates=dates,

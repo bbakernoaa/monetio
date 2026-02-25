@@ -224,14 +224,15 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
     Parameters
     ----------
     fname : str
-        File path or URL.
+        File path, URL, or fsspec-compatible path.
     **kwargs : dict
-        Additional arguments.
+        Additional arguments passed to FileUtility.get_fs and read_csv.
+        Includes `request_retries`, `request_timeout`, and `storage_options`.
 
     Returns
     -------
     pd.DataFrame
-        The loaded data.
+        The loaded data in long format.
     """
     # Regression fix: check valid retries
     request_retries = kwargs.get("request_retries", 3)
@@ -333,7 +334,7 @@ class ISHReader(PointReader):
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Retrieve and load ISH (Integrated Surface Hourly) data .
+        Retrieve and load ISH (Integrated Surface Hourly) data.
 
         Parameters
         ----------
@@ -360,18 +361,24 @@ class ISHReader(PointReader):
         verbose : bool, optional
             Whether to print verbose output, by default False.
         source : str, optional
-            Data source: 'ncdc' or 'aws', by default 'ncdc'.
+            Data source: 'ncdc' or 'aws', by default 'aws'.
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
             Whether to return a dask-backed object, by default False.
         **kwargs : dict
-            Additional arguments.
+            Additional arguments passed to the driver or to_xarray.
 
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded ISH data.
+
+        Examples
+        --------
+        >>> from monetio.readers.ish import ISHReader
+        >>> reader = ISHReader()
+        >>> ds = reader.open_dataset(dates='2021-08-01', site='72406093721')
         """
         # Regression fix: check multiple subsets
         if sum([box is not None, country is not None, state is not None, site is not None]) > 1:
@@ -445,6 +452,8 @@ class ISHReader(PointReader):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
+            from ..util import ds_to_2d
+
             # We first convert to 1D
             ds = self.to_xarray(df, expand2d=False, **kwargs)
 
@@ -464,8 +473,6 @@ class ISHReader(PointReader):
             if resample:
                 # Backend-agnostic resampling in xarray
                 # To preserve per-site data, we expand to 2D (time, node) before resampling
-                from ..util import ds_to_2d
-
                 pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
                 ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
 
@@ -489,16 +496,15 @@ class ISHReader(PointReader):
                 for c in metadata.coords:
                     ds.coords[c] = metadata.coords[c]
                 if "siteid" not in ds.coords and "siteid" not in ds.data_vars and "node" in ds.dims:
-                    ds.coords["siteid"] = (("node",), ds.node.values)
+                    ds.coords["siteid"] = (("node",), ds.node.data)
 
-                ds = ds.set_coords([c for c in meta_coords if c in ds.data_vars])
+                # Update history for resampling
+                ds = update_history(ds, f"Resampled ISH data to {window} window.")
 
             else:
                 # Now expand to 2D if requested (default is True in PointReader)
                 expand2d = kwargs.get("expand2d", True)
                 if expand2d:
-                    from ..util import ds_to_2d
-
                     pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
                     ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
                     if (
@@ -506,7 +512,10 @@ class ISHReader(PointReader):
                         and "siteid" not in ds.data_vars
                         and "node" in ds.dims
                     ):
-                        ds.coords["siteid"] = (("node",), ds.node.values)
+                        ds.coords["siteid"] = (("node",), ds.node.data)
+
+            # Ensure metadata are coordinates
+            ds = ds.set_coords([c for c in meta_coords if c in ds.variables])
 
             # Update history
             ds = update_history(ds, "Read ISH data.")
