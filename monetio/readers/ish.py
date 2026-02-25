@@ -148,7 +148,10 @@ class ISH:
         furls = []
 
         if lite:
-            url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite"
+            if self.source == "aws":
+                url = "s3://noaa-isd-pds/isd-lite/data"
+            else:
+                url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite"
         elif self.source == "aws":
             url = "s3://noaa-isd-pds/data"
         else:

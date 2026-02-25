@@ -90,6 +90,7 @@ class ISHLiteReader(PointReader):
         window: str = "h",
         n_procs: int = 1,
         verbose: bool = False,
+        source: str = "aws",
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
@@ -119,6 +120,8 @@ class ISHLiteReader(PointReader):
             Number of processors for dask compute (if not lazy), by default 1.
         verbose : bool, optional
             Whether to print verbose output, by default False.
+        source : str, optional
+            Data source: 'ncdc' or 'aws', by default 'aws'.
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
@@ -139,6 +142,7 @@ class ISHLiteReader(PointReader):
         >>> ds = reader.open_dataset(dates='2021-08-01', site='72406093721')
         """
         ish = ISH()
+        ish.source = source
 
         if files is None and dates is not None:
             dates = pd.to_datetime(dates)
@@ -316,6 +320,7 @@ def add_data(
     window: str = "h",
     n_procs: int = 1,
     verbose: bool = False,
+    source: str = "aws",
     as_xarray: bool = True,
     lazy: bool = False,
     **kwargs,
@@ -343,6 +348,8 @@ def add_data(
         Number of processors, by default 1.
     verbose : bool, optional
         Verbose output, by default False.
+    source : str, optional
+        Data source: 'ncdc' or 'aws', by default 'aws'.
     as_xarray : bool, optional
         Return xarray.Dataset, by default True.
     lazy : bool, optional
@@ -365,6 +372,7 @@ def add_data(
         window=window,
         n_procs=n_procs,
         verbose=verbose,
+        source=source,
         as_xarray=as_xarray,
         lazy=lazy,
         **kwargs,

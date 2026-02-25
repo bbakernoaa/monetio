@@ -1,8 +1,9 @@
+import numpy as np
 import pandas as pd
 import pytest
-import xarray as xr
-import numpy as np
+
 from monetio.readers.ish_lite import ISHLiteReader
+
 
 @pytest.fixture
 def mock_ish_lite_files(tmp_path):
@@ -18,11 +19,13 @@ def mock_ish_lite_files(tmp_path):
     content2 += "2023 01 01 01  220  90 10135  280   60 0 0 0\n"
 
     import gzip
+
     with gzip.open(fn1, "wb") as f:
         f.write(content1.encode())
     with gzip.open(fn2, "wb") as f:
         f.write(content2.encode())
     return [str(fn1), str(fn2)]
+
 
 def test_ish_lite_multi_site_resample(mock_ish_lite_files, monkeypatch):
     def mock_read_history(self, dates=None):
@@ -43,13 +46,16 @@ def test_ish_lite_multi_site_resample(mock_ish_lite_files, monkeypatch):
         )
 
     import monetio.readers.ish as ish
+
     monkeypatch.setattr(ish.ISH, "read_ish_history", mock_read_history)
 
     reader = ISHLiteReader()
 
     # 1. Eager with resample
     # resample='h' shouldn't change data as it's already hourly
-    ds = reader.open_dataset(files=mock_ish_lite_files, as_xarray=True, resample=True, window='h', lazy=False)
+    ds = reader.open_dataset(
+        files=mock_ish_lite_files, as_xarray=True, resample=True, window="h", lazy=False
+    )
 
     assert "node" in ds.dims
     assert ds.sizes["node"] == 2
@@ -73,6 +79,7 @@ def test_ish_lite_multi_site_resample(mock_ish_lite_files, monkeypatch):
     assert ds.latitude.isel(node=node_012345).values == 40.0
     assert ds.latitude.isel(node=node_543210).values == 41.0
 
+
 def test_ish_lite_multi_site_resample_lazy(mock_ish_lite_files, monkeypatch):
     def mock_read_history(self, dates=None):
         self.history = pd.DataFrame(
@@ -92,12 +99,15 @@ def test_ish_lite_multi_site_resample_lazy(mock_ish_lite_files, monkeypatch):
         )
 
     import monetio.readers.ish as ish
+
     monkeypatch.setattr(ish.ISH, "read_ish_history", mock_read_history)
 
     reader = ISHLiteReader()
 
     # 2. Lazy with resample
-    ds = reader.open_dataset(files=mock_ish_lite_files, as_xarray=True, resample=True, window='h', lazy=True)
+    ds = reader.open_dataset(
+        files=mock_ish_lite_files, as_xarray=True, resample=True, window="h", lazy=True
+    )
 
     assert ds.temp.chunks is not None
 
@@ -112,6 +122,7 @@ def test_ish_lite_multi_site_resample_lazy(mock_ish_lite_files, monkeypatch):
 
     assert ds_computed.temp.isel(time=0, node=node_012345).values == 10.0
     assert ds_computed.temp.isel(time=0, node=node_543210).values == 20.0
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
