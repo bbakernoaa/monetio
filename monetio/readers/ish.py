@@ -331,7 +331,7 @@ class ISHReader(PointReader):
         download: bool = False,
         n_procs: int = 1,
         verbose: bool = False,
-        source: str = "aws",
+        source: Optional[str] = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
@@ -388,7 +388,8 @@ class ISHReader(PointReader):
             raise ValueError("Only one of `box`, `country`, `state`, or `site` can be used")
 
         ish = ISH()
-        ish.source = source
+        if source is not None:
+            ish.source = source
 
         if files is None and dates is not None:
             dates = pd.to_datetime(dates)
