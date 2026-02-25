@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Union
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
+    import pandas as pd
+    import xarray as xr
+
+
 def nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
@@ -424,3 +434,69 @@ def _try_merge_exact(left, right, *, right_name=None):
             ) from e
     else:
         return left
+
+
+def force_object_strings(
+    df: pd.DataFrame | dd.DataFrame,
+) -> pd.DataFrame | dd.DataFrame:
+    """Convert all string columns to object-dtype to avoid Pandas 3.0 issues.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame or dask.dataframe.DataFrame
+        The input DataFrame.
+
+    Returns
+    -------
+    pandas.DataFrame or dask.dataframe.DataFrame
+        The DataFrame with string columns converted to object-dtype.
+    """
+    from pandas.api.types import is_string_dtype
+
+    cols = [col for col in df.columns if is_string_dtype(df[col].dtype)]
+    if cols:
+        return df.assign(**{col: df[col].astype(object) for col in cols})
+    return df
+
+
+def ds_to_2d(ds: xr.Dataset) -> xr.Dataset:
+    """Expand a 1D UGRID dataset to 2D (time, node).
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        The 1D dataset with a 'node' dimension and 'time', 'siteid' coordinates.
+
+    Returns
+    -------
+    xarray.Dataset
+        The 2D dataset with dimensions (time, siteid) renamed to (time, node).
+    """
+    import xarray as xr
+
+    if "node" not in ds.dims:
+        return ds
+
+    # Ensure we have what we need for the MultiIndex
+    if "time" not in ds or "siteid" not in ds:
+        return ds
+
+    # Create MultiIndex on the node dimension
+    # If 'variable' is present, we might be in 'long' format
+    if "variable" in ds:
+        ds = ds.set_index(node=["time", "siteid", "variable"])
+    else:
+        ds = ds.set_index(node=["time", "siteid"])
+
+    # Handle duplicate observations to prevent unstacking failures
+    ds = ds.drop_duplicates("node")
+
+    # Unstack to 2D
+    ds = ds.unstack("node")
+
+    # If we unstacked 'variable', they became data variables.
+    # If we unstacked siteid, it became a dimension.
+    if "siteid" in ds.dims:
+        ds = ds.rename({"siteid": "node"})
+
+    return ds
