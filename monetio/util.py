@@ -424,3 +424,65 @@ def _try_merge_exact(left, right, *, right_name=None):
             ) from e
     else:
         return left
+
+
+def force_object_strings(df):
+    """Ensure all string-like columns are object type to avoid Dask/Pandas 3.0 issues.
+
+    Parameters
+    ----------
+    df : pd.DataFrame or dd.DataFrame
+        The input data.
+
+    Returns
+    -------
+    pd.DataFrame or dd.DataFrame
+        The data with string columns forced to object type.
+    """
+    from pandas.api.types import is_string_dtype
+
+    cols = [col for col in df.columns if is_string_dtype(df[col].dtype)]
+    if cols:
+        return df.assign(**{col: df[col].astype(object) for col in cols})
+    return df
+
+
+def ds_to_2d(ds):
+    """Expand 1D UGRID dataset to 2D (time, node) using MultiIndex unstacking.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        The 1D UGRID dataset with 'time' and 'siteid' coordinates.
+
+    Returns
+    -------
+    xr.Dataset
+        The expanded 2D dataset.
+    """
+    import pandas as pd
+
+    # Use .data instead of .values to maintain laziness if they are dask-backed.
+    # Note: MultiIndex.from_arrays will still trigger computation if passed dask arrays.
+    # However, for metadata-like coordinates (time, siteid), this is often acceptable.
+    time_data = ds.time.data
+    siteid_data = ds.siteid.data
+
+    # Create temporary MultiIndex
+    temp_idx = pd.MultiIndex.from_arrays([time_data, siteid_data], names=["time", "siteid"])
+
+    # Map current node dimension to this MultiIndex
+    ds = ds.assign_coords(node=temp_idx)
+
+    # Drop duplicates if any (essential for unstacking)
+    ds = ds.drop_duplicates("node")
+
+    # Unstack to 2D
+    ds2d = ds.unstack("node")
+
+    # The unstacking creates a 2D structure (time, siteid).
+    # We rename siteid back to node to maintain UGRID/MONETIO convention.
+    if "siteid" in ds2d.dims:
+        ds2d = ds2d.rename({"siteid": "node"})
+
+    return ds2d
