@@ -59,7 +59,8 @@ def create_synthetic_wrfchem_ds():
 def test_wrfchem_reader_logic(lazy, tmp_path):
     """Test WRF-Chem reader with Eager (NumPy) and Lazy (Dask) backends."""
     ds_orig = create_synthetic_wrfchem_ds()
-    file_path = tmp_path / "wrfout_d01_2023-01-01_00:00:00.nc"
+    # Avoid colons in filenames for Windows compatibility
+    file_path = tmp_path / "wrfout_d01_2023-01-01_00-00-00.nc"
     ds_orig.to_netcdf(file_path)
 
     reader = WRFChemReader()
@@ -81,23 +82,23 @@ def test_wrfchem_reader_logic(lazy, tmp_path):
 
     # 3. Verify Unit Conversion (ppmv to ppbV)
     assert ds.O3.attrs["units"] == "ppbV"
-    assert (ds.O3 == 1000.0).all()
+    assert (ds.O3 == 1000.0).all().compute()
 
     # 4. Verify Diagnostic Sum (NOx = NO + NO2)
     assert "NOx" in ds.data_vars
     assert ds.NOx.attrs["units"] == "ppbV"
     # NO=1000, NO2=1000 -> NOx=2000
-    assert (ds.NOx == 2000.0).all()
+    assert (ds.NOx == 2000.0).all().compute()
 
     # 5. Verify Unit Conversion (ug/kg to ug/m3 using ALT)
     # P25=1, ALT=1 -> PM2.5 = 1/1 = 1
     assert ds.P25.attrs["units"] == r"$\mu g m^{-3}$"
-    assert (ds.P25 == 1.0).all()
+    assert (ds.P25 == 1.0).all().compute()
 
     # 6. Verify Diagnostic Sum (PM25)
     assert "PM25" in ds.data_vars
     # P25=1, BC1=1, others=0 -> PM25=2
-    assert (ds.PM25 == 2.0).all()
+    assert (ds.PM25 == 2.0).all().compute()
 
     # 7. Verify History
     assert "history" in ds.attrs
@@ -109,7 +110,8 @@ def test_wrfchem_reader_logic(lazy, tmp_path):
 def test_wrfchem_eager_lazy_consistency(tmp_path):
     """Explicitly verify that Eager and Lazy results are identical."""
     ds_orig = create_synthetic_wrfchem_ds()
-    file_path = tmp_path / "wrfout_d01_2023-01-01_00:00:00.nc"
+    # Avoid colons in filenames for Windows compatibility
+    file_path = tmp_path / "wrfout_d01_2023-01-01_00-00-00.nc"
     ds_orig.to_netcdf(file_path)
 
     reader = WRFChemReader()
@@ -122,3 +124,22 @@ def test_wrfchem_eager_lazy_consistency(tmp_path):
 
     # Compare history (timestamps might differ, so check keys/events)
     assert len(ds_eager.attrs["history"].split("\n")) == len(ds_lazy.attrs["history"].split("\n"))
+
+
+def test_wrfchem_no_ppb_conversion(tmp_path):
+    """Verify that if convert_to_ppb=False, units remain ppmv and diagnostics reflect that."""
+    ds_orig = create_synthetic_wrfchem_ds()
+    file_path = tmp_path / "wrfout_d01_2023-01-01_00-00-00_no_ppb.nc"
+    ds_orig.to_netcdf(file_path)
+
+    reader = WRFChemReader()
+    ds = reader.open_dataset(str(file_path), convert_to_ppb=False)
+
+    # 1. Verify units remain ppmv
+    assert ds.O3.attrs["units"] == "ppmv"
+    assert (ds.O3 == 1.0).all().compute()
+
+    # 2. Verify NOx is in ppmv (inherited from NO/NO2)
+    assert "NOx" in ds.data_vars
+    assert ds.NOx.attrs["units"] == "ppmv"
+    assert (ds.NOx == 2.0).all().compute()

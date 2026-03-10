@@ -225,12 +225,16 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
         weights = [1.0] * len(available_vars)
 
     # Compute lazy sum
-    new_var = ds[available_vars[0]] * weights[0]
-    for i in range(1, len(available_vars)):
-        new_var = new_var + ds[available_vars[i]] * weights[i]
+    with xr.set_options(keep_attrs=True):
+        new_var = ds[available_vars[0]] * weights[0]
+        for i in range(1, len(available_vars)):
+            new_var = new_var + ds[available_vars[i]] * weights[i]
+
+    # Inherit units from constituent variables if available, otherwise use spec
+    units = ds[available_vars[0]].attrs.get("units", spec.units)
 
     ds[name] = new_var.assign_attrs(
-        {"units": spec.units, "name": spec.name, "long_name": spec.long_name}
+        {"units": units, "name": spec.name, "long_name": spec.long_name}
     )
 
     # Update history
