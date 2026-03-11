@@ -1,7 +1,8 @@
 """ICAP-MME Reader"""
 
 from datetime import datetime
-from typing import List, Union
+from pathlib import Path
+from typing import Any, List, Optional, Tuple, Union
 
 import pandas as pd
 import xarray as xr
@@ -10,17 +11,31 @@ from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
 
+VALID_FILETYPES = ("MMC", "C4", "MME")
+VALID_DATA_VARS = (
+    "modeaod550",
+    "dustaod550",
+    "pm",
+    "seasaltaod550",
+    "smokeaod550",
+    "totaldustaod550",
+)
+
 
 @register_reader("icap_mme")
 class ICAPMMEReader(GriddedReader):
+    """
+    Reader for ICAP-MME (International Cooperative for Aerosol Prediction - Multi Model Ensemble) data.
+    """
+
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
         product: str = "MMC",
         data_var: str = "dustaod550",
         download: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> xr.Dataset:
         """
         Retrieve and load ICAP-MME data.
@@ -28,22 +43,27 @@ class ICAPMMEReader(GriddedReader):
         Parameters
         ----------
         files : Union[str, List[str]], optional
-            File paths or URLs to read. If None, uses `dates` to discover files.
+            File paths or URLs to read. If None, uses `dates` and `product` to discover files.
         dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
-            Dates to retrieve.
+            Dates to retrieve if `files` is not provided.
         product : str, optional
             ICAP product (e.g., 'MMC', 'C4', 'MME'), by default 'MMC'.
         data_var : str, optional
             Data variable (e.g., 'dustaod550'), by default 'dustaod550'.
         download : bool, optional
             Whether to download files to local directory, by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the driver.
 
         Returns
         -------
         xr.Dataset
-            The loaded ICAP-MME data.
+            The loaded ICAP-MME dataset.
+
+        Examples
+        --------
+        >>> reader = ICAPMMEReader()
+        >>> ds = reader.open_dataset(dates="2024-02-01", product="C4")
         """
         if files is None:
             if dates is None:
@@ -57,6 +77,13 @@ class ICAPMMEReader(GriddedReader):
             else:
                 files = urls.tolist()
 
+        # ICAP files are standard NetCDF, often h5netcdf compatible.
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "time"
+        if "combine" not in kwargs:
+            kwargs["combine"] = "nested"
+
+        # Use XarrayDriver to open (Lazy by default)
         ds = self.driver.open(files, **kwargs)
 
         ds = self.harmonize(ds)
@@ -67,22 +94,35 @@ class ICAPMMEReader(GriddedReader):
         return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/models/icap_mme.py
-# -----------------------------------------------------------------------------
+def build_urls(
+    dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+    filetype: str = "MMC",
+    data_var: str = "dustaod550",
+    verbose: bool = True,
+) -> Tuple[pd.Series, pd.Series]:
+    """
+    Construct ICAP-MME URLs and filenames for the given dates.
 
-valid_filetypes = ("MMC", "C4", "MME")
-valid_data_vars = (
-    "modeaod550",
-    "dustaod550",
-    "pm",
-    "seasaltaod550",
-    "smokeaod550",
-    "totaldustaod550",
-)
+    Parameters
+    ----------
+    dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+        Dates to build URLs for.
+    filetype : str, optional
+        ICAP product type (MMC, C4, MME), by default "MMC".
+    data_var : str, optional
+        Data variable name, by default "dustaod550".
+    verbose : bool, optional
+        Whether to print status messages, by default True.
 
+    Returns
+    -------
+    Tuple[pd.Series, pd.Series]
+        (urls, filenames).
 
-def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
+    Examples
+    --------
+    >>> urls, fnames = build_urls("2024-02-01", filetype="C4")
+    """
     from collections.abc import Iterable
 
     if isinstance(dates, Iterable) and not isinstance(dates, str):
@@ -107,28 +147,38 @@ def build_urls(dates, filetype="MMC", data_var="dustaod550", *, verbose=True):
     return pd.Series(urls, index=None), pd.Series(fnames, index=None)
 
 
-def remote_file_exists(file_url, *, verbose=True):
-    fs = FileUtility.get_fs(file_url)
-    exists = fs.exists(file_url)
-    if not exists and verbose:
-        print(f"File does not exist: {file_url}")
-    return exists
+def retrieve(
+    url: str, fname: str, download: bool = False, verbose: bool = True
+) -> Union[str, Path]:
+    """
+    Retrieve or download an ICAP-MME file.
 
+    Parameters
+    ----------
+    url : str
+        Source URL.
+    fname : str
+        Target filename.
+    download : bool, optional
+        Whether to download to a local file, by default False.
+    verbose : bool, optional
+        Whether to print status, by default True.
 
-def retrieve(url, fname, *, download=False, verbose=True):
-    from io import BytesIO
-    from pathlib import Path
+    Returns
+    -------
+    Union[str, Path]
+        The path or URL to the file.
 
+    Examples
+    --------
+    >>> path = retrieve("https://.../file.nc", "file.nc", download=True)
+    """
     p = Path(fname).absolute()
     fs = FileUtility.get_fs(url)
 
     if not download:
-        # Return BytesIO
-        # fs.open returns a file-like object
-        # We can read it into BytesIO if needed for compatibility or return fs open object
-        # original returned BytesIO(r.content)
-        with fs.open(url, "rb") as f:
-            return BytesIO(f.read())
+        # Return URL for remote opening via fsspec
+        return url
     else:
         if not p.is_file():
             if verbose:
@@ -138,55 +188,3 @@ def retrieve(url, fname, *, download=False, verbose=True):
             if verbose:
                 print(f"File Exists: {p.as_posix()}")
         return p
-
-
-def _check_file_url(url, *, verbose=True):
-    if not remote_file_exists(url, verbose=verbose):
-        raise ValueError(
-            f"File does not exist on ICAP HTTPS server: {url}. "
-            f"Check {url[: url.index('icap_')]} to see the available "
-            "`product` and `data_var`s for this month."
-        )
-
-
-def open_mfdataset_icap(
-    dates,
-    product="MMC",
-    data_var="dustaod550",
-    *,
-    download=False,
-    verbose=True,
-    **kwargs,
-):
-    if product.upper() not in valid_filetypes:
-        raise ValueError(f"Invalid input for 'product': Valid values are {valid_filetypes}.")
-
-    if data_var.lower() not in valid_data_vars:
-        raise ValueError(f"Invalid input for 'data_var': Valid values are {valid_data_vars}.")
-
-    urls, fnames = build_urls(dates, filetype=product, data_var=data_var, verbose=verbose)
-
-    if download is True:
-        paths = []
-        for url, fname in zip(urls, fnames):
-            _check_file_url(url, verbose=verbose)
-            paths.append(retrieve(url, fname, download=True, verbose=verbose))
-
-        if "combine" not in kwargs:
-            kwargs["combine"] = "nested"
-        if "concat_dim" not in kwargs:
-            kwargs["concat_dim"] = "time"
-
-        dset = xr.open_mfdataset(paths, **kwargs)
-    else:
-        dsets = []
-        for url, fname in zip(urls, fnames):
-            _check_file_url(url, verbose=verbose)
-            o = retrieve(url, fname, download=False, verbose=verbose)
-            try:
-                dsets.append(xr.open_dataset(o, engine="h5netcdf"))
-            except Exception:
-                dsets.append(xr.open_dataset(o))
-        dset = xr.concat(dsets, dim="time")
-
-    return dset

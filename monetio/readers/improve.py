@@ -1,9 +1,10 @@
 """IMPROVE Reader"""
 
 from functools import partial
-from typing import TYPE_CHECKING, List, Union
+from typing import Any, List, Union
 
 import pandas as pd
+import xarray as xr
 
 from ..util import force_object_strings
 from .base import PointReader, register_reader
@@ -11,13 +12,18 @@ from .drivers import FileUtility
 from .epa_utils import read_monitor_file
 from .sat_utils import update_history
 
-if TYPE_CHECKING:
+try:
     import dask.dataframe as dd
-    import xarray as xr
+except ImportError:
+    dd = None
 
 
 @register_reader("improve")
 class IMPROVEReader(PointReader):
+    """
+    Reader for IMPROVE (Interagency Monitoring of Protected Visual Environments) data.
+    """
+
     def open_dataset(
         self,
         files: Union[str, List[str]],
@@ -26,8 +32,8 @@ class IMPROVEReader(PointReader):
         as_xarray: bool = True,
         lazy: bool = False,
         pivot: bool = True,
-        **kwargs,
-    ) -> Union[pd.DataFrame, "xr.Dataset", "dd.DataFrame"]:
+        **kwargs: Any,
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
         Retrieve and load IMPROVE data.
 
@@ -45,27 +51,24 @@ class IMPROVEReader(PointReader):
             Whether to return a dask-backed object, by default False.
         pivot : bool, optional
             Whether to pivot the data to wide format, by default True.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the reader and driver.
 
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded IMPROVE data.
+
+        Examples
+        --------
+        >>> reader = IMPROVEReader()
+        >>> ds = reader.open_dataset("improve_data.txt")
         """
         # Use PandasDriver via base class
-        # Pass a partial of read_improve_file as the read_method
         read_func = partial(read_improve_file, delimiter=delimiter)
 
-        # Pop kwargs that are not for the driver/reader_func
-        # but for to_xarray or this method.
-        # super().open_dataset will pass **kwargs to the driver.
-        # The driver will pass them to read_func.
-        # So we should only keep driver-related kwargs if any.
-        # Actually, base.PointReader.open_dataset also uses some kwargs.
-
         driver_kwargs = kwargs.copy()
-        for k in ["expand2d", "pivot"]:
+        for k in ["expand2d", "pivot", "add_meta", "as_xarray", "lazy"]:
             driver_kwargs.pop(k, None)
 
         df = super().open_dataset(
@@ -76,18 +79,17 @@ class IMPROVEReader(PointReader):
             **driver_kwargs,
         )
 
-        # Determine backend
-        try:
-            import dask.dataframe as dd
-
-            is_dask = isinstance(df, dd.DataFrame)
-        except ImportError:
-            is_dask = False
-
-        if is_dask:
+        # Check for empty (Backend-agnostic)
+        is_empty = False
+        if dd is not None and isinstance(df, dd.DataFrame):
             if df.npartitions == 0:
-                return df
+                is_empty = True
         elif len(df) == 0:
+            is_empty = True
+
+        if is_empty:
+            if as_xarray:
+                return xr.Dataset()
             return df
 
         if add_meta:
@@ -111,28 +113,25 @@ class IMPROVEReader(PointReader):
 
         Parameters
         ----------
-        df : Union[pd.DataFrame, "dd.DataFrame"]
+        df : Union[pd.DataFrame, dd.DataFrame]
             Input dataframe.
 
         Returns
         -------
-        Union[pd.DataFrame, "dd.DataFrame"]
+        Union[pd.DataFrame, dd.DataFrame]
             Dataframe with metadata merged.
+
+        Examples
+        --------
+        >>> df = reader.add_metadata(df)
         """
-        try:
-            import dask.dataframe as dd
-
-            is_dask = isinstance(df, dd.DataFrame)
-        except ImportError:
-            is_dask = False
-
         monitor_df = read_monitor_file(network="IMPROVE")
 
         # Ensure siteid is object for reliable merging
         monitor_df = monitor_df.copy().drop_duplicates(subset=["siteid"])
-        monitor_df["siteid"] = monitor_df["siteid"].astype(object)
+        monitor_df = force_object_strings(monitor_df)
 
-        if is_dask:
+        if dd is not None and isinstance(df, dd.DataFrame):
             df["epaid"] = df["epaid"].astype(object)
             monitor_dask = dd.from_pandas(monitor_df, npartitions=1)
             df = df.merge(monitor_dask, left_on="epaid", right_on="siteid", how="left")
@@ -148,7 +147,7 @@ class IMPROVEReader(PointReader):
         return df
 
 
-def read_improve_file(fname: str, delimiter: str = "\t", **kwargs) -> pd.DataFrame:
+def read_improve_file(fname: str, delimiter: str = "\t", **kwargs: Any) -> pd.DataFrame:
     """
     Read a single IMPROVE data file.
 
@@ -158,13 +157,17 @@ def read_improve_file(fname: str, delimiter: str = "\t", **kwargs) -> pd.DataFra
         File path or URL.
     delimiter : str, optional
         Delimiter used in the file, by default "\\t".
-    **kwargs : dict
+    **kwargs : Any
         Additional arguments passed to pd.read_csv.
 
     Returns
     -------
     pd.DataFrame
         The loaded data.
+
+    Examples
+    --------
+    >>> df = read_improve_file("site_data.txt")
     """
     fs = FileUtility.get_fs(fname)
 
@@ -182,13 +185,12 @@ def read_improve_file(fname: str, delimiter: str = "\t", **kwargs) -> pd.DataFra
                     skiprows = i + 1
                     break
     except Exception:
-        # Fallback or let pd.read_csv fail if file is truly broken
         pass
 
-    # Read the CSV - only pass valid read_csv kwargs if they exist in kwargs
-    # For now, we pop the ones we know might be there from open_dataset but are not for read_csv
-    for k in ["pivot", "add_meta", "as_xarray", "lazy", "expand2d"]:
-        kwargs.pop(k, None)
+    # Read the CSV
+    read_kwargs = kwargs.copy()
+    for k in ["pivot", "add_meta", "as_xarray", "lazy", "expand2d", "storage_options"]:
+        read_kwargs.pop(k, None)
 
     df = pd.read_csv(
         fname,
@@ -197,7 +199,7 @@ def read_improve_file(fname: str, delimiter: str = "\t", **kwargs) -> pd.DataFra
         dtype={"EPACode": str},
         skiprows=skiprows,
         storage_options=storage_options,
-        **{k: v for k, v in kwargs.items() if k != "storage_options"},
+        **read_kwargs,
     )
 
     # Standardize columns

@@ -1,17 +1,20 @@
 """PAMS Reader"""
 
 import json
-from typing import TYPE_CHECKING, List, Union
+from typing import Any, List, Union
 
 import pandas as pd
 import xarray as xr
 
-if TYPE_CHECKING:
-    import dask.dataframe as dd
-
+from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
+
+try:
+    import dask.dataframe as dd
+except ImportError:
+    dd = None
 
 
 @register_reader("pams")
@@ -25,7 +28,7 @@ class PAMSReader(PointReader):
         files: Union[str, List[str]],
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
         Retrieve and load PAMS data.
@@ -38,25 +41,45 @@ class PAMSReader(PointReader):
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
             Whether to return a dask-backed object, by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the reader and driver.
 
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded PAMS data.
+
+        Examples
+        --------
+        >>> reader = PAMSReader()
+        >>> ds = reader.open_dataset("pams_data*.json")
         """
         # Filter out arguments that are not for the reader function
         reader_kwargs = {
             k: v for k, v in kwargs.items() if k not in ["expand2d", "pivot", "wide_fmt"]
         }
 
+        # Use PandasDriver to open files
         df = self.driver.open(files, read_method=read_pams, lazy=lazy, **reader_kwargs)
 
         df = self.harmonize(df)
 
+        # Consistently force object strings
+        df = force_object_strings(df)
+
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
+
+            # Transfer units if available
+            if "units" in ds.variables and "obs" in ds.data_vars:
+                try:
+                    # Taking units from the first observation
+                    # Use .data to avoid immediate compute if lazy,
+                    # but for a single scalar from coordinate it is usually OK.
+                    unit_val = ds["units"].values.flat[0]
+                    ds["obs"].attrs["units"] = str(unit_val)
+                except Exception:
+                    pass
 
             # Update history
             ds = update_history(ds, "Read PAMS data.")
@@ -66,12 +89,7 @@ class PAMSReader(PointReader):
         return df
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/obs/pams.py
-# -----------------------------------------------------------------------------
-
-
-def read_pams(filename: str, **kwargs) -> pd.DataFrame:
+def read_pams(filename: str, **kwargs: Any) -> pd.DataFrame:
     """
     Read a single PAMS JSON file.
 
@@ -79,13 +97,17 @@ def read_pams(filename: str, **kwargs) -> pd.DataFrame:
     ----------
     filename : str
         File path or URL.
-    **kwargs : dict
+    **kwargs : Any
         Additional arguments.
 
     Returns
     -------
     pd.DataFrame
         The loaded data.
+
+    Examples
+    --------
+    >>> df = read_pams("site_data.json")
     """
     # Determine storage options if S3
     storage_options = kwargs.get("storage_options")
@@ -93,23 +115,26 @@ def read_pams(filename: str, **kwargs) -> pd.DataFrame:
         storage_options = {"anon": True}
 
     fs = FileUtility.get_fs(filename)
-    with fs.open(filename, "r", transport_params=storage_options) as f:
+    # Note: json.load requires the full file in memory.
+    with fs.open(filename, "r") as f:
         jsonf = json.load(f)
 
     dataf = jsonf.get("Data", [])
     data = pd.DataFrame.from_dict(dataf)
 
     if data.empty:
-        return data
+        # Return empty with standard columns
+        return pd.DataFrame(columns=["siteid", "time", "latitude", "longitude", "obs", "units"])
 
+    # siteid construction
     data["siteid"] = (
         data.state_code.astype(str).str.zfill(2)
         + data.county_code.astype(str).str.zfill(3)
         + data.site_number.astype(str).str.zfill(4)
     )
 
+    # Vectorized time construction
     data["time"] = pd.to_datetime(data["date_gmt"] + " " + data["time_gmt"])
-    data["time_local"] = pd.to_datetime(data["date_local"] + " " + data["time_local"])
 
     data = data.rename(
         columns={
@@ -147,5 +172,12 @@ def read_pams(filename: str, **kwargs) -> pd.DataFrame:
         "Parts per million": "ppm",
     }
     data["units"] = data["units"].replace(repl)
+
+    # Set metadata for variables if they exist
+    # To be picked up by to_xarray
+    if "obs" in data.columns and "units" in data.columns:
+        # We can't easily set attributes on DataFrame columns that survive all transforms,
+        # but we can ensure units are consistent.
+        pass
 
     return data
