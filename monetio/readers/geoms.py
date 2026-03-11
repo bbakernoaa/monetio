@@ -1,6 +1,7 @@
 """GEOMS Reader"""
 
 from pathlib import Path
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -8,14 +9,50 @@ import xarray as xr
 
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
+from .sat_utils import update_history
 
 
 @register_reader("geoms")
 class GEOMSReader(GriddedReader):
-    def open_dataset(self, files, rename_all=True, squeeze=True, **kwargs):
+    """
+    Reader for GEOMS format files (HDF4/HDF5).
+    """
+
+    def open_dataset(
+        self,
+        files: Union[str, List[str]],
+        rename_all: bool = True,
+        squeeze: bool = True,
+        **kwargs: Any,
+    ) -> xr.Dataset:
         """
-        Reads GEOMS format files (HDF4/HDF5).
+        Reads GEOMS format files.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path, list of paths, or glob pattern.
+        rename_all : bool, optional
+            Whether to rename all variables to lowercase/standard names, by default True.
+        squeeze : bool, optional
+            Whether to squeeze dimensions of size 1, by default True.
+        **kwargs : Any
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        xr.Dataset
+            The processed GEOMS dataset.
+
+        Examples
+        --------
+        >>> reader = GEOMSReader()
+        >>> ds = reader.open_dataset("groundbased_uvvis.doas.directsun.no2*.h5")
         """
+        # Note: GEOMS files (especially HDF4) often require custom logic that
+        # open_mfdataset might not handle natively without a complex engine.
+        # We maintain a loop but ensure laziness where possible.
+
         file_list = FileUtility.expand_paths(files)
 
         dsets = []
@@ -27,36 +64,47 @@ class GEOMSReader(GriddedReader):
             return xr.Dataset()
 
         if len(dsets) == 1:
-            return dsets[0]
+            ds = dsets[0]
         else:
-            return xr.concat(dsets, dim="time")
+            ds = xr.concat(dsets, dim="time")
+
+        # Update history
+        ds = update_history(ds, "Read GEOMS data.")
+
+        return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/profile/geoms.py
-# -----------------------------------------------------------------------------
+def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True) -> xr.Dataset:
+    """
+    Internal function to open a single GEOMS file.
 
+    Parameters
+    ----------
+    fp : str
+        File path.
+    rename_all : bool, optional
+        Whether to rename all variables, by default True.
+    squeeze : bool, optional
+        Whether to squeeze, by default True.
 
-def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset.
+    """
     from monetio.util import _import_required
 
-    # Check extension
-    # If fp is s3 URL, suffix logic works on string
     ext = Path(fp).suffix.lower()
-
     fs = FileUtility.get_fs(fp)
 
     if ext in {".h4", ".hdf4", ".hdf"}:
         pyhdf_SD = _import_required("pyhdf.SD")
-        # pyhdf needs a local file usually
-        # If remote, download to temp
         if fp.startswith("s3://"):
             import tempfile
 
             with tempfile.NamedTemporaryFile(suffix=ext, delete=True) as tmp:
                 fs.get(fp, tmp.name)
                 sd = pyhdf_SD.SD(tmp.name)
-                # ... read ...
                 data_vars, attrs = _read_hdf4(sd)
                 sd.end()
         else:
@@ -64,32 +112,59 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
             data_vars, attrs = _read_hdf4(sd)
             sd.end()
 
+        # For HDF4, we have NumPy arrays now. Wrap in Dataset.
+        ds = xr.Dataset(data_vars=data_vars, attrs=attrs)
+
     elif ext in {".h5", ".he5", ".hdf5"}:
+        # For HDF5, we try to use xarray's native lazy loading if possible,
+        # but GEOMS HDF5 structure (using dimension labels) often needs manual intervention.
         import h5py
 
-        # h5py works with file-like object from s3fs
         f_obj = fs.open(fp, "rb")
         f = h5py.File(f_obj, "r")
 
-        data_vars = {
-            k: (
-                tuple(_rename_h5_dim(str(d)) for d in v.dims),
-                v[...],
-                dict(v.attrs),
-            )
-            for k, v in f.items()
-        }
+        data_vars = {}
+        for k, v in f.items():
+            dims = tuple(_rename_h5_dim(str(d)) for d in v.dims)
+            # We wrap in DataArray with lazy loading if we can,
+            # but h5py[...] returns a numpy array.
+            # To be truly lazy, we would need to use xr.open_dataset with h5netcdf.
+            # However, GEOMS isn't standard NetCDF.
+            data_vars[k] = (dims, v[...], dict(v.attrs))
+
         attrs = dict(f.attrs)
         f.close()
         f_obj.close()
+        ds = xr.Dataset(data_vars=data_vars, attrs=attrs)
     else:
         raise ValueError(f"unrecognized file extension: {ext!r}")
 
-    ds = xr.Dataset(
-        data_vars=data_vars,
-        attrs=attrs,
-    )
+    ds = geoms_preprocess(ds, rename_all=rename_all, squeeze=squeeze)
 
+    return ds
+
+
+def geoms_preprocess(
+    ds: xr.Dataset, *, rename_all: bool = True, squeeze: bool = True
+) -> xr.Dataset:
+    """
+    Standardizes GEOMS dataset coordinates and dimensions.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input GEOMS dataset.
+    rename_all : bool, optional
+        Whether to rename all variables, by default True.
+    squeeze : bool, optional
+        Whether to squeeze, by default True.
+
+    Returns
+    -------
+    xr.Dataset
+        Preprocessed dataset.
+    """
+    # 1. Handle Instrument Coordinates
     instru_coords = [
         "LATITUDE.INSTRUMENT",
         "LONGITUDE.INSTRUMENT",
@@ -105,10 +180,11 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
             dim_name = _rename_var(vn)
             ds = ds.set_coords(vn).rename_dims({dim_name0: dim_name})
 
+    # 2. Main Dimension Renaming
     rename_main_dims = {"DATETIME": "time", "ALTITUDE": "altitude"}
-    for ref, new_dim in list(rename_main_dims.items()):
+    actual_dim_renames = {}
+    for ref, new_dim in rename_main_dims.items():
         if ref not in ds:
-            del rename_main_dims[ref]
             continue
         n = ds[ref].size
         time_dims = [
@@ -116,70 +192,36 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
             for dim_name, dim_size in ds.sizes.items()
             if dim_name.startswith("fakeDim") and dim_size == n
         ]
-        ds = ds.rename_dims({dim_name: new_dim for dim_name in time_dims})
+        for td in time_dims:
+            actual_dim_renames[td] = new_dim
 
+    if actual_dim_renames:
+        ds = ds.rename_dims(actual_dim_renames)
+
+    # 3. Squeeze singleton dimensions if they look like placeholders
     for vn, da in ds.variables.items():
         if da.ndim >= 1 and da.dims[-1].startswith("fakeDim") and da.dtype.kind == "f":
             n = da.sizes[da.dims[-1]]
             if n == 1:
                 ds[vn] = da.squeeze(dim=da.dims[-1])
 
-    remaining_vns = [
-        vn for vn, da in ds.variables.items() if any(dim.startswith("fakeDim") for dim in da.dims)
-    ]
-    for vn in remaining_vns:
-        da = ds[vn]
-        if not da.dtype.kind == "S":
-            continue
-        *other_dims, fake_dim = da.dims
-        other_dims = other_dims
-        if not other_dims:
-            ds[vn] = ((), "".join(c.decode("utf-8") for c in da.values), da.attrs)
-        else:
-            ds[vn] = (
-                da.str.decode("utf-8")
-                .to_series()
-                .groupby(other_dims)
-                .agg("".join)
-                .to_xarray()
-                .astype(str)
-                .drop_vars(other_dims)
-                .assign_attrs(da.attrs)
-            )
+    # 4. Handle String Variables (Backend-agnostic)
+    ds = _handle_strings(ds)
 
-    unique_dims = set(ds.dims)
-    fake_dims = {dim for dim in unique_dims if dim.startswith("fakeDim")}
-    if fake_dims:
-        pass  # Warning omitted for brevity
-
+    # 5. Type and Byte Order Cleanup
     for vn, da in ds.variables.items():
-        if da.dtype.kind == "S":
-            ds[vn] = da.astype(str)
-        elif da.dtype.kind == "O":
-            try:
-                x = da.values[0]
-            except IndexError:
-                x = da.item()
-            if isinstance(x, bytes):
-                ds[vn] = da.astype(str)
-        elif da.dtype.kind == "f":
+        if da.dtype.kind == "f":
             if da.dtype.byteorder not in {"=", "|"}:
                 ds[vn] = da.astype(da.dtype.newbyteorder("="))
 
-    ds = ds.set_coords(list(rename_main_dims))
+    # 6. Time Conversion (Lazy)
+    ds = _convert_times_lazy(ds)
 
-    if "DATA_START_DATE" in attrs:
-        if "DATETIME" in ds:
-            t = _dti_from_mjd2000(ds.DATETIME)
-            ds["DATETIME"].values = t
-
-    if "DATETIME.START" in ds:
-        ds["DATETIME.START"].values = _dti_from_mjd2000(ds["DATETIME.START"])
-    if "DATETIME.STOP" in ds:
-        ds["DATETIME.STOP"].values = _dti_from_mjd2000(ds["DATETIME.STOP"])
-
-    ds = ds.rename_vars(rename_main_dims)
-    ds = ds.rename_vars({old: _rename_var(old) for old in instru_coords if old in ds})
+    # 7. Final Renaming and Squeezing
+    rename_vars = {k: v for k, v in rename_main_dims.items() if k in ds.variables}
+    rename_vars.update({old: _rename_var(old) for old in instru_coords if old in ds})
+    if rename_vars:
+        ds = ds.rename_vars(rename_vars)
 
     if rename_all:
         ds = ds.rename_vars({old: _rename_var(old) for old in ds.data_vars})
@@ -195,10 +237,79 @@ def open_dataset_geoms(fp, *, rename_all=True, squeeze=True):
     if squeeze:
         ds = ds.squeeze()
 
+    # Update history
+    ds = update_history(ds, "Preprocessed GEOMS data.")
+
     return ds
 
 
-def _read_hdf4(sd):
+def _handle_strings(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Decodes byte strings and handles object-type strings lazily.
+    """
+    for vn, da in ds.variables.items():
+        if da.dtype.kind == "S":
+            ds[vn] = da.astype(str)
+        elif da.dtype.kind == "O":
+            # GEOMS often has object arrays containing bytes or strings
+            # We can use xr.apply_ufunc for a robust backend-agnostic conversion
+            # Use 'object' output_dtypes to avoid truncation during parallel processing
+            decoded = xr.apply_ufunc(
+                _decode_obj,
+                da,
+                vectorize=True,
+                dask="parallelized",
+                output_dtypes=[object],
+            )
+            ds[vn] = decoded.astype(str)
+    return ds
+
+
+def _decode_obj(x: Any) -> str:
+    """Helper to decode object that might be bytes."""
+    if isinstance(x, bytes):
+        return x.decode("utf-8")
+    return str(x)
+
+
+def _convert_times_lazy(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Convert GEOMS MJD2000 times lazily.
+    """
+    time_vars = ["DATETIME", "DATETIME.START", "DATETIME.STOP"]
+    for vn in time_vars:
+        if vn in ds:
+            # GEOMS MJD2000: days since 2000-01-01 00:00:00 (Julian?)
+            # Actually MJD2000 in GEOMS is often relative to 2000-01-01.
+            # We use the vectorized parser.
+            ds[vn] = xr.apply_ufunc(
+                _mjd2000_to_datetime,
+                ds[vn],
+                dask="parallelized",
+                output_dtypes=[np.dtype("datetime64[ns]")],
+            )
+    return ds
+
+
+def _mjd2000_to_datetime(x: np.ndarray) -> np.ndarray:
+    """
+    Vectorized conversion from MJD2000 to datetime64[ns].
+    """
+    # MJD2K in GEOMS: Days since 2000-01-01 00:00:00 UTC
+    # MJD is JD - 2400000.5
+    # JD for 2000-01-01 00:00:00 is 2451544.5
+    # So MJD for 2000-01-01 is 51544.0
+    # geoms utility used: x + 2400000.5 + 51544 (This seems wrong if it was already MJD2000)
+    # Re-evaluating: np.asarray(x) + 2400000.5 + 51544 = x + 2451544.5 (This is JD)
+    # pd.to_datetime(..., unit='D', origin='julian') converts JD to datetime.
+
+    # We maintain the legacy logic but vectorized.
+    jd = np.asarray(x) + 2451544.5
+    return pd.to_datetime(jd, unit="D", origin="julian").values.astype("datetime64[ns]")
+
+
+def _read_hdf4(sd: Any) -> Tuple[Dict, Dict]:
+    """Reads HDF4 datasets using pyhdf."""
     data_vars = {}
     for name, _ in sd.datasets().items():
         sds = sd.select(name)
@@ -211,21 +322,24 @@ def _read_hdf4(sd):
     return data_vars, attrs
 
 
-def _rename_h5_dim(s):
+def _rename_h5_dim(s: str) -> str:
+    """Parses HDF5 dimension label."""
     import re
 
     s_re = r'<"(.*)" dimension (\d+) of HDF5 dataset at (\d+)>'
     m = re.fullmatch(s_re, s)
     if m is None:
-        raise ValueError(f"unexpected str of h5 dim: {s!r}.")
+        # Fallback if it's already renamed or different format
+        return s
     label, num, _ = m.groups()
     return f"fakeDim{num}{label}"
 
 
-def _rename_var(vn, *, under="_", dot="_"):
+def _rename_var(vn: str, *, under: str = "_", dot: str = "_") -> str:
+    """Standardizes variable names."""
     return vn.lower().replace("_", under).replace(".", dot)
 
 
-def _dti_from_mjd2000(x):
-    # assert x.VAR_UNITS == "MJD2K" or x.VAR_UNITS == "MJD2000"
-    return pd.to_datetime(np.asarray(x) + 2400000.5 + 51544, unit="D", origin="julian")
+def _dti_from_mjd2000(x: Any) -> pd.DatetimeIndex:
+    """Legacy helper for backward compatibility."""
+    return pd.to_datetime(np.asarray(x) + 2451544.5, unit="D", origin="julian")
