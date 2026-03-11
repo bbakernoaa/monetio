@@ -25,7 +25,11 @@ Community Multiscale Air Quality Model.
 
 Hybrid Single-Particle Lagrangian Integrated Trajectory model.
 
-- **Source ID**: `hysplit`
+- **Source ID**: `hysplit` (Concentration) or `hytraj` (Trajectories)
+- **Features**:
+    - Lazy loading via Dask.
+    - Automatic grid continuity fixing.
+    - Optimized mass loading calculations.
 
 ### WRF-Chem
 
