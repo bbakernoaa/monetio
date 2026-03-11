@@ -8,6 +8,7 @@ import xarray as xr
 
 from .base import GriddedReader, register_reader
 from .drivers import FileUtility
+from .sat_utils import update_history
 
 
 @register_reader("hysplit")
@@ -28,7 +29,7 @@ class HYSPLITReader(GriddedReader):
         file_list = FileUtility.expand_paths(files)
 
         if len(file_list) == 1:
-            return open_dataset_hysplit(
+            ds = open_dataset_hysplit(
                 file_list[0],
                 drange=drange,
                 century=century,
@@ -38,7 +39,7 @@ class HYSPLITReader(GriddedReader):
             )
         else:
             blist = [(f, f, "met") for f in file_list]
-            return combine_dataset(
+            ds = combine_dataset(
                 blist,
                 drange=drange,
                 century=century,
@@ -46,6 +47,9 @@ class HYSPLITReader(GriddedReader):
                 sample_time_stamp=sample_time_stamp,
                 check_grid=check_grid,
             )
+
+        ds = update_history(ds, "Read HYSPLIT data.")
+        return ds
 
     def harmonize(self, ds):
         return ds
@@ -413,66 +417,121 @@ def check_drange(drange, pdate1, pdate2):
     return testf, savedata
 
 
-def fix_grid_continuity(dset):
+def fix_grid_continuity(dset: xr.Dataset) -> xr.Dataset:
+    """
+    Fix grid continuity by reindexing to a full integer range.
+
+    Parameters
+    ----------
+    dset : xr.Dataset
+        Input HYSPLIT dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with continuous grid.
+    """
     if not dset.any():
         return dset
     if check_grid_continuity(dset):
         return dset
-    xvv = dset.x.values
-    yvv = dset.y.values
-    xlim = [xvv[0], xvv[-1]]
-    ylim = [yvv[0], yvv[-1]]
-    xindx = np.arange(xlim[0], xlim[1] + 1)
-    yindx = np.arange(ylim[0], ylim[1] + 1)
-    mgrid = get_latlongrid(dset.attrs, xindx, yindx)
-    conc = np.zeros_like(mgrid[0])
-    dummy = xr.DataArray(conc, dims=["y", "x"])
-    dummy = dummy.assign_coords(latitude=(("y", "x"), mgrid[1]))
-    dummy = dummy.assign_coords(longitude=(("y", "x"), mgrid[0]))
-    dummy = dummy.assign_coords(x=(("x"), xindx))
-    dummy = dummy.assign_coords(y=(("y"), yindx))
-    cdset, dummy2 = xr.align(dset, dummy, join="outer")
-    cdset = cdset.assign_coords(latitude=(("y", "x"), mgrid[1]))
-    cdset = cdset.assign_coords(longitude=(("y", "x"), mgrid[0]))
-    return cdset.fillna(0)
+
+    # Use min/max to avoid .values where possible (triggers 0-d compute if dask)
+    x_min, x_max = int(dset.x.min()), int(dset.x.max())
+    y_min, y_max = int(dset.y.min()), int(dset.y.max())
+
+    x_new = np.arange(x_min, x_max + 1)
+    y_new = np.arange(y_min, y_max + 1)
+
+    # Reindex to the full range, filling gaps with 0
+    dset = dset.reindex(x=x_new, y=y_new, fill_value=0)
+
+    # Update lat/lon coordinates for the new grid
+    mgrid = get_latlongrid(dset.attrs, x_new, y_new)
+    dset = dset.assign_coords(latitude=(("y", "x"), mgrid[1]), longitude=(("y", "x"), mgrid[0]))
+
+    dset = update_history(dset, "Fixed grid continuity and updated coordinates.")
+
+    return dset
 
 
-def check_grid_continuity(dset):
-    xvv = dset.x.values
-    yvv = dset.y.values
-    tt1 = np.array([xvv[i] - xvv[i - 1] for i in np.arange(1, len(xvv))])
-    tt2 = np.array([yvv[i] - yvv[i - 1] for i in np.arange(1, len(yvv))])
-    if np.any(tt1 != 1):
-        return False
-    if np.any(tt2 != 1):
-        return False
+def check_grid_continuity(dset: xr.Dataset) -> bool:
+    """
+    Check if the grid indices x and y are continuous (step of 1).
+
+    Parameters
+    ----------
+    dset : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    bool
+        True if grid is continuous.
+    """
+    # Use diff() for backend-agnostic continuity check
+    if "x" in dset.dims and dset.x.size > 1:
+        if not (dset.x.diff("x") == 1).all():
+            return False
+    if "y" in dset.dims and dset.y.size > 1:
+        if not (dset.y.diff("y") == 1).all():
+            return False
     return True
 
 
-def get_latlongrid(attrs, xindx, yindx):
-    xindx = np.array(xindx)
-    yindx = np.array(yindx)
-    if np.any(xindx <= 0):
-        raise Exception("HYSPLIT grid error xindex <=0")
-    if np.any(yindx <= 0):
-        raise Exception("HYSPLIT grid error yindex <=0")
-    lat, lon = getlatlon(attrs)
-    success = True
-    try:
-        lonlist = [lon[x - 1] for x in xindx]
-    except Exception:
-        success = False
-    try:
-        latlist = [lat[x - 1] for x in yindx]
-    except Exception:
-        success = False
-    if not success:
-        return None
-    mgrid = np.meshgrid(lonlist, latlist)
-    return mgrid
+def get_latlongrid(attrs: dict, xindx: np.ndarray, yindx: np.ndarray) -> list[np.ndarray]:
+    """
+    Generate 2D latitude and longitude grids from HYSPLIT attributes and indices.
+
+    Parameters
+    ----------
+    attrs : dict
+        HYSPLIT grid attributes.
+    xindx : np.ndarray
+        X-indices (1-based).
+    yindx : np.ndarray
+        Y-indices (1-based).
+
+    Returns
+    -------
+    list[np.ndarray]
+        [longitude_2d, latitude_2d]
+    """
+    xindx = np.asanyarray(xindx)
+    yindx = np.asanyarray(yindx)
+    if (xindx <= 0).any() or (yindx <= 0).any():
+        raise ValueError("HYSPLIT grid error: indices must be > 0")
+
+    lat_full, lon_full = getlatlon(attrs)
+
+    # Vectorized indexing
+    lon_sub = lon_full[xindx - 1]
+    lat_sub = lat_full[yindx - 1]
+
+    # Use xarray broadcasting for lazy 2D grid generation
+    lon_2d, lat_2d = xr.broadcast(
+        xr.DataArray(lon_sub, dims="x", coords={"x": xindx}),
+        xr.DataArray(lat_sub, dims="y", coords={"y": yindx}),
+    )
+
+    # Return as numpy-like data to match expected signature
+    return [lon_2d.transpose("y", "x").data, lat_2d.transpose("y", "x").data]
 
 
-def getlatlon(attrs):
+def getlatlon(attrs: dict) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Generate 1D latitude and longitude arrays from HYSPLIT attributes.
+
+    Parameters
+    ----------
+    attrs : dict
+        HYSPLIT grid attributes.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        (latitude, longitude)
+    """
     lon_tolerance = 0.001
     llcrnr_lat = attrs["llcrnr latitude"]
     llcrnr_lon = attrs["llcrnr longitude"]
@@ -480,11 +539,14 @@ def getlatlon(attrs):
     nlon = attrs["Number Lon Points"]
     dlat = attrs["Latitude Spacing"]
     dlon = attrs["Longitude Spacing"]
-    lastlon = llcrnr_lon + (nlon - 1) * dlon
-    lastlat = llcrnr_lat + (nlat - 1) * dlat
-    lat = np.linspace(llcrnr_lat, lastlat, num=int(nlat))
-    lon = np.linspace(llcrnr_lon, lastlon, num=int(nlon))
-    lon = np.array([x - 360 if x >= 180 + lon_tolerance else x for x in lon])
+
+    # Vectorized generation
+    lat = llcrnr_lat + np.arange(nlat) * dlat
+    lon = llcrnr_lon + np.arange(nlon) * dlon
+
+    # Vectorized wrap-around
+    lon = np.where(lon >= 180 + lon_tolerance, lon - 360, lon)
+
     return lat, lon
 
 
@@ -593,6 +655,9 @@ def combine_dataset(
         rval = fix_grid_continuity(newhxr)
     else:
         rval = newhxr
+
+    rval = update_history(rval, "Combined multiple HYSPLIT datasets.")
+
     return rval
 
 
@@ -615,20 +680,22 @@ def add_species(dset, species=None):
     while ppp < len(tmp):
         total_par = total_par + tmp[ppp]
         ppp += 1
-    atthash = dset.attrs
+    atthash = dset.attrs.copy()
     atthash["Species ID"] = sflist
     total_par = total_par.assign_attrs(atthash)
+    total_par = update_history(total_par, f"Added species sum: {sflist}")
     return total_par
 
 
 def reset_latlon_coords(hxr):
-    mgrid = get_latlongrid(hxr.attrs, hxr.x.values, hxr.y.values)
+    mgrid = get_latlongrid(hxr.attrs, hxr.x, hxr.y)
     if "latitude" in hxr.coords:
-        hxr = hxr.drop("longitude")
+        hxr = hxr.drop_vars("latitude")
     if "longitude" in hxr.coords:
-        hxr = hxr.drop("latitude")
+        hxr = hxr.drop_vars("longitude")
     hxr = hxr.assign_coords(latitude=(("y", "x"), mgrid[1]))
     hxr = hxr.assign_coords(longitude=(("y", "x"), mgrid[0]))
+    hxr = update_history(hxr, "Reset lat/lon coordinates.")
     return hxr
 
 
@@ -679,30 +746,57 @@ def remove_dep(xrash):
     return x2
 
 
-def mass_loading(xrash, delta=None):
+def mass_loading(
+    xrash: xr.DataArray | xr.Dataset, delta: np.ndarray | None = None
+) -> xr.DataArray | xr.Dataset:
     """
-    # input data array with concentration.
-    # return a data-array with mass loading through all the columns
+    Calculate mass loading by vertically integrating concentration.
+
+    Parameters
+    ----------
+    xrash : xr.DataArray | xr.Dataset
+        Input data with concentration.
+    delta : np.ndarray, optional
+        Layer thicknesses. If None, calculated from 'z'.
+
+    Returns
+    -------
+    xr.DataArray | xr.Dataset
+        Mass loading (sum of conc * delta).
     """
-    xrash = remove_dep(xrash)
-    if not delta:
-        delta = get_thickness(xrash)
+    # Original logic removed deposition first
+    if xrash.z[0] == 0:
+        xrash_no_dep = remove_dep(xrash)
     else:
-        delta = np.array(delta)
-    iii = 1
-    if delta[0] == 0:
-        iii = 1
-        start = 1
+        xrash_no_dep = xrash
+
+    if delta is None:
+        delta = get_thickness(xrash_no_dep)
     else:
-        iii = 0
-        start = 0
-    for yyy in np.arange(start, len(delta)):
-        if iii == start:
-            ml = xrash.isel(z=yyy) * delta[yyy]
-        else:
-            ml2 = xrash.isel(z=yyy) * delta[yyy]
-            ml = ml + ml2
-        iii += 1
+        delta = np.asanyarray(delta)
+        # If delta was provided for the full dataset (including dep),
+        # but we are using the dataset without dep, we need to slice delta.
+        if len(delta) == len(xrash.z) and xrash.z[0] == 0:
+            delta = delta[1:]
+
+    # Use xarray to perform the weighted sum lazily
+    # Map delta to the 'z' dimension
+    weights = xr.DataArray(delta, dims="z", coords={"z": xrash_no_dep.z})
+
+    # Avoid deposition layer (if thickness is 0)
+    weights = weights.where(weights > 0, np.nan)
+
+    ml = (xrash_no_dep * weights).sum(dim="z", skipna=True)
+
+    if isinstance(ml, xr.Dataset):
+        ml = update_history(ml, "Calculated mass loading.")
+    elif isinstance(ml, xr.DataArray):
+        # DataArrays don't always have history in attrs by convention in some parts of monetio
+        # but we can add it if it's there.
+        if "history" in xrash.attrs:
+            ml.attrs["history"] = xrash.attrs["history"]
+        ml = update_history(ml, "Calculated mass loading.")
+
     return ml
 
 
