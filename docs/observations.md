@@ -50,6 +50,7 @@ Global hourly and synoptic surface observations.
 
 ### Other Networks
 
+- **HYTRAJ**: HYSPLIT Trajectories (`hytraj`)
 - **NADP**: National Atmospheric Deposition Program (`nadp`)
 - **CRN**: Climate Reference Network (`crn`)
 - **CEMS**: Continuous Emission Monitoring Systems (`cems`)
