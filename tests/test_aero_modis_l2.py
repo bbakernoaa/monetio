@@ -1,8 +1,9 @@
 import numpy as np
-import pandas as pd
 import pytest
 import xarray as xr
+
 from monetio.readers.modis_l2 import modis_l2_preprocess
+
 
 def create_synthetic_modis_l2():
     """Create a synthetic MODIS L2-like dataset."""
@@ -35,6 +36,7 @@ def create_synthetic_modis_l2():
 
     return ds
 
+
 def test_modis_l2_preprocess_eager_lazy():
     """Test modis_l2_preprocess with both Eager and Lazy backends."""
     ds_eager = create_synthetic_modis_l2()
@@ -44,9 +46,9 @@ def test_modis_l2_preprocess_eager_lazy():
             "scale": 1.0,
             "minimum": 0.1,
             "maximum": 0.8,
-            "quality_flag": 3, # Mask if >= 3
+            "quality_flag": 3,  # Mask if >= 3
         },
-        "Quality_Flag": {}
+        "Quality_Flag": {},
     }
 
     # 1. Run Eager
@@ -74,6 +76,7 @@ def test_modis_l2_preprocess_eager_lazy():
     assert "history" in res_eager.attrs
     assert "Preprocessed MODIS L2 data via Aero Protocol." in res_eager.attrs["history"]
 
+
 @pytest.mark.parametrize("lazy", [False, True])
 def test_modis_l2_time_calculation(lazy):
     """Verify time calculation from Scan_Start_Time."""
@@ -87,4 +90,4 @@ def test_modis_l2_time_calculation(lazy):
     assert "time" in res.coords
     # 1993-01-01 + 30 years (not accounting for leap years perfectly in synthetic data,
     # but enough to check it's a datetime64)
-    assert res.time.dtype.kind == "M" # Datetime
+    assert res.time.dtype.kind == "M"  # Datetime
