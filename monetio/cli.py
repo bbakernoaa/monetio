@@ -114,15 +114,19 @@ def load(source, dates, output, n_procs, lazy, as_pandas, files, kwargs):
                 extra_kwargs[key] = val
 
     click.echo(f"Loading {source} data...")
-    obj = monetio.load(
-        source,
-        files=f,
-        dates=d,
-        n_procs=n_procs,
-        lazy=lazy,
-        as_xarray=not as_pandas,
-        **extra_kwargs,
-    )
+
+    # Build arguments dynamically to avoid passing defaults that might conflict
+    load_kwargs = {"as_xarray": not as_pandas}
+    if d is not None:
+        load_kwargs["dates"] = d
+    if f is not None:
+        load_kwargs["files"] = f
+    if n_procs != 1:
+        load_kwargs["n_procs"] = n_procs
+    if lazy:
+        load_kwargs["lazy"] = lazy
+
+    obj = monetio.load(source, **load_kwargs, **extra_kwargs)
     handle_save(obj, output, as_pandas)
 
 
