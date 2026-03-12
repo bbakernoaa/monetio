@@ -36,3 +36,17 @@ def test_cli_load_observation():
         mock_load.assert_called_once()
         assert mock_load.call_args[0][0] == "ish"
         assert mock_load.call_args[1]["as_xarray"] is False
+
+
+def test_cli_load_list_kwargs():
+    runner = CliRunner()
+    with patch("monetio.load") as mock_load:
+        mock_load.return_value = xr.Dataset()
+        result = runner.invoke(
+            cli, ["load", "cmaq", "-k", "var_list=O3", "-k", "var_list=NO2", "-k", "var_list=PM25"]
+        )
+        assert result.exit_code == 0
+
+        mock_load.assert_called_once()
+        kwargs = mock_load.call_args[1]
+        assert kwargs["var_list"] == ["O3", "NO2", "PM25"]

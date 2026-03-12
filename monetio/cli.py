@@ -105,7 +105,13 @@ def load(source, dates, output, n_procs, lazy, as_pandas, files, kwargs):
                         val = int(val)
                 except ValueError:
                     pass
-            extra_kwargs[key] = val
+
+            if key in extra_kwargs:
+                if not isinstance(extra_kwargs[key], list):
+                    extra_kwargs[key] = [extra_kwargs[key]]
+                extra_kwargs[key].append(val)
+            else:
+                extra_kwargs[key] = val
 
     click.echo(f"Loading {source} data...")
     obj = monetio.load(
