@@ -68,6 +68,59 @@ def common_options(f):
 
 
 @cli.command()
+@click.argument("source")
+@common_options
+@click.option("--files", "-f", multiple=True, help="File path(s) or glob pattern(s).")
+@click.option(
+    "--kwargs",
+    "-k",
+    multiple=True,
+    help="Additional keyword arguments in key=value format.",
+)
+def load(source, dates, output, n_procs, lazy, as_pandas, files, kwargs):
+    """
+    Generic command to load data from any registered source.
+
+    Available sources include: aeronet, airnow, aqs, goes, ish, ish_lite, etc.
+    See monetio.load documentation for full list.
+    """
+    d = parse_dates(dates)
+    f = list(files) if files else None
+
+    # Parse additional kwargs
+    extra_kwargs = {}
+    for kw in kwargs:
+        if "=" in kw:
+            key, val = kw.split("=", 1)
+            # Try to convert to int or float or bool if possible
+            if val.lower() == "true":
+                val = True
+            elif val.lower() == "false":
+                val = False
+            else:
+                try:
+                    if "." in val:
+                        val = float(val)
+                    else:
+                        val = int(val)
+                except ValueError:
+                    pass
+            extra_kwargs[key] = val
+
+    click.echo(f"Loading {source} data...")
+    obj = monetio.load(
+        source,
+        files=f,
+        dates=d,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+        **extra_kwargs,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
 @common_options
 @click.option("--siteid", help="AERONET site ID.")
 @click.option("--product", default="AOD15", help="AERONET product (e.g., 'AOD15', 'SDA20').")
