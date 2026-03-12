@@ -197,12 +197,13 @@ class NESDISEDRVIIRSReader(GriddedReader):
             },
         )
 
+        ds = ds.expand_dims("time")
+
         # Broadcast to 2D coordinates for backward compatibility with previous reader output
-        lon2d, lat2d = xr.broadcast(ds.longitude, ds.latitude)
+        # Ensuring coordinates are (y, x)
+        lat2d, lon2d = xr.broadcast(ds.latitude, ds.longitude)
         ds.coords["latitude"] = lat2d
         ds.coords["longitude"] = lon2d
-
-        ds = ds.expand_dims("time")
 
         # Re-order dimensions to (time, y, x) for consistency
         ds = ds.transpose("time", "y", "x")
