@@ -6,22 +6,28 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: pre-commit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: pre-commit/action@v3.0.1
+      - name: pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit run --all-files
 
   cff:
     name: Validate CITATION.cff
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - uses: citation-file-format/cffconvert-github-action@2.0.0
         with:
           args: "--validate"
@@ -30,8 +36,8 @@ jobs:
     name: codespell
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: codespell-project/actions-codespell@v2
-        with:
-          ignore_words_file: .codespell-exclude
-          skip: "./monetio/data/aqs_qualifiers.csv,./monetio/data/cemsinfo.csv,./monetio/data/stations.tsv"
+      - uses: actions/checkout@v4
+      - name: codespell
+        run: |
+          pip install codespell
+          codespell -I .codespell-exclude -S "./monetio/data/aqs_qualifiers.csv,./monetio/data/cemsinfo.csv,./monetio/data/stations.tsv" .

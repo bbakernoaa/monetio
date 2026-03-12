@@ -124,10 +124,14 @@ def nesdis_eps_viirs_preprocess(ds: xr.Dataset) -> xr.Dataset:
         # EPS uses descending latitudes (lat_max to lat_min)
         lats = np.linspace(lat_max, lat_min, nlat)
 
-        lon2d, lat2d = np.meshgrid(lons, lats)
+        # Lazy coordinate generation using xr.broadcast
+        lon1d = xr.DataArray(lons, dims=("x",), name="longitude")
+        lat1d = xr.DataArray(lats, dims=("y",), name="latitude")
+        lat2d, lon2d = xr.broadcast(lat1d, lon1d)
+
         ds = ds.assign_coords(
-            latitude=(("y", "x"), lat2d, {"units": "degrees_north", "standard_name": "latitude"}),
-            longitude=(("y", "x"), lon2d, {"units": "degrees_east", "standard_name": "longitude"}),
+            latitude=lat2d.assign_attrs({"units": "degrees_north", "standard_name": "latitude"}),
+            longitude=lon2d.assign_attrs({"units": "degrees_east", "standard_name": "longitude"}),
         )
 
     # 3. Handle Time

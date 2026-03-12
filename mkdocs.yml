@@ -22,6 +22,7 @@ nav:
   - Getting Started:
       - Why MONETIO?: why-monetio.md
       - Installing: installing.md
+      - Command Line Interface: cli.md
       - Observations: observations.md
       - Models: models.md
       - Tutorial:
