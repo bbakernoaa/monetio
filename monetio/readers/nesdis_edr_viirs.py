@@ -27,6 +27,7 @@ class NESDISEDRVIIRSReader(GriddedReader):
         date: Union[datetime.datetime, str, pd.Timestamp],
         resolution: str = "high",
         datapath: str = ".",
+        lazy: bool = False,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -34,12 +35,14 @@ class NESDISEDRVIIRSReader(GriddedReader):
 
         Parameters
         ----------
-        date : datetime.datetime or str
+        date : datetime.datetime, str, or pd.Timestamp
             Date to retrieve.
         resolution : str, optional
             'high' (0.10 deg) or 'low' (0.25 deg). Default is 'high'.
         datapath : str, optional
             Local path to store downloaded files. Default is '.'.
+        lazy : bool, optional
+            Whether to read data lazily using Dask, by default False.
         **kwargs : dict
             Additional arguments.
 
@@ -60,7 +63,7 @@ class NESDISEDRVIIRSReader(GriddedReader):
         unzipped_fname = self._unzip_file(fname)
 
         # Read
-        ds = self.read_data(unzipped_fname, date, resolution=resolution)
+        ds = self.read_data(unzipped_fname, date, resolution=resolution, lazy=lazy)
 
         # Update history
         ds = update_history(ds, "Read NESDIS EDR VIIRS data.")
@@ -70,6 +73,23 @@ class NESDISEDRVIIRSReader(GriddedReader):
     def download_data(
         self, date: pd.Timestamp, resolution: str = "high", datapath: str = "."
     ) -> str:
+        """
+        Download NESDIS EDR VIIRS data from FTP.
+
+        Parameters
+        ----------
+        date : pd.Timestamp
+            Date to download.
+        resolution : str, optional
+            'high' or 'low', by default "high".
+        datapath : str, optional
+            Local directory to save files, by default ".".
+
+        Returns
+        -------
+        str
+            Path to the downloaded file.
+        """
         import ftplib
 
         year = date.strftime("%Y")
@@ -93,6 +113,19 @@ class NESDISEDRVIIRSReader(GriddedReader):
         return filepath
 
     def _unzip_file(self, fname: str) -> str:
+        """
+        Unzip .gz file.
+
+        Parameters
+        ----------
+        fname : str
+            Input filename.
+
+        Returns
+        -------
+        str
+            Unzipped filename.
+        """
         import gzip
         import shutil
 
@@ -106,32 +139,75 @@ class NESDISEDRVIIRSReader(GriddedReader):
                     shutil.copyfileobj(f_in, f_out)
         return out_fname
 
-    def read_data(self, fname: str, date: pd.Timestamp, resolution: str = "high") -> xr.Dataset:
+    def read_data(
+        self, fname: str, date: pd.Timestamp, resolution: str = "high", lazy: bool = False
+    ) -> xr.Dataset:
+        """
+        Read NESDIS EDR VIIRS binary data into an xarray.Dataset.
+
+        Parameters
+        ----------
+        fname : str
+            Path to the binary file.
+        date : pd.Timestamp
+            The date associated with the data.
+        resolution : str, optional
+            'high' or 'low', by default "high".
+        lazy : bool, optional
+            Whether to use Dask for lazy loading, by default False.
+
+        Returns
+        -------
+        xr.Dataset
+            The dataset containing AOD and coordinates.
+        """
         if resolution in {"high", "h", "0.10"}:
             nlat, nlon = 1800, 3600
         else:
             nlat, nlon = 720, 1440
 
-        # Generate lat/lon
+        if lazy:
+            import dask.array as da
+            from dask import delayed
+
+            @delayed
+            def load_binary(f):
+                data = np.fromfile(f, dtype=np.float32)
+                # Binary file contains 2 layers, first is AOD
+                return data.reshape(2, nlat, nlon)[0, :, :]
+
+            aot = da.from_delayed(load_binary(fname), shape=(nlat, nlon), dtype=np.float32)
+            # Replace invalid values lazily
+            aot = da.where(aot < -999, np.nan, aot)
+        else:
+            f = np.fromfile(fname, dtype=np.float32)
+            aot = f.reshape(2, nlat, nlon)[0, :, :]
+            aot[aot < -999] = np.nan
+
+        # Generate lat/lon coords (1D for laziness)
         lons = np.linspace(-179.875, 179.875, nlon)
         lats = np.linspace(-89.875, 89.875, nlat)
-        lon2d, lat2d = np.meshgrid(lons, lats)
-
-        f = np.fromfile(fname, dtype=np.float32)
-        # Binary file contains 2 layers, first is AOD
-        aot = f.reshape(2, nlat, nlon)[0, :, :]
-        aot[aot < -999] = np.nan
 
         ds = xr.Dataset(
             data_vars={"aod_550": (("y", "x"), aot)},
             coords={
-                "time": [date],
-                "latitude": (("y", "x"), lat2d),
-                "longitude": (("y", "x"), lon2d),
+                "time": date,
+                "latitude": (("y",), lats),
+                "longitude": (("x",), lons),
             },
         )
+
+        # Broadcast to 2D coordinates for backward compatibility with previous reader output
+        lon2d, lat2d = xr.broadcast(ds.longitude, ds.latitude)
+        ds.coords["latitude"] = lat2d
+        ds.coords["longitude"] = lon2d
+
         ds = ds.expand_dims("time")
 
+        # Re-order dimensions to (time, y, x) for consistency
+        ds = ds.transpose("time", "y", "x")
+
+        # Metadata
         ds.aod_550.attrs.update(
             {
                 "long_name": "Aerosol Optical Thickness at 550nm",
@@ -143,5 +219,8 @@ class NESDISEDRVIIRSReader(GriddedReader):
         ds.longitude.attrs.update({"units": "degrees_east", "standard_name": "longitude"})
 
         ds.attrs["source"] = f"ftp://{SERVER}{BASE_DIR}"
+
+        # Update history
+        ds = update_history(ds, "Modernized binary reading via Aero Protocol.")
 
         return ds
