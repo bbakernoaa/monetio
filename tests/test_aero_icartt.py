@@ -13,7 +13,7 @@ def create_mock_icartt(filename):
     # 2: PI
     # 3: ORG
     # 4: SRC
-    # 5: MIS
+    # 5: MISSION
     # 6: 1
     # 7: 2023, 05, 15...
     # 8: 1
