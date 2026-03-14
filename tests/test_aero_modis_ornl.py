@@ -1,6 +1,7 @@
 import numpy as np
-import xarray as xr
+
 from monetio.readers.modis_ornl import _get_latlon
+
 
 def test_modis_ornl_latlon_lazy():
     """Verify that _get_latlon is lazy and matches expected values."""
