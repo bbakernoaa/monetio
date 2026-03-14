@@ -704,59 +704,99 @@ def reset_latlon_coords(hxr):
 # -----------------------------------------------------------------------------
 
 
-def thickness_hash(xrash):
+def thickness_hash(xrash: xr.Dataset | xr.DataArray) -> dict:
+    """
+    Map layer heights to their thicknesses.
+
+    Parameters
+    ----------
+    xrash : xr.Dataset | xr.DataArray
+        Dataset containing vertical dimension 'z'.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping height to thickness.
+    """
     delta = get_thickness(xrash)
-    xlevs = xrash.z.values
-    dhash = dict(zip(xlevs, delta))
+    # Mapping requires discrete values, but we can do this without .values for dask-friendliness
+    # by assuming coordinate 'z' is manageable in memory (usually < 100 levels)
+    xlevs = xrash.z.data
+    dhash = dict(zip(xlevs, delta.data))
     return dhash
 
 
-def get_thickness(xrash):
+def get_thickness(xrash: xr.Dataset | xr.DataArray) -> xr.DataArray:
     """
-    helper function for mass_loading
-    """
-    alts = list(xrash.z.values)
-    b = [0]
-    alts2 = alts
-    if alts[0] != 0:
-        b.extend(alts)
-        alts = b
+    Calculate layer thicknesses from vertical coordinates.
 
-    a2 = alts[1:]
-    a3 = alts[0:-1]
-    delta = np.array(a2) - np.array(a3)
-    # if deposition layer then first layer has
-    # thickness of 0.
-    if alts2[0] == 0:
-        b = [0]
-        b.extend(delta)
-        delta = b
-    return np.array(delta)
+    Parameters
+    ----------
+    xrash : xr.Dataset | xr.DataArray
+        Dataset containing vertical dimension 'z'.
+
+    Returns
+    -------
+    xr.DataArray
+        Thickness of each layer.
+    """
+    z = xrash.z
+
+    # Create interfaces by prepending 0 if not present
+    # Case 1: First layer is deposition (z=0)
+    # Case 2: First layer is above ground (z>0)
+    is_dep = (z[0] == 0).item()
+
+    if is_dep:
+        # z: [0, 100, 500, ...] -> thicknesses: [0, 100, 400, ...]
+        # We handle this by computing differences on z and prepending a 0.
+        delta = z.diff(dim="z", label="lower")
+        # Prepend 0 for the deposition layer
+        # Avoid xr.concat on dimension that already exists if possible, or ensure it's handled right
+        # Actually, concat with coords={"z": [0.0]} should work if delta has no overlap.
+        # But diff(label="lower") returns z[1:] as coordinates.
+        delta_0 = xr.DataArray([0.0], coords={"z": [0.0]}, dims="z")
+        delta_vals = xr.concat([delta_0, delta], dim="z")
+    else:
+        # z: [100, 500, ...] -> thicknesses: [100, 400, ...]
+        # Prepend 0 to coordinates to calculate the first thickness
+        z_0 = xr.DataArray([0.0], coords={"z": [0.0]}, dims="z")
+        z_with_surf = xr.concat([z_0, z], dim="z")
+        delta_vals = z_with_surf.diff(dim="z").assign_coords(z=z)
+
+    return delta_vals.rename("thickness")
 
 
-def remove_dep(xrash):
+def remove_dep(xrash: xr.Dataset | xr.DataArray) -> xr.Dataset | xr.DataArray:
     """
-    remove the deposition layer.
-    helper function for mass_loading
+    Remove the deposition layer (z=0) if present.
+
+    Parameters
+    ----------
+    xrash : xr.Dataset | xr.DataArray
+        Input data.
+
+    Returns
+    -------
+    xr.Dataset | xr.DataArray
+        Data without deposition layer.
     """
-    vals = xrash.z.values
-    if vals[0] == 0:
-        vals = vals[1:]
-    x2 = xrash.sel(z=vals)
-    return x2
+    if xrash.z[0] == 0:
+        return xrash.isel(z=slice(1, None))
+    return xrash
 
 
 def mass_loading(
-    xrash: xr.DataArray | xr.Dataset, delta: np.ndarray | None = None
+    xrash: xr.DataArray | xr.Dataset, delta: xr.DataArray | np.ndarray | None = None
 ) -> xr.DataArray | xr.Dataset:
     """
-    Calculate mass loading by vertically integrating concentration.
+    Calculate mass loading by vertically integrating concentration lazily.
 
     Parameters
     ----------
     xrash : xr.DataArray | xr.Dataset
         Input data with concentration.
-    delta : np.ndarray, optional
+    delta : xr.DataArray | np.ndarray, optional
         Layer thicknesses. If None, calculated from 'z'.
 
     Returns
@@ -764,38 +804,44 @@ def mass_loading(
     xr.DataArray | xr.Dataset
         Mass loading (sum of conc * delta).
     """
-    # Original logic removed deposition first
-    if xrash.z[0] == 0:
-        xrash_no_dep = remove_dep(xrash)
-    else:
-        xrash_no_dep = xrash
+    # 1. Identify and exclude deposition layer for integration
+    is_dep = (xrash.z[0] == 0).item()
+    xrash_no_dep = remove_dep(xrash)
 
+    # 2. Get thicknesses
     if delta is None:
-        delta = get_thickness(xrash_no_dep)
+        weights = get_thickness(xrash_no_dep)
     else:
-        delta = np.asanyarray(delta)
-        # If delta was provided for the full dataset (including dep),
-        # but we are using the dataset without dep, we need to slice delta.
-        if len(delta) == len(xrash.z) and xrash.z[0] == 0:
-            delta = delta[1:]
+        if isinstance(delta, np.ndarray):
+            # If provided as numpy, align with the dataset
+            # Determine if delta includes the dep layer
+            if len(delta) == len(xrash.z) and is_dep:
+                delta = delta[1:]
+            weights = xr.DataArray(delta, coords={"z": xrash_no_dep.z}, dims="z")
+        else:
+            weights = delta
+            # Ensure it doesn't have the dep layer if we are integrating
+            if "z" in weights.coords and (weights.z[0] == 0).item():
+                weights = weights.isel(z=slice(1, None))
 
-    # Use xarray to perform the weighted sum lazily
-    # Map delta to the 'z' dimension
-    weights = xr.DataArray(delta, dims="z", coords={"z": xrash_no_dep.z})
-
-    # Avoid deposition layer (if thickness is 0)
+    # 3. Compute lazy mass loading
+    # Mask out non-positive weights to be safe
     weights = weights.where(weights > 0, np.nan)
 
     ml = (xrash_no_dep * weights).sum(dim="z", skipna=True)
 
+    # 4. Provenance and scientific hygiene
     if isinstance(ml, xr.Dataset):
-        ml = update_history(ml, "Calculated mass loading.")
+        ml = update_history(ml, "Calculated mass loading via Aero Protocol.")
     elif isinstance(ml, xr.DataArray):
-        # DataArrays don't always have history in attrs by convention in some parts of monetio
-        # but we can add it if it's there.
-        if "history" in xrash.attrs:
-            ml.attrs["history"] = xrash.attrs["history"]
-        ml = update_history(ml, "Calculated mass loading.")
+        # Ensure name is reasonable
+        if hasattr(xrash, "name"):
+            ml.name = f"{xrash.name}_mass_loading"
+        # Update history if attributes are accessible
+        if hasattr(ml, "attrs"):
+            if "history" in xrash.attrs:
+                ml.attrs["history"] = xrash.attrs["history"]
+            ml = update_history(ml, "Calculated mass loading via Aero Protocol.")
 
     return ml
 
