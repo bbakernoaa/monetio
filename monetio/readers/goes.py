@@ -158,7 +158,7 @@ def goes_preprocess(ds: xr.Dataset) -> xr.Dataset:
 
 def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     """
-    Calculate latitude and longitude for GOES data lazily.
+    Calculate latitude and longitude for GOES data lazily using the Aero Protocol.
 
     Parameters
     ----------
@@ -181,37 +181,72 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
             proj_dict[k] = v[0]
 
     crs = CRS.from_cf(proj_dict)
+    # Use PROJ string for the worker function to ensure it is picklable for Dask
+    proj_srs = crs.to_proj4()
     ds.attrs["projection"] = crs.to_wkt()
-    proj = Proj(crs)
 
     satellite_height = proj_var.perspective_point_height
 
-    def _calc_latlon(x, y):
-        # x and y are in radians in GOES files
-        xx, yy = np.meshgrid(x * satellite_height, y * satellite_height)
-        lon, lat = proj(xx, yy, inverse=True)
-        # Handle out of disk values
+    # 1. Multiply by satellite height lazily (convert radians to meters)
+    x_m = ds.x * satellite_height
+    y_m = ds.y * satellite_height
+
+    # 2. Broadcast to 2D (y, x) lazily
+    if hasattr(ds, "chunks") and ds.chunks:
+        x_m = x_m.chunk({"x": ds.chunks.get("x", "auto")})
+        y_m = y_m.chunk({"y": ds.chunks.get("y", "auto")})
+
+    # Note: GOES data variables usually have dimensions (y, x)
+    y_2d, x_2d = xr.broadcast(y_m, x_m)
+
+    def _proj_inv(xv: np.ndarray, yv: np.ndarray, p_srs: str) -> tuple:
+        """
+        Element-wise inverse projection wrapper.
+
+        Parameters
+        ----------
+        xv : np.ndarray
+            X coordinates in meters.
+        yv : np.ndarray
+            Y coordinates in meters.
+        p_srs : str
+            PROJ4 projection string.
+
+        Returns
+        -------
+        tuple
+            (latitude, longitude) as float32 NumPy arrays.
+        """
+        # Ensure p_srs is a string if it came as a Dask scalar/array
+        if isinstance(p_srs, (np.ndarray, np.generic)):
+            p_srs = p_srs.item()
+        if hasattr(p_srs, "decode"):
+            p_srs = p_srs.decode()
+
+        p = Proj(p_srs)
+        lon, lat = p(xv, yv, inverse=True)
+        # Handle out of disk values (GOES specific)
         lon = np.where(lon < 400, lon, np.nan)
         lat = np.where(lat < 100, lat, np.nan)
         return lat.astype(np.float32), lon.astype(np.float32)
 
-    # Use standardized approach: unified apply_ufunc for both backends.
-    # We use allow_rechunk=True to handle cases where x/y are chunked, as they are
-    # core dimensions for the projection calculation.
+    # 3. Apply projection lazily
     lat, lon = xr.apply_ufunc(
-        _calc_latlon,
-        ds.x,
-        ds.y,
-        input_core_dims=[["x"], ["y"]],
-        output_core_dims=[["y", "x"], ["y", "x"]],
+        _proj_inv,
+        x_2d,
+        y_2d,
+        proj_srs,
         dask="parallelized",
         output_dtypes=[np.float32, np.float32],
-        dask_gufunc_kwargs={"allow_rechunk": True},
+        output_core_dims=[(), ()],
     )
 
     ds = ds.assign_coords(
         latitude=lat.assign_attrs({"units": "degrees_north", "standard_name": "latitude"}),
         longitude=lon.assign_attrs({"units": "degrees_east", "standard_name": "longitude"}),
     )
+
+    # Update history
+    ds = update_history(ds, "Optimized GOES coordinate generation via Aero Protocol.")
 
     return ds

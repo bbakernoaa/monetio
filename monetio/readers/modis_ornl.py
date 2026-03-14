@@ -116,13 +116,62 @@ class MODISData:
             self.isScaled = True
 
 
-def _nearest(items, pivot):
+def _nearest(items: pd.DatetimeIndex, pivot: pd.Timestamp) -> pd.Timestamp:
+    """
+    Find the nearest date in a list.
+
+    Parameters
+    ----------
+    items : pd.DatetimeIndex
+        List of available dates.
+    pivot : pd.Timestamp
+        Target date.
+
+    Returns
+    -------
+    pd.Timestamp
+        The nearest date.
+    """
     return min(items, key=lambda x: abs(x - pivot))
 
 
 def _get_single_retrieval(
-    date, product, band, quality_control, lat, lon, kmAboveBelow, kmLeftRight
-):
+    date: pd.Timestamp,
+    product: str,
+    band: str,
+    quality_control: Optional[Any],
+    lat: float,
+    lon: float,
+    kmAboveBelow: int,
+    kmLeftRight: int,
+) -> MODISData:
+    """
+    Retrieve a single MODIS subset from ORNL.
+
+    Parameters
+    ----------
+    date : pd.Timestamp
+        Target date.
+    product : str
+        MODIS product ID.
+    band : str
+        Product band.
+    quality_control : Optional[Any]
+        Quality control filter.
+    lat : float
+        Latitude.
+    lon : float
+        Longitude.
+    kmAboveBelow : int
+        Kilometers above/below.
+    kmLeftRight : int
+        Kilometers left/right.
+
+    Returns
+    -------
+    MODISData
+        Object containing retrieved data and metadata.
+    """
     client = Client(DEFAULT_WSDL)
 
     # Get available dates
@@ -161,7 +210,20 @@ def _get_single_retrieval(
     return m
 
 
-def _make_xarray_dataset(m) -> xr.Dataset:
+def _make_xarray_dataset(m: MODISData) -> xr.Dataset:
+    """
+    Create an xarray Dataset from MODISData.
+
+    Parameters
+    ----------
+    m : MODISData
+        Object containing data and metadata.
+
+    Returns
+    -------
+    xr.Dataset
+        The formatted dataset.
+    """
     # Reshape and flip to match standard orientation if needed
     # The original code did: m.data.reshape(m.ncols, m.nrows, order='C')[::-1, :]
     # which resulted in (x, y) dims.
@@ -186,13 +248,54 @@ def _make_xarray_dataset(m) -> xr.Dataset:
     return ds
 
 
-def _get_latlon(xll, yll, cell_width, nx, ny):
+def _get_latlon(
+    xll: float, yll: float, cell_width: float, nx: int, ny: int
+) -> tuple[xr.DataArray, xr.DataArray]:
+    """
+    Generate latitude and longitude coordinates lazily.
+
+    Parameters
+    ----------
+    xll : float
+        X coordinate of lower left corner (meters).
+    yll : float
+        Y coordinate of lower left corner (meters).
+    cell_width : float
+        Cell width (meters).
+    nx : int
+        Number of columns.
+    ny : int
+        Number of rows.
+
+    Returns
+    -------
+    tuple[xr.DataArray, xr.DataArray]
+        (longitude, latitude) 2D DataArrays.
+    """
     from pyproj import Proj
 
-    sinu = Proj("+proj=sinu +a=6371007.181 +b=6371007.181 +units=m +R=6371007.181")
+    # Generate 1D coordinates
     x = np.linspace(xll, xll + cell_width * nx, nx)
     y = np.linspace(yll, yll + cell_width * ny, ny)
-    xx, yy = np.meshgrid(x, y)
-    lon, lat = sinu(xx, yy, inverse=True)
-    # The original code flipped y
-    return lon[::-1, :], lat[::-1, :]
+
+    # Use broadcast for lazy 2D expansion
+    xda = xr.DataArray(x, dims="x")
+    yda = xr.DataArray(y, dims="y")
+    y_2d, x_2d = xr.broadcast(yda, xda)
+
+    def _proj_inv(xv: np.ndarray, yv: np.ndarray) -> tuple:
+        """Element-wise inverse projection wrapper."""
+        sinu = Proj("+proj=sinu +a=6371007.181 +b=6371007.181 +units=m +R=6371007.181")
+        return sinu(xv, yv, inverse=True)
+
+    lon, lat = xr.apply_ufunc(
+        _proj_inv,
+        x_2d,
+        y_2d,
+        dask="parallelized",
+        output_dtypes=[float, float],
+        output_core_dims=[(), ()],
+    )
+
+    # Original code flipped y orientation
+    return lon.isel(y=slice(None, None, -1)), lat.isel(y=slice(None, None, -1))
