@@ -305,7 +305,7 @@ def _mjd2000_to_datetime(x: np.ndarray) -> np.ndarray:
 
     # We maintain the legacy logic but vectorized.
     jd = np.asarray(x) + 2451544.5
-    return pd.to_datetime(jd, unit="d", origin="julian").values.astype("datetime64[ns]")
+    return pd.to_datetime(jd, unit="D", origin="julian").values.astype("datetime64[ns]")
 
 
 def _read_hdf4(sd: Any) -> Tuple[Dict, Dict]:
@@ -342,4 +342,4 @@ def _rename_var(vn: str, *, under: str = "_", dot: str = "_") -> str:
 
 def _dti_from_mjd2000(x: Any) -> pd.DatetimeIndex:
     """Legacy helper for backward compatibility."""
-    return pd.to_datetime(np.asarray(x) + 2451544.5, unit="d", origin="julian")
+    return pd.to_datetime(np.asarray(x) + 2451544.5, unit="D", origin="julian")
