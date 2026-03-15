@@ -231,7 +231,7 @@ def regulatory_resample(df, col="model", pollutant_standard=None):
 
 
 def calc_daily_max(df, param=None, rolling_frequency=8):
-    from pandas import Index, to_timedelta
+    from pandas import to_timedelta
 
     if param is None:
         temp = df.copy()

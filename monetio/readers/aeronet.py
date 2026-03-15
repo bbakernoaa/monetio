@@ -411,9 +411,7 @@ def build_urls(
                 time_list = [pd.to_datetime(t, unit="s", utc=True) for t in t_list]
         else:
             # Generate daily URLs
-            time_bounds = pd.date_range(
-                start=min_date.floor("D"), end=max_date.ceil("D"), freq="D"
-            )
+            time_bounds = pd.date_range(start=min_date.floor("D"), end=max_date.ceil("D"), freq="D")
 
             # Clip bounds to the actual requested range
             time_list = time_bounds.tolist()
