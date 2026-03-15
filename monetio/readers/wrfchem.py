@@ -1,7 +1,7 @@
 """WRF-Chem Reader"""
 
 from functools import partial
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import xarray as xr
@@ -26,7 +26,7 @@ class WRFChemReader(GriddedReader):
         var_list: Optional[List[str]] = None,
         surf_only: bool = False,
         surf_only_nc: bool = False,
-        **kwargs: dict,
+        **kwargs: Any,
     ) -> xr.Dataset:
         """
         Reads WRF-Chem netCDF files.
@@ -45,7 +45,7 @@ class WRFChemReader(GriddedReader):
             Whether to only keep surface data, by default False.
         surf_only_nc : bool, optional
             Whether input data already contains only surface data, by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the driver.
 
         Returns

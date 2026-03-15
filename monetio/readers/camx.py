@@ -1,7 +1,7 @@
 """CAMx Reader"""
 
 from functools import partial
-from typing import List, Union
+from typing import Any, List, Union
 
 import numpy as np
 import xarray as xr
@@ -27,7 +27,7 @@ class CAMxReader(GriddedReader):
         earth_radius: float = 6370000,
         convert_to_ppb: bool = True,
         drop_duplicates: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> xr.Dataset:
         """
         Reads CAMx netCDF files.
@@ -42,12 +42,12 @@ class CAMxReader(GriddedReader):
             Convert gas species from ppmV to ppbV, by default True.
         drop_duplicates : bool, optional
             Drop duplicate time steps within each file, by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the driver.
 
         Returns
         -------
-        xr.Dataset
+        xarray.Dataset
             The processed CAMx dataset.
         """
         # Set default backend kwargs for CAMx if not present
@@ -97,7 +97,7 @@ def camx_preprocess(
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input CAMx dataset.
     earth_radius : float, optional
         Earth radius in meters, by default 6370000.
@@ -108,7 +108,7 @@ def camx_preprocess(
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Processed dataset.
     """
     # 1. Add lazy diagnostic variables
@@ -166,26 +166,39 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
     name : str
         Name of the diagnostic variable.
     spec : DiagnosticSpec
-        Specification for the diagnostic (from camx_specs).
+        Specification for the diagnostic.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with diagnostic added if possible.
     """
-    # Special cases for CAMx pre-existing totals
-    if name == "PM25" and "PM25_TOT" in ds.data_vars:
-        ds["PM25"] = ds["PM25_TOT"]
-        return ds
-    if name == "PM10" and "PM_TOT" in ds.data_vars:
-        ds["PM10"] = ds["PM_TOT"]
+    # 1. Check if name already exists as a data variable
+    if name in ds.data_vars:
         return ds
 
+    # 2. Check for pre-calculated summary variables to prevent regressions
+    aliases = {
+        "PM25": ["PM25_TOT", "PM2_5"],
+        "PM10": ["PM_TOT", "PM10"],
+    }
+
+    for alias in aliases.get(name, []):
+        if alias in ds.data_vars:
+            ds[name] = ds[alias].copy()
+            ds[name].attrs.update(
+                {"units": spec.units, "name": spec.name, "long_name": spec.long_name}
+            )
+            # Update history
+            ds = update_history(ds, f"Added lazy diagnostic: {name} (using alias {alias}).")
+            return ds
+
+    # 3. Identify constituent variables available in the dataset
     available_vars = [v for v in spec.variables if v in ds.data_vars]
     if not available_vars:
         return ds
@@ -197,14 +210,37 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
     else:
         weights = [1.0] * len(available_vars)
 
-    # Compute lazy sum
-    new_var = ds[available_vars[0]] * weights[0]
-    for i in range(1, len(available_vars)):
-        new_var = new_var + ds[available_vars[i]] * weights[i]
+    # 4. Compute lazy sum with unit synchronization
+    with xr.set_options(keep_attrs=True):
+        # Use first variable as base
+        v0 = available_vars[0]
+        new_var = ds[v0] * weights[0]
+        base_units = ds[v0].attrs.get("units", "").lower()
+
+        for i in range(1, len(available_vars)):
+            v = available_vars[i]
+            v_var = ds[v]
+            v_units = v_var.attrs.get("units", "").lower()
+
+            # Unit synchronization (e.g. ppmV vs ppbV)
+            if v_units != base_units:
+                if "ppm" in v_units and "ppb" in base_units:
+                    v_var = v_var * 1000.0
+                elif "ppb" in v_units and "ppm" in base_units:
+                    v_var = v_var / 1000.0
+
+            new_var = new_var + v_var * weights[i]
+
+    # Inherit units from constituent variables if available, otherwise use spec
+    units = ds[v0].attrs.get("units", spec.units)
 
     ds[name] = new_var.assign_attrs(
-        {"units": spec.units, "name": spec.name, "long_name": spec.long_name}
+        {"units": units, "name": spec.name, "long_name": spec.long_name}
     )
+
+    # Update history
+    ds = update_history(ds, f"Added lazy diagnostic: {name} (sum of {', '.join(available_vars)}).")
+
     return ds
 
 
@@ -214,14 +250,14 @@ def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
     drop_duplicates : bool, optional
         Whether to drop duplicate time steps, by default False.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with 'time' coordinate.
     """
     tflag = ds.TFLAG
@@ -266,14 +302,14 @@ def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
     proj4_srs : str
         The PROJ4 projection string.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with 'latitude' and 'longitude' coordinates.
     """
     from pyproj import Proj
@@ -360,19 +396,28 @@ def _convert_to_ppb(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with converted units.
     """
-    for i in ds.data_vars:
-        if "units" in ds[i].attrs:
-            if "ppm" in ds[i].attrs["units"].lower():
-                ds[i] = ds[i] * 1000.0
-                ds[i].attrs["units"] = "ppbV"
+    to_convert = [
+        v for v in ds.data_vars if "units" in ds[v].attrs and "ppm" in ds[v].attrs["units"].lower()
+    ]
+
+    if not to_convert:
+        return ds
+
+    for v in to_convert:
+        ds[v] = ds[v] * 1000.0
+        ds[v].attrs["units"] = "ppbV"
+
+    # Update history
+    ds = update_history(ds, f"Converted {', '.join(to_convert)} from ppmV to ppbV.")
+
     return ds
 
 
@@ -382,18 +427,30 @@ def _format_units(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with formatted unit strings.
     """
-    for i in ds.data_vars:
-        if "units" in ds[i].attrs:
-            if "micrograms" in ds[i].attrs["units"].lower() or "ug" in ds[i].attrs["units"].lower():
-                ds[i].attrs["units"] = r"$\mu g m^{-3}$"
+    to_format = [
+        v
+        for v in ds.data_vars
+        if "units" in ds[v].attrs
+        and ("micrograms" in ds[v].attrs["units"].lower() or "ug" in ds[v].attrs["units"].lower())
+    ]
+
+    if not to_format:
+        return ds
+
+    for v in to_format:
+        ds[v].attrs["units"] = r"$\mu g m^{-3}$"
+
+    # Update history
+    ds = update_history(ds, rf"Formatted units for {', '.join(to_format)} to $\mu g m^{{-3}}$.")
+
     return ds
 
 

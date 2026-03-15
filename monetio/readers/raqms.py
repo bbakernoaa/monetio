@@ -1,6 +1,6 @@
 """RAQMS Reader"""
 
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import xarray as xr
@@ -22,7 +22,7 @@ class RAQMSReader(GriddedReader):
         convert_to_ppb: bool = True,
         var_list: Optional[List[str]] = None,
         surf_only: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> xr.Dataset:
         """
         Reads RAQMS netCDF files.
@@ -33,16 +33,16 @@ class RAQMSReader(GriddedReader):
             File path, list of paths, or glob pattern.
         convert_to_ppb : bool, optional
             Convert gas species from ppv to ppbv, by default True.
-        var_list : List[str], optional
+        var_list : list of str, optional
             List of variables to keep, by default None.
         surf_only : bool, optional
             Whether to only return the surface layer, by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to xarray.open_mfdataset or the driver.
 
         Returns
         -------
-        xr.Dataset
+        xarray.Dataset
             The processed RAQMS dataset.
         """
         # RAQMS check file format
@@ -115,7 +115,7 @@ def _fix(ds: xr.Dataset, *, surf_only: bool, convert_to_ppb: bool) -> xr.Dataset
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input RAQMS dataset.
     surf_only : bool
         Whether to keep only the surface layer.
@@ -124,7 +124,7 @@ def _fix(ds: xr.Dataset, *, surf_only: bool, convert_to_ppb: bool) -> xr.Dataset
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Fixed dataset.
     """
     ds = _fix_grid(ds)
@@ -135,20 +135,23 @@ def _fix(ds: xr.Dataset, *, surf_only: bool, convert_to_ppb: bool) -> xr.Dataset
         ds = ds.isel(z=0).expand_dims("z")
 
     if convert_to_ppb:
-        for i in ds.data_vars:
-            if "units" in ds[i].attrs:
-                if ds[i].attrs["units"] == "ppv":
-                    with xr.set_options(keep_attrs=True):
-                        ds[i] = ds[i] * 1e9
-                    ds[i].attrs["units"] = "ppbv"
+        to_convert = [v for v in ds.data_vars if ds[v].attrs.get("units") == "ppv"]
+        if to_convert:
+            for v in to_convert:
+                with xr.set_options(keep_attrs=True):
+                    ds[v] = ds[v] * 1e9
+                ds[v].attrs["units"] = "ppbv"
+            # Update history
+            ds = update_history(ds, f"Converted {', '.join(to_convert)} from ppv to ppbv.")
 
     if "ttheta" in ds.data_vars:
         # Calculate temperature from potential temperature
         k = 0.28571428571428564  # R/cp = kappa (unitless)
         with xr.set_options(keep_attrs=True):
             ds["temperature_k"] = ds["ttheta"] * (ds["pres_pa_mid"] / 100000) ** k
-        ds["temperature_k"].attrs["units"] = "K"
-        ds["temperature_k"].attrs["long_name"] = "Temperature"
+        ds["temperature_k"].attrs.update({"units": "K", "long_name": "Temperature"})
+        # Update history
+        ds = update_history(ds, "Calculated temperature_k from ttheta and pres_pa_mid.")
 
     # Transpose if dims exist
     dims = [d for d in ["time", "z", "y", "x"] if d in ds.dims]
@@ -163,12 +166,12 @@ def _fix_grid(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with 'latitude' and 'longitude' coordinates.
     """
     # Handle coordinates lazily BEFORE renaming dims
@@ -240,12 +243,12 @@ def _fix_time(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with 'time' coordinate.
     """
     if "Times" in ds.variables:
@@ -287,12 +290,12 @@ def _fix_pres(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with renamed and scaled pressure variables.
     """
     rename0 = {
@@ -304,11 +307,16 @@ def _fix_pres(ds: xr.Dataset) -> xr.Dataset:
 
     if rename:
         ds = ds.rename_vars(rename)
+        # Update history
+        ds = update_history(ds, f"Renamed pressure variables: {rename}.")
 
-    for vn in rename.values():
-        if "units" in ds[vn].attrs and ds[vn].attrs["units"] in {"mb", "hPa"}:
+    to_scale = [vn for vn in rename.values() if ds[vn].attrs.get("units") in {"mb", "hPa"}]
+    if to_scale:
+        for vn in to_scale:
             with xr.set_options(keep_attrs=True):
                 ds[vn] = ds[vn] * 100
             ds[vn].attrs.update(units="Pa")
+        # Update history
+        ds = update_history(ds, f"Scaled {', '.join(to_scale)} from mb/hPa to Pa.")
 
     return ds
