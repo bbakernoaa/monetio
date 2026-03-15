@@ -645,7 +645,11 @@ class EmissionsCall(EpaApiObject):
             #    fid.write(line)
         # ----------------------------------------------------
         df = pd.DataFrame(tra, columns=cols)
-        df.apply(pd.to_numeric, errors="ignore")
+        for c in df.columns:
+            try:
+                df[c] = pd.to_numeric(df[c])
+            except Exception:
+                pass
         df = self.manage_date(df)
         if self.calltype == "AD":
             df["SO2MODC"] = -8
@@ -900,7 +904,7 @@ class Emissions:
         if self.df.empty:
             self.df = df
         elif not df.empty:
-            self.df = self.df.append(df)
+            self.df = pd.concat([self.df, df], ignore_index=True)
         # self.df.to_csv(efile)
         return ec.status_code
 
@@ -1064,7 +1068,7 @@ class MonitoringPlan(EpaApiObject):
             index_col=[0],
             converters=chash,
             parse_dates=["beginDateHour", "endDateHour"],
-            date_parser=lambda x: parsedate(x, self.dfmt),
+            date_format=self.dfmt,
         )
 
         self.dfall = df.copy()

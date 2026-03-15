@@ -69,7 +69,7 @@ class CEMSReader(PointReader):
 
             # Discovery logic
             files = []
-            for dt in dates.floor("MS").unique():
+            for dt in dates.to_period("M").to_timestamp().unique():
                 for st in states:
                     files.append(build_url(dt, st))
 

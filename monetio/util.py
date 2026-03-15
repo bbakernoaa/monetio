@@ -5,6 +5,62 @@ import numpy as np
 import xarray as xr
 
 
+def normalize_pandas_freq(freq: str) -> str:
+    """
+    Normalize pandas frequency codes for compatibility with pandas 3.0+.
+
+    'h' instead of 'H' (mandatory in 3.0)
+    'D' instead of 'd' (recommended in 3.0)
+    'ME' instead of 'M' or 'm'
+    'QE' instead of 'Q' or 'q'
+    'YE' instead of 'A' or 'a' or 'ye' or 'Y' or 'y'
+
+    Parameters
+    ----------
+    freq : str
+        Input frequency code.
+
+    Returns
+    -------
+    str
+        Normalized frequency code.
+    """
+    if not freq or not isinstance(freq, str):
+        return freq
+
+    # Extract numeric part and alias part
+    import re
+
+    match = re.match(r"(\d*)(.*)", freq)
+    num, alias = match.groups()
+
+    mapping = {
+        "h": "h",
+        "H": "h",
+        "d": "D",
+        "D": "D",
+        "m": "ME",
+        "M": "ME",
+        "me": "ME",
+        "ME": "ME",
+        "q": "QE",
+        "Q": "QE",
+        "qe": "QE",
+        "QE": "QE",
+        "a": "YE",
+        "A": "YE",
+        "y": "YE",
+        "Y": "YE",
+        "ye": "YE",
+        "YE": "YE",
+    }
+
+    if alias in mapping:
+        return f"{num}{mapping[alias]}"
+
+    return freq
+
+
 def nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
 
@@ -58,16 +114,14 @@ def _force_forder(x):
 
 
 def kolmogorov_zurbenko_filter(df, window, iterations):
-    import pandas as pd
-
     """KZ filter implementation
-        series is a pandas series
-        window is the filter window m in the units of the data (m = 2q+1)
-        iterations is the number of times the moving average is evaluated
-        """
+    series is a pandas series
+    window is the filter window m in the units of the data (m = 2q+1)
+    iterations is the number of times the moving average is evaluated
+    """
     z = df.copy()
     for i in range(iterations):
-        z = pd.rolling_mean(z, window=window, min_periods=1, center=True)
+        z = z.rolling(window=window, min_periods=1, center=True).mean()
     return z
 
 
@@ -144,7 +198,10 @@ def calc_8hr_rolling_max(df, col=None, window=None):
         .dropna()
     )
     df_rolling_max = (
-        df_rolling.groupby("siteid").resample("D", on="time_local").max().reset_index(drop=True)
+        df_rolling.groupby("siteid")
+        .resample(normalize_pandas_freq("d"), on="time_local")
+        .max()
+        .reset_index(drop=True)
     )
     df = df.reset_index(drop=True)
     return df.merge(df_rolling_max, on=["siteid", "time_local"])
@@ -152,21 +209,27 @@ def calc_8hr_rolling_max(df, col=None, window=None):
 
 def calc_24hr_ave(df, col=None):
     df.index = df.time_local
-    df_24hr_ave = df.groupby("siteid")[col].resample("D").mean().reset_index()
+    df_24hr_ave = (
+        df.groupby("siteid")[col].resample(normalize_pandas_freq("D")).mean().reset_index()
+    )
     df = df.reset_index(drop=True)
     return df.merge(df_24hr_ave, on=["siteid", "time_local"])
 
 
 def calc_3hr_ave(df, col=None):
     df.index = df.time_local
-    df_3hr_ave = df.groupby("siteid")[col].resample("3H").mean().reset_index()
+    df_3hr_ave = (
+        df.groupby("siteid")[col].resample(normalize_pandas_freq("3h")).mean().reset_index()
+    )
     df = df.reset_index(drop=True)
     return df.merge(df_3hr_ave, on=["siteid", "time_local"])
 
 
 def calc_annual_ave(df, col=None):
     df.index = df.time_local
-    df_annual_ave = df.groupby("siteid")[col].resample("A").mean().reset_index()
+    df_annual_ave = (
+        df.groupby("siteid")[col].resample(normalize_pandas_freq("YE")).mean().reset_index()
+    )
     df = df.reset_index(drop=True)
     return df.merge(df_annual_ave, on=["siteid", "time_local"])
 

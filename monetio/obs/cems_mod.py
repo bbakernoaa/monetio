@@ -512,7 +512,7 @@ class CEMS:
         # create column with datetime information
         # from column with month-day-year and column with hour.
         dftime = dftemp.apply(
-            lambda x: pd.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt),
+            lambda x: datetime.datetime.strptime("{} {}".format(x["date"], x["hour"]), dfmt),
             axis=1,
         )
         dftemp = pd.concat([dftime, dftemp], axis=1)
@@ -531,7 +531,7 @@ class CEMS:
             if verbose:
                 print("Initializing pandas dataframe. Loading " + efile)
         else:
-            self.df = self.df.append(dftemp)
+            self.df = pd.concat([self.df, dftemp], ignore_index=True)
             if verbose:
                 print("Appending to pandas dataframe. Loading " + efile)
         # if verbose: print(dftemp[0:10])

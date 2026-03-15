@@ -11,6 +11,7 @@ import xarray as xr
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
+from ..util import normalize_pandas_freq
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
@@ -490,9 +491,13 @@ class ISHReader(PointReader):
                         metadata[c] = val
 
                 try:
-                    ds = ds.sortby("time").resample(time=window).mean(numeric_only=True)
+                    ds = (
+                        ds.sortby("time")
+                        .resample(time=normalize_pandas_freq(window))
+                        .mean(numeric_only=True)
+                    )
                 except Exception:
-                    ds = ds.sortby("time").resample(time=window).mean()
+                    ds = ds.sortby("time").resample(time=normalize_pandas_freq(window)).mean()
 
                 # Restore metadata
                 for c in metadata.data_vars:
@@ -531,7 +536,7 @@ class ISHReader(PointReader):
                     df = (
                         df.set_index("time")
                         .groupby("siteid")
-                        .resample(window)
+                        .resample(normalize_pandas_freq(window))
                         .mean(numeric_only=True)
                         .reset_index()
                     )

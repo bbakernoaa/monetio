@@ -289,7 +289,7 @@ def add_data(
     sites=None,
     entity=None,
     sensor_type=None,
-    query_time_split="1H",
+    query_time_split="1h",
     wide_fmt=False,  # FIXME: probably want to default to True
     **kwargs,
 ):
