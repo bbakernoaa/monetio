@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 import pandas as pd
 import xarray as xr
 
-from ..util import force_object_strings
+from ..util import force_object_strings, normalize_pandas_freq
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
@@ -207,7 +207,7 @@ class AERONETReader(PointReader):
                 df = (
                     df.set_index("time")
                     .groupby("siteid")
-                    .resample(freq, include_groups=False)
+                    .resample(normalize_pandas_freq(freq), include_groups=False)
                     .mean(numeric_only=True)
                     .reset_index()
                 )
@@ -411,7 +411,9 @@ def build_urls(
                 time_list = [pd.to_datetime(t, unit="s", utc=True) for t in t_list]
         else:
             # Generate daily URLs
-            time_bounds = pd.date_range(start=min_date.floor("D"), end=max_date.ceil("D"), freq="D")
+            time_bounds = pd.date_range(
+                start=min_date.floor("D"), end=max_date.ceil("D"), freq="D"
+            )
 
             # Clip bounds to the actual requested range
             time_list = time_bounds.tolist()
@@ -899,7 +901,7 @@ class AERONET:
             from datetime import datetime
 
             now = datetime.utcnow()
-            self.dates = pd.date_range(start=now.date(), end=now, freq="H")
+            self.dates = pd.date_range(start=now.date(), end=now, freq="h")
         else:
             self.dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
 
@@ -929,7 +931,7 @@ class AERONET:
                 self.df.reset_index()
                 .set_index("time")
                 .groupby("siteid")
-                .resample(freq)
+                .resample(normalize_pandas_freq(freq))
                 .mean(numeric_only=True)
                 .reset_index()
             )
@@ -980,7 +982,7 @@ class AERONET:
 
     def set_daterange(self, begin="", end=""):
         """Set daterange."""
-        dates = pd.date_range(start=begin, end=end, freq="H")
+        dates = pd.date_range(start=begin, end=end, freq="h")
         self.dates = dates
 
     @staticmethod

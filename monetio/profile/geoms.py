@@ -260,4 +260,4 @@ def _dti_from_mjd2000(x):
     assert x.VAR_UNITS == "MJD2K" or x.VAR_UNITS == "MJD2000"
     # 2400000.5 -- offset for MJD
     # 51544 -- offset between MJD2000 and MJD
-    return pd.to_datetime(np.asarray(x) + 2400000.5 + 51544, unit="D", origin="julian")
+    return pd.to_datetime(np.asarray(x) + 2400000.5 + 51544, unit="d", origin="julian")

@@ -1,3 +1,6 @@
+from ..util import normalize_pandas_freq
+
+
 def convert_epa_unit(df, obscolumn="SO2", unit="UG/M3"):
     """
     converts ppb to ug/m3 for SO2 in aqs and airnow datasets
@@ -218,7 +221,7 @@ def regulatory_resample(df, col="model", pollutant_standard=None):
         dfn = df.drop_duplicates(subset=["siteid"])
         df = (
             df.groupby("siteid")[col]
-            .resample("D")
+            .resample(normalize_pandas_freq("D"))
             .mean()
             .reset_index()
             .rename(columns={"level_1": "time_local"})
@@ -237,14 +240,14 @@ def calc_daily_max(df, param=None, rolling_frequency=8):
     temp.index = temp.time_local
     if rolling_frequency > 1:
         g = (
-            temp.groupby("siteid")["model", "gmt_offset"]
+            temp.groupby("siteid")[["model", "gmt_offset"]]
             .rolling(rolling_frequency, center=True, win_type="boxcar")
             .mean()
         )
         q = g.reset_index(level=0)
         k = (
             q.groupby("siteid")
-            .resample("D")
+            .resample(normalize_pandas_freq("D"))
             .max()
             .reset_index(level=1)
             .reset_index(drop="siteid")
@@ -252,15 +255,14 @@ def calc_daily_max(df, param=None, rolling_frequency=8):
         )
     else:
         k = (
-            temp.groupby("siteid")["model", "gmt_offset"]
-            .resample("D")
+            temp.groupby("siteid")[["model", "gmt_offset"]]
+            .resample(normalize_pandas_freq("D"))
             .max()
             .reset_index()
             .rename({"level_1": "time_local"})
         )
-    columnstomerge = temp.columns[~temp.columns.isin(k.columns) & (temp.columns != "time")].append(
-        Index(["siteid"])
-    )
+    columnstomerge = temp.columns[~temp.columns.isin(k.columns) & (temp.columns != "time")].tolist()
+    columnstomerge.append("siteid")
     if param is None:
         dff = k.merge(df[columnstomerge], on="siteid", how="left").drop_duplicates(
             subset=["siteid", "time_local"]

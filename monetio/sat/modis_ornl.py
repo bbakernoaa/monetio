@@ -378,7 +378,7 @@ def _get_single_retrieval(
             lat=lat,
             lon=lon,
             startDate=int(dates.strftime("%Y%j")),
-            endDate=int((dates + pd.Timedelta(1, units="D")).strftime("%Y%j")),
+            endDate=int((dates + pd.Timedelta(1, unit="d")).strftime("%Y%j")),
             kmAboveBelow=kmAboveBelow,
             kmLeftRight=kmLeftRight,
         )
