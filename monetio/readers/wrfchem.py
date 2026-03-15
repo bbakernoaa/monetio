@@ -1,7 +1,7 @@
 """WRF-Chem Reader"""
 
 from functools import partial
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import xarray as xr
@@ -26,7 +26,7 @@ class WRFChemReader(GriddedReader):
         var_list: Optional[List[str]] = None,
         surf_only: bool = False,
         surf_only_nc: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> xr.Dataset:
         """
         Reads WRF-Chem netCDF files.
@@ -39,18 +39,18 @@ class WRFChemReader(GriddedReader):
             Convert gas species from ppmV to ppbV, by default True.
         mech : str, optional
             Mechanism for calculating sums, by default "racm_esrl_vcp".
-        var_list : List[str], optional
+        var_list : list of str, optional
             List of variables to include, by default None.
         surf_only : bool, optional
             Whether to only keep surface data, by default False.
         surf_only_nc : bool, optional
             Whether input data already contains only surface data, by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the driver.
 
         Returns
         -------
-        xr.Dataset
+        xarray.Dataset
             The processed WRF-Chem dataset.
         """
         if "preprocess" not in kwargs:
@@ -92,13 +92,13 @@ def wrfchem_preprocess(
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input WRF-Chem dataset.
     convert_to_ppb : bool, optional
         Whether to convert gas species to ppbV, by default True.
     mech : str, optional
         Mechanism for diagnostics, by default "racm_esrl_vcp".
-    var_list : List[str], optional
+    var_list : list of str, optional
         List of variables to keep, by default None.
     surf_only : bool, optional
         Keep only surface layer, by default False.
@@ -107,7 +107,7 @@ def wrfchem_preprocess(
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         The preprocessed dataset.
     """
     # 1. Coordinate and Dimension Renaming
@@ -185,7 +185,7 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
     name : str
         Name of the diagnostic variable.
@@ -194,14 +194,17 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with diagnostic added if possible.
     """
-    # Check if name already exists as a data variable (pre-calculated in WRF)
-    # Some modules output PM2_5_DRY or similar.
+    # 1. Check if name already exists as a data variable
+    if name in ds.data_vars:
+        return ds
+
+    # 2. Check for pre-calculated WRF-Chem aliases (e.g. PM2_5_DRY)
     wrf_aliases = {
-        "PM25": ["PM2_5_DRY", "PM25_TOT"],
-        "PM10": ["PM10_DRY", "PM10_TOT"],
+        "PM25": ["PM2_5_DRY", "PM25_TOT", "PM2_5"],
+        "PM10": ["PM10_DRY", "PM10_TOT", "PM10"],
     }
 
     aliases = wrf_aliases.get(name, [])
@@ -211,8 +214,11 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
             ds[name].attrs.update(
                 {"units": spec.units, "name": spec.name, "long_name": spec.long_name}
             )
+            # Update history
+            ds = update_history(ds, f"Added lazy diagnostic: {name} (using alias {alias}).")
             return ds
 
+    # 3. Identify constituent variables available in the dataset
     available_vars = [v for v in spec.variables if v in ds.data_vars]
     if not available_vars:
         return ds
@@ -224,21 +230,36 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
     else:
         weights = [1.0] * len(available_vars)
 
-    # Compute lazy sum
+    # 4. Compute lazy sum with unit synchronization
     with xr.set_options(keep_attrs=True):
-        new_var = ds[available_vars[0]] * weights[0]
+        # Use first variable as base
+        v0 = available_vars[0]
+        new_var = ds[v0] * weights[0]
+        base_units = ds[v0].attrs.get("units", "").lower()
+
         for i in range(1, len(available_vars)):
-            new_var = new_var + ds[available_vars[i]] * weights[i]
+            v = available_vars[i]
+            v_var = ds[v]
+            v_units = v_var.attrs.get("units", "").lower()
+
+            # Unit synchronization (e.g. ppmV vs ppbV)
+            if v_units != base_units:
+                if "ppm" in v_units and "ppb" in base_units:
+                    v_var = v_var * 1000.0
+                elif "ppb" in v_units and "ppm" in base_units:
+                    v_var = v_var / 1000.0
+
+            new_var = new_var + v_var * weights[i]
 
     # Inherit units from constituent variables if available, otherwise use spec
-    units = ds[available_vars[0]].attrs.get("units", spec.units)
+    units = ds[v0].attrs.get("units", spec.units)
 
     ds[name] = new_var.assign_attrs(
         {"units": units, "name": spec.name, "long_name": spec.long_name}
     )
 
     # Update history
-    ds = update_history(ds, f"Added lazy diagnostic: {name}")
+    ds = update_history(ds, f"Added lazy diagnostic: {name} (sum of {', '.join(available_vars)}).")
 
     return ds
 
@@ -249,12 +270,12 @@ def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset with 'Times' variable.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with 'time' coordinate.
     """
     times_var = ds.Times
@@ -302,25 +323,27 @@ def _convert_to_ppb(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with converted units.
     """
-    converted = False
-    for i in ds.data_vars:
-        if "units" in ds[i].attrs:
-            units = ds[i].attrs["units"].lower()
-            if "ppmv" in units:
-                ds[i] = ds[i] * 1000.0
-                ds[i].attrs["units"] = "ppbV"
-                converted = True
+    to_convert = [
+        v for v in ds.data_vars if "units" in ds[v].attrs and "ppmv" in ds[v].attrs["units"].lower()
+    ]
 
-    if converted:
-        ds = update_history(ds, "Converted ppmV to ppbV.")
+    if not to_convert:
+        return ds
+
+    for v in to_convert:
+        ds[v] = ds[v] * 1000.0
+        ds[v].attrs["units"] = "ppbV"
+
+    # Update history
+    ds = update_history(ds, f"Converted {', '.join(to_convert)} from ppmV to ppbV.")
 
     return ds
 
@@ -331,41 +354,48 @@ def _convert_ugkg_to_ugm3(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Dataset with converted units if ALT or P/PB/T are available.
     """
-    converted = False
+    to_convert = [
+        v
+        for v in ds.data_vars
+        if "units" in ds[v].attrs and "ug/kg" in ds[v].attrs["units"].lower()
+    ]
+
+    if not to_convert:
+        return ds
+
+    method = None
     if "ALT" in ds.variables:
-        for i in ds.data_vars:
-            if "units" in ds[i].attrs:
-                units = ds[i].attrs["units"].lower()
-                if "ug/kg" in units:
-                    ds[i] = ds[i] / ds["ALT"]
-                    ds[i].attrs["units"] = r"$\mu g m^{-3}$"
-                    converted = True
-    elif "P" in ds.variables and "PB" in ds.variables and "T" in ds.variables:
+        # Use inverse density (specific volume)
+        for v in to_convert:
+            ds[v] = ds[v] / ds["ALT"]
+            ds[v].attrs["units"] = r"$\mu g m^{-3}$"
+        method = "using ALT (specific volume)"
+    elif all(k in ds.variables for k in ["P", "PB", "T"]):
         # Standard WRF-Chem density calculation
         # P_tot is total pressure (perturbation + base)
         # T_actual is temperature in K
         R = 287.05
         P_tot = ds["P"] + ds["PB"]
+        # Potential temperature to actual temperature conversion
         T_actual = (ds["T"] + 300.0) * (P_tot / 100000.0) ** (287.05 / 1004.5)
         rho = P_tot / (R * T_actual)
 
-        for i in ds.data_vars:
-            if "units" in ds[i].attrs:
-                units = ds[i].attrs["units"].lower()
-                if "ug/kg" in units:
-                    ds[i] = ds[i] * rho
-                    ds[i].attrs["units"] = r"$\mu g m^{-3}$"
-                    converted = True
+        for v in to_convert:
+            ds[v] = ds[v] * rho
+            ds[v].attrs["units"] = r"$\mu g m^{-3}$"
+        method = "using air density calculated from P, PB, T"
 
-    if converted:
-        ds = update_history(ds, r"Converted $\mu g/kg$ to $\mu g/m^3$ using air density.")
+    if method:
+        ds = update_history(
+            ds, rf"Converted {', '.join(to_convert)} from $\mu g/kg$ to $\mu g/m^3$ {method}."
+        )
 
     return ds

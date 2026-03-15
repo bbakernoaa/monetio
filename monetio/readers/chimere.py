@@ -1,7 +1,7 @@
 """Chimere Reader"""
 
 from functools import partial
-from typing import List, Union
+from typing import Any, List, Union
 
 import xarray as xr
 
@@ -18,9 +18,9 @@ class ChimereReader(GriddedReader):
     def open_dataset(
         self,
         files: Union[str, List[str]],
-        var_list: List[str] = None,
+        var_list: list[str] = None,
         surf_only: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> xr.Dataset:
         """
         Reads Chimere netCDF files.
@@ -29,16 +29,16 @@ class ChimereReader(GriddedReader):
         ----------
         files : Union[str, List[str]]
             File path, list of paths, or glob pattern.
-        var_list : List[str], optional
+        var_list : list of str, optional
             List of variable names meant to be kept for the analysis, by default None.
         surf_only : bool, optional
             Whether to only keep surface data (layer 0), by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the driver.
 
         Returns
         -------
-        xr.Dataset
+        xarray.Dataset
             The processed Chimere dataset.
         """
         if "preprocess" not in kwargs:
@@ -71,16 +71,16 @@ def chimere_preprocess(
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input Chimere dataset.
-    var_list : List[str], optional
+    var_list : list of str, optional
         List of variables to keep, by default None.
     surf_only : bool, optional
         Whether to keep only surface data, by default False.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         Processed dataset.
     """
     if var_list is not None:
@@ -96,14 +96,30 @@ def chimere_preprocess(
     # Only rename if they exist
     rename_dict = {k: v for k, v in rename_dict.items() if k in ds.variables or k in ds.dims}
 
-    ds = ds.rename(rename_dict)
+    if rename_dict:
+        ds = ds.rename(rename_dict)
+        # Update history
+        ds = update_history(ds, f"Renamed coordinates/dimensions: {rename_dict}.")
 
     if surf_only and "z" in ds.dims:
-        ds = ds.isel(z=0).expand_dims("z", axis=1)
+        ds = ds.isel(z=[0])
+        # Update history
+        ds = update_history(ds, "Subsetted to surface layer (z=0).")
 
     ds = ds.reset_coords()
     coords = [c for c in ["latitude", "longitude", "time"] if c in ds.variables]
     ds = ds.set_coords(coords)
+
+    # Ensure lat/lon have standard attributes
+    if "latitude" in ds.coords:
+        ds["latitude"].attrs.update({"units": "degrees_north", "standard_name": "latitude"})
+    if "longitude" in ds.coords:
+        ds["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
+
+    # Transpose to standard order if dims exist
+    dims = [d for d in ["time", "z", "y", "x"] if d in ds.dims]
+    if dims:
+        ds = ds.transpose(*dims)
 
     # Scientific Hygiene: Strip whitespace from all string attributes
     for var in ds.variables:
