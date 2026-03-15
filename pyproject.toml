@@ -90,6 +90,9 @@ package-data = {"monetio" = ["data/*.csv", "data/*.tsv", "data/*.txt", "data/*.p
 
 
 [tool.pytest.ini_options]
+markers = [
+    "network: tests that require network access",
+]
 filterwarnings = [
     "ignore:The distutils package is deprecated:DeprecationWarning:joblib.backports",
     "ignore:The error_bad_lines argument has been deprecated:FutureWarning::",

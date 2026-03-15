@@ -51,6 +51,14 @@ def test_pams_eager_lazy(tmp_path):
         ds_lazy.compute().drop_vars("history", errors="ignore"),
     )
 
+    # Check history
+    assert "history" in ds_eager.attrs
+    assert "Read PAMS data." in ds_eager.attrs["history"]
+
+    # Check column renaming and units
+    assert "obs" in ds_eager.data_vars
+    assert ds_eager.obs.attrs["units"] == "ppb"
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
