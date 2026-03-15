@@ -65,7 +65,7 @@ def test_modis_l2_preprocess_eager_lazy():
     assert "latitude" in res_eager.coords
     assert "longitude" in res_eager.coords
     assert "time" in res_eager.coords
-    assert res_eager.dims == {"y": 10, "x": 5}
+    assert res_eager.sizes == {"y": 10, "x": 5}
 
     # Verify transformations
     # Masked by minimum (0.1) or maximum (0.8) or quality flag (>= 3)
