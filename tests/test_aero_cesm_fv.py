@@ -1,17 +1,15 @@
-import shutil
 import warnings
 from pathlib import Path
 
-import numpy as np
 import pytest
 import xarray as xr
-from filelock import FileLock
 
-from monetio.models._cesm_fv_mm import _calc_pressure, _calc_pressure_i, open_mfdataset
+from monetio.models._cesm_fv_mm import _calc_pressure, open_mfdataset
 
 HERE = Path(__file__).parent
 
 cesm_xdist = pytest.mark.xdist_group(name="retrieve-files")
+
 
 def retrieve_test_file(updated=True):
     if updated:
@@ -23,12 +21,13 @@ def retrieve_test_file(updated=True):
     if not p.is_file():
         warnings.warn(f"Downloading test file {fn} for CESM-FV test")
         import requests
+
         try:
             r = requests.get(
                 "https://csl.noaa.gov/groups/csl4/modeldata/melodies-monet/data/"
                 + f"example_model_data/cesmfv_example/{fn}",
                 stream=True,
-                timeout=30
+                timeout=30,
             )
             r.raise_for_status()
             with open(p, "wb") as f:
@@ -38,13 +37,16 @@ def retrieve_test_file(updated=True):
 
     return p
 
+
 @pytest.fixture(scope="module")
 def test_file_path(tmp_path_factory, worker_id):
     p = retrieve_test_file(updated=True)
     return p
 
+
 def _check_dimensions(ds):
     assert set(ds.dims) >= {"time", "x", "y"}
+
 
 def _check_latitude_and_longitude(ds):
     assert "lat" not in ds.variables
@@ -54,6 +56,7 @@ def _check_latitude_and_longitude(ds):
     # Check for 2D coords (xarray standard in monetio)
     assert ds.latitude.ndim == 2
     assert ds.longitude.ndim == 2
+
 
 @cesm_xdist
 @pytest.mark.network
@@ -67,6 +70,7 @@ def test_open_mfdataset(test_file_path):
     if "NO2" in ds.variables:
         assert ds["NO2"].attrs["units"] == "ppbv"
 
+
 @cesm_xdist
 @pytest.mark.network
 def test_open_mfdataset_surf_only_false(test_file_path):
@@ -77,6 +81,7 @@ def test_open_mfdataset_surf_only_false(test_file_path):
     _check_latitude_and_longitude(ds)
     assert "pres_pa_mid" in ds.variables
     assert ds["pres_pa_mid"].attrs["units"] == "Pa"
+
 
 @cesm_xdist
 @pytest.mark.network
