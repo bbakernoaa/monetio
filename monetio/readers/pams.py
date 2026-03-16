@@ -81,6 +81,8 @@ class PAMSReader(PointReader):
             if not unit_map:
                 # Eagerly peek at the first file to recover mapping if missing
                 try:
+                    from .drivers import FileUtility
+
                     file_list = FileUtility.expand_paths(files)
                     if file_list:
                         meta_df = read_pams(file_list[0])
