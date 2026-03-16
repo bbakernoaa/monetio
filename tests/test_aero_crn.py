@@ -1,16 +1,22 @@
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-from unittest.mock import patch, MagicMock
+
 from monetio.readers.crn import CRNReader, read_crn
+
 
 def test_parse_yyyymmdd_hhmm_logic():
     from monetio.readers.time_utils import parse_yyyymmdd_hhmm
+
     yyyymmdd = np.array([20230101, 20231231])
     hhmm = np.array([0, 2359])
     res = parse_yyyymmdd_hhmm(yyyymmdd, hhmm)
-    expected = pd.to_datetime(["2023-01-01 00:00:00", "2023-12-31 23:59:00"]).values.astype("datetime64[ns]")
+    expected = pd.to_datetime(["2023-01-01 00:00:00", "2023-12-31 23:59:00"]).values.astype(
+        "datetime64[ns]"
+    )
     np.testing.assert_array_equal(res, expected)
 
     hhmmss = np.array([100, 123045])
@@ -18,8 +24,11 @@ def test_parse_yyyymmdd_hhmm_logic():
     # 100 is treated as HHMM if max is < 10000, but here 123045 makes it HHMMSS
     # 000100 -> 00:01:00
     # 123045 -> 12:30:45
-    expected2 = pd.to_datetime(["2023-01-01 00:01:00", "2023-12-31 12:30:45"]).values.astype("datetime64[ns]")
+    expected2 = pd.to_datetime(["2023-01-01 00:01:00", "2023-12-31 12:30:45"]).values.astype(
+        "datetime64[ns]"
+    )
     np.testing.assert_array_equal(res2, expected2)
+
 
 @pytest.fixture
 def mock_crn_file(tmp_path):
@@ -33,6 +42,7 @@ def mock_crn_file(tmp_path):
     f.write_text(content)
     return str(f)
 
+
 def test_read_crn(mock_crn_file):
     df = read_crn(mock_crn_file)
     assert len(df) == 2
@@ -41,19 +51,22 @@ def test_read_crn(mock_crn_file):
     assert df["time"].iloc[0] == pd.Timestamp("2023-01-01 00:00:00")
     assert df["time_local"].iloc[0] == pd.Timestamp("2022-12-31 19:00:00")
 
+
 @patch("monetio.readers.crn.CRNReader.get_monitor_df")
 def test_crn_reader_eager(mock_get_monitor, mock_crn_file):
     # Mock monitor DF
-    monitor_df = pd.DataFrame({
-        "WBAN": ["64758"],
-        "STATE": ["MD"],
-        "LOCATION": ["Test Site"],
-        "VECTOR": ["Test Vector"],
-        "LATITUDE": [39.0],
-        "LONGITUDE": [-76.5],
-        "NETWORK": ["USCRN"],
-        "GMT_OFFSET": [-5.0]
-    })
+    monitor_df = pd.DataFrame(
+        {
+            "WBAN": ["64758"],
+            "STATE": ["MD"],
+            "LOCATION": ["Test Site"],
+            "VECTOR": ["Test Vector"],
+            "LATITUDE": [39.0],
+            "LONGITUDE": [-76.5],
+            "NETWORK": ["USCRN"],
+            "GMT_OFFSET": [-5.0],
+        }
+    )
     mock_get_monitor.return_value = monitor_df
 
     reader = CRNReader()
@@ -67,20 +80,23 @@ def test_crn_reader_eager(mock_get_monitor, mock_crn_file):
     # Check if history is updated
     assert "Merged with CRN station metadata" in ds.attrs["history"]
 
+
 @patch("monetio.readers.crn.CRNReader.get_monitor_df")
 def test_crn_reader_lazy(mock_get_monitor, mock_crn_file):
     pytest.importorskip("dask")
     # Mock monitor DF
-    monitor_df = pd.DataFrame({
-        "WBAN": ["64758"],
-        "STATE": ["MD"],
-        "LOCATION": ["Test Site"],
-        "VECTOR": ["Test Vector"],
-        "LATITUDE": [39.0],
-        "LONGITUDE": [-76.5],
-        "NETWORK": ["USCRN"],
-        "GMT_OFFSET": [-5.0]
-    })
+    monitor_df = pd.DataFrame(
+        {
+            "WBAN": ["64758"],
+            "STATE": ["MD"],
+            "LOCATION": ["Test Site"],
+            "VECTOR": ["Test Vector"],
+            "LATITUDE": [39.0],
+            "LONGITUDE": [-76.5],
+            "NETWORK": ["USCRN"],
+            "GMT_OFFSET": [-5.0],
+        }
+    )
     mock_get_monitor.return_value = monitor_df
 
     reader = CRNReader()
@@ -94,18 +110,21 @@ def test_crn_reader_lazy(mock_get_monitor, mock_crn_file):
     ds_eager = reader.open_dataset(files=mock_crn_file, as_xarray=True, lazy=False)
     xr.testing.assert_allclose(ds.compute(), ds_eager)
 
+
 def test_crn_build_urls_optimization():
     reader = CRNReader()
     dates = pd.to_datetime(["2023-01-01"])
 
     # Mock monitors
-    monitor_df = pd.DataFrame({
-        "STATE": ["MD"],
-        "LOCATION": ["Test Site"],
-        "VECTOR": ["Test"],
-        "LATITUDE": [39.0],
-        "LONGITUDE": [-76.5]
-    })
+    monitor_df = pd.DataFrame(
+        {
+            "STATE": ["MD"],
+            "LOCATION": ["Test Site"],
+            "VECTOR": ["Test"],
+            "LATITUDE": [39.0],
+            "LONGITUDE": [-76.5],
+        }
+    )
 
     with patch("monetio.readers.crn.CRNReader.get_monitor_df", return_value=monitor_df):
         with patch("monetio.readers.crn.FileUtility.get_fs") as mock_get_fs:
@@ -113,7 +132,9 @@ def test_crn_build_urls_optimization():
             mock_get_fs.return_value = mock_fs
 
             # Mock ls to return our expected file
-            mock_fs.ls.return_value = ["https://www1.ncdc.noaa.gov/pub/data/uscrn/products/hourly02/2023/CRNH0203-2023-MD_Test_Site_Test.txt"]
+            mock_fs.ls.return_value = [
+                "https://www1.ncdc.noaa.gov/pub/data/uscrn/products/hourly02/2023/CRNH0203-2023-MD_Test_Site_Test.txt"
+            ]
 
             urls, fnames = reader.build_urls(dates)
 
@@ -124,18 +145,21 @@ def test_crn_build_urls_optimization():
             # Ensure exists was NOT called if ls worked
             assert mock_fs.exists.call_count == 0
 
+
 def test_crn_build_urls_fallback():
     reader = CRNReader()
     dates = pd.to_datetime(["2023-01-01"])
 
     # Mock monitors
-    monitor_df = pd.DataFrame({
-        "STATE": ["MD"],
-        "LOCATION": ["Test Site"],
-        "VECTOR": ["Test"],
-        "LATITUDE": [39.0],
-        "LONGITUDE": [-76.5]
-    })
+    monitor_df = pd.DataFrame(
+        {
+            "STATE": ["MD"],
+            "LOCATION": ["Test Site"],
+            "VECTOR": ["Test"],
+            "LATITUDE": [39.0],
+            "LONGITUDE": [-76.5],
+        }
+    )
 
     with patch("monetio.readers.crn.CRNReader.get_monitor_df", return_value=monitor_df):
         with patch("monetio.readers.crn.FileUtility.get_fs") as mock_get_fs:
