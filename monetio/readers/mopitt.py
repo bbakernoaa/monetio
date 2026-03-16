@@ -10,6 +10,8 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+MOPITT_MISSING = -9999.0
+
 
 @register_reader("mopitt")
 class MOPITTReader(GriddedReader):
@@ -53,26 +55,54 @@ class MOPITTReader(GriddedReader):
 
 def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """
-    Preprocess MOPITT dataset: standardize coordinates and handle metadata.
-    """
-    # MOPITT L3 HDF5 structure: /HDFEOS/GRIDS/MOP03/Data Fields/
-    # If opened with group selection or root
+    Preprocess MOPITT dataset: standardize coordinates, handle time, and
+    calculate auxiliary variables (pressure, a priori profiles).
 
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset from MOPITT L3 file.
+
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset with standard names and derived variables.
+    """
+    # 1. Expand Mapping
+    # MOPITT L3 HDF5 structure: /HDFEOS/GRIDS/MOP03/Data Fields/
     mapping = {
         "HDFEOS/GRIDS/MOP03/Data Fields/Latitude": "latitude",
         "HDFEOS/GRIDS/MOP03/Data Fields/Longitude": "longitude",
+        "HDFEOS/GRIDS/MOP03/Data Fields/Pressure": "pressure_levels",
+        "HDFEOS/GRIDS/MOP03/Data Fields/Pressure2": "pressure_levels_ak",
         "HDFEOS/GRIDS/MOP03/Data Fields/RetrievedCOTotalColumnDay": "co_column",
-        # etc.
+        "HDFEOS/GRIDS/MOP03/Data Fields/APrioriCOTotalColumnDay": "apriori_co_column",
+        "HDFEOS/GRIDS/MOP03/Data Fields/APrioriCOSurfaceMixingRatioDay": "apriori_co_surf",
+        "HDFEOS/GRIDS/MOP03/Data Fields/SurfacePressureDay": "surface_pressure",
+        "HDFEOS/GRIDS/MOP03/Data Fields/TotalColumnAveragingKernelDay": "co_ak_column",
+        "HDFEOS/GRIDS/MOP03/Data Fields/APrioriCOMixingRatioProfileDay": "apriori_co_profile",
+        # Night versions
+        "HDFEOS/GRIDS/MOP03/Data Fields/RetrievedCOTotalColumnNight": "co_column_night",
+        "HDFEOS/GRIDS/MOP03/Data Fields/APrioriCOTotalColumnNight": "apriori_co_column_night",
+        "HDFEOS/GRIDS/MOP03/Data Fields/APrioriCOSurfaceMixingRatioNight": "apriori_co_surf_night",
+        "HDFEOS/GRIDS/MOP03/Data Fields/SurfacePressureNight": "surface_pressure_night",
+        "HDFEOS/GRIDS/MOP03/Data Fields/TotalColumnAveragingKernelNight": "co_ak_column_night",
+        "HDFEOS/GRIDS/MOP03/Data Fields/APrioriCOMixingRatioProfileNight": "apriori_co_profile_night",
     }
 
     for old, new in mapping.items():
         if old in ds.variables:
             ds = ds.rename({old: new})
 
-    # Standardize
+    # Ensure pressure levels are coordinates
+    for p_var in ["pressure_levels", "pressure_levels_ak"]:
+        if p_var in ds.variables and p_var not in ds.coords:
+            ds = ds.set_coords(p_var)
+
+    # 2. Standardize
     ds = standardize_satellite_coords(ds)
 
-    # Handle time from attributes if missing
+    # 3. Handle time from attributes if missing
     if "time" not in ds.coords:
         # Check for StartTime in attributes
         start_time = ds.attrs.get("StartTime")
@@ -81,7 +111,88 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
                 start_time = start_time[0]
             # MOPITT uses seconds since 1993-01-01
             dt = datetime.datetime(1993, 1, 1) + datetime.timedelta(seconds=float(start_time))
-            ds["time"] = [pd.to_datetime(dt)]
-            ds = ds.expand_dims("time")
+            time_val = pd.to_datetime(dt)
+            if "time" not in ds.dims:
+                ds = ds.expand_dims("time")
+            ds = ds.assign_coords(time=("time", [time_val]))
+
+    # 4. Handle Missing Values
+    for var in ds.data_vars:
+        ds[var] = ds[var].where(ds[var] != MOPITT_MISSING)
+
+    # 5. Calculate Pressure (Lazy)
+    if "co_ak_column" in ds.data_vars and "surface_pressure" in ds.data_vars:
+        ds = _add_mopitt_pressure(ds)
+
+    # 6. Combine A Priori (Lazy)
+    if (
+        "apriori_co_profile" in ds.data_vars
+        and "apriori_co_surf" in ds.data_vars
+        and "pressure_levels_ak" in ds.coords
+    ):
+        ds = _combine_mopitt_apriori(ds)
+
+    # Update history
+    ds = update_history(ds, "Preprocessed MOPITT L3 data via Aero Protocol.")
 
     return ds
+
+
+def _add_mopitt_pressure(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Calculate 3D pressure array lazily for MOPITT.
+    """
+    if "pressure_levels_ak" not in ds.coords:
+        return ds
+
+    # Ensure pressure levels are in ascending order (100 to 1000 hPa)
+    ds_sorted = ds.sortby("pressure_levels_ak", ascending=True)
+    alt = ds_sorted.coords["pressure_levels_ak"]
+    if "time" in alt.dims:
+        alt = alt.isel(time=0, drop=True)
+    z_dim = alt.dims[0]
+    ak_col = ds_sorted["co_ak_column"]
+    ps = ds_sorted["surface_pressure"]
+
+    _, p_3d = xr.broadcast(ak_col, alt)
+
+    # Replace the 1000 hPa level (now at alt.max()) with actual surface pressure
+    p_3d = xr.where(alt == alt.max(), ps, p_3d)
+
+    # Center Pressure calculation
+    # p_center[TOP] = 87.0 (at 100 hPa, which is alt.min())
+    # p_center[z] = p[z] - (p[z] - p[z-1])/2
+    # Shift towards surface (higher index in ascending alt) to get previous (lower pressure) level
+    # Actually if ascending, p[z] > p[z-1]. So p_prev is level above.
+    p_prev = p_3d.shift({z_dim: 1})
+    p_center = p_3d - (p_3d - p_prev) / 2.0
+    p_center = xr.where(alt == alt.min(), 87.0, p_center)
+
+    # Apply mask: keep layers above surface (where surface_pressure >= level_pressure)
+    p_center = p_center.where((alt == alt.min()) | (ps >= p_3d), np.nan)
+
+    ds_sorted["pressure"] = p_center.assign_attrs({"units": "hPa", "long_name": "Center Pressure"})
+
+    return update_history(ds_sorted, "Calculated 3D center pressure lazily.")
+
+
+def _combine_mopitt_apriori(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Combine surface and profile a priori values lazily.
+    """
+    prof = ds["apriori_co_profile"]
+    surf = ds["apriori_co_surf"]
+    alt = ds.coords["pressure_levels_ak"]
+    if "time" in alt.dims:
+        alt = alt.isel(time=0, drop=True)
+
+    # Combine: replace 1000 hPa level with surface values
+    combined = xr.where(alt == alt.max(), surf, prof)
+
+    # Masking based on pressure if available
+    if "pressure" in ds.variables:
+        combined = combined.where(~ds["pressure"].isnull())
+
+    ds["apriori_co_profile"] = combined.assign_attrs(prof.attrs)
+
+    return update_history(ds, "Combined surface and profile a priori values lazily.")

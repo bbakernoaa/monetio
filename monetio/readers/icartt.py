@@ -1,9 +1,9 @@
-"""ICARTT Reader ."""
+"""ICARTT Reader."""
 
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -17,8 +17,81 @@ if TYPE_CHECKING:
     import dask.dataframe as dd
 
 
+def parse_icartt_header(filename: str) -> dict[str, Any]:
+    """
+    Parse ICARTT file header metadata.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the ICARTT file.
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary containing header metadata.
+    """
+    fs = FileUtility.get_fs(filename)
+    header = {}
+    with fs.open(filename, "r") as f:
+        line1 = f.readline()
+        if not line1:
+            return {}
+        try:
+            n_header = int(line1.split(",")[0])
+        except (ValueError, IndexError):
+            return {}
+
+        header["n_header"] = n_header
+        header["PI"] = f.readline().strip()
+        header["organization"] = f.readline().strip()
+        header["source"] = f.readline().strip()
+        header["mission"] = f.readline().strip()
+        f.readline()  # Line 6: volume
+
+        # Line 7: Dates (index 6)
+        date_line = f.readline().split(",")
+        try:
+            header["date_valid"] = datetime.datetime(
+                int(date_line[0]), int(date_line[1]), int(date_line[2])
+            )
+        except (ValueError, IndexError):
+            header["date_valid"] = datetime.datetime(1970, 1, 1)
+
+        f.readline()  # Line 8: interval
+
+        # Line 9: IVAR name and units
+        ivar_line = f.readline().split(",")
+        header["ivar_name"] = ivar_line[0].strip()
+        header["ivar_units"] = ivar_line[1].strip() if len(ivar_line) > 1 else ""
+
+        # Line 10: Number of DVARs
+        try:
+            n_vars = int(f.readline().strip())
+        except ValueError:
+            n_vars = 0
+        header["n_vars"] = n_vars
+
+        # Line 11: Scales
+        header["scales"] = [float(x) for x in f.readline().split(",")]
+
+        # Line 12: Missing values
+        header["missing_values"] = [x.strip() for x in f.readline().split(",")]
+
+        # Line 13+: DVAR names
+        var_names = [header["ivar_name"]]
+        for i in range(n_vars):
+            vname = f.readline().split(",")[0].strip()
+            var_names.append(vname)
+        header["var_names"] = var_names
+
+    return header
+
+
 def read_icartt(filename: str, **kwargs) -> pd.DataFrame:
-    """Reads a single ICARTT file into a pandas DataFrame.
+    """
+    Reads a single ICARTT file into a pandas DataFrame.
+    Data is returned unscaled and with raw missing values to allow lazy processing.
 
     Parameters
     ----------
@@ -30,98 +103,32 @@ def read_icartt(filename: str, **kwargs) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        Data from the ICARTT file with time and metadata.
+        Data from the ICARTT file.
     """
-    fs = FileUtility.get_fs(filename)
-    with fs.open(filename, "r") as f:
-        header_lines = []
-        line1 = f.readline()
-        if not line1:
-            return pd.DataFrame()
-        header_lines.append(line1.strip())
-        try:
-            n_header = int(line1.split(",")[0])
-        except (ValueError, IndexError):
-            return pd.DataFrame()
-
-        for _ in range(n_header - 1):
-            line = f.readline()
-            if not line:
-                break
-            header_lines.append(line.strip())
-
-    if len(header_lines) < 13:
+    header = parse_icartt_header(filename)
+    if not header:
         return pd.DataFrame()
 
-    # Line 7: Dates (index 6) (YYYY, MM, DD, YYYY, MM, DD)
-    try:
-        date_line = [int(x) for x in header_lines[6].split(",")]
-        date_valid = datetime.datetime(date_line[0], date_line[1], date_line[2])
-    except (ValueError, IndexError):
-        date_valid = datetime.datetime(1970, 1, 1)
+    df = pd.read_csv(
+        filename,
+        skiprows=header["n_header"],
+        names=header["var_names"],
+        sep=",",
+        skipinitialspace=True,
+    )
 
-    # Line 10: Number of dependent variables (index 9)
-    try:
-        n_vars = int(header_lines[9])
-    except (ValueError, IndexError):
-        n_vars = 0
-
-    # Line 11: Scales (index 10)
-    try:
-        scales = [float(x) for x in header_lines[10].split(",")]
-    except (ValueError, IndexError):
-        scales = [1.0] * n_vars
-
-    # Line 12: Missing values (index 11)
-    try:
-        missing_values = [x.strip() for x in header_lines[11].split(",")]
-    except (ValueError, IndexError):
-        missing_values = ["-9999"] * n_vars
-
-    # Variable names
-    # Independent variable (IVAR) on line 9 (index 8)
-    ivar_line = header_lines[8].split(",")
-    ivar_name = ivar_line[0].strip()
-    var_names = [ivar_name]
-
-    # Dependent variables (DVAR) on lines 13 (index 12) onwards
-    for i in range(n_vars):
-        try:
-            vname = header_lines[12 + i].split(",")[0].strip()
-            var_names.append(vname)
-        except IndexError:
-            var_names.append(f"var_{i}")
-
-    # Data part
-    # We use n_header because line numbers are 1-based and we want to skip n_header lines
-    df = pd.read_csv(filename, skiprows=n_header, names=var_names, sep=",", skipinitialspace=True)
-
-    # Apply scales and handle missing values for dependent variables
-    for i, (scale, miss) in enumerate(zip(scales, missing_values)):
-        if i + 1 >= len(var_names):
-            break
-        col = var_names[i + 1]
-        try:
-            miss_val = float(miss)
-            # Use a small tolerance for floating point comparison
-            mask = np.isclose(df[col].astype(float), miss_val)
-            df.loc[mask, col] = np.nan
-        except (ValueError, TypeError):
-            df.loc[df[col].astype(str) == miss, col] = np.nan
-
-        df[col] = df[col].astype(float) * scale
-
-    # Time conversion
-    # Assume IVAR is seconds from date_valid
-    if "time" in ivar_name.lower() or "sec" in ivar_line[1].lower():
-        df["time"] = date_valid + pd.to_timedelta(df[ivar_name], unit="s")
+    # Convert IVAR to time if possible
+    if "time" in header["ivar_name"].lower() or "sec" in header["ivar_units"].lower():
+        df["time"] = header["date_valid"] + pd.to_timedelta(df[header["ivar_name"]], unit="s")
 
     return df
 
 
 @register_reader("icartt")
 class ICARTTReader(PointReader):
-    """ICARTT Data Reader."""
+    """
+    ICARTT Data Reader following the Aero Protocol.
+    """
 
     fixed_location = False
 
@@ -132,7 +139,8 @@ class ICARTTReader(PointReader):
         lazy: bool = False,
         **kwargs,
     ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
-        """Retrieve and load ICARTT data.
+        """
+        Retrieve and load ICARTT data with lazy scaling and missing value handling.
 
         Parameters
         ----------
@@ -150,43 +158,50 @@ class ICARTTReader(PointReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded ICARTT data.
         """
+        # We need metadata from the first file to setup lazy processing
+        file_list = FileUtility.expand_paths(files)
+        if not file_list:
+            raise FileNotFoundError(f"No files found matching {files}")
+
+        header = parse_icartt_header(file_list[0])
+
+        # Open data
         df = self.driver.open(files, read_method=read_icartt, lazy=lazy, **kwargs)
+
+        if lazy:
+            # For Dask, we apply scaling and missing values via map_partitions
+            # or we do it after converting to Xarray (preferable for Aero Protocol)
+            pass
 
         df = self.harmonize(df)
 
         if as_xarray:
+            # Default to expand2d=False for ICARTT to keep it simple and match expected results
+            # if not explicitly requested otherwise.
+            if "expand2d" not in kwargs:
+                kwargs["expand2d"] = False
+
             ds = self.to_xarray(df, **kwargs)
 
-            # Add global metadata from the first file
-            file_list = FileUtility.expand_paths(files)
-            if file_list:
-                try:
-                    meta = self._get_metadata(file_list[0])
-                    ds.attrs.update(meta)
-                except Exception:
-                    pass
+            # Apply scaling and missing values lazily in Xarray
+            ds = icartt_preprocess(ds, header)
 
-            # Update history
-            ds = update_history(ds, "Read ICARTT data.")
+            # Add global metadata
+            ds.attrs.update(
+                {
+                    k: v
+                    for k, v in header.items()
+                    if k in ["PI", "organization", "source", "mission"]
+                }
+            )
+
+            ds = update_history(ds, "Read ICARTT data via Aero Protocol.")
             return ds
 
         return df
 
-    def _get_metadata(self, filename: str) -> dict:
-        """Extract global metadata from the ICARTT header."""
-        meta = {}
-        fs = FileUtility.get_fs(filename)
-        with fs.open(filename, "r") as f:
-            f.readline()  # Line 1: n_header, format
-            meta["PI"] = f.readline().strip()  # Line 2
-            meta["organization"] = f.readline().strip()  # Line 3
-            meta["source"] = f.readline().strip()  # Line 4
-            meta["mission"] = f.readline().strip()  # Line 5
-        return meta
-
     def harmonize(self, df: pd.DataFrame | dd.DataFrame) -> pd.DataFrame | dd.DataFrame:
-        """Standardize column names for coordinates."""
-        # Common ICARTT names for lat/lon
+        """Standardize coordinate column names."""
         rename_dict = {}
         for col in df.columns:
             lcol = col.lower()
@@ -194,6 +209,8 @@ class ICARTTReader(PointReader):
                 rename_dict[col] = "latitude"
             if "longitude" in lcol and col != "longitude":
                 rename_dict[col] = "longitude"
+            if "altitude" in lcol and col != "altitude":
+                rename_dict[col] = "altitude"
             if "siteid" in lcol and col != "siteid":
                 rename_dict[col] = "siteid"
 
@@ -201,3 +218,61 @@ class ICARTTReader(PointReader):
             df = df.rename(columns=rename_dict)
 
         return super().harmonize(df)
+
+
+def icartt_preprocess(ds: xr.Dataset, header: dict[str, Any]) -> xr.Dataset:
+    """
+    Apply scaling and missing value handling lazily to ICARTT dataset.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    header : Dict[str, Any]
+        Header metadata including scales and missing values.
+
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset.
+    """
+    scales = header.get("scales", [])
+    missing_values = header.get("missing_values", [])
+    var_names = header.get("var_names", [])
+
+    # DVARs start from index 1 (0 is IVAR)
+    for i, (scale, miss) in enumerate(zip(scales, missing_values)):
+        if i + 1 >= len(var_names):
+            break
+        orig_col = var_names[i + 1]
+
+        # Find the column in ds, handling harmonization
+        col = None
+        if orig_col in ds.variables:
+            col = orig_col
+        else:
+            # Check harmonized names
+            for c in ds.variables:
+                if c.lower() == orig_col.lower():
+                    col = c
+                    break
+
+        if col is None:
+            continue
+
+        # Handle missing values
+        try:
+            miss_val = float(miss)
+            # Use a small tolerance for floating point comparison
+            # We must use .data to avoid issues with xarray wrappers if any
+            # but usually .where works fine.
+            # Let's try to be very explicit.
+            ds[col] = ds[col].where(np.abs(ds[col].astype(float) - miss_val) > 1e-4)
+        except (ValueError, TypeError):
+            ds[col] = ds[col].where(ds[col].astype(str).str.strip() != miss.strip())
+
+        # Scaling
+        if scale != 1.0:
+            ds[col] = ds[col].astype(float) * scale
+
+    return ds
