@@ -94,9 +94,10 @@ class PAMSReader(PointReader):
                 for varname, unit in unit_map.items():
                     if varname in ds.data_vars:
                         ds[varname].attrs["units"] = unit
-            elif "units" in ds.coords and "obs" in ds.data_vars:
-                # Fallback for non-pivoted 1D or if mapping failed
-                # We avoid .values[0] for Dask.
+                    elif varname == "obs" and "obs" in ds.data_vars:
+                        ds["obs"].attrs["units"] = unit
+            elif "units" in ds.variables and "obs" in ds.data_vars:
+                # Fallback for non-pivoted or if mapping failed
                 is_lazy = hasattr(ds["units"].data, "compute")
                 if not is_lazy:
                     try:
@@ -202,10 +203,14 @@ def read_pams(filename: str, **kwargs: Any) -> pd.DataFrame:
 
     # Set metadata for variables if they exist
     # To be picked up by open_dataset
-    if "variable" in data.columns and "units" in data.columns and not data.empty:
+    if "units" in data.columns and not data.empty:
         # PAMS JSONs typically contain one parameter per file or mixed.
         # We'll store a mapping of parameter -> unit in attrs.
-        mapping = data.groupby("variable")["units"].first().to_dict()
+        if "variable" in data.columns:
+            mapping = data.groupby("variable")["units"].first().to_dict()
+        else:
+            # Fallback if not pivoted or missing variable col
+            mapping = {"obs": data["units"].iloc[0]}
         data.attrs["unit_mapping"] = mapping
 
     return data
