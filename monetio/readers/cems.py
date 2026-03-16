@@ -54,11 +54,13 @@ class CEMSReader(PointReader):
             Whether to return a dask-backed object, by default False.
         **kwargs : dict
             Additional arguments passed to the reader and driver.
+            Includes `expand2d`, `pivot`, and `wide_fmt` for Xarray conversion.
 
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
-            The loaded CEMS data.
+            The loaded CEMS data. If `as_xarray=True`, units are assigned
+            to individual data variables (e.g., 'lbs' for SO2).
 
         Examples
         --------
@@ -93,6 +95,30 @@ class CEMSReader(PointReader):
 
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
+
+            # Retrieve unit mapping from dataframe attrs
+            # Note: pd.concat and Dask operations can drop attrs.
+            unit_map = getattr(df, "attrs", {}).get("unit_mapping", {})
+
+            if not unit_map:
+                # Eagerly peek at the first file to recover mapping if missing
+                try:
+                    from .drivers import FileUtility
+
+                    file_list = FileUtility.expand_paths(files)
+                    if file_list:
+                        meta_df = read_cems(file_list[0])
+                        unit_map = meta_df.attrs.get("unit_mapping", {})
+                except Exception as e:
+                    import warnings
+
+                    warnings.warn(f"CEMS unit mapping recovery failed: {e}")
+
+            # Apply units to variables
+            if unit_map:
+                for varname, unit in unit_map.items():
+                    if varname in ds.data_vars:
+                        ds[varname].attrs["units"] = unit
 
             # Update history
             ds = update_history(ds, "Read CEMS data.")
@@ -167,48 +193,62 @@ def read_cems(efile: str, **kwargs: dict) -> pd.DataFrame:
     pd.DataFrame
         The loaded CEMS data.
     """
-    dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0, **kwargs)
-    columns = list(dftemp.columns.values)
+    from ..util import force_object_strings
 
-    # Standardize column names
-    rcolumn = []
-    for ccc in columns:
-        cl = ccc.lower()
-        if "facility" in cl and "name" in cl:
-            rcolumn.append("facility_name")
-        elif "orispl" in cl:
-            rcolumn.append("orispl_code")
-        elif "facility" in cl and "id" in cl:
-            rcolumn.append("fac_id")
-        elif "so2" in cl and "lbs" in cl and "rate" not in cl:
-            rcolumn.append("so2_lbs")
-        elif "nox" in cl and "lbs" in cl and "rate" not in cl:
-            rcolumn.append("nox_lbs")
-        elif "co2" in cl and "short" in cl and "tons" in cl:
-            rcolumn.append("co2_short_tons")
-        elif "date" in cl:
-            rcolumn.append("date")
-        elif "hour" in cl:
-            rcolumn.append("hour")
-        elif "lat" in cl:
-            rcolumn.append("latitude")
-        elif "lon" in cl:
-            rcolumn.append("longitude")
-        elif "state" in cl:
-            rcolumn.append("state_name")
-        else:
-            rcolumn.append(ccc.strip().lower())
-    dftemp.columns = rcolumn
+    dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0, **kwargs)
+
+    # Standardize column names using a mapping
+    rename_map = {
+        "facility_name": ["facility", "name"],
+        "orispl_code": ["orispl"],
+        "fac_id": ["facility", "id"],
+        "so2_lbs": ["so2", "lbs"],
+        "nox_lbs": ["nox", "lbs"],
+        "co2_short_tons": ["co2", "short", "tons"],
+        "date": ["date"],
+        "hour": ["hour"],
+        "latitude": ["lat"],
+        "longitude": ["lon"],
+        "state_name": ["state"],
+    }
+
+    new_columns = []
+    for col in dftemp.columns:
+        cl = col.lower()
+        matched = False
+        for target, keywords in rename_map.items():
+            if all(k in cl for k in keywords):
+                # Special case for SO2/NOx to avoid "rate"
+                if target in ["so2_lbs", "nox_lbs"] and "rate" in cl:
+                    continue
+                new_columns.append(target)
+                matched = True
+                break
+        if not matched:
+            new_columns.append(cl.strip())
+
+    dftemp.columns = new_columns
+
+    # Capture units mapping for variables
+    unit_map = {
+        "so2_lbs": "lbs",
+        "nox_lbs": "lbs",
+        "co2_short_tons": "short tons",
+        "gross_load_mw": "MW",
+        "steam_load_1000lb_hr": "1000 lb/hr",
+    }
+    # Store in attributes to be picked up by open_dataset
+    dftemp.attrs["unit_mapping"] = {k: v for k, v in unit_map.items() if k in dftemp.columns}
 
     # Optimized vectorized time construction
-    dfmt = get_date_fmt(str(dftemp["date"].iloc[0]))
-    dftemp["time_local"] = pd.to_datetime(dftemp["date"], format=dfmt) + pd.to_timedelta(
-        dftemp["hour"], unit="h"
-    )
-
-    # For backend-agnostic loading, we need a 'time' column (UTC)
-    # CEMS data is local time. We set time = time_local for now.
-    dftemp["time"] = dftemp["time_local"]
+    if not dftemp.empty and "date" in dftemp.columns and "hour" in dftemp.columns:
+        dfmt = get_date_fmt(str(dftemp["date"].iloc[0]))
+        dftemp["time_local"] = pd.to_datetime(dftemp["date"], format=dfmt) + pd.to_timedelta(
+            dftemp["hour"], unit="h"
+        )
+        # For backend-agnostic loading, we need a 'time' column (UTC)
+        # CEMS data is local time. We set time = time_local for now.
+        dftemp["time"] = dftemp["time_local"]
 
     dftemp = dftemp.drop(columns=["date", "hour", "year"], errors="ignore")
 
@@ -216,4 +256,4 @@ def read_cems(efile: str, **kwargs: dict) -> pd.DataFrame:
     if "orispl_code" in dftemp.columns:
         dftemp["siteid"] = dftemp["orispl_code"].astype(str)
 
-    return dftemp
+    return force_object_strings(dftemp)
