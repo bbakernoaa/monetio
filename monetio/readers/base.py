@@ -146,6 +146,10 @@ class PointReader(BaseReader):
         """
         if "latitude" in df.columns and "longitude" in df.columns:
             df = df.dropna(subset=["latitude", "longitude"])
+
+        # Update history if attributes exist (backend-agnostic)
+        df = update_history(df, "Harmonized and dropped NaN locations.")
+
         return super().harmonize(df)
 
     def to_xarray(
@@ -260,6 +264,14 @@ class PointReader(BaseReader):
             for var in ds.data_vars:
                 if "node" in ds[var].dims:
                     ds[var].attrs.update({"mesh": "mesh", "location": "node"})
+
+        # Copy attributes from DataFrame if they exist (e.g. history)
+        if hasattr(df, "attrs"):
+            for k, v in df.attrs.items():
+                if k not in ds.attrs:
+                    ds.attrs[k] = v
+                elif k == "history":
+                    ds.attrs[k] = f"{v}\n{ds.attrs[k]}"
 
         # Add Global Attributes
         if "Conventions" not in ds.attrs:

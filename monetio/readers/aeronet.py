@@ -21,77 +21,83 @@ from .sat_utils import update_history
 
 @register_reader("aeronet")
 class AERONETReader(PointReader):
+    """
+    Reader for AERONET (Aerosol Robotic Network) data.
+    """
+
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
         product: str = "AOD15",
-        inv_type: str = None,
-        latlonbox: List[float] = None,
-        siteid: str = None,
+        inv_type: Optional[str] = None,
+        latlonbox: Optional[List[float]] = None,
+        siteid: Optional[str] = None,
         daily: bool = False,
         lunar: bool = False,
-        freq: str = None,
+        freq: Optional[str] = None,
         detect_dust: bool = False,
-        interp_to_aod_values: Union[List[float], np.ndarray] = None,
+        interp_to_aod_values: Optional[Union[List[float], np.ndarray]] = None,
         n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,
         retries: int = 5,
         backoff_factor: float = 2.0,
         n_chunks: Optional[int] = None,
-        **kwargs,
+        **kwargs: dict,
     ) -> Union[pd.DataFrame, xr.Dataset]:
         """
-                Retrieve and load AERONET data .
+        Retrieve and load AERONET data.
 
-                Parameters
-                ----------
-                files : Union[str, List[str]], optional
-                    File path, list of paths, or glob pattern.
-                dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
-                    Dates to retrieve if files are not provided.
-                product : str, optional
-                    AERONET product (e.g., 'AOD15', 'SDA20'), by default "AOD15".
-                inv_type : str, optional
-                    Inversion type (e.g., 'ALM15', 'HYB20'), by default None.
-                latlonbox : List[float], optional
-                    Bounding box [latmin, lonmin, latmax, lonmax], by default None.
-                siteid : str, optional
-                    Specific AERONET site ID, by default None.
-                daily : bool, optional
-                    Whether to load daily averages instead of all points, by default False.
-                lunar : bool, optional
-                    Whether to include lunar data, by default False.
-                freq : str, optional
-                    Resampling frequency (e.g., '1H'), by default None.
-                detect_dust : bool, optional
-                    Whether to add a 'dust' column based on AOD/Angstrom, by default False.
-                interp_to_aod_values : Union[List[float], np.ndarray], optional
-                    Wavelengths (nm) to interpolate AOD to, by default None.
-                n_procs : int, optional
-                    Number of processors for parallel loading (non-lazy), by default 1.
-                as_xarray : bool, optional
-                    Whether to return an xarray.Dataset, by default True.
-                lazy : bool, optional
-                    Whether to return a dask-backed object, by default False.
-                retries : int, optional
-                    Number of retries for network calls, by default 5.
-                backoff_factor : float, optional
-                    Backoff factor for exponential retries, by default 1.0.
-                **kwargs : dict
-                    Additional arguments passed to the driver.
+        Parameters
+        ----------
+        files : Union[str, List[str]], optional
+            File path, list of paths, or glob pattern.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve if files are not provided.
+        product : str, optional
+            AERONET product (e.g., 'AOD15', 'SDA20'), by default "AOD15".
+        inv_type : str, optional
+            Inversion type (e.g., 'ALM15', 'HYB20'), by default None.
+        latlonbox : List[float], optional
+            Bounding box [latmin, lonmin, latmax, lonmax], by default None.
+        siteid : str, optional
+            Specific AERONET site ID, by default None.
+        daily : bool, optional
+            Whether to load daily averages instead of all points, by default False.
+        lunar : bool, optional
+            Whether to include lunar data, by default False.
+        freq : str, optional
+            Resampling frequency (e.g., '1H'), by default None.
+        detect_dust : bool, optional
+            Whether to add a 'dust' column based on AOD/Angstrom, by default False.
+        interp_to_aod_values : Union[List[float], np.ndarray], optional
+            Wavelengths (nm) to interpolate AOD to, by default None.
+        n_procs : int, optional
+            Number of processors for parallel loading (non-lazy), by default 1.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        retries : int, optional
+            Number of retries for network calls, by default 5.
+        backoff_factor : float, optional
+            Backoff factor for exponential retries, by default 2.0.
+        n_chunks : int, optional
+            Number of chunks to split the date range into for NASA requests, by default None.
+        **kwargs : dict
+            Additional arguments passed to the driver.
 
-                Returns
+        Returns
         -------
-                Union[pd.DataFrame, xr.Dataset]
-                    The loaded AERONET data.
+        Union[pd.DataFrame, xr.Dataset]
+            The loaded AERONET data.
 
-                Examples
-                --------
-                >>> from monetio.readers.aeronet import AERONETReader
-                >>> reader = AERONETReader()
-                >>> ds = reader.open_dataset(dates='2021-08-01', siteid='Mauna_Loa')
+        Examples
+        --------
+        >>> from monetio.readers.aeronet import AERONETReader
+        >>> reader = AERONETReader()
+        >>> ds = reader.open_dataset(dates='2021-08-01', siteid='Mauna_Loa')
         """
         if files is None:
             if dates is None:
@@ -355,7 +361,7 @@ def build_urls(
     latlonbox: Optional[List[float]] = None,
     split_by_day: bool = False,
     n_chunks: Optional[int] = None,
-    **kwargs,
+    **kwargs: dict,
 ) -> List[str]:
     """
     Construct AERONET URLs.
@@ -538,7 +544,7 @@ def read_aeronet_csv(
     detect_dust: bool = False,
     storage_options: Optional[dict] = None,
     meta_df: Optional[pd.DataFrame] = None,
-    **kwargs,
+    **kwargs: dict,
 ) -> pd.DataFrame:
     """
     Read a single AERONET file or URL.

@@ -131,18 +131,28 @@ class IMPROVEReader(PointReader):
         monitor_df = monitor_df.copy().drop_duplicates(subset=["siteid"])
         monitor_df = force_object_strings(monitor_df)
 
-        if dd is not None and isinstance(df, dd.DataFrame):
-            df["epaid"] = df["epaid"].astype(object)
-            monitor_dask = dd.from_pandas(monitor_df, npartitions=1)
-            df = df.merge(monitor_dask, left_on="epaid", right_on="siteid", how="left")
+        # Backend-agnostic site ID cast
+        df["epaid"] = df["epaid"].astype(object)
+
+        # Identify backend and wrap monitor_df if needed
+        if hasattr(df, "npartitions"):
+            # Dask detected
+            import dask.dataframe as dd_local
+
+            monitor_wrap = dd_local.from_pandas(monitor_df, npartitions=1)
         else:
-            df["epaid"] = df["epaid"].astype(object)
-            df = df.merge(monitor_df, left_on="epaid", right_on="siteid", how="left")
+            monitor_wrap = monitor_df
+
+        # Merge
+        df = df.merge(monitor_wrap, left_on="epaid", right_on="siteid", how="left")
 
         # Handle column name conflicts from merge
         if "siteid_x" in df.columns:
             df = df.drop(columns=["siteid_y", "state_name_y"], errors="ignore")
             df = df.rename(columns={"siteid_x": "siteid", "state_name_x": "state_name"})
+
+        # Update history if possible
+        df = update_history(df, "Merged with IMPROVE station metadata.")
 
         return df
 

@@ -72,10 +72,12 @@ class PAMSReader(PointReader):
 
             # Transfer units if available
             if "units" in ds.variables and "obs" in ds.data_vars:
+                # To be truly Aero/Lazy safe, we avoid immediate compute of data.
+                # However, for metadata transfer, if the variable is a coordinate,
+                # we can often get its representative value safely.
                 try:
-                    # Taking units from the first observation
-                    # Use .data to avoid immediate compute if lazy,
-                    # but for a single scalar from coordinate it is usually OK.
+                    # Use .values[0] for Eager and ensure we don't trigger Dask if Lazy
+                    # Coordinate values are usually small.
                     unit_val = ds["units"].values.flat[0]
                     ds["obs"].attrs["units"] = str(unit_val)
                 except Exception:

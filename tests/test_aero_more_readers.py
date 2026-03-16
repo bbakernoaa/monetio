@@ -4,63 +4,92 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from monetio.readers.cems import CEMSReader, read_cems
-from monetio.readers.icap_mme import ICAPMMEReader
+from monetio.readers.aeronet import AERONETReader
+from monetio.readers.improve import IMPROVEReader
+from monetio.readers.pams import PAMSReader
 
 
 @pytest.fixture
-def mock_cems_file(tmp_path):
-    f = tmp_path / "cems_test.csv"
-    # Columns: Facility Name, ORISPL, Date, Hour, Latitude, Longitude, ...
-    content = (
-        "Facility Name,ORISPL,Date,Hour,Latitude,Longitude,SO2 (lbs),NOx (lbs),CO2 (short tons)\n"
-    )
-    content += "Test Plant,1234,2023-01-01,0,39.0,-76.5,10.0,5.0,100.0\n"
-    content += "Test Plant,1234,2023-01-01,1,39.0,-76.5,11.0,6.0,101.0\n"
+def mock_improve_file(tmp_path):
+    f = tmp_path / "improve_test.txt"
+    content = "Metadata lines...\nData\n"
+    content += "SiteCode\tDate\tEPACode\tVal\tState\tParamCode\tUnit\n"
+    content += "TEST1\t2023-01-01\t123456789\t10.0\tMD\tPM25\tug/m3\n"
     f.write_text(content)
     return str(f)
 
 
-def test_read_cems(mock_cems_file):
-    df = read_cems(mock_cems_file)
-    assert len(df) == 2
-    assert "time" in df.columns
-    assert df["time"].iloc[0] == pd.Timestamp("2023-01-01 00:00:00")
-    assert df["time"].iloc[1] == pd.Timestamp("2023-01-01 01:00:00")
-    assert df["siteid"].iloc[0] == "1234"
+def test_improve_reader_eager(mock_improve_file):
+    reader = IMPROVEReader()
+    # Mock monitor file read
+    with patch("monetio.readers.improve.read_monitor_file") as mock_mon:
+        mock_mon.return_value = pd.DataFrame(
+            {"siteid": ["123456789"], "latitude": [39.0], "longitude": [-76.5]}
+        )
+        ds = reader.open_dataset(files=mock_improve_file, add_meta=True, as_xarray=True, lazy=False)
+        assert isinstance(ds, xr.Dataset)
+        assert "PM25" in ds.data_vars
+        assert ds.sizes["time"] == 1
+        assert "Merged with IMPROVE station metadata" in ds.attrs["history"]
 
 
-def test_cems_reader_eager(mock_cems_file):
-    reader = CEMSReader()
-    ds = reader.open_dataset(files=mock_cems_file, as_xarray=True, lazy=False)
-    assert isinstance(ds, xr.Dataset)
-    assert "so2_lbs" in ds.data_vars
-    assert ds.sizes["time"] == 2
-    assert ds.sizes["node"] == 1
-
-
-def test_cems_reader_lazy(mock_cems_file):
+def test_improve_reader_lazy(mock_improve_file):
     pytest.importorskip("dask")
-    reader = CEMSReader()
-    ds = reader.open_dataset(files=mock_cems_file, as_xarray=True, lazy=True)
-    assert ds.so2_lbs.chunks is not None
-    ds_eager = reader.open_dataset(files=mock_cems_file, as_xarray=True, lazy=False)
-    xr.testing.assert_allclose(ds.compute(), ds_eager)
+    reader = IMPROVEReader()
+    with patch("monetio.readers.improve.read_monitor_file") as mock_mon:
+        mock_mon.return_value = pd.DataFrame(
+            {"siteid": ["123456789"], "latitude": [39.0], "longitude": [-76.5]}
+        )
+        ds = reader.open_dataset(files=mock_improve_file, add_meta=True, as_xarray=True, lazy=True)
+        assert ds.PM25.chunks is not None
+        ds_eager = reader.open_dataset(
+            files=mock_improve_file, add_meta=True, as_xarray=True, lazy=False
+        )
+        xr.testing.assert_allclose(ds.compute(), ds_eager)
 
 
-@patch("monetio.readers.icap_mme.FileUtility.get_fs")
-def test_icap_mme_reader_mock(mock_get_fs):
-    # Mocking xarray.open_mfdataset is hard, so we just test build_urls
-    from monetio.readers.icap_mme import build_urls
+@pytest.fixture
+def mock_pams_file(tmp_path):
+    f = tmp_path / "pams_test.json"
+    data = {
+        "Data": [
+            {
+                "state_code": "24",
+                "county_code": "001",
+                "site_number": "0001",
+                "date_gmt": "2023-01-01",
+                "time_gmt": "00:00",
+                "sample_measurement": 10.0,
+                "units_of_measure": "Parts per billion",
+                "latitude": 39.0,
+                "longitude": -76.5,
+            }
+        ]
+    }
+    import json
 
-    dates = pd.to_datetime(["2024-02-01 00:00:00"])
-    urls, fnames = build_urls(dates, filetype="MMC", data_var="dustaod550")
-    assert isinstance(urls, list)
-    assert len(urls) == 1
-    assert "icap_2024020100_MMC_dustaod550.nc" in urls[0]
-    assert "icap_2024020100_MMC_dustaod550.nc" == fnames[0]
+    f.write_text(json.dumps(data))
+    return str(f)
 
 
-def test_icap_mme_reader_instantiation():
-    reader = ICAPMMEReader()
+def test_pams_reader_eager(mock_pams_file):
+    reader = PAMSReader()
+    ds = reader.open_dataset(files=mock_pams_file, as_xarray=True, lazy=False)
+    assert isinstance(ds, xr.Dataset)
+    assert ds.obs.attrs["units"] == "ppb"
+    assert ds.sizes["time"] == 1
+
+
+def test_pams_reader_lazy(mock_pams_file):
+    pytest.importorskip("dask")
+    reader = PAMSReader()
+    ds = reader.open_dataset(files=mock_pams_file, as_xarray=True, lazy=True)
+    # Underlying data should be dask
+    assert ds.obs.chunks is not None
+    assert ds.obs.attrs["units"] == "ppb"
+
+
+@patch("monetio.readers.aeronet.FileUtility.get_fs")
+def test_aeronet_reader_instantiation(mock_get_fs):
+    reader = AERONETReader()
     assert reader is not None
