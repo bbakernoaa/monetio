@@ -604,6 +604,9 @@ def force_object_strings(df):
     except ImportError:
         is_dask = False
 
+    # Preserve attributes (Aero Protocol: Scientific Hygiene)
+    attrs = getattr(df, "attrs", {}).copy()
+
     if is_dask:
         # For Dask, we use assign to ensure metadata is updated
         # and we explicitly cast to object.
@@ -612,13 +615,23 @@ def force_object_strings(df):
             # which would call len(df[col]) and trigger a compute.
             if pd.api.types.is_string_dtype(df[col].dtype):
                 df = df.assign(**{col: df[col].astype(object)})
-        return df
     else:
         df = df.copy()
         for col in df.columns:
             if pd.api.types.is_string_dtype(df[col].dtype):
                 df[col] = df[col].astype(object)
-        return df
+
+    if attrs:
+        try:
+            df.attrs.update(attrs)
+        except Exception:
+            # Fallback for backends where update() might fail
+            for k, v in attrs.items():
+                try:
+                    df.attrs[k] = v
+                except Exception:
+                    pass
+    return df
 
 
 def ds_to_2d(ds, pivot=True, fixed_location=False):
@@ -749,9 +762,15 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
                         except Exception:
                             pass
 
-        if "history" in ds2d.attrs:
-            ds2d.attrs["history"] = f"{ds2d.attrs['history']}\n{history}"
-        else:
+        # Copy attributes from original dataset (Aero Protocol: Scientific Hygiene)
+        for k, v in ds.attrs.items():
+            if k not in ds2d.attrs:
+                ds2d.attrs[k] = v
+            elif k == "history":
+                if v not in ds2d.attrs["history"]:
+                    ds2d.attrs["history"] = f"{v}\n{ds2d.attrs['history']}"
+
+        if "history" not in ds2d.attrs:
             ds2d.attrs["history"] = history
         return ds2d
     except Exception as e:

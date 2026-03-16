@@ -96,13 +96,19 @@ class PAMSReader(PointReader):
                         ds[varname].attrs["units"] = unit
                     elif varname == "obs" and "obs" in ds.data_vars:
                         ds["obs"].attrs["units"] = unit
-            elif "units" in ds.variables and "obs" in ds.data_vars:
+
+            if "obs" in ds.data_vars and "units" not in ds["obs"].attrs:
                 # Fallback for non-pivoted or if mapping failed
-                is_lazy = hasattr(ds["units"].data, "compute")
+                is_lazy = False
+                if "units" in ds.variables:
+                    is_lazy = hasattr(ds["units"].data, "compute")
                 if not is_lazy:
                     try:
-                        ds["obs"].attrs["units"] = str(ds["units"].values.flat[0])
-                    except (IndexError, AttributeError):
+                        # Extract units from the first element of 'units' coordinate/variable
+                        # This works if 'units' is a string array/coordinate
+                        unit_val = str(ds["units"].values.flat[0])
+                        ds["obs"].attrs["units"] = unit_val
+                    except (IndexError, AttributeError, KeyError):
                         pass
 
             # Update history
