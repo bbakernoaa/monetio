@@ -75,7 +75,7 @@ class ICAPMMEReader(GriddedReader):
                 for url, fname in zip(urls, fnames):
                     files.append(str(retrieve(url, fname, download=True)))
             else:
-                files = urls.tolist()
+                files = urls
 
         # ICAP files are standard NetCDF, often h5netcdf compatible.
         if "concat_dim" not in kwargs:
@@ -99,7 +99,7 @@ def build_urls(
     filetype: str = "MMC",
     data_var: str = "dustaod550",
     verbose: bool = True,
-) -> Tuple[pd.Series, pd.Series]:
+) -> Tuple[List[str], List[str]]:
     """
     Construct ICAP-MME URLs and filenames for the given dates.
 
@@ -116,8 +116,8 @@ def build_urls(
 
     Returns
     -------
-    Tuple[pd.Series, pd.Series]
-        (urls, filenames).
+    Tuple[List[str], List[str]]
+        A tuple containing a list of URLs and a list of filenames.
 
     Examples
     --------
@@ -144,7 +144,7 @@ def build_urls(
         urls.append(url)
         fnames.append(fname)
 
-    return pd.Series(urls, index=None), pd.Series(fnames, index=None)
+    return urls, fnames
 
 
 def retrieve(
