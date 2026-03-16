@@ -43,11 +43,13 @@ class PAMSReader(PointReader):
             Whether to return a dask-backed object, by default False.
         **kwargs : Any
             Additional arguments passed to the reader and driver.
+            Includes `expand2d`, `pivot`, and `wide_fmt` for Xarray conversion.
 
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
-            The loaded PAMS data.
+            The loaded PAMS data. If `as_xarray=True`, units are preserved
+            on individual data variables via an internal `unit_mapping`.
 
         Examples
         --------
@@ -68,20 +70,39 @@ class PAMSReader(PointReader):
         df = force_object_strings(df)
 
         if as_xarray:
+            # We must handle unit transfer BEFORE or AFTER expansion.
+            # If we expand (pivot), the variables change names.
             ds = self.to_xarray(df, **kwargs)
 
-            # Transfer units if available
-            if "units" in ds.variables and "obs" in ds.data_vars:
-                # To be truly Aero/Lazy safe, we avoid immediate compute of data.
-                # However, for metadata transfer, if the variable is a coordinate,
-                # we can often get its representative value safely.
+            # Retrieve unit mapping from dataframe attrs
+            # Note: pd.concat and Dask operations can drop attrs.
+            unit_map = getattr(df, "attrs", {}).get("unit_mapping", {})
+
+            if not unit_map:
+                # Eagerly peek at the first file to recover mapping if missing
                 try:
-                    # Use .values[0] for Eager and ensure we don't trigger Dask if Lazy
-                    # Coordinate values are usually small.
-                    unit_val = ds["units"].values.flat[0]
-                    ds["obs"].attrs["units"] = str(unit_val)
-                except Exception:
-                    pass
+                    file_list = FileUtility.expand_paths(files)
+                    if file_list:
+                        meta_df = read_pams(file_list[0])
+                        unit_map = meta_df.attrs.get("unit_mapping", {})
+                except Exception as e:
+                    import warnings
+
+                    warnings.warn(f"PAMS unit mapping recovery failed: {e}")
+
+            if unit_map:
+                for varname, unit in unit_map.items():
+                    if varname in ds.data_vars:
+                        ds[varname].attrs["units"] = unit
+            elif "units" in ds.coords and "obs" in ds.data_vars:
+                # Fallback for non-pivoted 1D or if mapping failed
+                # We avoid .values[0] for Dask.
+                is_lazy = hasattr(ds["units"].data, "compute")
+                if not is_lazy:
+                    try:
+                        ds["obs"].attrs["units"] = str(ds["units"].values.flat[0])
+                    except (IndexError, AttributeError):
+                        pass
 
             # Update history
             ds = update_history(ds, "Read PAMS data.")
@@ -135,6 +156,10 @@ def read_pams(filename: str, **kwargs: Any) -> pd.DataFrame:
         + data.site_number.astype(str).str.zfill(4)
     )
 
+    # Standardize column naming for PointReader
+    if "parameter" in data.columns:
+        data = data.rename(columns={"parameter": "variable"})
+
     # Vectorized time construction
     data["time"] = pd.to_datetime(data["date_gmt"] + " " + data["time_gmt"])
 
@@ -176,10 +201,11 @@ def read_pams(filename: str, **kwargs: Any) -> pd.DataFrame:
     data["units"] = data["units"].replace(repl)
 
     # Set metadata for variables if they exist
-    # To be picked up by to_xarray
-    if "obs" in data.columns and "units" in data.columns:
-        # We can't easily set attributes on DataFrame columns that survive all transforms,
-        # but we can ensure units are consistent.
-        pass
+    # To be picked up by open_dataset
+    if "variable" in data.columns and "units" in data.columns and not data.empty:
+        # PAMS JSONs typically contain one parameter per file or mixed.
+        # We'll store a mapping of parameter -> unit in attrs.
+        mapping = data.groupby("variable")["units"].first().to_dict()
+        data.attrs["unit_mapping"] = mapping
 
     return data
