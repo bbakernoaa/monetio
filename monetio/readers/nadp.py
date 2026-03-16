@@ -25,7 +25,7 @@ META_URLS = {
 }
 
 
-def read_nadp(filename: str, network: str = "ntn", **kwargs) -> pd.DataFrame:
+def read_nadp(filename: str, network: str = "ntn", **kwargs: dict) -> pd.DataFrame:
     """
     Read a single NADP file.
 
@@ -63,20 +63,32 @@ def read_nadp(filename: str, network: str = "ntn", **kwargs) -> pd.DataFrame:
     # Use FileUtility to handle remote files
     fs = FileUtility.get_fs(filename)
     with fs.open(filename, "r") as f:
-        df = pd.read_csv(f, parse_dates=parse_dates, **kwargs)
+        df = pd.read_csv(f, **kwargs)
 
     df.columns = [i.lower() for i in df.columns]
+
+    # Handle date parsing
+    if parse_dates:
+        for col_idx in parse_dates:
+            col_name = df.columns[col_idx]
+            df[col_name] = pd.to_datetime(df[col_name], errors="coerce")
     df = df.rename(columns=rename_cols)
 
     # Apply network-specific cleaning
     if network == "ntn":
         for col in ["mg", "br", "so4", "cl", "no3", "nh4", "k", "na", "ca"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
             flag = "flag" + col
-            if flag in df.columns:
+            if flag in df.columns and col in df.columns:
                 df.loc[(df[flag] == "<") | (df[col] < 0), col] = np.nan
     elif network == "mdn":
         if "qr" in df.columns:
-            df.loc[df.qr == "C", ["rgppt", "svol", "subppt", "hgconc", "hgdep"]] = np.nan
+            cols = ["rgppt", "svol", "subppt", "hgconc", "hgdep"]
+            for col in cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+            df.loc[df.qr == "C", [c for c in cols if c in df.columns]] = np.nan
     elif network == "airmon":
         if "qrcode" in df.columns:
             cols = [
@@ -98,10 +110,17 @@ def read_nadp(filename: str, network: str = "ntn", **kwargs) -> pd.DataFrame:
                 "conduclab",
                 "conducfield",
             ]
-            df.loc[df.qrcode == "C", cols] = np.nan
+            for col in cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+            df.loc[df.qrcode == "C", [c for c in cols if c in df.columns]] = np.nan
     elif network in ["amon", "amnet"]:
         if "qr" in df.columns:
-            df.loc[df.qr == "C", ["airvol", "conc"]] = np.nan
+            cols = ["airvol", "conc"]
+            for col in cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
+            df.loc[df.qr == "C", [c for c in cols if c in df.columns]] = np.nan
 
     return df
 
@@ -121,7 +140,7 @@ class NADPReader(PointReader):
         weekly: bool = True,
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs,
+        **kwargs: dict,
     ) -> Union[xr.Dataset, pd.DataFrame]:
         """
         Open NADP dataset.
@@ -239,7 +258,9 @@ class NADPReader(PointReader):
 
         return meta
 
-    def build_url(self, network: str = "NTN", siteid: Optional[str] = None, weekly: bool = True):
+    def build_url(
+        self, network: str = "NTN", siteid: Optional[str] = None, weekly: bool = True
+    ) -> str:
         """
         Build URL for NADP data.
 
