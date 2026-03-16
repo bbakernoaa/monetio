@@ -1,16 +1,16 @@
 """CEMS Reader"""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import pandas as pd
 import xarray as xr
 
-if TYPE_CHECKING:
-    import dask.dataframe as dd
-
 from .base import PointReader, register_reader
 from .sat_utils import update_history
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 
 class CEMS:
@@ -21,15 +21,19 @@ class CEMS:
 
 @register_reader("cems")
 class CEMSReader(PointReader):
+    """
+    Reader for Continuous Emissions Monitoring System (CEMS) data.
+    """
+
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
         states: Union[str, List[str]] = "md",
         n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs,
+        **kwargs: dict,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
         Retrieve and load CEMS data.
@@ -55,6 +59,11 @@ class CEMSReader(PointReader):
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded CEMS data.
+
+        Examples
+        --------
+        >>> reader = CEMSReader()
+        >>> ds = reader.open_dataset(dates="2023-01-01", states="md")
         """
         if files is None:
             if dates is None:
@@ -98,9 +107,21 @@ class CEMSReader(PointReader):
 # -----------------------------------------------------------------------------
 
 
-def build_url(date, state):
+def build_url(date: datetime, state: str) -> str:
     """
     Build CEMS URL for a given date and state.
+
+    Parameters
+    ----------
+    date : datetime
+        The date to retrieve data for.
+    state : str
+        The state abbreviation (e.g., 'md').
+
+    Returns
+    -------
+    str
+        The constructed URL.
     """
     url = "ftp://newftp.epa.gov/DmDnLoad/emissions/hourly/monthly/"
     url += date.strftime("%Y") + "/"
@@ -108,20 +129,45 @@ def build_url(date, state):
     return url + fname
 
 
-def get_date_fmt(date):
+def get_date_fmt(date: str) -> str:
+    """
+    Determine the date format based on the first entry.
+
+    Parameters
+    ----------
+    date : str
+        The date string to inspect.
+
+    Returns
+    -------
+    str
+        The identified datetime format string.
+    """
     temp = date.split("-")
     if len(temp[0]) == 4:
-        fmt = "%Y-%m-%d %H"
+        fmt = "%Y-%m-%d"
     else:
-        fmt = "%m-%d-%Y %H"
+        fmt = "%m-%d-%Y"
     return fmt
 
 
-def read_cems(efile, **kwargs):
+def read_cems(efile: str, **kwargs: dict) -> pd.DataFrame:
     """
     Read a single CEMS file.
+
+    Parameters
+    ----------
+    efile : str
+        The path or URL to the CEMS file.
+    **kwargs : dict
+        Additional arguments passed to pd.read_csv.
+
+    Returns
+    -------
+    pd.DataFrame
+        The loaded CEMS data.
     """
-    dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0)
+    dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0, **kwargs)
     columns = list(dftemp.columns.values)
 
     # Standardize column names
@@ -154,14 +200,14 @@ def read_cems(efile, **kwargs):
             rcolumn.append(ccc.strip().lower())
     dftemp.columns = rcolumn
 
-    dfmt = get_date_fmt(dftemp["date"].iloc[0])
-    # Vectorized time construction
-    dt_str = dftemp["date"].astype(str) + " " + dftemp["hour"].astype(str)
-    dftemp["time"] = pd.to_datetime(dt_str, format=dfmt)
-    dftemp = dftemp.rename(columns={"time": "time_local"})
+    # Optimized vectorized time construction
+    dfmt = get_date_fmt(str(dftemp["date"].iloc[0]))
+    dftemp["time_local"] = pd.to_datetime(dftemp["date"], format=dfmt) + pd.to_timedelta(
+        dftemp["hour"], unit="h"
+    )
+
     # For backend-agnostic loading, we need a 'time' column (UTC)
-    # CEMS data is local time, and usually doesn't have offset info easily accessible in the file.
-    # We set time = time_local for now, or use timezonefinder if we had lat/lon.
+    # CEMS data is local time. We set time = time_local for now.
     dftemp["time"] = dftemp["time_local"]
 
     dftemp = dftemp.drop(columns=["date", "hour", "year"], errors="ignore")

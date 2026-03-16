@@ -94,3 +94,62 @@ def parse_wrf_times(times_arr: np.ndarray) -> np.ndarray:
 
     # Force ns to match project expectations and avoid discrepancies with Pandas 3.0+
     return pd.to_datetime(s.ravel()).values.astype("datetime64[ns]").reshape(s.shape)
+
+
+def parse_yyyymmdd_hhmm(yyyymmdd: np.ndarray, hhmm: np.ndarray) -> np.ndarray:
+    """
+    Vectorized parsing of YYYYMMDD and HHMM (or HHMMSS) dates and times.
+
+    Parameters
+    ----------
+    yyyymmdd : np.ndarray
+        Array of dates in YYYYMMDD format.
+    hhmm : np.ndarray
+        Array of times in HHMM or HHMMSS format.
+
+    Returns
+    -------
+    np.ndarray
+        Array of datetime64[ns] objects.
+    """
+    yyyymmdd = np.asanyarray(yyyymmdd)
+    hhmm = np.asanyarray(hhmm)
+
+    # Use float for intermediate to handle NaNs if present
+    years = (yyyymmdd // 10000).astype(float)
+    months = ((yyyymmdd // 100) % 100).astype(float)
+    days = (yyyymmdd % 100).astype(float)
+
+    # HHMMSS check: 2400 is the threshold (HHMM max is 2359)
+    # We use nanmax safely.
+    try:
+        is_hhmmss = (
+            np.nanmax(hhmm) >= 10000 if hhmm.size > 0 and not np.all(np.isnan(hhmm)) else False
+        )
+    except (ValueError, TypeError):
+        is_hhmmss = False
+
+    if is_hhmmss:
+        hours = (hhmm // 10000).astype(float)
+        minutes = ((hhmm // 100) % 100).astype(float)
+        seconds = (hhmm % 100).astype(float)
+    else:
+        hours = (hhmm // 100).astype(float)
+        minutes = (hhmm % 100).astype(float)
+        seconds = 0.0
+
+    df = pd.DataFrame(
+        {
+            "year": years.ravel(),
+            "month": months.ravel(),
+            "day": days.ravel(),
+            "hour": hours.ravel(),
+            "minute": minutes.ravel(),
+            "second": seconds if isinstance(seconds, float) else seconds.ravel(),
+        }
+    )
+
+    # Use coerce to handle any invalid dates produced by math on NaNs
+    return (
+        pd.to_datetime(df, errors="coerce").values.astype("datetime64[ns]").reshape(yyyymmdd.shape)
+    )

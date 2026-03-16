@@ -12,6 +12,7 @@ from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
+from .time_utils import parse_yyyymmdd_hhmm
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
@@ -116,7 +117,7 @@ SHCOLS = [
 ]
 
 
-def read_crn(filename: str, **kwargs) -> pd.DataFrame:
+def read_crn(filename: str, **kwargs: dict) -> pd.DataFrame:
     """
     Read a single CRN file.
 
@@ -155,25 +156,16 @@ def read_crn(filename: str, **kwargs) -> pd.DataFrame:
             **kwargs,
         )
 
-    # Manual date parsing for compatibility with Pandas 3.0
+    # Vectorized date parsing using parse_yyyymmdd_hhmm
     if not is_daily:
         if "UTC_DATE" in df.columns and "UTC_TIME" in df.columns:
-            df["time"] = pd.to_datetime(
-                df["UTC_DATE"].astype(str) + df["UTC_TIME"].astype(str).str.zfill(4),
-                format="%Y%m%d%H%M",
-                errors="coerce",
-            )
+            df["time"] = parse_yyyymmdd_hhmm(df["UTC_DATE"].values, df["UTC_TIME"].values)
         if "LST_DATE" in df.columns and "LST_TIME" in df.columns:
-            df["time_local"] = pd.to_datetime(
-                df["LST_DATE"].astype(str) + df["LST_TIME"].astype(str).str.zfill(4),
-                format="%Y%m%d%H%M",
-                errors="coerce",
-            )
+            df["time_local"] = parse_yyyymmdd_hhmm(df["LST_DATE"].values, df["LST_TIME"].values)
     else:
         if "LST_DATE" in df.columns:
-            df["time_local"] = pd.to_datetime(
-                df["LST_DATE"].astype(str), format="%Y%m%d", errors="coerce"
-            )
+            # For daily, time is at midnight
+            df["time_local"] = parse_yyyymmdd_hhmm(df["LST_DATE"].values, 0)
 
     return df
 
@@ -276,14 +268,6 @@ class CRNReader(PointReader):
         # Ensure siteid/WBANNO is string and padded to 5 digits
         monitors["WBANNO"] = monitors["WBANNO"].astype(str).str.zfill(5)
 
-        # Identify backend
-        try:
-            import dask.dataframe as dd
-
-            is_dask = isinstance(df, dd.DataFrame)
-        except ImportError:
-            is_dask = False
-
         df["WBANNO"] = df["WBANNO"].astype(str).str.zfill(5)
         # Merge (unified logic for both backends)
         df = df.merge(monitors, how="left", on=["WBANNO", "LATITUDE", "LONGITUDE"])
@@ -291,10 +275,8 @@ class CRNReader(PointReader):
         # Handle time conversion if needed
         if "time" not in df.columns:
             if "time_local" in df.columns and "GMT_OFFSET" in df.columns:
-                if is_dask:
-                    df["time"] = df["time_local"] + dd.to_timedelta(df["GMT_OFFSET"], unit="h")
-                else:
-                    df["time"] = df["time_local"] + pd.to_timedelta(df["GMT_OFFSET"], unit="h")
+                # Use backend-agnostic arithmetic: astype('timedelta64[h]') works for both
+                df["time"] = df["time_local"] + df["GMT_OFFSET"].astype("timedelta64[h]")
             elif "time_local" in df.columns:
                 # Fallback for daily data if GMT_OFFSET is missing
                 df["time"] = df["time_local"]
@@ -302,6 +284,9 @@ class CRNReader(PointReader):
         df = df.rename(columns={"WBANNO": "siteid"})
         # Lowercase all columns
         df.columns = [c.lower() for c in df.columns]
+
+        # Update history for provenance
+        df = update_history(df, "Merged with CRN station metadata and applied GMT offset.")
 
         return df
 
@@ -384,33 +369,44 @@ class CRNReader(PointReader):
         urls = []
         fnames = []
 
-        for _, row in monitors.iterrows():
-            for y in years:
-                state = row["STATE"]
-                site = row["LOCATION"].replace(" ", "_")
-                vector = row["VECTOR"].replace(" ", "_")
+        # Optimization: group by product and year to use fs.ls
+        product = "daily01" if daily else ("subhourly01" if sub_hourly else "hourly02")
+        fname_prefix = "CRND0103-" if daily else ("CRNS0101-05-" if sub_hourly else "CRNH0203-")
 
-                if daily:
-                    beginning = f"{baseurl}daily01/{y}/"
-                    fname_prefix = "CRND0103-"
-                elif sub_hourly:
-                    beginning = f"{baseurl}subhourly01/{y}/"
-                    fname_prefix = "CRNS0101-05-"
-                else:
-                    beginning = f"{baseurl}hourly02/{y}/"
-                    fname_prefix = "CRNH0203-"
+        for y in years:
+            year_url = f"{baseurl}{product}/{y}/"
+            fs = FileUtility.get_fs(year_url)
+            try:
+                # Get all files in the directory for this year/product
+                all_files = fs.ls(year_url)
+                # Map to basenames for matching
+                all_fnames = [os.path.basename(f) for f in all_files]
 
-                rest = f"{y}-{state}_{site}_{vector}.txt"
-                url = f"{beginning}{fname_prefix}{rest}"
-                fname = f"{fname_prefix}{rest}"
+                for _, row in monitors.iterrows():
+                    state = row["STATE"]
+                    site = row["LOCATION"].replace(" ", "_")
+                    vector = row["VECTOR"].replace(" ", "_")
 
-                fs = FileUtility.get_fs(url)
-                try:
+                    rest = f"{y}-{state}_{site}_{vector}.txt"
+                    fname = f"{fname_prefix}{rest}"
+
+                    if fname in all_fnames:
+                        urls.append(f"{year_url}{fname}")
+                        fnames.append(fname)
+            except Exception:
+                # Fallback to individual checks if ls fails or is not supported
+                for _, row in monitors.iterrows():
+                    state = row["STATE"]
+                    site = row["LOCATION"].replace(" ", "_")
+                    vector = row["VECTOR"].replace(" ", "_")
+
+                    rest = f"{y}-{state}_{site}_{vector}.txt"
+                    url = f"{year_url}{fname_prefix}{rest}"
+                    fname = f"{fname_prefix}{rest}"
+
                     if fs.exists(url):
                         urls.append(url)
                         fnames.append(fname)
-                except Exception:
-                    pass
 
         return urls, fnames
 
