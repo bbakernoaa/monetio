@@ -67,6 +67,42 @@ def kolmogorov_zurbenko_filter(df, window, iterations):
     return z
 
 
+def normalize_pandas_freq(freq):
+    """Normalize pandas frequency strings for compatibility with pandas 3.0+.
+
+    Parameters
+    ----------
+    freq : str
+        The frequency string to normalize.
+
+    Returns
+    -------
+    str
+        The normalized frequency string.
+    """
+    if freq is None:
+        return None
+
+    mapping = {
+        "H": "h",
+        "A": "YE",
+        "M": "ME",
+        "d": "D",
+        "AS": "YS",
+        "MS": "MS",
+    }
+    # Handle composite frequencies like '2H' -> '2h'
+    import re
+
+    match = re.match(r"(\d*)(.*)", freq)
+    if match:
+        number, unit = match.groups()
+        if unit in mapping:
+            return f"{number}{mapping[unit]}"
+
+    return mapping.get(freq, freq)
+
+
 def wsdir2uv(ws, wdir):
     from numpy import cos, pi, sin
 

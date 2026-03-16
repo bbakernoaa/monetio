@@ -181,11 +181,10 @@ class AQS:
         if "daily" in url:
             df = pd.read_csv(
                 url,
-                parse_dates={"time_local": ["Date Local"]},
-                infer_datetime_format=True,
                 dtype={0: str, 1: str, 2: str},
                 encoding="ISO-8859-1",
             )
+            df["time_local"] = pd.to_datetime(df["Date Local"])
             df.columns = self.renameddcols
             df["pollutant_standard"] = df.pollutant_standard.astype(str)
             self.daily = True
@@ -193,13 +192,10 @@ class AQS:
         else:
             df = pd.read_csv(
                 url,
-                parse_dates={
-                    "time": ["Date GMT", "Time GMT"],
-                    "time_local": ["Date Local", "Time Local"],
-                },
-                infer_datetime_format=True,
                 low_memory=False,
             )
+            df["time"] = pd.to_datetime(df["Date GMT"] + " " + df["Time GMT"])
+            df["time_local"] = pd.to_datetime(df["Date Local"] + " " + df["Time Local"])
             # print(df.columns.values)
             df.columns = self.columns_rename(df.columns.values)
 

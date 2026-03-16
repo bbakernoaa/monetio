@@ -259,10 +259,9 @@ class CRN:
             cols = self.dcols
             df = pd.read_csv(
                 url,
-                delim_whitespace=True,
+                sep=r"\s+",
                 names=cols,
                 parse_dates={"time_local": [1]},
-                infer_datetime_format=True,
                 na_values=nanvals,
             )
             self.daily = True
@@ -270,26 +269,24 @@ class CRN:
             cols = self.shcols
             df = pd.read_csv(
                 url,
-                delim_whitespace=True,
+                sep=r"\s+",
                 names=cols,
                 parse_dates={
                     "time": ["UTC_DATE", "UTC_TIME"],
                     "time_local": ["LST_DATE", "LST_TIME"],
                 },
-                infer_datetime_format=True,
                 na_values=nanvals,
             )
         else:
             cols = self.hcols
             df = pd.read_csv(
                 url,
-                delim_whitespace=True,
+                sep=r"\s+",
                 names=cols,
                 parse_dates={
                     "time": ["UTC_DATE", "UTC_TIME"],
                     "time_local": ["LST_DATE", "LST_TIME"],
                 },
-                infer_datetime_format=True,
                 na_values=nanvals,
             )
         return df

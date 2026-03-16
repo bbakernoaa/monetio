@@ -1045,7 +1045,6 @@ class MonitoringPlan(EpaApiObject):
             index_col=[0],
             converters=chash,
             parse_dates=["beginDateHour", "endDateHour"],
-            date_parser=lambda x: parsedate(x, self.dfmt),
         )
 
         self.dfall = df.copy()

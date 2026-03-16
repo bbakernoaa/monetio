@@ -225,9 +225,9 @@ def test_interp_daily_with_pytspack():
 @pytest.mark.parametrize(
     "dates",
     [
-        pd.to_datetime(["2019-09-01", "2019-09-02"]),
-        pd.to_datetime(["2019-09-01", "2019-09-03"]),
-        pd.to_datetime(["2019-09-01", "2019-09-01 12:00"]),
+        pd.to_datetime(["2019-09-01", "2019-09-02"], format="ISO8601"),
+        pd.to_datetime(["2019-09-01", "2019-09-03"], format="ISO8601"),
+        pd.to_datetime(["2019-09-01", "2019-09-01 12:00"], format="ISO8601"),
     ],
     ids=[
         "one day",

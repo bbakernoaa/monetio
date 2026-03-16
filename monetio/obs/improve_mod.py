@@ -73,7 +73,6 @@ class IMPROVE:
                 fname,
                 delimiter=delimiter,
                 parse_dates=[2],
-                infer_datetime_format=True,
                 dtype={"EPACode": str},
                 skiprows=skiprows,
             )
@@ -82,7 +81,6 @@ class IMPROVE:
                 fname,
                 delimiter=delimiter,
                 parse_dates=[2],
-                infer_datetime_format=True,
                 dtype={"EPACode": str},
             )
         df.rename(columns={"EPACode": "epaid"}, inplace=True)

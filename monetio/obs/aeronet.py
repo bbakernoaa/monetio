@@ -54,6 +54,9 @@ def add_local(
 
     # TODO: DRY wrt. class?
     if freq is not None:
+        from ..util import normalize_pandas_freq
+
+        freq = normalize_pandas_freq(freq)
         a.df = a.df.set_index("time").groupby("siteid").resample(freq).mean().reset_index()
 
     if detect_dust:
@@ -150,11 +153,19 @@ def add_data(
     requested_parallel = n_procs != 1
 
     # Split up by day
-    dates = pd.to_datetime(dates)
     if dates is not None:
+        from ..util import normalize_pandas_freq
+
+        dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
         min_date = dates.min()
         max_date = dates.max()
-        time_bounds = pd.date_range(start=min_date, end=max_date, freq="D")
+        # Ensure we have at least 2 distinct days for range if possible
+        if min_date.date() == max_date.date() and min_date != max_date:
+            time_bounds = pd.DatetimeIndex([min_date, max_date])
+        else:
+            time_bounds = pd.date_range(
+                start=min_date, end=max_date, freq=normalize_pandas_freq("D")
+            )
         if max_date not in time_bounds:
             time_bounds = time_bounds.append(pd.DatetimeIndex([max_date]))
 
@@ -165,6 +176,9 @@ def add_data(
         )
         df = pd.concat(dfs, ignore_index=True).drop_duplicates()
         if freq is not None:
+            from ..util import normalize_pandas_freq
+
+            freq = normalize_pandas_freq(freq)
             df.index = df.time
             df = df.groupby("siteid").resample(freq).mean().reset_index()
         return df.reset_index(drop=True)
@@ -359,7 +373,12 @@ class AERONET:
             # sites if the site isn't valid.
             # Note that having a valid site ID doesn't mean there will be any data
             # (depends on time period).
-            if self.siteid in get_valid_sites().siteid.values:
+            valid_sites = get_valid_sites()
+            if valid_sites is not None and self.siteid in valid_sites.siteid.values:
+                loc_ = f"&site={self.siteid}"
+            elif valid_sites is None:
+                # If we can't get the valid sites list, we just have to trust the user's ID
+                # and let the Web Service return what it will.
                 loc_ = f"&site={self.siteid}"
             else:
                 raise ValueError(f"invalid site {self.siteid!r}")
@@ -408,17 +427,39 @@ class AERONET:
             # With the `build_url` validation, we shouldn't get here
             raise Exception("invalid query, open the URL to check the error")
 
-        df = pd.read_csv(
-            self.url,
-            engine="python",
-            header="infer",
-            skiprows=skiprows,
-            parse_dates={"time": [1, 2]},
-            usecols=None,
-            # ^ SDA header is missing one column (80 vs 81 in data) and we lose one making 'time'
-            date_parser=lambda x: datetime.strptime(x, r"%d:%m:%Y %H:%M:%S"),
-            na_values=-999,
+        try:
+            df = pd.read_csv(
+                self.url,
+                header="infer",
+                skiprows=skiprows,
+                usecols=None,
+                # ^ SDA header is missing one column (80 vs 81 in data) and we lose one making 'time'
+                na_values=-999,
+                encoding="ISO-8859-1",
+                low_memory=False,
+            )
+        except Exception:
+            # Re-read with python engine if C engine fails
+            df = pd.read_csv(
+                self.url,
+                header="infer",
+                skiprows=skiprows,
+                usecols=None,
+                na_values=-999,
+                encoding="ISO-8859-1",
+                engine="python",
+            )
+        # Combined date and time parsing for Pandas 3.0+
+        # iloc[:, 1] is date, iloc[:, 2] is time
+        # Use .astype(str) and ensure we don't have leading/trailing spaces
+        time_str = (
+            df.iloc[:, 1].astype(str).str.strip() + " " + df.iloc[:, 2].astype(str).str.strip()
         )
+        df["time"] = pd.to_datetime(time_str, format=r"%d:%m:%Y %H:%M:%S", errors="coerce")
+        # Drop rows where time parsing failed
+        df = df.dropna(subset=["time"])
+        df["time"] = df["time"].dt.floor("s")
+
         df.rename(columns=str.lower, inplace=True)
         df.rename(
             columns={
@@ -465,8 +506,10 @@ class AERONET:
         self.latlonbox = latlonbox
         self.siteid = siteid
         if dates is None:  # get the current day
+            from ..util import normalize_pandas_freq
+
             now = datetime.utcnow()
-            self.dates = pd.date_range(start=now.date(), end=now, freq="H")
+            self.dates = pd.date_range(start=now.date(), end=now, freq=normalize_pandas_freq("H"))
         else:
             self.dates = pd.DatetimeIndex(dates)
         if product is not None:
@@ -496,6 +539,9 @@ class AERONET:
             ) from e
 
         if freq is not None:
+            from ..util import normalize_pandas_freq
+
+            freq = normalize_pandas_freq(freq)
             self.df = (
                 self.df.set_index("time").groupby("siteid").resample(freq).mean().reset_index()
             )
@@ -626,5 +672,11 @@ class AERONET:
         )
 
     def set_daterange(self, begin="", end=""):
-        dates = pd.date_range(start=begin, end=end, freq="H").values.astype("M8[s]").astype("O")
+        from ..util import normalize_pandas_freq
+
+        dates = (
+            pd.date_range(start=begin, end=end, freq=normalize_pandas_freq("H"))
+            .values.astype("M8[s]")
+            .astype("O")
+        )
         self.dates = dates

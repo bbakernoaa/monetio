@@ -68,7 +68,7 @@ def _get_sinu_grid_df():
     from pandas import read_csv
 
     f = path[:-8] + "data/sn_bound_10deg.txt"
-    td = read_csv(f, skiprows=4, delim_whitespace=True)
+    td = read_csv(f, skiprows=4, sep=r"\s+")
     td = td.assign(ihiv="h" + td.ih.astype(str).str.zfill(2) + "v" + td.iv.astype(str).str.zfill(2))
     return td
 

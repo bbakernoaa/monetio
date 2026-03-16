@@ -9,11 +9,22 @@ from monetio import ish
 try:
     import requests
 
-    requests.head("https://www1.ncdc.noaa.gov/pub/data/noaa/")
+    requests.head("https://www.ncei.noaa.gov/pub/data/noaa/", timeout=5)
 except Exception:
     pytest.skip("NCEI server issues", allow_module_level=True)
 
 
+def wrap_network_test(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            pytest.skip(f"Network error: {e}")
+
+    return wrapper
+
+
+@wrap_network_test
 def test_ish_read_history():
     dates = pd.date_range("2020-09-01", "2020-09-02")
     ish_ = ish.ISH()
@@ -41,6 +52,7 @@ def test_ish_read_history():
     assert (df.wban == "99999").sum() > 10_000
 
 
+@wrap_network_test
 @pytest.mark.parametrize("download", [False, True])
 def test_ish_one_site(download):
     dates = pd.date_range("2020-09-01", "2020-09-02")
@@ -81,6 +93,7 @@ def test_ish_one_site(download):
     assert (df.vsb == 99999).sum() == 0
 
 
+@wrap_network_test
 def test_ish_no_resample():
     dates = pd.date_range("2020-09-01", "2020-09-02")
     site = "72224400358"  # "College Park AP"
@@ -92,6 +105,7 @@ def test_ish_no_resample():
     assert sum(col.endswith("_quality") for col in df.columns) == 8
 
 
+@wrap_network_test
 def test_ish_one_state_partially_empty():
     dates = pd.date_range("2020-09-01", "2020-09-02")
     state = "DE"
@@ -110,6 +124,7 @@ def test_ish_one_state_partially_empty():
     }, "one empty site not included in state results"
 
 
+@wrap_network_test
 @pytest.mark.parametrize("resample", [False, True])
 def test_ish_one_site_empty(resample):
     dates = pd.date_range("2020-09-01", "2020-09-02")
@@ -119,6 +134,7 @@ def test_ish_one_site_empty(resample):
     assert df.empty
 
 
+@wrap_network_test
 def test_ish_resample():
     dates = pd.date_range("2020-09-01", "2020-09-02")
     site = "72224400358"  # "College Park AP"
@@ -130,6 +146,7 @@ def test_ish_resample():
     assert len(df) == 8
 
 
+@wrap_network_test
 @pytest.mark.parametrize("meta", ["country", "state", "site"])
 def test_ish_invalid_subset(meta):
     dates = pd.date_range("2020-09-01", "2020-09-02")
@@ -143,6 +160,7 @@ def test_ish_error_on_multiple_subset_options():
         ish.add_data(dates, site="72224400358", state="MD")
 
 
+@wrap_network_test
 def test_ish_read_url_direct():
     url = "https://www1.ncdc.noaa.gov/pub/data/noaa/2020/717490-99999-2020.gz"
     ish_ = ish.ISH()

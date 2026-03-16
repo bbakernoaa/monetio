@@ -48,7 +48,7 @@ class NADP:
         print("Reading NADP-NTN Data...")
         print(url)
         # header = self.get_columns()
-        df = pd.read_csv(url, infer_datetime_format=True, parse_dates=[2, 3])
+        df = pd.read_csv(url, parse_dates=[2, 3])
         df.columns = [i.lower() for i in df.columns]
         df.rename(columns={"dateon": "time", "dateoff": "time_off"}, inplace=True)
         try:
@@ -73,7 +73,7 @@ class NADP:
     def read_mdn(self, url):
         print("Reading NADP-MDN Data...")
         # header = self.get_columns()
-        df = pd.read_csv(url, infer_datetime_format=True, parse_dates=[1, 2])
+        df = pd.read_csv(url, parse_dates=[1, 2])
         df.columns = [i.lower() for i in df.columns]
         df.rename(columns={"dateon": "time", "dateoff": "time_off"}, inplace=True)
         try:
@@ -91,7 +91,7 @@ class NADP:
     def read_airmon(self, url):
         print("Reading NADP-AIRMoN Data...")
         # header = self.get_columns()
-        df = pd.read_csv(url, infer_datetime_format=True, parse_dates=[2, 3])
+        df = pd.read_csv(url, parse_dates=[2, 3])
         df.columns = [i.lower() for i in df.columns]
         df.rename(columns={"dateon": "time", "dateoff": "time_off"}, inplace=True)
         try:
@@ -130,7 +130,7 @@ class NADP:
     def read_amon(self, url):
         print("Reading NADP-AMoN Data...")
         # header = self.get_columns()
-        df = pd.read_csv(url, infer_datetime_format=True, parse_dates=[2, 3])
+        df = pd.read_csv(url, parse_dates=[2, 3])
         df.columns = [i.lower() for i in df.columns]
         df.rename(columns={"startdate": "time", "enddate": "time_off"}, inplace=True)
         try:
@@ -148,7 +148,7 @@ class NADP:
     def read_amnet(self, url):
         print("Reading NADP-AMNet Data...")
         # header = self.get_columns()
-        df = pd.read_csv(url, infer_datetime_format=True, parse_dates=[2, 3])
+        df = pd.read_csv(url, parse_dates=[2, 3])
         df.columns = [i.lower() for i in df.columns]
         df.rename(columns={"startdate": "time", "enddate": "time_off"}, inplace=True)
         try:
