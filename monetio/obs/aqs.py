@@ -185,10 +185,22 @@ class AQS:
                 encoding="ISO-8859-1",
             )
             df["time_local"] = pd.to_datetime(df["Date Local"])
-            df.columns = self.renameddcols
-            df["pollutant_standard"] = df.pollutant_standard.astype(str)
+            # Ensure column count matches before renaming
+            # Note: renameddcols is 29 elements.
+            # Some daily files might have an extra column or missing columns.
+            if len(df.columns) == len(self.renameddcols):
+                df.columns = self.renameddcols
+            else:
+                df.columns = self.columns_rename(df.columns.values)
+            if "pollutant_standard" in df.columns:
+                df["pollutant_standard"] = df.pollutant_standard.astype(str)
+            if "arithmetic_mean" in df.columns:
+                df.rename(columns={"arithmetic_mean": "obs"}, inplace=True)
+            elif "Sample Measurement" in df.columns:
+                df.rename(columns={"Sample Measurement": "obs"}, inplace=True)
+            if "time" not in df.columns:
+                df["time"] = df["time_local"]
             self.daily = True
-            # df.rename(columns={'parameter_name':'variable'})
         else:
             df = pd.read_csv(
                 url,
