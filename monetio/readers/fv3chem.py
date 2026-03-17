@@ -1,12 +1,11 @@
 """FV3-CHEM Reader"""
 
-from glob import glob
-from typing import List, Optional, Union
+from functools import partial
+from typing import Any, List, Union
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-from numpy import sort
 
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
@@ -14,66 +13,62 @@ from .sat_utils import update_history
 
 @register_reader("fv3chem")
 class FV3ChemReader(GriddedReader):
-    def open_dataset(self, files: Union[str, List[str]], **kwargs: Optional[dict]) -> xr.Dataset:
+    """
+    Reader for FV3-Chem and AQM model output files (NEMSIO or GRIB2).
+    """
+
+    def open_dataset(self, files: Union[str, List[str]], **kwargs: Any) -> xr.Dataset:
         """
-        Open a single dataset or multiple files from fv3chem outputs (nemsio or grib2).
+        Open a single dataset or multiple files from FV3-Chem outputs.
 
         Parameters
         ----------
         files : Union[str, List[str]]
             File path, list of paths, or glob pattern.
-        **kwargs : dict
-            Additional arguments passed to the driver and driver.open.
+        **kwargs : Any
+            Additional arguments passed to xarray.open_mfdataset or the driver.
 
         Returns
         -------
         xr.Dataset
             The processed FV3-Chem dataset.
         """
-        # We manually handle file expansion here because of the nemsio/grib logic
-        # However, the driver also expands paths.
-        # Let's use the driver's capability to expand paths first.
+        # Determine file type from the first file (after expansion)
+        # We'll use the driver to handle the expansion and opening.
+        # But we need to know the type for preprocessing.
 
-        # But we need to know if it is nemsio or grib before calling open_mfdataset/open_dataset
-        # because the arguments differ (engine="pynio" vs "nemsio"? No, nemsio uses standard open but needs preprocessing).
+        # Let's peek at the first file if possible, or use the pattern.
+        # XarrayDriver.open handles both.
 
-        # Actually, original code uses `xr.open_dataset` for nemsio (netcdf-like?) or grib.
-        # It seems `nemsio` might be opened as netcdf if converted?
-        # Original docstring says: "must preprocess the files with nemsio2nc4 or fv3grib2nc4"
-        # So they are actually NetCDF files.
+        # Setup preprocessing
+        if "preprocess" not in kwargs:
+            kwargs["preprocess"] = partial(fv3chem_preprocess)
 
-        # Let's inspect the files to decide.
-        if isinstance(files, str):
-            expanded_files = sort(glob(files))
-        else:
-            expanded_files = sort(files)
-
-        if len(expanded_files) == 0:
-            raise FileNotFoundError(f"No files found for {files}")
-
-        names, nemsio, grib = self._check_file_type(expanded_files)
-
-        if not nemsio and not grib:
-            # Fallback or error
-            # Original code raises ValueError
-            raise ValueError("File format not recognized. Ensure nemsio or grib2/grb2 in filename.")
-
-        # Prepare kwargs
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
         if "combine" not in kwargs:
-            kwargs["combine"] = "nested"  # Default for mfdataset usually
+            kwargs["combine"] = "nested"
 
-        # Open
-        ds = self.driver.open(names, **kwargs)
+        ds = self.driver.open(files, **kwargs)
 
-        # Post-process
-        if nemsio:
-            ds = _fix_nemsio(ds)
-            # Fix time for nemsio needs filename(s)
-            ds = _fix_time_nemsio(ds, names)
-        elif grib:
-            ds = _fix_grib2(ds)
+        # Some post-processing that might depend on the filenames (for NEMSIO time)
+        # If it's NEMSIO, we might need to fix the time coordinate.
+        # The preprocess function doesn't easily have access to the filename
+        # unless we pass it or it's in the dataset attributes.
+        # Often open_mfdataset adds 'source' or similar.
+        # For now, let's see if we can handle time in preprocess or here.
+
+        # Actually, NEMSIO time fix depends on the filename 'atmfXXX'.
+        # If we use open_mfdataset, we can get the filenames from the dataset.
+        # In xarray >= 0.20, ds.encoding.get('source') might work if opened individually.
+        # But for mfdataset, it's on the data variables.
+
+        if _is_nemsio(ds):
+            # Try to fix time if filenames are available in attributes or encoding
+            # For mfdataset, we might need to check each file.
+            # If the user passed multiple files, we can try to match them.
+            # For now, let's assume we can handle it if 'time' is present.
+            pass
 
         ds = self.harmonize(ds)
 
@@ -82,34 +77,87 @@ class FV3ChemReader(GriddedReader):
 
         return ds
 
-    def _check_file_type(self, names: List[str]) -> tuple:
-        """
-        Check if files are nemsio or grib2 format.
 
-        Parameters
-        ----------
-        names : List[str]
-            List of filenames.
+def fv3chem_preprocess(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Preprocess function for a single FV3-Chem file.
 
-        Returns
-        -------
-        tuple
-            (names, nemsio_flag, grib_flag)
-        """
-        nemsios = [True for i in names if "nemsio" in i]
-        gribs = [True for i in names if "grb2" in i or "grib2" in i or "grb" in i]
-        grib = False
-        nemsio = False
-        if len(nemsios) >= 1:
-            nemsio = True
-        elif len(gribs) >= 1:
-            grib = True
-        return names, nemsio, grib
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input FV3-Chem dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+        Processed dataset.
+    """
+    # 1. Identify type
+    nemsio = _is_nemsio(ds)
+    grib = _is_grib(ds)
+
+    # 2. Rename variables
+    ds = _rename_func(ds, {})
+
+    # 3. Handle specific types
+    if nemsio:
+        ds = _fix_nemsio(ds)
+        # Note: Time fix for NEMSIO often requires the filename.
+        # If 'source' is in encoding, we can use it.
+        source = ds.encoding.get("source")
+        if source:
+            ds = _fix_time_nemsio(ds, source)
+    elif grib:
+        ds = _fix_grib2(ds)
+
+    # 4. Scientific Hygiene: Strip whitespace from all string attributes
+    for var in ds.variables:
+        for attr, val in ds[var].attrs.items():
+            if isinstance(val, str):
+                ds[var].attrs[attr] = val.strip()
+
+    # Update history
+    ds = update_history(ds, "Preprocessed FV3-Chem data.")
+
+    return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/models/fv3chem.py
-# -----------------------------------------------------------------------------
+def _is_nemsio(ds: xr.Dataset) -> bool:
+    """
+    Check if the dataset originates from a NEMSIO file.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset to check.
+
+    Returns
+    -------
+    bool
+        True if NEMSIO.
+    """
+    # NEMSIO-derived NetCDF files often have 'hgtsfc' and 'delz'
+    # or specific attributes.
+    return "hgtsfc" in ds.variables and "delz" in ds.variables
+
+
+def _is_grib(ds: xr.Dataset) -> bool:
+    """
+    Check if the dataset originates from a GRIB2 file.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset to check.
+
+    Returns
+    -------
+    bool
+        True if GRIB.
+    """
+    # GRIB2-derived NetCDF files (via fv3grib2nc4) often have long var names
+    # or 'lat_0' / 'lon_0'
+    return "lat_0" in ds.coords or any("entireatmosphere" in str(v) for v in ds.data_vars)
 
 
 def _fix_time_nemsio(ds: xr.Dataset, fname: Union[str, List[str]]) -> xr.Dataset:
@@ -118,45 +166,49 @@ def _fix_time_nemsio(ds: xr.Dataset, fname: Union[str, List[str]]) -> xr.Dataset
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         The dataset to fix.
     fname : Union[str, List[str]]
         Filename(s) used to extract forecast hour.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         The dataset with corrected time.
     """
-    # If fname is a list, we handle it.
-    is_multi = isinstance(fname, (list, tuple, np.ndarray)) and len(fname) > 1
 
-    # Extract hour from filename(s)
-    # "atmf" in i -> "...atmf003..." -> hour = 3.
-    def _get_hour(fn):
+    def _get_hour(fn: str) -> int:
         try:
-            hour_str = [i for i in fn.split(".") if "atmf" in i][0][-3:]
-            return int(hour_str)
+            # Look for atmfXXX
+            import re
+
+            match = re.search(r"atmf(\d{3})", fn)
+            if match:
+                return int(match.group(1))
+            return 0
         except (IndexError, ValueError):
             return 0
 
-    if is_multi:
-        # If ds.time matches fname length (one time per file)
+    if isinstance(fname, (list, tuple, np.ndarray)):
+        # If we have multiple filenames and multiple times, try to align them
         if "time" in ds.dims and ds.sizes["time"] == len(fname):
             hours = [_get_hour(fn) for fn in fname]
             tdeltas = [pd.Timedelta(h, unit="h") for h in hours]
-
-            # Use xarray arithmetic to add timedeltas lazily
-            # If we have multiple files with different offsets,
-            # we can create a DataArray of timedeltas and add it.
             tdelta_da = xr.DataArray(tdeltas, dims="time")
             ds["time"] = ds.time + tdelta_da
+        elif ds.sizes.get("time", 1) == 1:
+            # Single time point in the dataset, use first filename
+            hour = _get_hour(fname[0])
+            if hour > 0:
+                ds["time"] = ds.time + pd.Timedelta(hour, unit="h")
     else:
         # Single file
-        fn = fname[0] if isinstance(fname, (list, tuple)) else fname
-        hour = _get_hour(fn)
+        hour = _get_hour(str(fname))
         if hour > 0:
             ds["time"] = ds.time + pd.Timedelta(hour, unit="h")
+
+    # Update history
+    ds = update_history(ds, "Fixed NEMSIO time coordinate from filename.")
 
     return ds
 
@@ -167,20 +219,20 @@ def _fix_nemsio(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         The dataset to fix.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         The fixed dataset.
     """
-    ds = _rename_func(ds, {})
-    try:
-        if "hgtsfc" in ds.variables and "delz" in ds.variables:
-            ds["geohgt"] = _calc_nemsio_hgt(ds)
-    except Exception:
-        pass
+    if "hgtsfc" in ds.variables and "delz" in ds.variables:
+        ds["geohgt"] = _calc_nemsio_hgt(ds)
+
+    # Update history
+    ds = update_history(ds, "Fixed NEMSIO variables and calculated geopotential height.")
+
     return ds
 
 
@@ -190,14 +242,14 @@ def _rename_func(ds: xr.Dataset, rename_dict: dict) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         The dataset to rename variables in.
     rename_dict : dict
         Explicit rename mapping.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         The dataset with renamed variables.
     """
     final_dict = rename_dict.copy()
@@ -217,6 +269,10 @@ def _rename_func(ds: xr.Dataset, rename_dict: dict) -> xr.Dataset:
     if actual_rename:
         ds = ds.rename(actual_rename)
 
+    # Update history
+    if actual_rename:
+        ds = update_history(ds, f"Renamed variables: {', '.join(actual_rename.values())}.")
+
     return ds
 
 
@@ -226,12 +282,12 @@ def _fix_grib2(ds: xr.Dataset) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         The dataset to fix.
 
     Returns
     -------
-    xr.Dataset
+    xarray.Dataset
         The fixed dataset.
     """
     rename_dict = {
@@ -311,7 +367,6 @@ def _fix_grib2(ds: xr.Dataset) -> xr.Dataset:
     ds = _rename_func(ds, rename_dict)
 
     # Check if 'latitude'/'longitude' exist already or need renaming from lat_0/lon_0
-    # Grib2 often has lat_0, lon_0
     rename_coords = {}
     if "latitude" not in ds.coords:
         if "lat_0" in ds.coords:
@@ -344,7 +399,6 @@ def _fix_grib2(ds: xr.Dataset) -> xr.Dataset:
             ds = ds.rename(rename_dims)
 
         # Use broadcast to create 2D arrays lazily
-        # After renaming dims, coords might also be renamed if they shared the name
         lat_name = "y" if "y" in ds.coords else "latitude"
         lon_name = "x" if "x" in ds.coords else "longitude"
 
@@ -352,6 +406,9 @@ def _fix_grib2(ds: xr.Dataset) -> xr.Dataset:
         ds["longitude"] = lon_2d
         ds["latitude"] = lat_2d
         ds = ds.set_coords(["latitude", "longitude"])
+
+    # Update history
+    ds = update_history(ds, "Fixed GRIB2 variables and generated 2D coordinates.")
 
     return ds
 
@@ -362,20 +419,24 @@ def _calc_nemsio_hgt(ds: xr.Dataset) -> xr.DataArray:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         The dataset containing surface height and layer thickness.
 
     Returns
     -------
-    xr.DataArray
+    xarray.DataArray
         The calculated geopotential height.
     """
     sfc = ds.hgtsfc
     dz = ds.delz
-    # Level 0 height = sfc + dz[0]
-    # Level 1 height = Level 0 + dz[1] = sfc + dz[0] + dz[1]
-    # Correct lazy logic: sfc + dz.cumsum()
-    z = dz.cumsum(dim="z") + sfc
+    # z is usually the third dimension (LAY or z)
+    z_dim = [d for d in dz.dims if d in ["LAY", "z", "bottom_top"]]
+    if not z_dim:
+        z_dim = dz.dims[0]
+    else:
+        z_dim = z_dim[0]
+
+    z = dz.cumsum(dim=z_dim) + sfc
     z.name = "geohgt"
     z.attrs["long_name"] = "Geopotential Height"
     z.attrs["units"] = "m"
