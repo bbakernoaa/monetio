@@ -337,6 +337,7 @@ def add_monitor_metadata(
     airnow: bool = False,
     daily: bool = False,
     left_on: str = "siteid",
+    history_msg: Optional[str] = None,
 ) -> Union[pd.DataFrame, "dd.DataFrame"]:
     """
     Add site metadata from the monitor file (AQS or AirNow).
@@ -353,6 +354,8 @@ def add_monitor_metadata(
         Whether to adjust 'time' for daily data using 'gmt_offset', by default False.
     left_on : str, optional
         The column in `df` to merge on, by default 'siteid'.
+    history_msg : str, optional
+        Optional history message to add to the dataframe attributes, by default None.
 
     Returns
     -------
@@ -405,7 +408,9 @@ def add_monitor_metadata(
         df["time"] = df.time_local - lib.to_timedelta(df.gmt_offset, unit="h")
 
     # Update history
-    df = update_history(df, f"Added station metadata from {'AirNow' if airnow else 'AQS'}.")
+    if history_msg is None:
+        history_msg = f"Added station metadata from {'AirNow' if airnow else 'AQS'}."
+    df = update_history(df, history_msg)
 
     return df
 

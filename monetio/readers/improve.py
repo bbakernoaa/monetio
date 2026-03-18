@@ -125,7 +125,12 @@ class IMPROVEReader(PointReader):
         --------
         >>> df = reader.add_metadata(df)
         """
-        df = add_monitor_metadata(df, network="IMPROVE", left_on="epaid")
+        df = add_monitor_metadata(
+            df,
+            network="IMPROVE",
+            left_on="epaid",
+            history_msg="Merged with IMPROVE station metadata.",
+        )
 
         # Handle IMPROVE-specific column name cleanup
         if "state_name_y" in df.columns:

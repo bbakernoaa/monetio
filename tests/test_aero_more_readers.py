@@ -22,7 +22,7 @@ def mock_improve_file(tmp_path):
 def test_improve_reader_eager(mock_improve_file):
     reader = IMPROVEReader()
     # Mock monitor file read
-    with patch("monetio.readers.improve.read_monitor_file") as mock_mon:
+    with patch("monetio.readers.epa_utils.read_monitor_file") as mock_mon:
         mock_mon.return_value = pd.DataFrame(
             {"siteid": ["123456789"], "latitude": [39.0], "longitude": [-76.5]}
         )
@@ -36,7 +36,7 @@ def test_improve_reader_eager(mock_improve_file):
 def test_improve_reader_lazy(mock_improve_file):
     pytest.importorskip("dask")
     reader = IMPROVEReader()
-    with patch("monetio.readers.improve.read_monitor_file") as mock_mon:
+    with patch("monetio.readers.epa_utils.read_monitor_file") as mock_mon:
         mock_mon.return_value = pd.DataFrame(
             {"siteid": ["123456789"], "latitude": [39.0], "longitude": [-76.5]}
         )
