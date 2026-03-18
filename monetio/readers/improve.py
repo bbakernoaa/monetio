@@ -9,7 +9,7 @@ import xarray as xr
 from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
-from .epa_utils import read_monitor_file
+from .epa_utils import add_monitor_metadata
 from .sat_utils import update_history
 
 try:
@@ -125,34 +125,18 @@ class IMPROVEReader(PointReader):
         --------
         >>> df = reader.add_metadata(df)
         """
-        monitor_df = read_monitor_file(network="IMPROVE")
+        df = add_monitor_metadata(
+            df,
+            network="IMPROVE",
+            left_on="epaid",
+            history_msg="Merged with IMPROVE station metadata.",
+        )
 
-        # Ensure siteid is object for reliable merging
-        monitor_df = monitor_df.copy().drop_duplicates(subset=["siteid"])
-        monitor_df = force_object_strings(monitor_df)
-
-        # Backend-agnostic site ID cast
-        df["epaid"] = df["epaid"].astype(object)
-
-        # Identify backend and wrap monitor_df if needed
-        if hasattr(df, "npartitions"):
-            # Dask detected
-            import dask.dataframe as dd_local
-
-            monitor_wrap = dd_local.from_pandas(monitor_df, npartitions=1)
-        else:
-            monitor_wrap = monitor_df
-
-        # Merge
-        df = df.merge(monitor_wrap, left_on="epaid", right_on="siteid", how="left")
-
-        # Handle column name conflicts from merge
-        if "siteid_x" in df.columns:
-            df = df.drop(columns=["siteid_y", "state_name_y"], errors="ignore")
-            df = df.rename(columns={"siteid_x": "siteid", "state_name_x": "state_name"})
-
-        # Update history if possible
-        df = update_history(df, "Merged with IMPROVE station metadata.")
+        # Handle IMPROVE-specific column name cleanup
+        if "state_name_y" in df.columns:
+            df = df.drop(columns=["state_name_y"], errors="ignore").rename(
+                columns={"state_name_x": "state_name"}
+            )
 
         return df
 

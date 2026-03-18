@@ -13,10 +13,10 @@ if TYPE_CHECKING:
     import dask.dataframe as dd
 from numpy import nan
 
-from ..util import force_object_strings, long_to_wide
+from ..util import long_to_wide
 from .base import PointReader, register_reader
 from .drivers import FileUtility
-from .epa_utils import read_monitor_file
+from .epa_utils import add_monitor_metadata
 from .sat_utils import update_history
 
 
@@ -545,32 +545,4 @@ def get_station_locations(
     Union[pd.DataFrame, dd.DataFrame]
         Dataframe with site metadata.
     """
-    # Check if dask
-    try:
-        import dask.dataframe as dd
-
-        is_dask = isinstance(df, dd.DataFrame)
-    except ImportError:
-        is_dask = False
-
-    monitor_df = read_monitor_file(airnow=True)
-
-    # To avoid "boolean value of NA is ambiguous" and merge warnings,
-    # we force string columns to 'object' (NumPy style) rather than nullable 'string'.
-    # This ensures bit-perfect matching in tests and avoids Dask/Pandas 3.0 discrepancies.
-    monitor_df = force_object_strings(monitor_df.drop_duplicates(subset=["siteid"]))
-
-    if is_dask:
-        # Cast key to object on dask side too
-        df["siteid"] = df["siteid"].astype(object)
-        # Convert monitor_df to dask to ensure consistent merging
-        # and explicitly cast to object to avoid nullable string issues in Pandas 3.0
-        monitor_df_dask = dd.from_pandas(monitor_df, npartitions=1).assign(
-            siteid=lambda x: x.siteid.astype(object)
-        )
-        df = df.merge(monitor_df_dask, on="siteid", how="left")
-    else:
-        df["siteid"] = df["siteid"].astype(object)
-        df = df.merge(monitor_df, on="siteid", how="left")
-
-    return df
+    return add_monitor_metadata(df, airnow=True)

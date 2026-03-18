@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional, Union
 import pandas as pd
 
 from ..util import force_object_strings
+from .sat_utils import update_history
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
@@ -325,8 +326,149 @@ def convert_epa_unit(
         df[unit_column] = df[unit_column].mask(mask, ppb)
 
     # Update history
-    from .sat_utils import update_history
-
     df = update_history(df, f"Converted {species} to {to_unit}.")
+
+    return df
+
+
+def add_monitor_metadata(
+    df: Union[pd.DataFrame, "dd.DataFrame"],
+    network: Optional[str] = None,
+    airnow: bool = False,
+    daily: bool = False,
+    left_on: str = "siteid",
+    history_msg: Optional[str] = None,
+) -> Union[pd.DataFrame, "dd.DataFrame"]:
+    """
+    Add site metadata from the monitor file (AQS or AirNow).
+
+    Parameters
+    ----------
+    df : Union[pd.DataFrame, dd.DataFrame]
+        Input dataframe.
+    network : str, optional
+        Filter by network (e.g., 'IMPROVE'), by default None.
+    airnow : bool, optional
+        Whether to load the AirNow monitor file instead of AQS, by default False.
+    daily : bool, optional
+        Whether to adjust 'time' for daily data using 'gmt_offset', by default False.
+    left_on : str, optional
+        The column in `df` to merge on, by default 'siteid'.
+    history_msg : str, optional
+        Optional history message to add to the dataframe attributes, by default None.
+
+    Returns
+    -------
+    Union[pd.DataFrame, dd.DataFrame]
+        Dataframe with metadata merged.
+
+    Examples
+    --------
+    >>> df = add_monitor_metadata(df, network='IMPROVE', left_on='epaid')
+    """
+    try:
+        import dask.dataframe as dd
+
+        is_dask = isinstance(df, dd.DataFrame)
+        lib = dd if is_dask else pd
+    except ImportError:
+        is_dask = False
+        lib = pd
+
+    monitor_df = read_monitor_file(network=network, airnow=airnow)
+
+    if monitor_df.empty:
+        return df
+
+    # Ensure siteid is unique and object for reliable merging
+    monitor_df = force_object_strings(monitor_df.drop_duplicates(subset=["siteid"]))
+
+    # Prepare keys
+    df = df.assign(**{left_on: df[left_on].astype(object)})
+
+    if is_dask:
+        monitor_wrap = dd.from_pandas(monitor_df, npartitions=1)
+        # Re-force object strings on the Dask-wrapped monitor file
+        # to ensure it doesn't revert to nullable strings during wrapping.
+        monitor_wrap = force_object_strings(monitor_wrap)
+    else:
+        monitor_wrap = monitor_df
+
+    # Merge
+    df = df.merge(monitor_wrap, left_on=left_on, right_on="siteid", how="left")
+
+    # Handle column name conflicts from merge
+    if left_on != "siteid" and "siteid_x" in df.columns:
+        df = df.drop(columns=["siteid_y"], errors="ignore").rename(columns={"siteid_x": "siteid"})
+    elif "siteid_x" in df.columns:
+        df = df.drop(columns=["siteid_y"], errors="ignore").rename(columns={"siteid_x": "siteid"})
+
+    if daily and "gmt_offset" in df.columns and "time_local" in df.columns:
+        # Adjust time for daily data based on local time and offset
+        df["time"] = df.time_local - lib.to_timedelta(df.gmt_offset, unit="h")
+
+    # Update history
+    if history_msg is None:
+        history_msg = f"Added station metadata from {'AirNow' if airnow else 'AQS'}."
+    df = update_history(df, history_msg)
+
+    return df
+
+
+def standardize_epa_units(
+    df: Union[pd.DataFrame, "dd.DataFrame"],
+) -> Union[pd.DataFrame, "dd.DataFrame"]:
+    """
+    Standardize EPA units and adjust observation values accordingly.
+
+    Converts:
+    - Knots to m/s
+    - degrees Fahrenheit to K
+    - Normalizes several common unit names (e.g., 'parts per billion' to 'ppb')
+
+    Parameters
+    ----------
+    df : Union[pd.DataFrame, dd.DataFrame]
+        Input dataframe.
+
+    Returns
+    -------
+    Union[pd.DataFrame, dd.DataFrame]
+        Dataframe with standardized units and values.
+
+    Examples
+    --------
+    >>> df = standardize_epa_units(df)
+    """
+    # Knots to m/s
+    is_knots = df.units.str.lower() == "knots"
+    df["obs"] = df["obs"].mask(is_knots, df.obs * 0.51444)
+    df["units"] = df["units"].mask(is_knots, "m/s")
+
+    # Fahrenheit to Kelvin
+    is_f = df.units.str.lower() == "degrees fahrenheit"
+    df["obs"] = df["obs"].mask(is_f, (df.obs + 459.67) * 5.0 / 9.0)
+    df["units"] = df["units"].mask(is_f, "k")
+
+    # Others (just rename)
+    unit_map = {
+        "parts per billion carbon": "ppbC",
+        "parts per billion": "ppb",
+        "parts per million": "ppm",
+        "micrograms/cubic meter (25 c)": "ug/m3",
+        "micrograms/cubic meter (lc)": "ug/m3",
+        "degrees centigrade": "c",
+        "percent relative humidity": "%",
+    }
+
+    # Apply mapping to units column
+    df["units_lower"] = df.units.str.lower()
+    for old, new in unit_map.items():
+        df["units"] = df["units"].mask(df.units_lower == old, new)
+
+    df = df.drop(columns="units_lower")
+
+    # Update history
+    df = update_history(df, "Standardized units and adjusted observation values.")
 
     return df
