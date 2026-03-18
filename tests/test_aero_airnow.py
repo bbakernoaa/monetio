@@ -41,9 +41,9 @@ def test_airnow_eager_vs_lazy_local(mock_airnow_file, monkeypatch):
             }
         )
 
-    import monetio.readers.airnow as airnow
+    import monetio.readers.epa_utils as epa_utils
 
-    monkeypatch.setattr(airnow, "read_monitor_file", mock_read_monitor)
+    monkeypatch.setattr(epa_utils, "read_monitor_file", mock_read_monitor)
     reader = AirNowReader()
     ds_eager = reader.open_dataset(
         files=mock_airnow_file, as_xarray=True, lazy=False, wide_fmt=True, bad_utcoffset="fix"

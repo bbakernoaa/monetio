@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 from monetio.util import force_object_strings, long_to_wide
 
 from .base import PointReader, register_reader
-from .epa_utils import read_monitor_file
+from .epa_utils import add_monitor_metadata, standardize_epa_units
 from .sat_utils import update_history
 
 logger = logging.getLogger(__name__)
@@ -280,7 +280,7 @@ class AQS:
             df.drop(["datum", "qualifier"], axis=1, inplace=True, errors="ignore")
         voc = "VOC" in url
         df = self.get_species(df, voc=voc)
-        df = self.change_units(df)
+        df = standardize_epa_units(df)
         df = force_object_strings(df)
         return df.drop(columns="date_of_last_change", errors="ignore")
 
@@ -376,40 +376,7 @@ class AQS:
         self, df: Union[pd.DataFrame, "dd.DataFrame"], daily: bool = False, network: str = None
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         """Add site metadata and adjust time for daily data."""
-        try:
-            import dask.dataframe as dd
-
-            is_dask = isinstance(df, dd.DataFrame)
-        except ImportError:
-            is_dask = False
-
-        monitor_df = read_monitor_file()
-
-        if network is not None:
-            monitors = monitor_df.loc[monitor_df.isin([network]).any(axis=1)].drop_duplicates(
-                subset=["siteid"]
-            )
-        else:
-            monitors = monitor_df.drop_duplicates(subset=["siteid"])
-
-        # Ensure siteid is object for reliable merging
-        monitors = monitors.copy()
-        monitors["siteid"] = monitors["siteid"].astype(object)
-
-        if is_dask:
-            df["siteid"] = df["siteid"].astype(object)
-            monitors_dask = dd.from_pandas(monitors, npartitions=1)
-            df = df.merge(monitors_dask, on="siteid", how="left")
-        else:
-            df["siteid"] = df["siteid"].astype(object)
-            df = df.merge(monitors, on="siteid", how="left")
-
-        if daily and "gmt_offset" in df.columns:
-            # Adjust time for daily data based on local time and offset
-            if is_dask:
-                df["time"] = df.time_local - dd.to_timedelta(df.gmt_offset, unit="h")
-            else:
-                df["time"] = df.time_local - pd.to_timedelta(df.gmt_offset, unit="h")
+        df = add_monitor_metadata(df, network=network, daily=daily)
 
         if "parameter_name" in df.columns:
             df = df.drop(columns="parameter_name")
@@ -527,40 +494,5 @@ class AQS:
                     warnings.warn(f"Short names not available for these variables:\n{_tbl}")
 
         df["variable"] = df["variable"].fillna(df["parameter_name"])
-
-        return df
-
-    @staticmethod
-    def change_units(
-        df: Union[pd.DataFrame, "dd.DataFrame"],
-    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
-        """Standardize units and adjust observation values accordingly."""
-        # Knots to m/s
-        is_knots = df.units.str.lower() == "knots"
-        df["obs"] = df["obs"].mask(is_knots, df.obs * 0.51444)
-        df["units"] = df["units"].mask(is_knots, "m/s")
-
-        # Fahrenheit to Kelvin
-        is_f = df.units.str.lower() == "degrees fahrenheit"
-        df["obs"] = df["obs"].mask(is_f, (df.obs + 459.67) * 5.0 / 9.0)
-        df["units"] = df["units"].mask(is_f, "k")
-
-        # Others (just rename)
-        unit_map = {
-            "parts per billion carbon": "ppbC",
-            "parts per billion": "ppb",
-            "parts per million": "ppm",
-            "micrograms/cubic meter (25 c)": "ug/m3",
-            "micrograms/cubic meter (lc)": "ug/m3",
-            "degrees centigrade": "c",
-            "percent relative humidity": "%",
-        }
-
-        # Apply mapping to units column
-        df["units_lower"] = df.units.str.lower()
-        for old, new in unit_map.items():
-            df["units"] = df["units"].mask(df.units_lower == old, new)
-
-        df = df.drop(columns="units_lower")
 
         return df
