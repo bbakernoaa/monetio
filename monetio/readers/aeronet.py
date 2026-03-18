@@ -37,6 +37,7 @@ class AERONETReader(PointReader):
         lunar: bool = False,
         freq: Optional[str] = None,
         detect_dust: bool = False,
+        add_diagnostics: bool = False,
         interp_to_aod_values: Optional[Union[List[float], np.ndarray]] = None,
         n_procs: int = 1,
         as_xarray: bool = True,
@@ -222,6 +223,19 @@ class AERONETReader(PointReader):
 
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
+
+            if add_diagnostics:
+                # Add 550nm AOD if possible
+                if "aod_500nm" in ds.variables and "440-870_angstrom_exponent" in ds.variables:
+                    ds = add_aod_at_wavelength(ds, target_wv=550.0, base_wv=500.0)
+                elif (
+                    "aod_500nm" in ds.variables
+                    and "aod_440nm" in ds.variables
+                    and "aod_870nm" in ds.variables
+                ):
+                    # Calculate AE first
+                    ds = add_angstrom_exponent(ds, wv1=440.0, wv2=870.0)
+                    ds = add_aod_at_wavelength(ds, target_wv=550.0, base_wv=500.0)
 
             # Update history
             ds = update_history(ds, "Read AERONET data.")
@@ -805,6 +819,137 @@ def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray
                 df = df.rename(columns={ename: f"{ename}{suff}"})
 
     return pd.concat([df, out], axis=1)
+
+
+def add_angstrom_exponent(
+    ds: xr.Dataset,
+    wv1: float = 440.0,
+    wv2: float = 870.0,
+    aod1_name: Optional[str] = None,
+    aod2_name: Optional[str] = None,
+    output_name: Optional[str] = None,
+) -> xr.Dataset:
+    """
+    Calculate the Angstrom Exponent (AE) between two wavelengths.
+    AE = -log(AOD1/AOD2) / log(WV1/WV2)
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+    wv1 : float, optional
+        First wavelength in nm, by default 440.0.
+    wv2 : float, optional
+        Second wavelength in nm, by default 870.0.
+    aod1_name : str, optional
+        Name of the first AOD variable. If None, uses 'aod_{wv1}nm'.
+    aod2_name : str, optional
+        Name of the second AOD variable. If None, uses 'aod_{wv2}nm'.
+    output_name : str, optional
+        Name of the output AE variable. If None, uses '{wv1}-{wv2}_angstrom_exponent'.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with the calculated Angstrom Exponent.
+    """
+    if aod1_name is None:
+        aod1_name = f"aod_{int(wv1)}nm"
+    if aod2_name is None:
+        aod2_name = f"aod_{int(wv2)}nm"
+    if output_name is None:
+        output_name = f"{int(wv1)}-{int(wv2)}_angstrom_exponent"
+
+    if aod1_name not in ds.variables or aod2_name not in ds.variables:
+        return ds
+
+    def _ae_func(a1, a2):
+        # Handle zero or negative AODs to avoid log issues
+        a1 = np.where(a1 > 0, a1, np.nan)
+        a2 = np.where(a2 > 0, a2, np.nan)
+        return -np.log(a1 / a2) / np.log(wv1 / wv2)
+
+    ae = xr.apply_ufunc(
+        _ae_func,
+        ds[aod1_name],
+        ds[aod2_name],
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+
+    ds[output_name] = ae
+    ds[output_name].attrs.update(
+        {
+            "units": "1",
+            "long_name": f"Angstrom Exponent ({wv1}-{wv2}nm)",
+            "description": f"Calculated from {aod1_name} and {aod2_name}.",
+        }
+    )
+
+    return update_history(ds, f"Calculated Angstrom Exponent {output_name}.")
+
+
+def add_aod_at_wavelength(
+    ds: xr.Dataset,
+    target_wv: float = 550.0,
+    base_wv: float = 500.0,
+    ae_name: str = "440-870_angstrom_exponent",
+    base_aod_name: Optional[str] = None,
+    output_name: Optional[str] = None,
+) -> xr.Dataset:
+    """
+    Estimate AOD at a target wavelength using the Angstrom power law.
+    AOD_target = AOD_base * (target_wv / base_wv) ^ (-AE)
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+    target_wv : float, optional
+        Target wavelength in nm, by default 550.0.
+    base_wv : float, optional
+        Base wavelength in nm, by default 500.0.
+    ae_name : str, optional
+        Name of the Angstrom Exponent variable, by default "440-870_angstrom_exponent".
+    base_aod_name : str, optional
+        Name of the base AOD variable. If None, uses 'aod_{base_wv}nm'.
+    output_name : str, optional
+        Name of the output AOD variable. If None, uses 'aod_{target_wv}nm'.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with the estimated AOD.
+    """
+    if base_aod_name is None:
+        base_aod_name = f"aod_{int(base_wv)}nm"
+    if output_name is None:
+        output_name = f"aod_{int(target_wv)}nm"
+
+    if base_aod_name not in ds.variables or ae_name not in ds.variables:
+        return ds
+
+    def _aod_func(a_base, ae):
+        return a_base * (target_wv / base_wv) ** (-ae)
+
+    aod_target = xr.apply_ufunc(
+        _aod_func,
+        ds[base_aod_name],
+        ds[ae_name],
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+
+    ds[output_name] = aod_target
+    ds[output_name].attrs.update(
+        {
+            "units": "1",
+            "long_name": f"Aerosol Optical Depth at {target_wv}nm",
+            "description": f"Estimated from {base_aod_name} and {ae_name} using Angstrom power law.",
+        }
+    )
+
+    return update_history(ds, f"Estimated AOD at {target_wv}nm ({output_name}).")
 
 
 class AERONET:
