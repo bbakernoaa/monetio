@@ -90,7 +90,8 @@ class RAQMSReader(GriddedReader):
                 kwargs["drop_variables"].append("theta")
 
         # 2. Open the dataset using standard xarray (via XarrayDriver)
-        ds = self.driver.open(files, **kwargs)
+        # Use fpaths instead of files to ensure consistent set of files
+        ds = self.driver.open(fpaths, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read RAQMS data.")
