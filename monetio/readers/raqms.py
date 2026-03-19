@@ -1,5 +1,8 @@
 """RAQMS Reader"""
 
+import os
+from functools import partial
+from glob import glob
 from typing import Any, List, Optional, Union
 
 import numpy as np
@@ -44,12 +47,14 @@ class RAQMSReader(GriddedReader):
         -------
         xarray.Dataset
             The processed RAQMS dataset.
+
+        Examples
+        --------
+        >>> from monetio.readers.raqms import RAQMSReader
+        >>> reader = RAQMSReader()
+        >>> ds = reader.open_dataset("uwhyb_*.nc")
         """
         # RAQMS check file format
-        import os
-        from glob import glob
-
-        # Match original behavior for tests
         if isinstance(files, str):
             fpaths = sorted(glob(files))
         else:
@@ -60,6 +65,15 @@ class RAQMSReader(GriddedReader):
         ):
             raise ValueError(
                 "File format not supported. Note that files should be preprocessed to netCDF."
+            )
+
+        # 1. Setup preprocessing
+        if "preprocess" not in kwargs:
+            kwargs["preprocess"] = partial(
+                raqms_preprocess,
+                convert_to_ppb=convert_to_ppb,
+                var_list=var_list,
+                surf_only=surf_only,
             )
 
         # Prepare kwargs
@@ -75,65 +89,74 @@ class RAQMSReader(GriddedReader):
             if isinstance(kwargs["drop_variables"], list):
                 kwargs["drop_variables"].append("theta")
 
-        ds = self.driver.open(files, **kwargs)
+        # 2. Open the dataset using standard xarray (via XarrayDriver)
+        # Use fpaths instead of files to ensure consistent set of files
+        ds = self.driver.open(fpaths, **kwargs)
 
-        # 1. Update history
+        # Update history
         ds = update_history(ds, "Read RAQMS data.")
-
-        if var_list is not None:
-            # Add required vars
-            required = [
-                "lat",
-                "lon",
-                "IDATE",
-                "Times",
-                "psfc",
-                "delp",
-                "pdash",
-                "ttheta",
-            ]
-            # Ensure we don't duplicate
-            vars_to_keep = list(set(var_list + required))
-            # Only keep available ones
-            vars_to_keep = [v for v in vars_to_keep if v in ds.variables]
-            ds = ds[vars_to_keep]
-
-        # Post processing
-        ds = _fix(ds, surf_only=surf_only, convert_to_ppb=convert_to_ppb)
 
         return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/models/raqms.py
-# -----------------------------------------------------------------------------
-
-
-def _fix(ds: xr.Dataset, *, surf_only: bool, convert_to_ppb: bool) -> xr.Dataset:
+def raqms_preprocess(
+    ds: xr.Dataset,
+    *,
+    convert_to_ppb: bool = True,
+    var_list: Optional[List[str]] = None,
+    surf_only: bool = False,
+) -> xr.Dataset:
     """
-    Internal fix function for RAQMS dataset.
+    Preprocess function for a single RAQMS file.
 
     Parameters
     ----------
     ds : xarray.Dataset
         Input RAQMS dataset.
-    surf_only : bool
-        Whether to keep only the surface layer.
-    convert_to_ppb : bool
-        Whether to convert ppv to ppbv.
+    convert_to_ppb : bool, optional
+        Convert gas species to ppbv, by default True.
+    var_list : list of str, optional
+        List of variables to keep, by default None.
+    surf_only : bool, optional
+        Whether to keep only the surface layer, by default False.
 
     Returns
     -------
     xarray.Dataset
-        Fixed dataset.
+        Processed dataset.
     """
+    # 1. Variable selection
+    if var_list is not None:
+        required = [
+            "lat",
+            "lon",
+            "IDATE",
+            "Times",
+            "psfc",
+            "delp",
+            "pdash",
+            "ttheta",
+        ]
+        vars_to_keep = list(set(var_list + required))
+        vars_to_keep = [v for v in vars_to_keep if v in ds.variables]
+        ds = ds[vars_to_keep]
+
+    # 2. Grid and Coordinates
     ds = _fix_grid(ds)
+
+    # 3. Time
     ds = _fix_time(ds)
+
+    # 4. Pressure
     ds = _fix_pres(ds)
 
+    # 5. Surface only
     if surf_only:
-        ds = ds.isel(z=0).expand_dims("z")
+        # Check if 'z' dimension exists before slicing
+        if "z" in ds.dims:
+            ds = ds.isel(z=0).expand_dims("z")
 
+    # 6. Unit conversion
     if convert_to_ppb:
         to_convert = [v for v in ds.data_vars if ds[v].attrs.get("units") == "ppv"]
         if to_convert:
@@ -141,21 +164,22 @@ def _fix(ds: xr.Dataset, *, surf_only: bool, convert_to_ppb: bool) -> xr.Dataset
                 with xr.set_options(keep_attrs=True):
                     ds[v] = ds[v] * 1e9
                 ds[v].attrs["units"] = "ppbv"
-            # Update history
             ds = update_history(ds, f"Converted {', '.join(to_convert)} from ppv to ppbv.")
 
-    if "ttheta" in ds.data_vars:
-        # Calculate temperature from potential temperature
-        k = 0.28571428571428564  # R/cp = kappa (unitless)
+    # 7. Temperature
+    if "ttheta" in ds.data_vars and "pres_pa_mid" in ds.data_vars:
+        k = 0.28571428571428564  # R/cp = kappa
         with xr.set_options(keep_attrs=True):
             ds["temperature_k"] = ds["ttheta"] * (ds["pres_pa_mid"] / 100000) ** k
         ds["temperature_k"].attrs.update({"units": "K", "long_name": "Temperature"})
-        # Update history
         ds = update_history(ds, "Calculated temperature_k from ttheta and pres_pa_mid.")
 
-    # Transpose if dims exist
+    # 8. Transpose
     dims = [d for d in ["time", "z", "y", "x"] if d in ds.dims]
     ds = ds.transpose(*dims)
+
+    # Update history
+    ds = update_history(ds, "Preprocessed RAQMS data.")
 
     return ds
 
@@ -178,47 +202,48 @@ def _fix_grid(ds: xr.Dataset) -> xr.Dataset:
     lat_name = "lat" if "lat" in ds.dims else "y"
     lon_name = "lon" if "lon" in ds.dims else "x"
 
-    lat_orig = ds[lat_name]
-    lon_orig = ds[lon_name]
-    lon_adj = xr.where(lon_orig >= 180, lon_orig - 360, lon_orig)
+    if lat_name in ds.variables and lon_name in ds.variables:
+        lat_orig = ds[lat_name]
+        lon_orig = ds[lon_name]
+        lon_adj = xr.where(lon_orig >= 180, lon_orig - 360, lon_orig)
 
-    # Broadcast to 2D
-    # xr.broadcast will handle both NumPy and Dask lazily
-    lon2d, lat2d = xr.broadcast(lon_adj, lat_orig)
+        # Broadcast to 2D
+        # xr.broadcast will handle both NumPy and Dask lazily
+        lon2d, lat2d = xr.broadcast(lon_adj, lat_orig)
 
-    # Rename dims of the dataset FIRST
-    rename_dims = {}
-    if "lat" in ds.dims:
-        rename_dims["lat"] = "y"
-    if "lon" in ds.dims:
-        rename_dims["lon"] = "x"
-    if "lev" in ds.dims:
-        rename_dims["lev"] = "z"
+        # Rename dims of the dataset FIRST
+        rename_dims = {}
+        if "lat" in ds.dims:
+            rename_dims["lat"] = "y"
+        if "lon" in ds.dims:
+            rename_dims["lon"] = "x"
+        if "lev" in ds.dims:
+            rename_dims["lev"] = "z"
 
-    if rename_dims:
-        ds = ds.rename_dims(rename_dims)
+        if rename_dims:
+            ds = ds.rename_dims(rename_dims)
 
-    # Ensure dimension order and rename to standard y, x for coordinates
-    lon2d = lon2d.transpose(lat_name, lon_name).rename({lat_name: "y", lon_name: "x"})
-    lat2d = lat2d.transpose(lat_name, lon_name).rename({lat_name: "y", lon_name: "x"})
+        # Ensure dimension order and rename to standard y, x for coordinates
+        lon2d = lon2d.transpose(lat_name, lon_name).rename({lat_name: "y", lon_name: "x"})
+        lat2d = lat2d.transpose(lat_name, lon_name).rename({lat_name: "y", lon_name: "x"})
 
-    ds["longitude"] = lon2d.assign_attrs(
-        {
-            "long_name": "Longitude",
-            "units": "degree_east",
-            "standard_name": "longitude",
-        }
-    )
-    ds["latitude"] = lat2d.assign_attrs(
-        {
-            "long_name": "Latitude",
-            "units": "degree_north",
-            "standard_name": "latitude",
-        }
-    )
+        ds["longitude"] = lon2d.assign_attrs(
+            {
+                "long_name": "Longitude",
+                "units": "degree_east",
+                "standard_name": "longitude",
+            }
+        )
+        ds["latitude"] = lat2d.assign_attrs(
+            {
+                "long_name": "Latitude",
+                "units": "degree_north",
+                "standard_name": "latitude",
+            }
+        )
 
-    ds = ds.drop_vars(["lat", "lon"], errors="ignore")
-    ds = ds.set_coords(["latitude", "longitude"])
+        ds = ds.drop_vars(["lat", "lon"], errors="ignore")
+        ds = ds.set_coords(["latitude", "longitude"])
 
     if "lev" in ds.variables:
         ds["lev"].attrs.update(

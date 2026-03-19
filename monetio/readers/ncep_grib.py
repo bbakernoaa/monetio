@@ -1,19 +1,44 @@
 """NCEP GRIB Reader"""
 
+from typing import Any, List, Union
+
+import numpy as np
+import xarray as xr
+
 from .base import GriddedReader, register_reader
+from .sat_utils import update_history
 
 
 @register_reader("ncep_grib")
 class NCEPGribReader(GriddedReader):
-    def open_dataset(self, files, **kwargs):
-        """
-        Reads NCEP GRIB files using pynio (via cfgrib/xarray logic or custom engine).
-        The original code used engine="pynio".
-        """
+    """
+    Reader for NCEP GRIB files.
+    """
 
+    def open_dataset(self, files: Union[str, List[str]], **kwargs: Any) -> xr.Dataset:
+        """
+        Reads NCEP GRIB files.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path, list of paths, or glob pattern.
+        **kwargs : Any
+            Additional arguments passed to xarray.open_mfdataset or the driver.
+
+        Returns
+        -------
+        xarray.Dataset
+            The processed NCEP GRIB dataset.
+
+        Examples
+        --------
+        >>> from monetio.readers.ncep_grib import NCEPGribReader
+        >>> reader = NCEPGribReader()
+        >>> ds = reader.open_dataset("gfs.*.grib2", engine="pynio")
+        """
         # Ensure we have engine='pynio' if not specified
-        # Note: pynio is often deprecated/hard to install.
-        # But we must preserve original behavior.
+        # Note: pynio is often used for these files but might be hard to install.
         if "engine" not in kwargs:
             kwargs["engine"] = "pynio"
 
@@ -21,57 +46,84 @@ class NCEPGribReader(GriddedReader):
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
 
+        if "preprocess" not in kwargs:
+            kwargs["preprocess"] = ncep_grib_preprocess
+
         ds = self.driver.open(files, **kwargs)
 
-        return _fix_grib2(ds)
+        # Update history
+        ds = update_history(ds, "Read NCEP GRIB data.")
+
+        return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/models/ncep_grib.py
-# -----------------------------------------------------------------------------
+def ncep_grib_preprocess(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Preprocess function for a single NCEP GRIB file.
+    Converts 1D latitude/longitude to 2D coordinates lazily.
 
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input NCEP GRIB dataset.
 
-def _fix_grib2(f):
-    from numpy import meshgrid
+    Returns
+    -------
+    xarray.Dataset
+        Processed dataset with 'latitude' and 'longitude' coordinates on (y, x) dims.
+    """
+    # 1. Coordinate Renaming
+    if "lat_0" in ds.coords:
+        ds = ds.rename({"lat_0": "latitude", "lon_0": "longitude"})
 
-    latitude = f.lat_0.values
-    longitude = f.lon_0.values
+    # 2. Generate 2D Latitude and Longitude lazily
+    if "latitude" in ds.coords and "longitude" in ds.coords:
+        # Check if they are 1D
+        if ds.latitude.ndim == 1 and ds.longitude.ndim == 1:
+            lat_dim = ds.latitude.dims[0]
+            lon_dim = ds.longitude.dims[0]
 
-    # Original logic replaces latitude/longitude with index range?
-    # f['latitude'] = range(len(f.latitude))
-    # f['longitude'] = range(len(f.longitude))
-    # This suggests lat_0/lon_0 were 1D coordinate variables.
+            # Save 1D values and rename their dimensions for broadcast
+            lon1d = ds.longitude.rename({lon_dim: "x"})
+            lat1d = ds.latitude.rename({lat_dim: "y"})
 
-    # We rename to y, x
-    # Rename lat_0 -> latitude (temporarily?) -> y
+            # Broadcast to 2D
+            # xr.broadcast will handle both NumPy and Dask lazily
+            lon2d, lat2d = xr.broadcast(lon1d, lat1d)
 
-    # Let's follow original exactly
-    # But f.lat_0 might not exist if opened via cfgrib instead of pynio.
-    # But assuming pynio:
+            # Ensure dimension order is (y, x) to match original meshgrid behavior
+            lon2d = lon2d.transpose("y", "x")
+            lat2d = lat2d.transpose("y", "x")
 
-    # Original code:
-    # latitude = f.lat_0.values
-    # longitude = f.lon_0.values
-    # f["latitude"] = range(len(f.latitude)) # This fails if f.latitude doesn't exist yet?
-    # Actually original code:
-    # f['latitude'] = range(len(f.latitude))
-    # Wait, 'f.latitude' implies it exists?
-    # Or maybe it meant range(len(latitude)) (the local var).
-    # Assuming the local var.
+            # Replace 1D coords in the dataset with index ranges
+            ds = ds.assign_coords(
+                **{
+                    lat_dim: np.arange(ds.sizes[lat_dim]),
+                    lon_dim: np.arange(ds.sizes[lon_dim]),
+                }
+            )
+            # Rename dims to y, x
+            ds = ds.rename({lat_dim: "y", lon_dim: "x"})
 
-    # Renaming
-    if "lat_0" in f.coords:
-        f = f.rename({"lat_0": "latitude", "lon_0": "longitude"})
+            # Assign 2D coordinates
+            ds = ds.assign_coords(
+                longitude=lon2d.assign_attrs(
+                    {"long_name": "Longitude", "units": "degree_east", "standard_name": "longitude"}
+                ),
+                latitude=lat2d.assign_attrs(
+                    {"long_name": "Latitude", "units": "degree_north", "standard_name": "latitude"}
+                ),
+            )
 
-    # Now f.latitude exists.
-    # The original code reassigns f['latitude'] to indices.
-    f["latitude"] = range(len(f.latitude))
-    f["longitude"] = range(len(f.longitude))
+            ds = ds.set_coords(["latitude", "longitude"])
 
-    f = f.rename({"latitude": "y", "longitude": "x"})
+    # 3. Scientific Hygiene: Strip whitespace from string attributes
+    for var in ds.variables:
+        for attr, val in ds[var].attrs.items():
+            if isinstance(val, str):
+                ds[var].attrs[attr] = val.strip()
 
-    lon, lat = meshgrid(longitude, latitude)
-    f["longitude"] = (("y", "x"), lon)
-    f["latitude"] = (("y", "x"), lat)
-    f = f.set_coords(["latitude", "longitude"])
-    return f
+    # Update history
+    ds = update_history(ds, "Preprocessed NCEP GRIB data.")
+
+    return ds
