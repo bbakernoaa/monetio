@@ -88,7 +88,9 @@ class GOESReader(GriddedReader):
         List[str]
             List of S3 URLs.
         """
-        import s3fs
+        from ..util import _import_required
+
+        s3fs = _import_required("s3fs")
 
         if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])

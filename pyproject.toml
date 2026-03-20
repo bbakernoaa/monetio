@@ -31,17 +31,12 @@ dependencies = [
     "dask",
     "netCDF4",
     "pandas",
-    "s3fs",
-    "scipy",
     "xarray",
     "requests",
     "h5netcdf",
     "h5py",
-    "lxml",
-    "pyhdf!=0.11.3",
-    "timezonefinder",
-    "pyarrow",
-    "pyproj"
+    "pyproj",
+    "pyarrow"
 ]
 
 [project.scripts]
@@ -51,7 +46,14 @@ monetio = "monetio.cli:cli"
 version = {attr = "monetio.__version__"}
 
 [project.optional-dependencies]
+all = [
+    "s3fs",
+    "scipy",
+    "pyhdf!=0.11.3",
+    "timezonefinder",
+]
 dev = [
+    "monetio[all]",
     "pytest",
     "pytest-cov",
     "pytest-print",
@@ -77,6 +79,7 @@ docs = [
 ]
 
 test = [
+    "monetio[all]",
     "pytest",
     "pytest-cov",
     "pytest-xdist",

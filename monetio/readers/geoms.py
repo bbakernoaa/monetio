@@ -118,7 +118,9 @@ def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True
     elif ext in {".h5", ".he5", ".hdf5"}:
         # For HDF5, we try to use xarray's native lazy loading if possible,
         # but GEOMS HDF5 structure (using dimension labels) often needs manual intervention.
-        import h5py
+        from monetio.util import _import_required
+
+        h5py = _import_required("h5py")
 
         f_obj = fs.open(fp, "rb")
         f = h5py.File(f_obj, "r")

@@ -482,7 +482,9 @@ def filter_bad_values(
 @lru_cache(maxsize=1)
 def _get_tf(*, in_memory: bool = True):
     """Get the TimezoneFinder instance."""
-    import timezonefinder
+    from ..util import _import_required
+
+    timezonefinder = _import_required("timezonefinder")
 
     return timezonefinder.TimezoneFinder(in_memory=in_memory)
 

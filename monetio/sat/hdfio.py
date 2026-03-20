@@ -1,18 +1,23 @@
 import logging
 import sys
 
-from ..util import _import_required
 
-hdf = _import_required("pyhdf.SD")
+def _get_hdf():
+    from ..util import _import_required
 
-hdftypes = {
-    "int16": hdf.SDC.INT16,
-    "uint16": hdf.SDC.UINT16,
-    "int32": hdf.SDC.INT32,
-    "uint32": hdf.SDC.UINT32,
-    "float32": hdf.SDC.FLOAT32,
-    "float64": hdf.SDC.FLOAT64,
-}
+    return _import_required("pyhdf.SD")
+
+
+def _get_hdftypes():
+    hdf = _get_hdf()
+    return {
+        "int16": hdf.SDC.INT16,
+        "uint16": hdf.SDC.UINT16,
+        "int32": hdf.SDC.INT32,
+        "uint32": hdf.SDC.UINT32,
+        "float32": hdf.SDC.FLOAT32,
+        "float64": hdf.SDC.FLOAT64,
+    }
 
 
 def hdf_open(filename):
@@ -20,7 +25,7 @@ def hdf_open(filename):
     filename - file name
     return - file id
     """
-
+    hdf = _get_hdf()
     try:
         fileid = hdf.SD(filename, hdf.SDC.READ)
         logging.debug("hdfio.hdf_open:" + filename)
@@ -35,6 +40,7 @@ def hdf_create(filename):
     filename - file name
     return - file id
     """
+    hdf = _get_hdf()
     try:
         fileid = hdf.SD(filename, hdf.SDC.WRITE | hdf.SDC.CREATE | hdf.SDC.TRUNC)
         logging.debug("hdfio.hdf_create:" + filename)
@@ -56,6 +62,7 @@ def hdf_list(fileid):
     fileid - file id
     return datasets
     """
+    hdf = _get_hdf()
     datasets = sorted(fileid.datasets())
     indices = list()
     for dataset in datasets:
@@ -83,6 +90,7 @@ def hdf_write_coord(fileid, coordname, data):
     coordname - coordinate variable name
     data - coordinate array
     """
+    hdftypes = _get_hdftypes()
     logging.debug("hdfio.hdf_write_coord:" + coordname)
     coordid = fileid.create(coordname, hdftypes[str(data.dtype)], data.shape)
     dimid = coordid.dim(0)
@@ -99,6 +107,7 @@ def hdf_write_field(fileid, fieldname, coordnames, data, fill=None):
     data - field array
     fill - fill value
     """
+    hdftypes = _get_hdftypes()
     logging.debug("hdfio.hdf_write_field:" + fieldname)
     fieldid = fileid.create(fieldname, hdftypes[str(data.dtype)], data.shape)
     for i in range(len(coordnames)):

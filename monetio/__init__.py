@@ -5,12 +5,10 @@ from .models import (
     camx,
     chimere,
     cmaq,
-    fv3chem,
     hysplit,
     hytraj,
     ncep_grib,
     pardump,
-    prepchem,
     raqms,
 )
 from .obs import (
@@ -74,13 +72,11 @@ __all__ = [
     # models
     "camx",
     "cmaq",
-    "fv3chem",
     "hysplit",
     "hytraj",
     "icap_mme",
     "ncep_grib",
     "pardump",
-    "prepchem",
     "raqms",
     "chimere",
 ]
@@ -90,13 +86,11 @@ _READER_MODULES = {
     # Models
     "cmaq": ".readers.cmaq",
     "camx": ".readers.camx",
-    "fv3chem": ".readers.fv3chem",
     "hysplit": ".readers.hysplit",
     "hytraj": ".readers.hytraj",
     "icap_mme": ".readers.icap_mme",
     "ncep_grib": ".readers.ncep_grib",
     "pardump": ".readers.pardump",
-    "prepchem": ".readers.prepchem",
     "raqms": ".readers.raqms",
     "ufs": ".readers.ufs",
     "wrfchem": ".readers.wrfchem",
@@ -144,7 +138,7 @@ def load(source: str, files=None, **kwargs):
         df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
 
     Available sources:
-        Models: cmaq, camx, fv3chem, hysplit, hytraj, icap_mme, ncep_grib, pardump, prepchem, raqms, ufs, wrfchem, grib2
+        Models: cmaq, camx, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, ufs, wrfchem, grib2
         Obs: airnow, aeronet, aqs, cems, crn, improve, ish, ish_lite, nadp, openaq, pams
         Profile: icartt, tolnet, geoms, gml_ozonesonde
         Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp, omps, omps_nadir, viirs_jrr
