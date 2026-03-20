@@ -216,7 +216,7 @@ def test_get_times():
 
     ds = xr.Dataset(data_vars={"TFLAG": (("TSTEP", "VAR", "DATE-TIME"), tflag)})
 
-    ds_out = _get_times(ds, drop_duplicates=False)
+    ds_out = _get_times(ds)
     assert "time" in ds_out.coords
     assert ds_out.time[0].values == np.datetime64("2023-01-01T00:00:00")
     assert ds_out.time[1].values == np.datetime64("2023-01-01T01:00:00")

@@ -5,7 +5,6 @@ from typing import Any, List, Union
 
 import numpy as np
 import xarray as xr
-from pandas import Series
 
 from monetio.grids import grid_from_dataset
 
@@ -62,7 +61,6 @@ class CAMxReader(GriddedReader):
                 camx_preprocess,
                 earth_radius=earth_radius,
                 convert_to_ppb=convert_to_ppb,
-                drop_duplicates=drop_duplicates,
             )
 
         # 2. Open the dataset using standard xarray (via XarrayDriver)
@@ -76,6 +74,7 @@ class CAMxReader(GriddedReader):
         # 3. Finalize
         if drop_duplicates:
             ds = ds.drop_duplicates("time")
+            ds = update_history(ds, "Dropped duplicate time steps.")
 
         ds = self.harmonize(ds)
 
@@ -90,7 +89,6 @@ def camx_preprocess(
     *,
     earth_radius: float = 6370000,
     convert_to_ppb: bool = True,
-    drop_duplicates: bool = False,
 ) -> xr.Dataset:
     """
     Preprocess function for a single CAMx file.
@@ -103,13 +101,15 @@ def camx_preprocess(
         Earth radius in meters, by default 6370000.
     convert_to_ppb : bool, optional
         Convert gas species to ppbV, by default True.
-    drop_duplicates : bool, optional
-        Drop duplicate time steps, by default False.
 
     Returns
     -------
     xarray.Dataset
         Processed dataset.
+
+    Examples
+    --------
+    >>> ds = camx_preprocess(ds, convert_to_ppb=True)
     """
     # 1. Add lazy diagnostic variables
     for name, spec in DIAGNOSTICS.items():
@@ -127,7 +127,7 @@ def camx_preprocess(
 
     # 3. Time
     if "TFLAG" in ds.variables:
-        ds = _get_times(ds, drop_duplicates=drop_duplicates)
+        ds = _get_times(ds)
 
     # 4. Units and Formatting
     if convert_to_ppb:
@@ -244,7 +244,7 @@ def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.D
     return ds
 
 
-def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
+def _get_times(ds: xr.Dataset) -> xr.Dataset:
     """
     Extracts and assigns time coordinate from TFLAG lazily.
 
@@ -252,13 +252,15 @@ def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
     ----------
     ds : xarray.Dataset
         Input dataset.
-    drop_duplicates : bool, optional
-        Whether to drop duplicate time steps, by default False.
 
     Returns
     -------
     xarray.Dataset
         Dataset with 'time' coordinate.
+
+    Examples
+    --------
+    >>> ds = _get_times(ds)
     """
     tflag = ds.TFLAG
     # CAMx TFLAG can be (TSTEP, DATE_TIME) or (TSTEP, VAR, DATE_TIME)
@@ -280,12 +282,6 @@ def _get_times(ds: xr.Dataset, *, drop_duplicates: bool = False) -> xr.Dataset:
         dask="parallelized",
         output_dtypes=[np.dtype("datetime64[ns]")],
     )
-
-    if drop_duplicates:
-        dates_computed = dates.compute()
-        unique_indices = Series(dates_computed).drop_duplicates(keep="last").index.values
-        ds = ds.isel(TSTEP=unique_indices)
-        dates = dates.isel(TSTEP=unique_indices)
 
     ds = ds.assign_coords(TSTEP=dates)
     ds = ds.rename({"TSTEP": "time"})
