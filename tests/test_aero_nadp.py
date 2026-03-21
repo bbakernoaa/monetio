@@ -1,60 +1,153 @@
 from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
 
-from monetio.readers.nadp import NADPReader, read_nadp
+from monetio.readers.nadp import NADPReader
 
 
 @pytest.fixture
-def mock_nadp_file(tmp_path):
-    f = tmp_path / "nadp_test.csv"
-    # Example columns for NTN: Real files often have an extra column at start or SiteID is at index 1.
-    # The reader uses parse_dates=[2, 3] for NTN, which implies DateOn is at index 2.
-    content = "ID,SiteID,DateOn,DateOff,Mg,flagMg,so4,flagso4\n"
-    content += "1,MD99,2023-01-01,2023-01-08,0.5,,1.2,\n"
-    content += "2,MD99,2023-01-08,2023-01-15,0.6,,1.3,\n"
-    f.write_text(content)
-    return str(f)
-
-
-def test_read_nadp(mock_nadp_file):
-    df = read_nadp(mock_nadp_file, network="ntn")
-    assert len(df) == 2
-    assert "time" in df.columns
-    assert "time_off" in df.columns
-    assert df["time"].iloc[0] == pd.Timestamp("2023-01-01")
-
-
-@patch("monetio.readers.nadp.NADPReader.get_monitor_df")
-def test_nadp_reader_eager(mock_get_monitor, mock_nadp_file):
-    mock_get_monitor.return_value = pd.DataFrame(
-        {"siteid": ["MD99"], "latitude": [39.0], "longitude": [-76.5]}
+def mock_ntn_data():
+    """Create dummy NTN data."""
+    df = pd.DataFrame(
+        {
+            "siteid": ["TX01", "TX01"],
+            "network": ["NTN", "NTN"],
+            "dateon": ["2023-01-01", "2023-01-08"],
+            "dateoff": ["2023-01-08", "2023-01-15"],
+            "mg": [1.0, 2.0],
+            "flagmg": [" ", "<"],
+            "so4": [3.0, 4.0],
+            "flagso4": [" ", " "],
+        }
     )
+    return df
+
+
+@pytest.fixture
+def mock_meta():
+    """Create dummy metadata."""
+    df = pd.DataFrame(
+        {"siteid": ["TX01"], "latitude": [30.0], "longitude": [-100.0], "elevation": [100.0]}
+    )
+    return df
+
+
+def test_nadp_ntn_eager(tmp_path, mock_ntn_data, mock_meta):
+    """Test NTN reader in eager mode."""
+    fn = tmp_path / "NTN-All-w.csv"
+    mock_ntn_data.to_csv(fn, index=False)
 
     reader = NADPReader()
-    ds = reader.open_dataset(files=mock_nadp_file, network="ntn", as_xarray=True, lazy=False)
+
+    original_read_csv = pd.read_csv
+
+    def side_effect(arg, **kwargs):
+        if isinstance(arg, str) and arg.startswith("http"):
+            return mock_meta
+        return original_read_csv(arg, **kwargs)
+
+    with patch("pandas.read_csv", side_effect=side_effect):
+        ds = reader.open_dataset(files=str(fn), network="NTN", as_xarray=True, lazy=False)
 
     assert isinstance(ds, xr.Dataset)
     assert "mg" in ds.data_vars
+    assert "node" in ds.dims
+    assert "time" in ds.dims
     assert ds.sizes["node"] == 1
     assert ds.sizes["time"] == 2
-    assert "Merged with NADP (ntn) station metadata" in ds.attrs["history"]
+
+    mg_vals = ds.mg.sel(siteid="TX01").values
+    assert 1.0 in mg_vals
+    assert np.isnan(mg_vals).any()
+    assert ds.latitude.values[0] == 30.0
 
 
-@patch("monetio.readers.nadp.NADPReader.get_monitor_df")
-def test_nadp_reader_lazy(mock_get_monitor, mock_nadp_file):
+def test_nadp_ntn_lazy(tmp_path, mock_ntn_data, mock_meta):
+    """Test NTN reader in lazy mode."""
     pytest.importorskip("dask")
-    mock_get_monitor.return_value = pd.DataFrame(
-        {"siteid": ["MD99"], "latitude": [39.0], "longitude": [-76.5]}
-    )
+    fn = tmp_path / "NTN-All-w.csv"
+    mock_ntn_data.to_csv(fn, index=False)
 
     reader = NADPReader()
-    ds = reader.open_dataset(files=mock_nadp_file, network="ntn", as_xarray=True, lazy=True)
+
+    original_read_csv = pd.read_csv
+
+    def side_effect(arg, **kwargs):
+        if isinstance(arg, str) and arg.startswith("http"):
+            return mock_meta
+        return original_read_csv(arg, **kwargs)
+
+    with patch("pandas.read_csv", side_effect=side_effect):
+        ds = reader.open_dataset(files=str(fn), network="NTN", as_xarray=True, lazy=True)
 
     assert isinstance(ds, xr.Dataset)
     assert ds.mg.chunks is not None
 
-    ds_eager = reader.open_dataset(files=mock_nadp_file, network="ntn", as_xarray=True, lazy=False)
-    xr.testing.assert_allclose(ds.compute(), ds_eager)
+    ds_computed = ds.compute()
+    mg_vals = ds_computed.mg.sel(siteid="TX01").values
+    assert 1.0 in mg_vals
+    assert np.isnan(mg_vals).any()
+    assert ds_computed.latitude.values[0] == 30.0
+
+
+def test_nadp_mdn_eager(tmp_path, mock_meta):
+    """Test MDN reader cleaning logic."""
+    df_mdn = pd.DataFrame(
+        {
+            "siteid": ["TX01"],
+            "dateon": ["2023-01-01"],
+            "dateoff": ["2023-01-08"],
+            "qr": ["C"],
+            "hgconc": [10.0],
+        }
+    )
+    fn = tmp_path / "MDN-All-w.csv"
+    df_mdn.to_csv(fn, index=False)
+
+    reader = NADPReader()
+
+    original_read_csv = pd.read_csv
+
+    def side_effect(arg, **kwargs):
+        if isinstance(arg, str) and arg.startswith("http"):
+            return mock_meta
+        return original_read_csv(arg, **kwargs)
+
+    with patch("pandas.read_csv", side_effect=side_effect):
+        ds = reader.open_dataset(files=str(fn), network="MDN", as_xarray=True, lazy=False)
+
+    # QR='C' should set hgconc to NaN
+    assert np.isnan(ds.hgconc.values[0])
+
+
+def test_nadp_amon_eager(tmp_path, mock_meta):
+    """Test AMoN reader cleaning logic."""
+    df_amon = pd.DataFrame(
+        {
+            "siteid": ["TX01"],
+            "network": ["AMoN"],
+            "startdate": ["2023-01-01"],
+            "enddate": ["2023-01-15"],
+            "qr": ["C"],
+            "conc": [5.0],
+        }
+    )
+    fn = tmp_path / "all-ave.csv"
+    df_amon.to_csv(fn, index=False)
+
+    reader = NADPReader()
+
+    original_read_csv = pd.read_csv
+
+    def side_effect(arg, **kwargs):
+        if isinstance(arg, str) and arg.startswith("http"):
+            return mock_meta
+        return original_read_csv(arg, **kwargs)
+
+    with patch("pandas.read_csv", side_effect=side_effect):
+        ds = reader.open_dataset(files=str(fn), network="amon", as_xarray=True, lazy=False)
+
+    assert np.isnan(ds.conc.values[0])
