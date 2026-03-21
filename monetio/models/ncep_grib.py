@@ -3,7 +3,7 @@ import xarray as xr
 
 
 def open_dataset(fname):
-    """Open a single dataset from fv3chem outputs (nemsio or grib2 currently)
+    """Open a single dataset from model outputs (grib2 currently)
 
     Parameters
     ----------
@@ -32,7 +32,7 @@ def open_dataset(fname):
 
 
 def open_mfdataset(fname):
-    """Open a multiple files from fv3chem outputs (nemsio or grib2 currently)
+    """Open multiple files from model outputs (grib2 currently)
 
     Parameters
     ----------

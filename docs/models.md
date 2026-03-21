@@ -37,11 +37,11 @@ Weather Research and Forecasting model coupled with Chemistry.
 
 - **Source ID**: `wrfchem`
 
-### FV3-Chem (UFS-Chem)
+### UFS-AQM
 
 Unified Forecast System with Chemistry.
 
-- **Source ID**: `fv3chem` or `ufs`
+- **Source ID**: `ufs`
 
 ### Other Models
 

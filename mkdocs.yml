@@ -32,7 +32,6 @@ nav:
           - IMPROVE Trends: tutorial/improve_trends_kmeans.md
           - CMAQ Hawaii Volcano: tutorial/CMAQ_hi_volcano.md
           - NESDIS VIIRS AOD: tutorial/NESDIS_VIIRS_AOD.md
-          - FV3-Chem Tutorial: tutorial/fv3chem_tutorial.md
       - WCOSS: wcoss.md
   - Contributing:
       - Adding a Reader: contributing/add_reader.md

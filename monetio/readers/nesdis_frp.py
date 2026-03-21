@@ -94,7 +94,10 @@ class NESDISFRPReader(GriddedReader):
     def read_tile(
         self, fname: str, tile: int = 1, res: str = "C384", dtype: str = "f4"
     ) -> xr.DataArray:
-        from scipy.io import FortranFile
+        from ..util import _import_required
+
+        scipy_io = _import_required("scipy.io")
+        FortranFile = scipy_io.FortranFile
 
         try:
             import fv3grid as fg

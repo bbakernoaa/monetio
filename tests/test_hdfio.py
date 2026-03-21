@@ -83,4 +83,6 @@ def pyhdf_missing(monkeypatch):
 
 def test_pyhdf_missing_error(pyhdf_missing):
     with pytest.raises(RuntimeError, match="importing required module 'pyhdf.SD'"):
-        import monetio.sat.hdfio  # noqa: F401
+        from monetio.sat.hdfio import hdf_open
+
+        hdf_open("dummy.hdf")

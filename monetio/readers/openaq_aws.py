@@ -242,7 +242,9 @@ def _to_datetime_index(dates, **kwargs):
 
 def get_paths(dates, *, siteid=None, country=None, provider=None):
     """Get site-day paths, searching independently by location ID, country, and provider."""
-    import s3fs
+    from ..util import _import_required
+
+    s3fs = _import_required("s3fs")
 
     fs = s3fs.S3FileSystem(anon=True)
 
@@ -309,7 +311,9 @@ def get_paths(dates, *, siteid=None, country=None, provider=None):
 
 def get_providers():
     """Get OpenAQ data providers by searching the bucket paths."""
-    import s3fs
+    from ..util import _import_required
+
+    s3fs = _import_required("s3fs")
 
     fs = s3fs.S3FileSystem(anon=True)
     paths = fs.glob("openaq-data-archive/records/csv.gz/provider=*", maxdepth=1)
@@ -319,7 +323,9 @@ def get_providers():
 
 def get_provider_countries(provider):
     """Get countries for a given provider."""
-    import s3fs
+    from ..util import _import_required
+
+    s3fs = _import_required("s3fs")
 
     fs = s3fs.S3FileSystem(anon=True)
     glb = f"openaq-data-archive/records/csv.gz/provider={provider.lower()}/country=*"
@@ -332,7 +338,9 @@ def get_locations(*, provider=None, country=None):
     """Get location IDs corresponding to provider(s) and/or country(ies)."""
     import re
 
-    import s3fs
+    from ..util import _import_required
+
+    s3fs = _import_required("s3fs")
 
     fs = s3fs.S3FileSystem(anon=True)
     country = _maybe_to_list(country)
