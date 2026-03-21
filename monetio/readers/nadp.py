@@ -207,18 +207,11 @@ class NADPReader(PointReader):
         # Post-processing: Merge with monitor info
         df = self._postprocess(df, network=network)
 
-        # Update history
-        df = update_history(df, f"Merged with NADP ({network}) station metadata.")
-
         # Consistently force object strings
         df = force_object_strings(df)
 
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
-            # Update history for provenance
-            ds = update_history(
-                ds, f"Merged with NADP ({network}) station metadata and harmonized."
-            )
             return ds
 
         return df
@@ -268,6 +261,9 @@ class NADPReader(PointReader):
         # Original code dropped NaNs in latitude/longitude in NADP.read_*
         # PointReader.harmonize also does this.
         df = self.harmonize(df)
+
+        # Update history
+        df = update_history(df, f"Merged with NADP ({network}) station metadata.")
 
         return df
 

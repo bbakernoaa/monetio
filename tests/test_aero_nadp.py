@@ -59,10 +59,15 @@ def test_nadp_ntn_eager(tmp_path, mock_ntn_data, mock_meta):
     assert ds.sizes["node"] == 1
     assert ds.sizes["time"] == 2
 
-    mg_vals = ds.mg.sel(siteid="TX01").values
+    # Verify cleaning: flagmg '<' should lead to NaN
+    # Use where to select siteid since it might not be indexed in all xarray versions
+    mg_vals = ds.mg.where(ds.siteid == "TX01", drop=True).values.flatten()
     assert 1.0 in mg_vals
     assert np.isnan(mg_vals).any()
     assert ds.latitude.values[0] == 30.0
+    # Verify provenance
+    assert "history" in ds.attrs
+    assert "Merged with NADP (NTN) station metadata" in ds.attrs["history"]
 
 
 def test_nadp_ntn_lazy(tmp_path, mock_ntn_data, mock_meta):
@@ -87,7 +92,7 @@ def test_nadp_ntn_lazy(tmp_path, mock_ntn_data, mock_meta):
     assert ds.mg.chunks is not None
 
     ds_computed = ds.compute()
-    mg_vals = ds_computed.mg.sel(siteid="TX01").values
+    mg_vals = ds_computed.mg.where(ds_computed.siteid == "TX01", drop=True).values.flatten()
     assert 1.0 in mg_vals
     assert np.isnan(mg_vals).any()
     assert ds_computed.latitude.values[0] == 30.0
@@ -98,6 +103,7 @@ def test_nadp_mdn_eager(tmp_path, mock_meta):
     df_mdn = pd.DataFrame(
         {
             "siteid": ["TX01"],
+            "network": ["MDN"],
             "dateon": ["2023-01-01"],
             "dateoff": ["2023-01-08"],
             "qr": ["C"],
@@ -120,7 +126,7 @@ def test_nadp_mdn_eager(tmp_path, mock_meta):
         ds = reader.open_dataset(files=str(fn), network="MDN", as_xarray=True, lazy=False)
 
     # QR='C' should set hgconc to NaN
-    assert np.isnan(ds.hgconc.values[0])
+    assert np.isnan(ds.hgconc.values).all()
 
 
 def test_nadp_amon_eager(tmp_path, mock_meta):
@@ -150,4 +156,4 @@ def test_nadp_amon_eager(tmp_path, mock_meta):
     with patch("pandas.read_csv", side_effect=side_effect):
         ds = reader.open_dataset(files=str(fn), network="amon", as_xarray=True, lazy=False)
 
-    assert np.isnan(ds.conc.values[0])
+    assert np.isnan(ds.conc.values).all()
