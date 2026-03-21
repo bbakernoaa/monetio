@@ -1,5 +1,6 @@
 """NADP Reader"""
 
+import functools
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Union
 
@@ -42,6 +43,10 @@ def read_nadp(filename: str, network: str = "ntn", **kwargs: dict) -> pd.DataFra
     -------
     pd.DataFrame
         The loaded data.
+
+    Examples
+    --------
+    >>> df = read_nadp("NTN-All-w.csv", network="ntn")
     """
     network = network.lower()
     if network == "ntn":
@@ -74,53 +79,69 @@ def read_nadp(filename: str, network: str = "ntn", **kwargs: dict) -> pd.DataFra
             df[col_name] = pd.to_datetime(df[col_name], errors="coerce")
     df = df.rename(columns=rename_cols)
 
+    # Ensure flag/status columns are strings for later .str.contains usage
+    for col in ["qr", "qrcode"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.upper()
+
+    # Update history for I/O
+    df = update_history(df, f"Read NADP {network} data.")
+
     # Apply network-specific cleaning
     if network == "ntn":
-        for col in ["mg", "br", "so4", "cl", "no3", "nh4", "k", "na", "ca"]:
+        cols = ["mg", "br", "so4", "cl", "no3", "nh4", "k", "na", "ca"]
+        for col in cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
-            flag = "flag" + col
-            if flag in df.columns and col in df.columns:
-                df.loc[(df[flag] == "<") | (df[col] < 0), col] = np.nan
+                flag = "flag" + col
+                if flag in df.columns:
+                    mask = (df[flag] == "<") | (df[col] < 0)
+                    df[col] = df[col].mask(mask)
     elif network == "mdn":
-        if "qr" in df.columns:
-            cols = ["rgppt", "svol", "subppt", "hgconc", "hgdep"]
-            for col in cols:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
-            df.loc[df.qr == "C", [c for c in cols if c in df.columns]] = np.nan
+        cols = ["rgppt", "svol", "subppt", "hgconc", "hgdep"]
+        available_cols = [c for c in cols if c in df.columns]
+        if available_cols:
+            df[available_cols] = df[available_cols].apply(pd.to_numeric, errors="coerce")
+            if "qr" in df.columns:
+                mask = df.qr.str.contains("C", na=False)
+                for col in available_cols:
+                    df[col] = df[col].mask(mask)
     elif network == "airmon":
-        if "qrcode" in df.columns:
-            cols = [
-                "subppt",
-                "pptnws",
-                "pptbel",
-                "svol",
-                "ca",
-                "mg",
-                "k",
-                "na",
-                "nh4",
-                "no3",
-                "cl",
-                "so4",
-                "po4",
-                "phlab",
-                "phfield",
-                "conduclab",
-                "conducfield",
-            ]
-            for col in cols:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
-            df.loc[df.qrcode == "C", [c for c in cols if c in df.columns]] = np.nan
+        cols = [
+            "subppt",
+            "pptnws",
+            "pptbel",
+            "svol",
+            "ca",
+            "mg",
+            "k",
+            "na",
+            "nh4",
+            "no3",
+            "cl",
+            "so4",
+            "po4",
+            "phlab",
+            "phfield",
+            "conduclab",
+            "conducfield",
+        ]
+        available_cols = [c for c in cols if c in df.columns]
+        if available_cols:
+            df[available_cols] = df[available_cols].apply(pd.to_numeric, errors="coerce")
+            if "qrcode" in df.columns:
+                mask = df.qrcode.str.contains("C", na=False)
+                for col in available_cols:
+                    df[col] = df[col].mask(mask)
     elif network in ["amon", "amnet"]:
-        if "qr" in df.columns:
-            cols = ["airvol", "conc"]
-            for col in cols:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
-            df.loc[df.qr == "C", [c for c in cols if c in df.columns]] = np.nan
+        cols = ["airvol", "conc"]
+        available_cols = [c for c in cols if c in df.columns]
+        if available_cols:
+            df[available_cols] = df[available_cols].apply(pd.to_numeric, errors="coerce")
+            if "qr" in df.columns:
+                mask = df.qr.str.contains("C", na=False)
+                for col in available_cols:
+                    df[col] = df[col].mask(mask)
 
     return df
 
@@ -191,10 +212,6 @@ class NADPReader(PointReader):
 
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
-            # Update history for provenance
-            ds = update_history(
-                ds, f"Merged with NADP ({network}) station metadata and harmonized."
-            )
             return ds
 
         return df
@@ -216,8 +233,27 @@ class NADPReader(PointReader):
         -------
         Union[pd.DataFrame, dd.DataFrame]
             Post-processed dataframe.
+
+        Examples
+        --------
+        >>> reader = NADPReader()
+        >>> df = reader._postprocess(df, network="ntn")
         """
+        try:
+            import dask.dataframe as dd
+
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
+
         meta = self.get_monitor_df(network=network)
+
+        if is_dask:
+            meta = dd.from_pandas(meta, npartitions=1)
+
+        # Ensure siteid is consistent for merge
+        df = force_object_strings(df)
+        meta = force_object_strings(meta)
 
         # Merge (unified logic for both backends)
         df = df.merge(meta, on="siteid", how="left")
@@ -226,8 +262,12 @@ class NADPReader(PointReader):
         # PointReader.harmonize also does this.
         df = self.harmonize(df)
 
+        # Update history
+        df = update_history(df, f"Merged with NADP ({network}) station metadata.")
+
         return df
 
+    @functools.lru_cache(maxsize=8)
     def get_monitor_df(self, network: str) -> pd.DataFrame:
         """
         Load the NADP station metadata for a specific network.
@@ -241,6 +281,11 @@ class NADPReader(PointReader):
         -------
         pd.DataFrame
             Station metadata.
+
+        Examples
+        --------
+        >>> reader = NADPReader()
+        >>> meta = reader.get_monitor_df(network="ntn")
         """
         network = network.lower()
         url = META_URLS.get(network)
@@ -277,6 +322,11 @@ class NADPReader(PointReader):
         -------
         str
             The URL to the data file.
+
+        Examples
+        --------
+        >>> reader = NADPReader()
+        >>> url = reader.build_url(network="NTN", siteid="TX01")
         """
         baseurl = "http://nadp.slh.wisc.edu/datalib/"
         site_part = (siteid.upper() + "-") if siteid is not None else ""
