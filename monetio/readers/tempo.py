@@ -141,12 +141,13 @@ def tempo_preprocess(ds: xr.Dataset, variable_dict: Optional[Dict] = None) -> xr
     if "surface_pressure" in ds.variables:
         ps = ds["surface_pressure"]
         if ps.attrs.get("units") == "hPa":
-            ds["surface_pressure"] = ps * 100.0
-            ds["surface_pressure"].attrs["units"] = "Pa"
             # Scale attributes if they exist
+            new_attrs = ps.attrs.copy()
+            new_attrs["units"] = "Pa"
             for attr in ["valid_min", "valid_max", "Eta_A"]:
-                if attr in ps.attrs:
-                    ds["surface_pressure"].attrs[attr] *= 100.0
+                if attr in new_attrs:
+                    new_attrs[attr] *= 100.0
+            ds["surface_pressure"] = (ps * 100.0).assign_attrs(new_attrs)
 
     # 4. Calculate Pressure (Lazy)
     if variable_dict and "pressure" in variable_dict:
