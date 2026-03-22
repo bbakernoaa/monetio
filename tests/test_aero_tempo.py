@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
 import xarray as xr
+
 from monetio.readers.tempo import TEMPOReader
+
 
 def test_tempo_eager_lazy_consistency():
     """
@@ -13,7 +15,7 @@ def test_tempo_eager_lazy_consistency():
     # Coordinates
     lon = np.linspace(-120, -70, nx)
     lat = np.linspace(25, 50, ny)
-    lon2d, lat2d = np.meshgrid(lon, lat, indexing='ij')
+    lon2d, lat2d = np.meshgrid(lon, lat, indexing="ij")
 
     # Data variables
     no2 = np.random.rand(nx, ny).astype("f4")
@@ -21,7 +23,7 @@ def test_tempo_eager_lazy_consistency():
     qf[0, 0] = 10  # This should be masked if threshold < 10
 
     # Surface pressure with hybrid coefficients in attributes
-    sp = np.full((nx, ny), 1013.25, dtype="f4") # hPa
+    sp = np.full((nx, ny), 1013.25, dtype="f4")  # hPa
     eta_a = np.linspace(0, 10000, nz).astype("f4")
     eta_b = np.linspace(1, 0, nz).astype("f4")
 
@@ -34,12 +36,12 @@ def test_tempo_eager_lazy_consistency():
         coords={
             "latitude": (("x", "y"), lat2d),
             "longitude": (("x", "y"), lon2d),
-        }
+        },
     )
 
     variable_dict = {
         "vertical_column_troposphere": {"scale": 2.0, "quality_flag_max": 5},
-        "pressure": {}
+        "pressure": {},
     }
 
     # 2. Test Eager (NumPy)
@@ -81,7 +83,7 @@ def test_tempo_eager_lazy_consistency():
     # Pressure calculation
     # p = Eta_A + Eta_B * surface_pressure
     # For k=0: eta_a[0]=0, eta_b[0]=1, sp=101325 => p = 101325
-    expected_p0 = eta_a[0]*100.0 + eta_b[0] * 101325.0
+    expected_p0 = eta_a[0] * 100.0 + eta_b[0] * 101325.0
     assert ds_eager["pres_pa_mid"].values[0, 0, 0] == pytest.approx(expected_p0)
 
     # Check dimensions
@@ -89,24 +91,29 @@ def test_tempo_eager_lazy_consistency():
     assert "z" in ds_eager["pres_pa_mid"].dims
     assert ds_eager.sizes["z"] == nz
 
+
 def test_tempo_reader_integration_mock(monkeypatch):
     """
     Test TEMPOReader.open_dataset with mocked XarrayDriver to verify multi-group merging.
     """
+
     def mock_open(self, files, **kwargs):
         group = kwargs.get("group")
         if group == "product":
             return xr.Dataset({"vertical_column_troposphere": (("x", "y"), np.ones((5, 5)))})
         if group == "geolocation":
-            return xr.Dataset({
-                "latitude": (("x", "y"), np.ones((5, 5))),
-                "longitude": (("x", "y"), np.ones((5, 5)))
-            })
+            return xr.Dataset(
+                {
+                    "latitude": (("x", "y"), np.ones((5, 5))),
+                    "longitude": (("x", "y"), np.ones((5, 5))),
+                }
+            )
         if group == "support_data":
             return xr.Dataset({"surface_pressure": (("x", "y"), np.ones((5, 5)))})
         return xr.Dataset()
 
     from monetio.readers.drivers import XarrayDriver
+
     monkeypatch.setattr(XarrayDriver, "open", mock_open)
 
     reader = TEMPOReader()
