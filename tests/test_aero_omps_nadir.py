@@ -50,6 +50,65 @@ def test_omps_v8toz_preprocess(lazy):
         assert ds_out.ozone_column.chunks is not None
 
 
+def test_omps_v8toz_masking():
+    # Create dummy V8TOZ dataset with quality flags
+    ds = xr.Dataset(
+        {
+            "ColumnAmountO3": (("nTimes", "nIFOV"), np.ones((2, 2), dtype=np.float32)),
+            "QualityFlag": (("nTimes", "nIFOV"), [[0, 1], [2, 0]]),
+            "ScanTime": (("nTimes",), [0.0, 1.0]),
+            "Latitude": (("nTimes", "nIFOV"), np.zeros((2, 2))),
+            "Longitude": (("nTimes", "nIFOV"), np.zeros((2, 2))),
+        }
+    )
+
+    ds_out = omps_nadir_preprocess(ds, product="v8toz")
+
+    # Values where QualityFlag != 0 should be masked (NaN)
+    ozone = ds_out.ozone_column.values
+    assert ozone[0, 0] == 1.0
+    assert np.isnan(ozone[0, 1])
+    assert np.isnan(ozone[1, 0])
+    assert ozone[1, 1] == 1.0
+
+
+def test_omps_sdr_multi_group(monkeypatch):
+    # Mock XarrayDriver.open to return different groups
+    class MockDriver:
+        def open(self, files, **kwargs):
+            group = kwargs.get("group")
+            if group == "All_Data/OMPS-TC-SDR_All":
+                return xr.Dataset({"Radiance": (("y", "x"), np.ones((5, 10)))})
+            elif group == "All_Data/OMPS-TC-GEO_All":
+                return xr.Dataset(
+                    {
+                        "Latitude": (("y", "x"), np.zeros((5, 10))),
+                        "Longitude": (("y", "x"), np.zeros((5, 10))),
+                    }
+                )
+            return xr.Dataset()
+
+    reader = OMPSNadirReader()
+    monkeypatch.setattr(reader, "driver", MockDriver())
+
+    # Mock standardize_satellite_coords to avoid needing real satellite data
+    # (Actually it's better to let it run to verify it handles merged names)
+
+    ds = reader.open_dataset(files=["test.nc"], product="tc_sdr")
+
+    assert "radiance" in ds.data_vars
+    assert "latitude" in ds.coords
+    assert "longitude" in ds.coords
+    # If not expanding dims, it will be (y, x).
+    # But OMPSNadirReader.open_dataset sets concat_dim="time" and combine="nested"
+    # Wait, my mock driver returned (y, x). xr.merge doesn't add a time dim.
+    # The reader's open_dataset loop uses super().open_dataset(files, **g_kwargs)
+    # If files is a list of 1, XarrayDriver returns (y, x) if not preprocessed.
+    # My mock driver returned (y, x).
+    assert "y" in ds.radiance.dims
+    assert "x" in ds.radiance.dims
+
+
 def test_omps_nadir_reader_inference():
     reader = OMPSNadirReader()
     # Basic check that reader can be instantiated

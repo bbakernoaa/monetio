@@ -29,6 +29,7 @@ class OMPSNadirReader(GriddedReader):
         dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
         satellite: str = "snpp",
         product: str = "v8toz",
+        group: Union[str, List[str]] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -50,6 +51,9 @@ class OMPSNadirReader(GriddedReader):
             - 'nmto3_l3': NASA Nadir Mapper Total Ozone L3
             - 'tc_sdr': NOAA Total Column SDR
             - 'np_sdr': NOAA Nadir Profiler SDR
+        group : Union[str, List[str]], optional
+            The NetCDF group(s) to open. If None, appropriate groups for the
+            product will be selected (e.g. SDR + GEO for SDR products).
         **kwargs : dict
             Additional arguments passed to XarrayDriver.open.
 
@@ -57,16 +61,31 @@ class OMPSNadirReader(GriddedReader):
         -------
         xr.Dataset
             The OMPS dataset.
+
+        Examples
+        --------
+        Open standard V8TOZ product:
+        >>> reader = OMPSNadirReader()
+        >>> ds = reader.open_dataset(dates='2024-01-01', product='v8toz')
         """
         if files is None:
             if dates is None:
                 raise ValueError("Either 'files' or 'dates' must be provided.")
             files = self.build_urls(dates, satellite=satellite, product=product)
 
-        if "preprocess" not in kwargs:
-            from functools import partial
+        if group is None:
+            if product.lower() == "tc_sdr":
+                groups = ["All_Data/OMPS-TC-SDR_All", "All_Data/OMPS-TC-GEO_All"]
+            elif product.lower() == "np_sdr":
+                groups = ["All_Data/OMPS-NP-SDR_All", "All_Data/OMPS-NP-GEO_All"]
+            else:
+                groups = [None]
+        elif isinstance(group, str):
+            groups = [group]
+        else:
+            groups = group
 
-            kwargs["preprocess"] = partial(omps_nadir_preprocess, product=product)
+        user_preprocess = kwargs.pop("preprocess", None)
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
@@ -76,7 +95,48 @@ class OMPSNadirReader(GriddedReader):
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
 
-        ds = super().open_dataset(files, **kwargs)
+        dsets = []
+        for g in groups:
+            g_kwargs = kwargs.copy()
+            if g:
+                g_kwargs["group"] = g
+                # Filter files by group to avoid open_mfdataset failure
+                if isinstance(files, list) and len(files) > 1:
+                    # Look for SDR or GEO keyword in group name
+                    g_sdr = "SDR" in g.upper()
+                    g_geo = "GEO" in g.upper()
+                    g_files = [
+                        f
+                        for f in files
+                        if (g_sdr and "SDR" in f.upper()) or (g_geo and "GEO" in f.upper())
+                    ]
+                    # If filter returns nothing, it might be a single granule pair, fallback to all
+                    if not g_files:
+                        g_files = files
+                else:
+                    g_files = files
+            else:
+                g_files = files
+
+            try:
+                # Open without the preprocessor at this stage
+                ds_g = super().open_dataset(g_files, **g_kwargs)
+                dsets.append(ds_g)
+            except (OSError, RuntimeError, ValueError):
+                # Not all groups may be present in all files
+                continue
+
+        if not dsets:
+            raise RuntimeError(f"No groups could be opened for product {product}.")
+
+        # Merge groups
+        ds = xr.merge(dsets, compat="no_conflicts")
+
+        # Now apply OMPS preprocessing to the merged dataset
+        ds = omps_nadir_preprocess(ds, product=product)
+
+        if user_preprocess:
+            ds = user_preprocess(ds)
 
         # Update history
         ds = update_history(ds, f"Read OMPS Nadir {product} data from {satellite}.")
@@ -139,18 +199,26 @@ class OMPSNadirReader(GriddedReader):
             # but usually they don't.
             dir_name = product
 
+        # Determine if we need to fetch multiple directories (SDR + GEO)
+        dirs_to_search = [dir_name]
+        if product.lower() == "tc_sdr":
+            dirs_to_search.append("OMPS-TC-GEO")
+        elif product.lower() == "np_sdr":
+            dirs_to_search.append("OMPS-NP-GEO")
+
         fs = s3fs.S3FileSystem(anon=True)
         urls = []
         for d in dates.floor("D").unique():
-            prefix = f"{bucket}/{dir_name}/{d.strftime('%Y/%m/%d')}/"
-            try:
-                found = fs.glob(f"{prefix}*.nc")
-                # Also try .h5 for SDRs
-                if not found and "SDR" in dir_name:
-                    found = fs.glob(f"{prefix}*.h5")
-                urls.extend([f"s3://{f}" for f in found])
-            except Exception:
-                continue
+            for dn in dirs_to_search:
+                prefix = f"{bucket}/{dn}/{d.strftime('%Y/%m/%d')}/"
+                try:
+                    found = fs.glob(f"{prefix}*.nc")
+                    # Also try .h5 for SDRs
+                    if not found and "SDR" in dn:
+                        found = fs.glob(f"{prefix}*.h5")
+                    urls.extend([f"s3://{f}" for f in found])
+                except Exception:
+                    continue
 
         return sorted(urls)
 
@@ -170,6 +238,10 @@ def omps_nadir_preprocess(ds: xr.Dataset, product: str = "v8toz") -> xr.Dataset:
     -------
     xr.Dataset
         Processed dataset.
+
+    Examples
+    --------
+    >>> ds = omps_nadir_preprocess(ds, product='v8toz')
     """
     if product == "v8toz":
         ds = _preprocess_v8toz(ds)
@@ -203,7 +275,23 @@ def omps_nadir_preprocess(ds: xr.Dataset, product: str = "v8toz") -> xr.Dataset:
 
 
 def _preprocess_v8toz(ds: xr.Dataset) -> xr.Dataset:
-    """Preprocess NOAA V8TOZ Total Ozone EDR."""
+    """
+    Preprocess NOAA V8TOZ Total Ozone EDR.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset with standard names, lazily converted time, and quality masking.
+
+    Examples
+    --------
+    >>> ds = _preprocess_v8toz(ds)
+    """
     mapping = {
         "Latitude": "latitude",
         "Longitude": "longitude",
@@ -225,11 +313,32 @@ def _preprocess_v8toz(ds: xr.Dataset) -> xr.Dataset:
         ds["time"] = jpss_time_to_datetime(ds["time_raw"])
         ds = ds.set_coords("time")
 
+    # Quality Flagging (Lazy)
+    if "quality_flag" in ds.variables and "ozone_column" in ds.variables:
+        # According to OMPS V8TOZ docs, non-zero flags are usually bad
+        ds["ozone_column"] = ds["ozone_column"].where(ds["quality_flag"] == 0)
+
     return ds
 
 
 def _preprocess_sdr(ds: xr.Dataset) -> xr.Dataset:
-    """Preprocess NOAA SDR (Sensor Data Record)."""
+    """
+    Preprocess NOAA SDR (Sensor Data Record).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset, potentially merged from SDR and GEO groups.
+
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset with standard names.
+
+    Examples
+    --------
+    >>> ds = _preprocess_sdr(ds)
+    """
     # SDRs usually have data in groups
     mapping = {
         "All_Data/OMPS-TC-SDR_All/Radiance": "radiance",
@@ -238,8 +347,18 @@ def _preprocess_sdr(ds: xr.Dataset) -> xr.Dataset:
         "All_Data/OMPS-TC-GEO_All/Longitude": "longitude",
         "All_Data/OMPS-NP-GEO_All/Latitude": "latitude",
         "All_Data/OMPS-NP-GEO_All/Longitude": "longitude",
+        # Names after merging groups (no prefix)
+        "Radiance": "radiance",
+        "Latitude": "latitude",
+        "Longitude": "longitude",
     }
-    rename_dict = {old: new for old, new in mapping.items() if old in ds.variables}
+    # Ensure standard names are set even if renaming fails (e.g. they already exist)
+    # We rename only if the source exists and target does not exist as a variable.
+    rename_dict = {
+        old: new
+        for old, new in mapping.items()
+        if old in ds.variables and new not in ds.variables and old != new
+    }
     if rename_dict:
         ds = ds.rename(rename_dict)
 
