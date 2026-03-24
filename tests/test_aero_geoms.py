@@ -63,6 +63,10 @@ def test_geoms_protocol_compliance():
     # Check consistency
     xr.testing.assert_allclose(res_eager, res_lazy.compute())
 
+    # Verify that history was updated correctly (Provenance check)
+    assert "Renamed dimensions" in res_lazy.attrs["history"]
+    assert "Converted MJD2000 times" in res_lazy.attrs["history"]
+
     # Check time conversion
     expected_time = pd.to_datetime(ds_base.DATETIME.values + 2451544.5, unit="D", origin="julian")
     # Use xr.testing for datetime comparisons, but drop coords for direct comparison if needed
@@ -79,6 +83,55 @@ def test_geoms_protocol_compliance():
     assert "altitude" in res_eager.dims
     assert "latitude" in res_eager.coords
     assert "longitude" in res_eager.coords
+
+
+def test_mjd2000_consistency():
+    """Verify _mjd2000_to_datetime is backend-agnostic."""
+    from monetio.readers.geoms import _mjd2000_to_datetime
+
+    # 1. Eager
+    mjd_vals = np.array([8401.0, 8402.0])
+    res_eager = _mjd2000_to_datetime(mjd_vals)
+
+    # 2. Lazy (Dask) via apply_ufunc
+    da_mjd = xr.DataArray(mjd_vals, dims="time").chunk({"time": 1})
+    res_lazy_da = xr.apply_ufunc(
+        _mjd2000_to_datetime,
+        da_mjd,
+        dask="parallelized",
+        output_dtypes=[np.dtype("datetime64[ns]")],
+    )
+
+    # Assert results are identical
+    np.testing.assert_array_equal(res_eager, res_lazy_da.compute().values)
+    assert res_lazy_da.dtype == np.dtype("datetime64[ns]")
+
+
+def test_hdf5_lazy_loading_mock():
+    """Verify that HDF5-like lazy loading propagates without compute."""
+    import dask.array as da
+
+    from monetio.readers.geoms import geoms_preprocess
+
+    # Simulate lazy data loading from HDF5
+    nt = 10
+    lazy_data = da.from_array(np.random.rand(nt), chunks=5)
+
+    ds = xr.Dataset(
+        data_vars={
+            "DATETIME": (("fakeDim0datetime",), np.linspace(8401, 8402, nt)),
+            "O3": (("fakeDim0datetime",), lazy_data),
+        }
+    )
+
+    # Preprocess should remain lazy
+    ds_proc = geoms_preprocess(ds)
+
+    # Verify O3 is still a dask array
+    assert isinstance(ds_proc.o3.data, da.Array)
+    # Verify time is still converted lazily (it was eager in input, but apply_ufunc might make it lazy if we chunked it,
+    # but here we didn't chunk DATETIME in input. Let's check O3 specifically.)
+    assert ds_proc.o3.chunks is not None
 
 
 def test_open_dataset():
@@ -150,7 +203,9 @@ def test_pandora_totcol():
     assert "longitude" in ds.coords
     assert ds.sizes["time"] > 1
 
-    assert (ds.time.dt.floor("D") == pd.Timestamp("20231206")).all()
+    # In Pandas 3.0.1, direct comparison of dask-backed datetime64[ns] to pd.Timestamp can fail.
+    # We cast to np.datetime64 for a robust comparison.
+    assert (ds.time.dt.floor("D") == np.datetime64("2023-12-06")).all()
 
     assert "no2_column_absorption_solar" in ds.data_vars
 
