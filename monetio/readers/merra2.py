@@ -112,9 +112,7 @@ class MERRA2Reader(GriddedReader):
         }
 
         if product not in prod_map:
-            raise ValueError(
-                f"Unknown product: {product}. Available: {list(prod_map.keys())}"
-            )
+            raise ValueError(f"Unknown product: {product}. Available: {list(prod_map.keys())}")
 
         short_name, coll_name = prod_map[product]
         base_url = f"https://goldsmr4.gesdisc.eosdis.nasa.gov/opendap/MERRA2/{short_name}"
