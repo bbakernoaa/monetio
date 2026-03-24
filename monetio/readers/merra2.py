@@ -1,7 +1,9 @@
 """MERRA-2 Reader"""
 
+import datetime
 from typing import List, Optional, Union
 
+import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
@@ -17,7 +19,11 @@ class MERRA2Reader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[
+            Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str]
+        ] = None,
+        product: str = "inst1_2d_asm_Nx",
         username: Optional[str] = None,
         password: Optional[str] = None,
         **kwargs,
@@ -27,8 +33,17 @@ class MERRA2Reader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
-            File path(s) or URL(s).
+        files : Union[str, List[str]], optional
+            File path(s) or URL(s). If None, will try to build URLs using dates and product.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve. Used if files is None.
+        product : str, optional
+            MERRA-2 product short name, by default "inst1_2d_asm_Nx".
+            Common products:
+            - 'inst1_2d_asm_Nx': Instantaneous 2D atmospheric fields
+            - 'tavg1_2d_slv_Nx': Time-averaged 2D surface fields
+            - 'inst3_3d_asm_Np': Instantaneous 3D atmospheric fields (pressure levels)
+            - 'inst3_3d_chm_Np': Instantaneous 3D chemical fields (pressure levels)
         username : str, optional
             NASA Earthdata username. If provided, will setup .netrc.
         password : str, optional
@@ -44,18 +59,89 @@ class MERRA2Reader(GriddedReader):
         if username and password:
             setup_netrc(username, password)
 
+        if files is None:
+            if dates is None:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+            files = self.build_urls(dates, product=product)
+
         if "preprocess" not in kwargs:
-            kwargs["preprocess"] = merra2_preprocess
+            from functools import partial
+
+            kwargs["preprocess"] = partial(merra2_preprocess, product=product)
 
         ds = super().open_dataset(files, **kwargs)
 
         # Update history
-        ds = update_history(ds, "Read MERRA-2 data.")
+        ds = update_history(ds, f"Read MERRA-2 {product} data.")
 
         return ds
 
+    def build_urls(
+        self,
+        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
+        product: str = "inst1_2d_asm_Nx",
+    ) -> List[str]:
+        """
+        Build OPeNDAP URLs for MERRA-2 data based on dates and product.
 
-def merra2_preprocess(ds: xr.Dataset) -> xr.Dataset:
+        Parameters
+        ----------
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+            Dates to retrieve.
+        product : str, optional
+            MERRA-2 product short name.
+
+        Returns
+        -------
+        List[str]
+            List of OPeNDAP URLs.
+        """
+        if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
+            dates = pd.DatetimeIndex([pd.to_datetime(dates)])
+        else:
+            dates = pd.to_datetime(dates)
+
+        # Product mapping to GES DISC OPeNDAP paths
+        # Format: (ShortName.Version, CollectionName)
+        prod_map = {
+            "inst1_2d_asm_Nx": ("M2I1NXASM.5.12.4", "inst1_2d_asm_Nx"),
+            "tavg1_2d_slv_Nx": ("M2T1NXSLV.5.12.4", "tavg1_2d_slv_Nx"),
+            "inst3_3d_asm_Np": ("M2I3NPASM.5.12.4", "inst3_3d_asm_Np"),
+            "inst3_3d_chm_Np": ("M2I3NPCHM.5.12.4", "inst3_3d_chm_Np"),
+            "inst3_3d_asm_Nv": ("M2I3NVASM.5.12.4", "inst3_3d_asm_Nv"),
+        }
+
+        if product not in prod_map:
+            raise ValueError(
+                f"Unknown product: {product}. Available: {list(prod_map.keys())}"
+            )
+
+        short_name, coll_name = prod_map[product]
+        base_url = f"https://goldsmr4.gesdisc.eosdis.nasa.gov/opendap/MERRA2/{short_name}"
+
+        urls = []
+        for d in dates.floor("D").unique():
+            # MERRA-2 filenames usually include the date and the product name
+            # Example: MERRA2_400.inst1_2d_asm_Nx.20240101.nc4
+            # The stream ID (400, 300, 200, 100) depends on the year.
+            year = d.year
+            if 1980 <= year <= 1991:
+                stream = "100"
+            elif 1992 <= year <= 2000:
+                stream = "200"
+            elif 2001 <= year <= 2010:
+                stream = "300"
+            else:
+                stream = "400"
+
+            date_str = d.strftime("%Y%m%d")
+            url = f"{base_url}/{d.strftime('%Y/%m')}/MERRA2_{stream}.{coll_name}.{date_str}.nc4"
+            urls.append(url)
+
+        return urls
+
+
+def merra2_preprocess(ds: xr.Dataset, product: Optional[str] = None) -> xr.Dataset:
     """
     Preprocess MERRA-2 dataset: standardize coordinates and metadata.
 
@@ -63,6 +149,8 @@ def merra2_preprocess(ds: xr.Dataset) -> xr.Dataset:
     ----------
     ds : xr.Dataset
         Input dataset.
+    product : str, optional
+        MERRA-2 product short name.
 
     Returns
     -------

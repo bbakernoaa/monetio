@@ -98,3 +98,34 @@ def test_merra2_lazy_loading(mock_merra2_dataset, tmp_path):
     assert ds.pres_pa_mid.chunks is not None
     assert "history" in ds.attrs
     assert "Preprocessed MERRA-2 data via Aero Protocol." in ds.attrs["history"]
+
+
+def test_merra2_build_urls():
+    """Test URL building logic for MERRA-2."""
+    reader = MERRA2Reader()
+    urls = reader.build_urls("2024-01-01", product="inst1_2d_asm_Nx")
+    assert len(urls) == 1
+    assert "M2I1NXASM.5.12.4" in urls[0]
+    assert "MERRA2_400.inst1_2d_asm_Nx.20240101.nc4" in urls[0]
+
+    urls_old = reader.build_urls("1990-01-01", product="inst1_2d_asm_Nx")
+    assert "MERRA2_100" in urls_old[0]
+
+    with pytest.raises(ValueError, match="Unknown product"):
+        reader.build_urls("2024-01-01", product="invalid_product")
+
+
+def test_merra2_open_dataset_with_dates(monkeypatch):
+    """Test open_dataset with dates instead of files."""
+    reader = MERRA2Reader()
+
+    def mock_open(self, files, **kwargs):
+        return xr.Dataset(attrs={"files_opened": files})
+
+    # Mock the XarrayDriver.open (or GriddedReader.open_dataset indirectly)
+    # Actually it's easier to mock the super().open_dataset or the build_urls
+    monkeypatch.setattr("monetio.readers.base.GriddedReader.open_dataset", mock_open)
+
+    ds = reader.open_dataset(dates="2024-01-01", product="inst1_2d_asm_Nx")
+    assert "files_opened" in ds.attrs
+    assert "MERRA2_400.inst1_2d_asm_Nx.20240101.nc4" in ds.attrs["files_opened"][0]
