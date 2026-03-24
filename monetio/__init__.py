@@ -107,6 +107,7 @@ _READER_MODULES = {
     "nadp": ".readers.nadp",
     "openaq": ".readers.openaq",
     "pams": ".readers.pams",
+    "ndbc": ".readers.ndbc",
     # Profile
     "icartt": ".readers.icartt",
     "tolnet": ".readers.tolnet",
