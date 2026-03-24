@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
-import pytest
+
 from monetio.readers.earlinet import EARLINETReader
+
 
 def test_earlinet_reader_basic(tmp_path):
     # Create a mock EARLINET NetCDF file
@@ -10,7 +11,7 @@ def test_earlinet_reader_basic(tmp_path):
 
     # Mock data
     time_vals = pd.to_datetime(["2024-01-01 12:00:00", "2024-01-01 13:00:00"])
-    alt_vals = np.linspace(500, 10000, 200) # m
+    alt_vals = np.linspace(500, 10000, 200)  # m
 
     ds_mock = xr.Dataset(
         data_vars={
@@ -26,7 +27,7 @@ def test_earlinet_reader_basic(tmp_path):
         attrs={
             "title": "EARLINET Data",
             "station_ID": "ipr",
-        }
+        },
     )
     ds_mock.latitude.attrs["units"] = "degrees_north"
     ds_mock.longitude.attrs["units"] = "degrees_east"
@@ -56,8 +57,10 @@ def test_earlinet_reader_basic(tmp_path):
     assert "latitude" in ds_lazy.coords
     assert "longitude" in ds_lazy.coords
 
+
 def test_earlinet_load_universal(tmp_path):
     import monetio
+
     # Create a mock EARLINET NetCDF file
     fn = tmp_path / "ipr_001_20240101_2.nc"
     ds_mock = xr.Dataset(
@@ -70,7 +73,7 @@ def test_earlinet_load_universal(tmp_path):
             "time": (("time",), [pd.Timestamp("2024-01-01")]),
             "altitude": (("altitude",), np.arange(10)),
             "wavelength": (("wavelength",), [1064.0]),
-        }
+        },
     )
     ds_mock.to_netcdf(fn)
 

@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
-import pytest
+
 from monetio.readers.mplnet import MPLNETReader
+
 
 def test_mplnet_reader_basic(tmp_path):
     # Create a mock MPLNET V3 NetCDF file
@@ -10,14 +11,14 @@ def test_mplnet_reader_basic(tmp_path):
 
     # Mock data
     time_vals = pd.to_datetime(["2024-01-01 00:00:00", "2024-01-01 00:01:00"])
-    alt_vals = np.linspace(0.1, 10.0, 100) # km
+    alt_vals = np.linspace(0.1, 10.0, 100)  # km
 
     ds_mock = xr.Dataset(
         data_vars={
             "nrb": (("time", "altitude"), np.random.rand(2, 100)),
             "latitude": (("time",), [40.0, 40.0]),
             "longitude": (("time",), [-80.0, -80.0]),
-            "surface_altitude": (("time",), [0.5, 0.5]), # km
+            "surface_altitude": (("time",), [0.5, 0.5]),  # km
         },
         coords={
             "time": (("time",), time_vals),
@@ -25,7 +26,7 @@ def test_mplnet_reader_basic(tmp_path):
         },
         attrs={
             "title": "MPLNET V3 NRB Data",
-        }
+        },
     )
     ds_mock.surface_altitude.attrs["units"] = "km"
     ds_mock.latitude.attrs["units"] = "degrees_north"
@@ -57,8 +58,10 @@ def test_mplnet_reader_basic(tmp_path):
     assert "elevation" in ds_lazy.coords
     assert ds_lazy.elevation.attrs["units"] == "m"
 
+
 def test_mplnet_load_universal(tmp_path):
     import monetio
+
     # Create a mock MPLNET V3 NetCDF file
     fn = tmp_path / "MPLNET_V3_L1_NRB_20240101_SITE2.nc"
     ds_mock = xr.Dataset(
@@ -70,7 +73,7 @@ def test_mplnet_load_universal(tmp_path):
         coords={
             "time": (("time",), [pd.Timestamp("2024-01-01")]),
             "altitude": (("altitude",), np.arange(10)),
-        }
+        },
     )
     ds_mock.to_netcdf(fn)
 
