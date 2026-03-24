@@ -113,6 +113,7 @@ _READER_MODULES = {
     "tolnet": ".readers.tolnet",
     "geoms": ".readers.geoms",
     "gml_ozonesonde": ".readers.gml_ozonesonde",
+    "igra2": ".readers.igra2",
     # Sat
     "goes": ".readers.goes",
     "nesdis_edr_viirs": ".readers.nesdis_edr_viirs",
@@ -141,7 +142,7 @@ def load(source: str, files=None, **kwargs):
     Available sources:
         Models: cmaq, camx, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, ufs, wrfchem, grib2
         Obs: airnow, aeronet, aqs, cems, crn, improve, ish, ish_lite, nadp, openaq, pams
-        Profile: icartt, tolnet, geoms, gml_ozonesonde
+        Profile: icartt, tolnet, geoms, gml_ozonesonde, igra2
         Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp, omps, omps_nadir, viirs_jrr
     """
     if source not in READER_REGISTRY:
