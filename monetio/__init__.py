@@ -108,6 +108,8 @@ _READER_MODULES = {
     "openaq": ".readers.openaq",
     "pams": ".readers.pams",
     "ndbc": ".readers.ndbc",
+    "surfrad": ".readers.surfrad",
+    "solrad": ".readers.solrad",
     # Profile
     "icartt": ".readers.icartt",
     "tolnet": ".readers.tolnet",
