@@ -37,6 +37,7 @@ def read_igra2(fname: str, **kwargs) -> pd.DataFrame:
                         lines = internal_f.readlines()
             elif fname.endswith(".gz"):
                 import gzip
+
                 with gzip.open(BytesIO(content), "rb") as gz:
                     lines = gz.readlines()
             else:
@@ -57,27 +58,32 @@ def read_igra2(fname: str, **kwargs) -> pd.DataFrame:
                 day = int(line_str[21:23])
                 hour = int(line_str[24:26])
                 reltime = line_str[27:31].strip()
-                numlev = int(line_str[32:36])
+                # numlev = int(line_str[32:36])
                 lat_str = line_str[55:62].strip()
                 lon_str = line_str[63:71].strip()
                 lat = int(lat_str) / 10000.0 if lat_str else np.nan
                 lon = int(lon_str) / 10000.0 if lon_str else np.nan
 
-                if hour == 99: hour = 0
+                if hour == 99:
+                    hour = 0
                 try:
                     time = pd.Timestamp(year=year, month=month, day=day, hour=hour)
                 except ValueError:
                     time = pd.NaT
 
                 current_header = {
-                    "siteid": sid, "time": time, "reltime": reltime,
-                    "latitude": lat, "longitude": lon,
+                    "siteid": sid,
+                    "time": time,
+                    "reltime": reltime,
+                    "latitude": lat,
+                    "longitude": lon,
                 }
             except Exception as e:
                 logger.debug(f"Failed to parse header line: {line_str}. Error: {e}")
                 current_header = None
         else:
-            if current_header is None: continue
+            if current_header is None:
+                continue
             try:
                 # 1-based indexing from doc
                 line_str = line_str.ljust(51)
@@ -103,30 +109,40 @@ def read_igra2(fname: str, **kwargs) -> pd.DataFrame:
                 wspd = int(wspd_str) if wspd_str else -9999
 
                 data_row = current_header.copy()
-                data_row.update({
-                    "lvltyp1": lvl1, "lvltyp2": lvl2, "etime": etime,
-                    "press": press, "gph": gph, "temp": temp, "rh": rh,
-                    "dpdp": dpdp, "wdir": wdir, "wspd": wspd,
-                })
+                data_row.update(
+                    {
+                        "lvltyp1": lvl1,
+                        "lvltyp2": lvl2,
+                        "etime": etime,
+                        "press": press,
+                        "gph": gph,
+                        "temp": temp,
+                        "rh": rh,
+                        "dpdp": dpdp,
+                        "wdir": wdir,
+                        "wspd": wspd,
+                    }
+                )
                 data_list.append(data_row)
             except Exception as e:
                 logger.debug(f"Failed to parse data line: {line_str}. Error: {e}")
 
     df = pd.DataFrame(data_list)
-    if df.empty: return df
+    if df.empty:
+        return df
 
     def clean(series, scale=1.0):
         series = series.where(~series.isin([-9999, -8888]), np.nan)
         return series / scale
 
-    df["press"] = clean(df["press"])  # Pa
-    df["gph"] = clean(df["gph"])  # m
-    df["temp"] = clean(df["temp"], 10.0)  # C
-    df["rh"] = clean(df["rh"], 10.0)  # %
-    df["dpdp"] = clean(df["dpdp"], 10.0)  # C
-    df["wdir"] = clean(df["wdir"])  # deg
-    df["wspd"] = clean(df["wspd"], 10.0)  # m/s
-    df["etime"] = clean(df["etime"])  # s
+    df["press"] = clean(df["press"])
+    df["gph"] = clean(df["gph"])
+    df["temp"] = clean(df["temp"], 10.0)
+    df["rh"] = clean(df["rh"], 10.0)
+    df["dpdp"] = clean(df["dpdp"], 10.0)
+    df["wdir"] = clean(df["wdir"])
+    df["wspd"] = clean(df["wspd"], 10.0)
+    df["etime"] = clean(df["etime"])
 
     return df
 
@@ -148,6 +164,7 @@ def read_igra2_derived(fname: str, **kwargs) -> pd.DataFrame:
                         lines = internal_f.readlines()
             elif fname.endswith(".gz"):
                 import gzip
+
                 with gzip.open(BytesIO(content), "rb") as gz:
                     lines = gz.readlines()
             else:
@@ -168,15 +185,15 @@ def read_igra2_derived(fname: str, **kwargs) -> pd.DataFrame:
                 day = int(line_str[21:23])
                 hour = int(line_str[24:26])
                 reltime = line_str[27:31].strip()
-                numlev = int(line_str[31:36])
+                # numlev = int(line_str[31:36])
 
-                if hour == 99: hour = 0
+                if hour == 99:
+                    hour = 0
                 try:
                     time = pd.Timestamp(year=year, month=month, day=day, hour=hour)
                 except ValueError:
                     time = pd.NaT
 
-                # Header specific parameters
                 pw_str = line_str[37:43].strip()
                 pw = int(pw_str) if pw_str else -99999
 
@@ -189,14 +206,19 @@ def read_igra2_derived(fname: str, **kwargs) -> pd.DataFrame:
                     cin = int(cin_str) if cin_str else -99999
 
                 current_header = {
-                    "siteid": sid, "time": time, "reltime": reltime,
-                    "pw": pw, "cape": cape, "cin": cin,
+                    "siteid": sid,
+                    "time": time,
+                    "reltime": reltime,
+                    "pw": pw,
+                    "cape": cape,
+                    "cin": cin,
                 }
             except Exception as e:
                 logger.debug(f"Failed to parse derived header: {line_str}. Error: {e}")
                 current_header = None
         else:
-            if current_header is None: continue
+            if current_header is None:
+                continue
             try:
                 line_str = line_str.ljust(151)
                 press = int(line_str[0:7].strip()) if line_str[0:7].strip() else -99999
@@ -207,16 +229,23 @@ def read_igra2_derived(fname: str, **kwargs) -> pd.DataFrame:
                 vwnd = int(line_str[128:135].strip()) if line_str[128:135].strip() else -99999
 
                 data_row = current_header.copy()
-                data_row.update({
-                    "press": press, "gph": repgph, "calcgph": calcgph,
-                    "temp": temp, "uwnd": uwnd, "vwnd": vwnd
-                })
+                data_row.update(
+                    {
+                        "press": press,
+                        "gph": repgph,
+                        "calcgph": calcgph,
+                        "temp": temp,
+                        "uwnd": uwnd,
+                        "vwnd": vwnd,
+                    }
+                )
                 data_list.append(data_row)
             except Exception as e:
                 logger.debug(f"Failed to parse derived data line: {line_str}. Error: {e}")
 
     df = pd.DataFrame(data_list)
-    if df.empty: return df
+    if df.empty:
+        return df
 
     def clean(series, scale=1.0):
         series = series.where(series != -99999, np.nan)
@@ -255,12 +284,26 @@ class IGRA2Reader(PointReader):
         try:
             with fs.open(self.station_list_url, "r") as f:
                 colspecs = [
-                    (0, 11), (12, 20), (21, 30), (31, 37), (38, 40),
-                    (41, 71), (72, 76), (77, 81), (82, 88),
+                    (0, 11),
+                    (12, 20),
+                    (21, 30),
+                    (31, 37),
+                    (38, 40),
+                    (41, 71),
+                    (72, 76),
+                    (77, 81),
+                    (82, 88),
                 ]
                 names = [
-                    "siteid", "latitude", "longitude", "elevation", "state",
-                    "name", "fstyear", "lstyear", "nobs",
+                    "siteid",
+                    "latitude",
+                    "longitude",
+                    "elevation",
+                    "state",
+                    "name",
+                    "fstyear",
+                    "lstyear",
+                    "nobs",
                 ]
                 self.stations = pd.read_fwf(f, colspecs=colspecs, names=names)
         except Exception as e:
@@ -291,7 +334,8 @@ class IGRA2Reader(PointReader):
         if sites is None:
             raise ValueError("Must specify 'sites' (station IDs) to build URLs.")
 
-        if isinstance(sites, str): sites = [sites]
+        if isinstance(sites, str):
+            sites = [sites]
 
         urls = []
         for s in sites:
@@ -327,6 +371,7 @@ class IGRA2Reader(PointReader):
                 stations = stations.assign(siteid=stations.siteid.astype(object))
                 if lazy:
                     import dask.dataframe as dd
+
                     df = df.assign(siteid=df.siteid.astype(object))
                     stations_dask = dd.from_pandas(stations, npartitions=1)
                     stations_dask = stations_dask.assign(siteid=stations_dask.siteid.astype(object))
@@ -357,10 +402,19 @@ class IGRA2Reader(PointReader):
 
             # Add unit attributes
             units = {
-                "press": "Pa", "temp": "degC", "rh": "%", "gph": "m",
-                "calcgph": "m", "uwnd": "m/s", "vwnd": "m/s",
-                "wdir": "deg", "wspd": "m/s", "etime": "s",
-                "pw": "mm", "cape": "J/kg", "cin": "J/kg"
+                "press": "Pa",
+                "temp": "degC",
+                "rh": "%",
+                "gph": "m",
+                "calcgph": "m",
+                "uwnd": "m/s",
+                "vwnd": "m/s",
+                "wdir": "deg",
+                "wspd": "m/s",
+                "etime": "s",
+                "pw": "mm",
+                "cape": "J/kg",
+                "cin": "J/kg",
             }
             for var, unit in units.items():
                 if var in ds.data_vars:
