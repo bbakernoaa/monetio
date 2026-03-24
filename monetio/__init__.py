@@ -79,6 +79,9 @@ __all__ = [
     "pardump",
     "raqms",
     "chimere",
+    "gfs",
+    "gefs",
+    "gdas",
 ]
 
 # Map reader names to their module paths for lazy loading
@@ -95,6 +98,9 @@ _READER_MODULES = {
     "ufs": ".readers.ufs",
     "wrfchem": ".readers.wrfchem",
     "grib2": ".readers.grib2",
+    "gfs": ".readers.gfs",
+    "gefs": ".readers.gfs",
+    "gdas": ".readers.gfs",
     # Obs
     "airnow": ".readers.airnow",
     "aeronet": ".readers.aeronet",
