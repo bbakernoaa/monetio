@@ -128,6 +128,7 @@ _READER_MODULES = {
     "mopitt": ".readers.mopitt",
     "tempo": ".readers.tempo",
     "tropomi": ".readers.tropomi",
+    "merra2": ".readers.merra2",
     "nesdis_viirs_jrr": ".readers.nesdis_viirs_jrr",
     "viirs_jrr": ".readers.nesdis_viirs_jrr",
 }
