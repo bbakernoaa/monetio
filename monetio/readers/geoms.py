@@ -121,6 +121,7 @@ def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True
         from monetio.util import _import_required
 
         h5py = _import_required("h5py")
+        da_array = _import_required("dask.array")
 
         f_obj = fs.open(fp, "rb")
         f = h5py.File(f_obj, "r")
@@ -128,15 +129,14 @@ def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True
         data_vars = {}
         for k, v in f.items():
             dims = tuple(_rename_h5_dim(str(d)) for d in v.dims)
-            # We wrap in DataArray with lazy loading if we can,
-            # but h5py[...] returns a numpy array.
-            # To be truly lazy, we would need to use xr.open_dataset with h5netcdf.
-            # However, GEOMS isn't standard NetCDF.
-            data_vars[k] = (dims, v[...], dict(v.attrs))
+            # We wrap in DataArray with lazy loading using dask.array.from_array.
+            # This allows backend-agnostic lazy evaluation without immediate v[...] compute.
+            data_lazy = da_array.from_array(v, chunks="auto")
+            data_vars[k] = (dims, data_lazy, dict(v.attrs))
 
         attrs = dict(f.attrs)
-        f.close()
-        f_obj.close()
+        # Note: We don't close the file yet because dask needs the handle for lazy reads.
+        # This is a trade-off for GEOMS HDF5 files which don't fit standard xr.open_dataset engines.
         ds = xr.Dataset(data_vars=data_vars, attrs=attrs)
     else:
         raise ValueError(f"unrecognized file extension: {ext!r}")
@@ -199,6 +199,7 @@ def geoms_preprocess(
 
     if actual_dim_renames:
         ds = ds.rename_dims(actual_dim_renames)
+        ds = update_history(ds, f"Renamed dimensions: {actual_dim_renames}")
 
     # 3. Squeeze singleton dimensions if they look like placeholders
     for vn, da in ds.variables.items():
@@ -218,6 +219,7 @@ def geoms_preprocess(
 
     # 6. Time Conversion (Lazy)
     ds = _convert_times_lazy(ds)
+    ds = update_history(ds, "Converted MJD2000 times to datetime64[ns] lazily.")
 
     # 7. Final Renaming and Squeezing
     rename_vars = {k: v for k, v in rename_main_dims.items() if k in ds.variables}
@@ -248,6 +250,16 @@ def geoms_preprocess(
 def _handle_strings(ds: xr.Dataset) -> xr.Dataset:
     """
     Decodes byte strings and handles object-type strings lazily.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with decoded strings.
     """
     for vn, da in ds.variables.items():
         if da.dtype.kind == "S":
@@ -268,7 +280,19 @@ def _handle_strings(ds: xr.Dataset) -> xr.Dataset:
 
 
 def _decode_obj(x: Any) -> str:
-    """Helper to decode object that might be bytes."""
+    """
+    Helper to decode object that might be bytes.
+
+    Parameters
+    ----------
+    x : Any
+        Object to decode.
+
+    Returns
+    -------
+    str
+        Decoded string.
+    """
     if isinstance(x, bytes):
         return x.decode("utf-8")
     return str(x)
@@ -277,6 +301,16 @@ def _decode_obj(x: Any) -> str:
 def _convert_times_lazy(ds: xr.Dataset) -> xr.Dataset:
     """
     Convert GEOMS MJD2000 times lazily.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with converted times.
     """
     time_vars = ["DATETIME", "DATETIME.START", "DATETIME.STOP"]
     for vn in time_vars:
@@ -296,6 +330,16 @@ def _convert_times_lazy(ds: xr.Dataset) -> xr.Dataset:
 def _mjd2000_to_datetime(x: np.ndarray) -> np.ndarray:
     """
     Vectorized conversion from MJD2000 to datetime64[ns].
+
+    Parameters
+    ----------
+    x : np.ndarray
+        MJD2000 days.
+
+    Returns
+    -------
+    np.ndarray
+        datetime64[ns] array.
     """
     # MJD2K in GEOMS: Days since 2000-01-01 00:00:00 UTC
     # MJD is JD - 2400000.5
@@ -307,11 +351,27 @@ def _mjd2000_to_datetime(x: np.ndarray) -> np.ndarray:
 
     # We maintain the legacy logic but vectorized.
     jd = np.asarray(x) + 2451544.5
-    return pd.to_datetime(jd, unit="D", origin="julian").values.astype("datetime64[ns]")
+    # Use astype('datetime64[ns]') on the pandas series/index to avoid .values compute
+    # when possible, though apply_ufunc will pass numpy arrays here anyway.
+    return pd.to_datetime(jd, unit="D", origin="julian").to_numpy().astype("datetime64[ns]")
 
 
-def _read_hdf4(sd: Any) -> Tuple[Dict, Dict]:
-    """Reads HDF4 datasets using pyhdf."""
+def _read_hdf4(
+    sd: Any,
+) -> Tuple[Dict[str, Tuple[Tuple[str, ...], np.ndarray, Dict[str, Any]]], Dict[str, Any]]:
+    """
+    Reads HDF4 datasets using pyhdf.
+
+    Parameters
+    ----------
+    sd : Any
+        pyhdf SD object.
+
+    Returns
+    -------
+    Tuple[Dict, Dict]
+        data_vars and global attributes.
+    """
     data_vars = {}
     for name, _ in sd.datasets().items():
         sds = sd.select(name)
@@ -325,7 +385,19 @@ def _read_hdf4(sd: Any) -> Tuple[Dict, Dict]:
 
 
 def _rename_h5_dim(s: str) -> str:
-    """Parses HDF5 dimension label."""
+    """
+    Parses HDF5 dimension label.
+
+    Parameters
+    ----------
+    s : str
+        Dimension label string.
+
+    Returns
+    -------
+    str
+        Renamed dimension.
+    """
     import re
 
     s_re = r'<"(.*)" dimension (\d+) of HDF5 dataset at (\d+)>'
@@ -338,10 +410,38 @@ def _rename_h5_dim(s: str) -> str:
 
 
 def _rename_var(vn: str, *, under: str = "_", dot: str = "_") -> str:
-    """Standardizes variable names."""
+    """
+    Standardizes variable names.
+
+    Parameters
+    ----------
+    vn : str
+        Original variable name.
+    under : str, optional
+        Replacement for underscore, by default "_".
+    dot : str, optional
+        Replacement for dot, by default "_".
+
+    Returns
+    -------
+    str
+        Standardized name.
+    """
     return vn.lower().replace("_", under).replace(".", dot)
 
 
 def _dti_from_mjd2000(x: Any) -> pd.DatetimeIndex:
-    """Legacy helper for backward compatibility."""
+    """
+    Legacy helper for backward compatibility.
+
+    Parameters
+    ----------
+    x : Any
+        MJD2000 data.
+
+    Returns
+    -------
+    pd.DatetimeIndex
+        DatetimeIndex.
+    """
     return pd.to_datetime(np.asarray(x) + 2451544.5, unit="D", origin="julian")
