@@ -116,6 +116,8 @@ _READER_MODULES = {
     "geoms": ".readers.geoms",
     "gml_ozonesonde": ".readers.gml_ozonesonde",
     "igra2": ".readers.igra2",
+    "mplnet": ".readers.mplnet",
+    "earlinet": ".readers.earlinet",
     # Sat
     "goes": ".readers.goes",
     "nesdis_edr_viirs": ".readers.nesdis_edr_viirs",
