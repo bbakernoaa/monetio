@@ -55,9 +55,12 @@ class NCEPPDSReader(GriddedReader):
         if "engine" not in kwargs:
             kwargs["engine"] = "grib2io"
 
-        # grib2io engine might need help with S3 URLs.
-        # We ensure they are expanded and handled.
+        # grib2io engine generally requires local files or file-like objects.
+        # XarrayDriver handles S3 URLs by opening them via fsspec.
         ds = super().open_dataset(files, **kwargs)
+
+        # Apply Aero Protocol harmonization
+        ds = self.harmonize(ds)
 
         # Update history
         ds = update_history(ds, f"Read {self.__class__.__name__} data from AWS PDS.")
@@ -100,9 +103,13 @@ class NCEPPDSReader(GriddedReader):
             "RH": "relative_humidity",
             "PRMSL": "mslp",
         }
-        actual_var_rename = {
-            k: v for k, v in var_mapping.items() if k in ds.variables and v not in ds.variables
-        }
+        actual_var_rename = {}
+        for var in ds.variables:
+            for k, v in var_mapping.items():
+                # Check for exact match or suffix (e.g., 'TMP:isobaricInhPa')
+                if (var == k or var.startswith(f"{k}:")) and v not in ds.variables:
+                    actual_var_rename[var] = v
+                    break
         if actual_var_rename:
             ds = ds.rename(actual_var_rename)
 
