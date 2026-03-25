@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-import xarray as xr
 import pytest
+import xarray as xr
 
 from monetio.readers.eprofile import EPROFILEReader
 
@@ -88,6 +88,7 @@ def test_eprofile_load_redirection(tmp_path):
 
     # Test via monetio.obs.eprofile.add_data
     from monetio.obs.eprofile import add_data
+
     ds_obs = add_data(files=str(fn))
     assert isinstance(ds_obs, xr.Dataset)
     assert "attenuated_backscatter" in ds_obs.data_vars

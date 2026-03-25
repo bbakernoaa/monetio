@@ -111,9 +111,7 @@ def eprofile_preprocess(ds: xr.Dataset) -> xr.Dataset:
     if "longitude" in ds.coords:
         ds["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
     if "elevation" in ds.coords:
-        ds["elevation"].attrs.update(
-            {"units": "m", "standard_name": "height_above_mean_sea_level"}
-        )
+        ds["elevation"].attrs.update({"units": "m", "standard_name": "height_above_mean_sea_level"})
 
     # 5. Vertical Coordinate Calculation
     # If we have elevation (station height) and range, calculate altitude (absolute height)
