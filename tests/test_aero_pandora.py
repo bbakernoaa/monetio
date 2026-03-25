@@ -56,11 +56,15 @@ def test_pandora_build_urls_mock(monkeypatch):
 
     monkeypatch.setattr(fsspec, "filesystem", lambda x: MockFs())
 
-    urls = reader.build_urls(dates="2023-01-01", siteid="BoulderCO", instrument="Pandora57s1", product="no2")
+    urls = reader.build_urls(
+        dates="2023-01-01", siteid="BoulderCO", instrument="Pandora57s1", product="no2"
+    )
     assert len(urls) == 1
     assert "no2" in urls[0]
 
-    urls_o3 = reader.build_urls(dates="2023-01-01", siteid="BoulderCO", instrument="Pandora57s1", product="o3")
+    urls_o3 = reader.build_urls(
+        dates="2023-01-01", siteid="BoulderCO", instrument="Pandora57s1", product="o3"
+    )
     assert len(urls_o3) == 1
     assert "o3" in urls_o3[0]
 
