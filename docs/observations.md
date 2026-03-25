@@ -36,6 +36,12 @@ Aerosol Robotic Network (global).
 
 - **Source ID**: `aeronet`
 
+### SKYNET
+
+SKYNET sun photometer network.
+
+- **Source ID**: `skynet`
+
 ### OpenAQ
 
 Global air quality data platform.
