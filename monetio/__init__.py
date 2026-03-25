@@ -108,6 +108,7 @@ _READER_MODULES = {
     "cems": ".readers.cems",
     "crn": ".readers.crn",
     "improve": ".readers.improve",
+    "eprofile": ".readers.eprofile",
     "ish": ".readers.ish",
     "ish_lite": ".readers.ish_lite",
     "nadp": ".readers.nadp",
