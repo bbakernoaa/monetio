@@ -36,6 +36,13 @@ Aerosol Robotic Network (global).
 
 - **Source ID**: `aeronet`
 
+### ACTRIS/EBAS
+
+European Research Infrastructure for the observation of Aerosol, Clouds and Trace Gases.
+
+- **Source ID**: `actris`
+- **Variables**: `ozone`, `carbon_monoxide`, `aerosol_light_scattering_coefficient`, etc.
+
 ### OpenAQ
 
 Global air quality data platform.
