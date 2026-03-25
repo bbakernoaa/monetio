@@ -1,8 +1,9 @@
 import numpy as np
-import pandas as pd
 import pytest
 import xarray as xr
+
 from monetio.readers.actris import ACTRISReader
+
 
 @pytest.fixture
 def mock_actris_file(tmp_path):
@@ -32,7 +33,7 @@ Station setting: Rural
 ... more metadata lines until 68 ...
 """
     # Add dummy metadata lines to reach 68
-    header_lines = content.count('\n')
+    header_lines = content.count("\n")
     for i in range(68 - header_lines):
         content += f"Metadata line {i}\n"
 
@@ -44,6 +45,7 @@ Station setting: Rural
 
     file_path.write_text(content)
     return str(file_path)
+
 
 def test_actris_reader_eager(mock_actris_file):
     reader = ACTRISReader()
@@ -72,6 +74,7 @@ def test_actris_reader_eager(mock_actris_file):
     assert ds["elevation"].values[0] == 100.0
     assert ds["siteid"].values[0] == "Test Station"
 
+
 def test_actris_reader_lazy(mock_actris_file):
     reader = ACTRISReader()
     ds = reader.open_dataset(mock_actris_file, as_xarray=True, lazy=True)
@@ -85,8 +88,10 @@ def test_actris_reader_lazy(mock_actris_file):
     assert np.isnan(ds_computed["Ozone"].values[2])
     assert ds_computed["Ozone"].values[0] == 10.0
 
+
 def test_actris_redirection(mock_actris_file):
     from monetio.obs.actris import add_data
+
     ds = add_data(mock_actris_file)
     assert isinstance(ds, xr.Dataset)
     assert "Ozone" in ds.data_vars
