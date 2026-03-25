@@ -17,6 +17,8 @@ permissions:
 
 env:
   OPENAQ_API_KEY: "${{ secrets.OPENAQ_API_KEY }}"
+  # Opt into Node.js 24 for JavaScript actions to avoid deprecation warnings
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   test:

@@ -62,3 +62,4 @@ Global hourly and synoptic surface observations.
 - **CRN**: Climate Reference Network (`crn`)
 - **CEMS**: Continuous Emission Monitoring Systems (`cems`)
 - **IMPROVE**: Interagency Monitoring of Protected Visual Environments (`improve`)
+- **E-PROFILE**: European Automatic Lidar and Ceilometer network (`eprofile`)
