@@ -15,6 +15,7 @@ from . import (
     openaq_v2,
     openaq_v3,
     pams,
+    pandora,
     skynet,
 )
 from . import (
@@ -43,6 +44,7 @@ __all__ = [
     "openaq_v2",
     "openaq_v3",
     "pams",
+    "pandora",
     "skynet",
 ]
 

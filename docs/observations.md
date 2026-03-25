@@ -69,6 +69,14 @@ Network for the Detection of Atmospheric Composition Change (ground-based remote
 - **Formats**: GEOMS (HDF4/HDF5)
 - **Instruments**: Lidar, FTIR, UV-Vis spectrometer, etc.
 
+### Pandora
+
+Pandonia Global Network (ground-based remote sensing).
+
+- **Source ID**: `pandora`
+- **Formats**: GEOMS (HDF5)
+- **Variables**: `nitrogen_dioxide`, `ozone`, `formaldehyde`, `sulfur_dioxide`, etc.
+
 ### Integrated Surface Database (ISH)
 
 Global hourly and synoptic surface observations.
