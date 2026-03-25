@@ -41,6 +41,12 @@ Aerosol Robotic Network (global).
 SKYNET sun photometer network.
 
 - **Source ID**: `skynet`
+### ACTRIS/EBAS
+
+European Research Infrastructure for the observation of Aerosol, Clouds and Trace Gases.
+
+- **Source ID**: `actris`
+- **Variables**: `ozone`, `carbon_monoxide`, `aerosol_light_scattering_coefficient`, etc.
 
 ### OpenAQ
 

@@ -1,4 +1,5 @@
 from . import (
+    actris,
     aeronet,
     airnow,
     aqs,
@@ -21,6 +22,7 @@ from . import (
 )
 
 __all__ = [
+    "actris",
     "aeronet",
     "airnow",
     "aqs",
