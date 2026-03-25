@@ -43,6 +43,7 @@ MONETIO v0.2.7 has been released. MONETIO provides a consistent interface for re
 - [AirNow](https://www.airnow.gov/)
 - [AQS](https://www.epa.gov/aqs/)
 - [AERONET](https://aeronet.gsfc.nasa.gov/)
+- [SKYNET](https://www.skynet-isdc.org/)
 - [OpenAQ](https://openaq.org/)
 - [NADP](https://nadp.slh.wisc.edu/)
 - [CRN](https://www.ncei.noaa.gov/products/land-based-station/us-climate-reference-network)

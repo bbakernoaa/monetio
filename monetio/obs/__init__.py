@@ -13,6 +13,7 @@ from . import (
     openaq_v2,
     openaq_v3,
     pams,
+    skynet,
 )
 from . import (
     cems as cems,
@@ -38,6 +39,7 @@ __all__ = [
     "openaq_v2",
     "openaq_v3",
     "pams",
+    "skynet",
 ]
 
 __name__ = "obs"
