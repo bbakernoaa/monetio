@@ -95,3 +95,51 @@ def test_actris_redirection(mock_actris_file):
     ds = add_data(mock_actris_file)
     assert isinstance(ds, xr.Dataset)
     assert "Ozone" in ds.data_vars
+
+
+def test_actris_build_urls(monkeypatch):
+    """Test URL construction from THREDDS catalog."""
+
+    class MockResponse:
+        def __init__(self):
+            self.text = """
+            <catalog>
+              <dataset name="NO0042G.20230101000000.20241021102319.uv_abs.ozone.air.1y.1h.nc" ID="EBAS/NO0042G..." urlPath="ebas/NO0042G.20230101000000.nc" />
+              <dataset name="DE0001R.20230601000000.20241021102319.uv_abs.ozone.air.1y.1h.nc" ID="EBAS/DE0001R..." urlPath="ebas/DE0001R.20230601000000.nc" />
+              <dataset name="FR0001R.20230101000000.20241021102319.earlinet.ozone.air.1y.1h.nc" ID="EBAS/FR0001R..." urlPath="ebas/FR0001R.20230101000000.nc" />
+            </catalog>
+            """
+            self.status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+    import requests
+
+    # Clear cache if it exists to ensure monkeypatch works
+    from monetio.readers.actris import get_ebas_catalog
+
+    get_ebas_catalog.cache_clear()
+
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: MockResponse())
+
+    reader = ACTRISReader()
+    # Request range including both non-earlinet files
+    urls = reader.build_urls(dates=["2023-01-01", "2023-06-01"])
+    assert len(urls) == 2
+    # Check that OPeNDAP base is used
+    assert "thredds/dodsC/" in urls[0]
+    assert "ebas/NO0042G.20230101000000.nc" in urls[0]
+
+    # Filter by siteid
+    urls = reader.build_urls(dates=["2023-01-01", "2023-06-01"], siteid="NO0042G")
+    assert len(urls) == 1
+    assert "NO0042G" in urls[0]
+
+    # Verify overlap logic (1y file starting before range)
+    urls = reader.build_urls(dates=["2023-12-31"])
+    assert len(urls) == 2  # Both 2023-01 and 2023-06 files overlap with 2023-12-31
+
+    # Verify EARLINET exclusion
+    urls = reader.build_urls(dates=["2023-01-01"], siteid="FR0001R")
+    assert len(urls) == 0

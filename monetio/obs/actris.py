@@ -6,7 +6,7 @@ from ..readers.actris import ACTRISReader
 
 
 def add_data(
-    files,
+    files=None,
     **kwargs,
 ):
     """Retrieve and load ACTRIS/EBAS data."""

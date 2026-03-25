@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import datetime
+import functools
+import re
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -15,6 +18,28 @@ from .sat_utils import update_history
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
+
+
+@functools.lru_cache(maxsize=1)
+def get_ebas_catalog() -> str:
+    """
+    Fetch and cache the EBAS THREDDS catalog XML.
+
+    Returns
+    -------
+    str
+        The catalog XML content.
+    """
+    catalog_url = "https://thredds.nilu.no/thredds/catalog/ebas/catalog.xml"
+    try:
+        import requests
+
+        response = requests.get(catalog_url, timeout=60)
+        response.raise_for_status()
+        return response.text
+    except Exception as e:
+        warnings.warn(f"Failed to fetch EBAS catalog: {e}")
+        return ""
 
 
 def parse_ebas_header(filename: str) -> dict[str, Any]:
@@ -89,7 +114,7 @@ def parse_ebas_header(filename: str) -> dict[str, Any]:
         # The rest are metadata lines (e.g. Station latitude, etc.)
         metadata = []
         current_line = 13 + n_vars
-        while current_line < n_header:
+        while current_line <= n_header:
             line = f.readline().strip()
             metadata.append(line)
             current_line += 1
@@ -184,7 +209,9 @@ class ACTRISReader(PointReader):
 
     def open_dataset(
         self,
-        files: str | list[str],
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
+        siteid: str | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
@@ -194,8 +221,12 @@ class ACTRISReader(PointReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+            Dates to retrieve if files are not provided.
+        siteid : str, optional
+            Specific ACTRIS/EBAS site ID (e.g. 'NO0042G').
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
@@ -208,12 +239,49 @@ class ACTRISReader(PointReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded ACTRIS data.
         """
+        if files is None:
+            if dates is None:
+                raise ValueError("Must provide either 'files' or 'dates'.")
+            files = self.build_urls(dates, siteid=siteid, **kwargs)
+
+        if not files:
+            if as_xarray:
+                return xr.Dataset()
+            return pd.DataFrame()
+
+        # Handle list of files/URLs
+        files_list = np.atleast_1d(files).tolist()
+        first_file = files_list[0]
+
+        # Check if files are NetCDF (.nc)
+        if str(first_file).endswith(".nc"):
+            # NetCDF format from THREDDS
+            # OPeNDAP URLs work better with Xarray/NetCDF4
+            ds = xr.open_mfdataset(files, **kwargs)
+            # Coordinate standardization is already somewhat standard in EBAS NetCDF
+            # but we may need to rename to match PointReader conventions
+            rename_dict = {}
+            if "lat" in ds.coords:
+                rename_dict["lat"] = "latitude"
+            if "lon" in ds.coords:
+                rename_dict["lon"] = "longitude"
+            if "alt" in ds.coords:
+                rename_dict["alt"] = "elevation"
+            if rename_dict:
+                ds = ds.rename(rename_dict)
+
+            ds = update_history(ds, "Read ACTRIS/EBAS NetCDF data.")
+            if not as_xarray:
+                return ds.to_dataframe().reset_index()
+            return ds
+
+        # Default to NASA-Ames 1001 format
         # We need metadata from the first file to setup lazy processing
-        file_list = FileUtility.expand_paths(files)
-        if not file_list:
+        expanded_files = FileUtility.expand_paths(files_list)
+        if not expanded_files:
             raise FileNotFoundError(f"No files found matching {files}")
 
-        header = parse_ebas_header(file_list[0])
+        header = parse_ebas_header(expanded_files[0])
 
         # EBAS NASA-Ames files are space-separated
         kwargs.setdefault("read_method", read_actris)
@@ -246,6 +314,96 @@ class ACTRISReader(PointReader):
             return ds
 
         return df
+
+    def build_urls(
+        self,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,
+        siteid: str | None = None,
+        **kwargs,
+    ) -> list[str]:
+        """
+        Construct EBAS THREDDS URLs.
+
+        Parameters
+        ----------
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+            Dates to build URLs for.
+        siteid : str, optional
+            Specific site ID (e.g. 'NO0042G').
+
+        Returns
+        -------
+        List[str]
+            List of matching EBAS NetCDF OPeNDAP URLs.
+        """
+        dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
+        if dates.empty:
+            return []
+
+        catalog_xml = get_ebas_catalog()
+        if not catalog_xml:
+            return []
+
+        # Find datasets in the catalog
+        # Example dataset entry:
+        # <dataset name="NO0042G.20230101000000.20241021102319.uv_abs.ozone.air.1y.1h.NO01L_uv_abs_02.NO01L_uv_abs..nc" ... urlPath="ebas/NO0042G..." />
+        pattern = r'<dataset name="([^"]+)" ID="([^"]+)" urlPath="([^"]+)"'
+        matches = re.findall(pattern, catalog_xml)
+
+        urls = []
+        # Use OPeNDAP for better integration with Xarray
+        base_url = "https://thredds.nilu.no/thredds/dodsC/"
+
+        requested_min = dates.min()
+        requested_max = dates.max()
+
+        for name, dataset_id, url_path in matches:
+            # Exclude EARLINET as requested by user
+            if "earlinet" in name.lower():
+                continue
+
+            # Check siteid
+            if siteid and siteid not in name:
+                continue
+
+            # Check dates
+            # EBAS filename format: site.start_date.revision_date.component...nc
+            # start_date is YYYYMMDDHHMMSS
+            parts = name.split(".")
+            if len(parts) < 7:
+                continue
+
+            try:
+                start_date = pd.to_datetime(parts[1], format="%Y%m%d%H%M%S")
+            except Exception:
+                continue
+
+            # Duration heuristic from filename (e.g., 1y, 1d, 1mo)
+            duration_str = parts[6]
+            duration = pd.Timedelta(days=365)  # Default to 1 year
+            if "y" in duration_str:
+                try:
+                    duration = pd.Timedelta(days=int(duration_str.replace("y", "")) * 365)
+                except ValueError:
+                    pass
+            elif "mo" in duration_str:
+                try:
+                    duration = pd.Timedelta(days=int(duration_str.replace("mo", "")) * 30)
+                except ValueError:
+                    pass
+            elif "d" in duration_str:
+                try:
+                    duration = pd.Timedelta(days=int(duration_str.replace("d", "")))
+                except ValueError:
+                    pass
+
+            end_date = start_date + duration
+
+            # Check for overlap: [start_date, end_date] overlaps [requested_min, requested_max]
+            if start_date <= requested_max and end_date >= requested_min:
+                urls.append(f"{base_url}{url_path}")
+
+        return urls
 
     def harmonize(self, df: pd.DataFrame | dd.DataFrame) -> pd.DataFrame | dd.DataFrame:
         """Standardize coordinate column names."""
