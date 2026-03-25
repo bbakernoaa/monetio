@@ -54,6 +54,21 @@ Global air quality data platform.
 
 - **Source ID**: `openaq`
 
+### IAGOS
+
+In-service Aircraft for a Global Observing System (global airborne in-situ measurements).
+
+- **Source ID**: `iagos`
+- **Variables**: `ozone`, `carbon_monoxide`, `water_vapor`, `nitrogen_oxides`, etc.
+
+### NDACC
+
+Network for the Detection of Atmospheric Composition Change (ground-based remote sensing).
+
+- **Source ID**: `ndacc`
+- **Formats**: GEOMS (HDF4/HDF5)
+- **Instruments**: Lidar, FTIR, UV-Vis spectrometer, etc.
+
 ### Integrated Surface Database (ISH)
 
 Global hourly and synoptic surface observations.
