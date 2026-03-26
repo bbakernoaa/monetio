@@ -371,7 +371,7 @@ class ModelBin:
                         else:
                             concframe = self.parse_hdata8(hdata8a, hdata8b, pdate1)
                         dset = xr.Dataset.from_dataframe(concframe)
-                        if not self.dset.any():
+                        if not self.dset:
                             self.dset = dset
                         else:
                             self.dset = xr.merge([self.dset, dset])
@@ -387,9 +387,9 @@ class ModelBin:
         self.atthash["Species ID"] = list(set(self.atthash["Species ID"]))
         self.atthash["Coordinate time description"] = "Beginning of sampling time"
 
-        if not self.dset.any():
+        if not self.dset:
             return False
-        if self.dset.variables:
+        if self.dset.data_vars:
             self.dset.attrs = self.atthash
             mgrid = get_latlongrid(self.gridhash, self.dset.coords["x"], self.dset.coords["y"])
             self.dset = self.dset.assign_coords(longitude=(("y", "x"), mgrid[0]))
@@ -431,7 +431,7 @@ def fix_grid_continuity(dset: xr.Dataset) -> xr.Dataset:
     xr.Dataset
         Dataset with continuous grid.
     """
-    if not dset.any():
+    if not dset:
         return dset
     if check_grid_continuity(dset):
         return dset
@@ -661,30 +661,41 @@ def combine_dataset(
     return rval
 
 
-def add_species(dset, species=None):
-    sflist = []
-    splist = dset.attrs["Species ID"]
+def add_species(dset: xr.Dataset, species: list[str] = None) -> xr.Dataset:
+    """
+    Sum multiple species into a single DataArray/Dataset.
+
+    Parameters
+    ----------
+    dset : xr.Dataset
+        Input HYSPLIT dataset.
+    species : list[str], optional
+        List of species to sum. If None, all species in 'Species ID' attribute are used.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with the summed species.
+    """
+    splist = dset.attrs.get("Species ID", [])
     if not species:
-        species = dset.attrs["Species ID"]
+        species = splist
 
-    sss = 0
-    tmp = []
-    while sss < len(splist):
-        if splist[sss] in species:
-            tmp.append(dset[splist[sss]].fillna(0))
-            sflist.append(splist[sss])
-        sss += 1
+    sflist = [s for s in species if s in dset.data_vars]
 
-    total_par = tmp[0]
-    ppp = 1
-    while ppp < len(tmp):
-        total_par = total_par + tmp[ppp]
-        ppp += 1
-    atthash = dset.attrs.copy()
-    atthash["Species ID"] = sflist
-    total_par = total_par.assign_attrs(atthash)
-    total_par = update_history(total_par, f"Added species sum: {sflist}")
-    return total_par
+    if not sflist:
+        return dset
+
+    # Vectorized sum across selected species
+    total_par = dset[sflist].to_array(dim="species").sum(dim="species")
+
+    # Re-wrap in Dataset to maintain consistency with other readers
+    res = total_par.to_dataset(name="_".join(sflist) if len(sflist) < 3 else "summed_species")
+
+    # Transfer attributes
+    res.attrs = dset.attrs.copy()
+    res.attrs["Species ID"] = sflist
+    return update_history(res, f"Added species sum: {sflist}")
 
 
 def reset_latlon_coords(hxr):
@@ -728,7 +739,7 @@ def thickness_hash(xrash: xr.Dataset | xr.DataArray) -> dict:
 
 def get_thickness(xrash: xr.Dataset | xr.DataArray) -> xr.DataArray:
     """
-    Calculate layer thicknesses from vertical coordinates.
+    Calculate layer thicknesses from vertical coordinates backend-agnostic.
 
     Parameters
     ----------
@@ -740,36 +751,20 @@ def get_thickness(xrash: xr.Dataset | xr.DataArray) -> xr.DataArray:
     xr.DataArray
         Thickness of each layer.
     """
+    # Vectorized approach: thickness = z[i] - z[i-1], where z[-1] = 0
+    # This works for both deposition-inclusive (z[0]=0 -> thickness[0]=0)
+    # and above-ground (z[0]>0 -> thickness[0]=z[0]) grids.
     z = xrash.z
-
-    # Create interfaces by prepending 0 if not present
-    # Case 1: First layer is deposition (z=0)
-    # Case 2: First layer is above ground (z>0)
-    is_dep = (z[0] == 0).item()
-
-    if is_dep:
-        # z: [0, 100, 500, ...] -> thicknesses: [0, 100, 400, ...]
-        # We handle this by computing differences on z and prepending a 0.
-        delta = z.diff(dim="z", label="lower")
-        # Prepend 0 for the deposition layer
-        # Avoid xr.concat on dimension that already exists if possible, or ensure it's handled right
-        # Actually, concat with coords={"z": [0.0]} should work if delta has no overlap.
-        # But diff(label="lower") returns z[1:] as coordinates.
-        delta_0 = xr.DataArray([0.0], coords={"z": [0.0]}, dims="z")
-        delta_vals = xr.concat([delta_0, delta], dim="z")
-    else:
-        # z: [100, 500, ...] -> thicknesses: [100, 400, ...]
-        # Prepend 0 to coordinates to calculate the first thickness
-        z_0 = xr.DataArray([0.0], coords={"z": [0.0]}, dims="z")
-        z_with_surf = xr.concat([z_0, z], dim="z")
-        delta_vals = z_with_surf.diff(dim="z").assign_coords(z=z)
-
-    return delta_vals.rename("thickness")
+    # We use shift(fill_value=0) to avoid xr.concat which can be expensive/tricky with indexes
+    z_prev = z.shift(z=1, fill_value=0.0)
+    delta = z - z_prev
+    return delta.rename("thickness")
 
 
 def remove_dep(xrash: xr.Dataset | xr.DataArray) -> xr.Dataset | xr.DataArray:
     """
-    Remove the deposition layer (z=0) if present.
+    Mask the deposition layer (z=0) if present backend-agnostic.
+    Keeps the same shape but replaces z=0 values with NaN to remain lazy.
 
     Parameters
     ----------
@@ -779,11 +774,9 @@ def remove_dep(xrash: xr.Dataset | xr.DataArray) -> xr.Dataset | xr.DataArray:
     Returns
     -------
     xr.Dataset | xr.DataArray
-        Data without deposition layer.
+        Data with deposition layer masked.
     """
-    if xrash.z[0] == 0:
-        return xrash.isel(z=slice(1, None))
-    return xrash
+    return xrash.where(xrash.z > 0)
 
 
 def mass_loading(
@@ -804,8 +797,7 @@ def mass_loading(
     xr.DataArray | xr.Dataset
         Mass loading (sum of conc * delta).
     """
-    # 1. Identify and exclude deposition layer for integration
-    is_dep = (xrash.z[0] == 0).item()
+    # 1. Exclude deposition layer for integration (sum over atmospheric layers only)
     xrash_no_dep = remove_dep(xrash)
 
     # 2. Get thicknesses
@@ -814,15 +806,17 @@ def mass_loading(
     else:
         if isinstance(delta, np.ndarray):
             # If provided as numpy, align with the dataset
-            # Determine if delta includes the dep layer
-            if len(delta) == len(xrash.z) and is_dep:
-                delta = delta[1:]
-            weights = xr.DataArray(delta, coords={"z": xrash_no_dep.z}, dims="z")
+            # We assume delta matches the original z including dep if lengths match
+            if len(delta) == len(xrash.z):
+                # We need a way to filter delta without .item()
+                # But if it's already numpy, it's eager anyway.
+                # However, for consistency, let's use xarray.
+                full_weights = xr.DataArray(delta, coords={"z": xrash.z}, dims="z")
+                weights = remove_dep(full_weights)
+            else:
+                weights = xr.DataArray(delta, coords={"z": xrash_no_dep.z}, dims="z")
         else:
-            weights = delta
-            # Ensure it doesn't have the dep layer if we are integrating
-            if "z" in weights.coords and (weights.z[0] == 0).item():
-                weights = weights.isel(z=slice(1, None))
+            weights = remove_dep(delta)
 
     # 3. Compute lazy mass loading
     # Mask out non-positive weights to be safe
@@ -855,7 +849,8 @@ def cdump2awips(xrash1, dt, outname, mscale=1, munit="unit", format="NETCDF4"):
     # mass = mass_loading(xrash)
 
     iii = 0
-    for tm in xrash.time.values:
+    # Use to_index() or just iterate if xarray-backed time is small
+    for tm in xrash.time.to_index():
         fid = Dataset(outname + str(iii) + ".nc", "w", format=format)
         # Standardize AWIPS output (abbreviated port)
         # ... (rest of implementation follows from legacy cdump2netcdf.py)
