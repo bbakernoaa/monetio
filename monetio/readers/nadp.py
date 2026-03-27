@@ -203,6 +203,7 @@ class NADPReader(PointReader):
         Union[xr.Dataset, pd.DataFrame]
             The loaded dataset.
         """
+
         # We use read_nadp as the custom read_method
         def _reader(f, **inner_kwargs):
             return read_nadp(f, network=network, **inner_kwargs)

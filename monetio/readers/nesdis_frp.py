@@ -1,6 +1,5 @@
 """NESDIS FRP Reader"""
 
-import datetime
 import os
 from typing import Any, List, Optional, Union
 
@@ -32,7 +31,10 @@ class NESDISFRPReader(GriddedReader):
         """
         Retrieves and reads NESDIS FRP data.
         """
-        date = pd.Timestamp(dates)
+        if isinstance(dates, (pd.DatetimeIndex, list)) and len(dates) > 0:
+            date = pd.Timestamp(dates[0])
+        else:
+            date = pd.Timestamp(dates)
 
         if not os.path.exists(datapath):
             os.makedirs(datapath, exist_ok=True)
@@ -70,6 +72,18 @@ class NESDISFRPReader(GriddedReader):
         """
         Reads NESDIS FRP data.
         """
+        # NESDIS FRP reader defaults to using 'dates' for its retrieve() method
+        # and doesn't support direct XarrayDriver opening of the binary files.
+        # So we ensure dates is populated if files is passed as first argument.
+        if files is not None and dates is None:
+            try:
+                # If first arg looks like a date, treat it as dates
+                pd.to_datetime(files)
+                dates = files
+                files = None
+            except (ValueError, TypeError):
+                pass
+
         return super().open_dataset(files, dates, **kwargs)
 
     def download_data(

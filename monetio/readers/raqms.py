@@ -67,7 +67,7 @@ class RAQMSReader(GriddedReader):
         else:
             fpaths = sorted(res)
 
-        if fpaths and not all(
+        if not fpaths or not all(
             fp.endswith(".nc") and "uwhyb" in os.path.basename(fp) for fp in fpaths
         ):
             raise ValueError(
@@ -101,7 +101,6 @@ class RAQMSReader(GriddedReader):
         ds = super().open_dataset(
             fpaths,
             dates,
-            files=files,
             convert_to_ppb=convert_to_ppb,
             var_list=var_list,
             surf_only=surf_only,

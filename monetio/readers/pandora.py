@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any, List, Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -26,8 +26,8 @@ class PandoraReader(GEOMSReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Any] = None,
+        files: str | list[str] | None = None,
+        dates: Any | None = None,
         siteid: str | None = None,
         instrument: str | None = None,
         product: str | None = "no2",

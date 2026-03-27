@@ -1,7 +1,7 @@
 """NDBC Buoy Reader"""
 
 from functools import lru_cache, partial
-from typing import Any, List, Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd

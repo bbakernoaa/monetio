@@ -73,8 +73,8 @@ class CAMxReader(GriddedReader):
             kwargs["concat_dim"] = "time"
 
         ds = super().open_dataset(
-            files,
-            dates,
+            files=files,
+            dates=dates,
             earth_radius=earth_radius,
             convert_to_ppb=convert_to_ppb,
             drop_duplicates=drop_duplicates,

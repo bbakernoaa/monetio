@@ -1,6 +1,5 @@
 """OpenAQ V2 REST API Reader"""
 
-import datetime
 import logging
 from typing import Any, List, Optional, Union
 

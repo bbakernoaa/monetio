@@ -70,7 +70,9 @@ class TEMPOReader(GriddedReader):
             g_kwargs["group"] = g
             try:
                 # Open without the preprocessor at this stage via super()
-                ds_g = super().open_dataset(files, dates, group=group, variable_dict=variable_dict, **g_kwargs)
+                ds_g = super().open_dataset(
+                    files, dates, group=group, variable_dict=variable_dict, **g_kwargs
+                )
                 dsets.append(ds_g)
             except Exception:
                 # Not all groups may be present in all files

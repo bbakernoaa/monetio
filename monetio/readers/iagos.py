@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import os
-from typing import Any, List, Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 import xarray as xr
@@ -27,8 +27,8 @@ class IAGOSReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Any] = None,
+        files: str | list[str] | None = None,
+        dates: Any | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,

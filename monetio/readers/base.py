@@ -89,17 +89,16 @@ class BaseReader(abc.ABC):
                         files = files.iloc[:, 0].tolist()
                 return files
 
-        raise ValueError(
-            f"Reader {self.__class__.__name__} requires either 'files' or 'dates' "
-            "(and must support retrieval if 'files' is None)."
-        )
+        raise ValueError("Must provide either 'files' or 'dates'.")
 
     def build_urls(self, dates: Any, **kwargs: Any) -> Union[str, List[str]]:
         """
         Construct URLs for the given dates.
         Must be implemented by subclasses that support retrieval.
         """
-        raise NotImplementedError(f"Reader {self.__class__.__name__} does not implement build_urls.")
+        raise NotImplementedError(
+            f"Reader {self.__class__.__name__} does not implement build_urls."
+        )
 
     def harmonize(self, ds):
         """
@@ -131,7 +130,15 @@ class GriddedReader(BaseReader):
         if isinstance(res, xr.Dataset):
             return res
 
-        ds = self.driver.open(res, **kwargs)
+        try:
+            ds = self.driver.open(res, **kwargs)
+        except (OSError, FileNotFoundError) as e:
+            # If files were provided explicitly, re-raise
+            if files is not None:
+                raise
+            # If dates were used, it's a retrieval failure
+            raise OSError(f"Failed to retrieve or open files for dates {dates}. Error: {e}")
+
         return self.harmonize(ds)
 
 

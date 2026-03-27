@@ -287,9 +287,7 @@ class ACTRISReader(PointReader):
         kwargs.setdefault("read_method", read_actris)
 
         # Use base class to open
-        df = super().open_dataset(
-            files, dates, siteid=siteid, as_xarray=False, lazy=lazy, **kwargs
-        )
+        df = super().open_dataset(files, dates, siteid=siteid, as_xarray=False, lazy=lazy, **kwargs)
 
         df = self.harmonize(df)
 

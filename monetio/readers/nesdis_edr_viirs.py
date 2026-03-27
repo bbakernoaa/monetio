@@ -1,6 +1,5 @@
 """NESDIS EDR VIIRS Reader"""
 
-import datetime
 import os
 from typing import Any, List, Optional, Union
 

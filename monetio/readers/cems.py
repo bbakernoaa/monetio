@@ -92,9 +92,7 @@ class CEMSReader(PointReader):
         """
         # Filter out arguments that are not for the reader function
         reader_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k not in ["expand2d", "pivot", "wide_fmt", "states"]
+            k: v for k, v in kwargs.items() if k not in ["expand2d", "pivot", "wide_fmt", "states"]
         }
 
         df = super().open_dataset(

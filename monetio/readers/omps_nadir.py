@@ -120,8 +120,6 @@ class OMPSNadirReader(GriddedReader):
                     dates,
                     satellite=satellite,
                     product=product,
-                    group=group,
-                    files=files,
                     **g_kwargs,
                 )
                 dsets.append(ds_g)

@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 @register_reader("aqs")
 class AQSReader(PointReader):
-    def build_urls(self, dates, param: Optional[Union[str, List[str]]] = None, daily: bool = False, **kwargs) -> List[str]:
+    def build_urls(
+        self, dates, param: Optional[Union[str, List[str]]] = None, daily: bool = False, **kwargs
+    ) -> List[str]:
         """Build multiple URLs for given parameters and dates in parallel."""
         a = AQS()
         urls, _ = a.build_urls(param=param, dates=dates, daily=daily)
@@ -323,7 +325,9 @@ class AQS:
         fname = f"{fname_prefix}{code}{year}.zip"
         return url, fname
 
-    def build_urls(self, dates, param: Optional[Union[str, List[str]]] = None, daily: bool = False, **kwargs) -> tuple:
+    def build_urls(
+        self, dates, param: Optional[Union[str, List[str]]] = None, daily: bool = False, **kwargs
+    ) -> tuple:
         """Build multiple URLs for given parameters and dates in parallel."""
         params = self._get_param_list(param)
         import concurrent.futures

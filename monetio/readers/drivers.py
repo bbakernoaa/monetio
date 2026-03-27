@@ -1,6 +1,7 @@
 from typing import List, Union
 
 import fsspec
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -37,6 +38,10 @@ class FileUtility:
         """
         # Convert Path objects to string
         if hasattr(path_input, "__fspath__"):
+            path_input = str(path_input)
+
+        # Convert pandas/numpy timestamps to string
+        if isinstance(path_input, (pd.Timestamp, np.datetime64)):
             path_input = str(path_input)
 
         # Case 1: It's a list already
@@ -88,6 +93,9 @@ class XarrayDriver:
         # Expand wildcards (supports S3 globbing now)
         file_list = FileUtility.expand_paths(files)
 
+        if not file_list:
+            raise FileNotFoundError("No files provided or found.")
+
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
 
@@ -98,73 +106,16 @@ class XarrayDriver:
             "dates",
             "files",
             "param",
-            "daily",
-            "network",
             "download",
             "local",
-            "wide_fmt",
             "n_procs",
-            "earth_radius",
-            "convert_to_ppb",
-            "drop_duplicates",
-            "add_diagnostics",
-            "sites",
-            "weekly",
             "add_meta",
             "add_metadata",
             "backoff_factor",
-            "bad_utcoffset",
-            "box",
-            "calculate_pressure",
-            "century",
-            "check_grid",
-            "country",
-            "data_var",
-            "delimiter",
-            "derived",
-            "detect_dust",
-            "drange",
-            "engine",
-            "errors",
-            "filters",
             "find_paths",
-            "fname_pm25",
-            "freq",
-            "group",
-            "hour",
-            "instrument",
-            "interp_to_aod_values",
-            "inv_type",
-            "latlonbox",
-            "lead_time",
-            "location",
-            "lunar",
-            "mech",
-            "n_chunks",
-            "password",
-            "pivot",
-            "provider",
-            "qa_threshold",
-            "realtime",
-            "rename_all",
-            "renumber",
             "retries",
             "sample_time_stamp",
-            "satellite",
-            "site",
-            "source",
-            "squeeze",
-            "state",
-            "stations",
-            "sub_hourly",
-            "surf_only",
-            "surf_only_nc",
-            "taglist",
-            "username",
-            "var_list",
-            "variable_dict",
             "verbose",
-            "years",
         ]:
             xr_kwargs.pop(k, None)
 
@@ -258,81 +209,20 @@ class PandasDriver:
         # Remove infrastructure keywords
         kwargs = kwargs.copy()
         for k in [
-            "product",
-            "siteid",
             "dates",
             "files",
-            "sites",
-            "weekly",
-            "param",
-            "daily",
-            "network",
             "download",
             "local",
-            "wide_fmt",
             "n_procs",
             "as_xarray",
-            "meta",
             "expand2d",
-            "resample",
-            "window",
-            "drop_duplicates",
-            "states",
             "add_meta",
             "add_metadata",
             "backoff_factor",
-            "bad_utcoffset",
-            "box",
-            "calculate_pressure",
-            "century",
-            "check_grid",
-            "country",
-            "data_var",
-            "delimiter",
-            "derived",
-            "detect_dust",
-            "drange",
-            "engine",
-            "errors",
-            "filters",
             "find_paths",
-            "fname_pm25",
-            "freq",
-            "group",
-            "hour",
-            "instrument",
-            "interp_to_aod_values",
-            "inv_type",
-            "latlonbox",
-            "lead_time",
-            "location",
-            "lunar",
-            "mech",
-            "n_chunks",
-            "password",
-            "pivot",
-            "provider",
-            "qa_threshold",
-            "realtime",
-            "rename_all",
-            "renumber",
             "retries",
             "sample_time_stamp",
-            "satellite",
-            "site",
-            "source",
-            "squeeze",
-            "state",
-            "stations",
-            "sub_hourly",
-            "surf_only",
-            "surf_only_nc",
-            "taglist",
-            "username",
-            "var_list",
-            "variable_dict",
             "verbose",
-            "years",
         ]:
             kwargs.pop(k, None)
 

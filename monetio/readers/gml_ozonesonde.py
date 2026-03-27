@@ -1,9 +1,8 @@
 """GML Ozonesonde Reader"""
 
 import re
-from datetime import datetime
 from io import StringIO
-from typing import Any, List, NamedTuple, Optional, TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING, Any, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd

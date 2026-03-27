@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -413,8 +413,9 @@ class CRNReader(PointReader):
 
                     if fs.exists(url):
                         urls.append(url)
+                        fnames.append(fname_prefix + rest)
 
-        return urls
+        return urls, fnames
 
     def retrieve(self, urls: Union[str, List[str]]) -> List[str]:
         """

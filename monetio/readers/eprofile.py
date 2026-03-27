@@ -4,7 +4,6 @@ E-PROFILE (European ALC network) Reader
 
 from typing import Any, List, Optional, Union
 
-import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader

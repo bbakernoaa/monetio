@@ -58,12 +58,6 @@ class UFSReader(GriddedReader):
         >>> reader = UFSReader()
         >>> ds = reader.open_dataset("aqm.t12z.dyn.f*.nc", surf_only=True)
         """
-        if files is None:
-            if dates is not None and hasattr(self, "build_urls"):
-                files = self.build_urls(dates, **kwargs)
-            else:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
-
         dict_sum = dict_species_sums(mech=mech)
 
         list_calc_sum = []
@@ -172,8 +166,8 @@ class UFSReader(GriddedReader):
 
         # Open dataset
         ds = super().open_dataset(
-            files,
-            dates,
+            files=files,
+            dates=dates,
             convert_to_ppb=convert_to_ppb,
             mech=mech,
             var_list=var_list,

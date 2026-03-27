@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
