@@ -78,6 +78,42 @@ def read_ish_lite_file(fname: str, **kwargs) -> pd.DataFrame:
 
 @register_reader("ish_lite")
 class ISHLiteReader(PointReader):
+    def build_urls(
+        self,
+        dates: Optional[pd.DatetimeIndex] = None,
+        box: Optional[List[float]] = None,
+        country: Optional[str] = None,
+        state: Optional[str] = None,
+        site: Optional[str] = None,
+        source: Optional[str] = None,
+        **kwargs,
+    ) -> List[str]:
+        """
+        Build ISH Lite URLs.
+        """
+        ish = ISH()
+        if source is not None:
+            ish.source = source
+
+        dates = pd.to_datetime(dates)
+        if ish.history is None:
+            ish.read_ish_history(dates=dates)
+        dfloc = ish.history.copy()
+
+        if box is not None:
+            dfloc = ish.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
+        elif country is not None:
+            dfloc = dfloc.loc[dfloc.ctry == country, :]
+        elif state is not None:
+            dfloc = dfloc.loc[dfloc.state == state, :]
+        elif site is not None:
+            dfloc = dfloc.loc[dfloc.station_id == site, :]
+
+        urls = ish.build_urls(dates=dates, sites=dfloc, lite=True)
+        if urls.empty:
+            return []
+        return urls.name.tolist()
+
     def open_dataset(
         self,
         files: Optional[Union[str, List[str]]] = None,
@@ -145,32 +181,19 @@ class ISHLiteReader(PointReader):
         if source is not None:
             ish.source = source
 
-        if files is None and dates is not None:
-            dates = pd.to_datetime(dates)
-            if ish.history is None:
-                ish.read_ish_history(dates=dates)
-            dfloc = ish.history.copy()
-
-            if box is not None:
-                dfloc = ish.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
-            elif country is not None:
-                dfloc = dfloc.loc[dfloc.ctry == country, :]
-            elif state is not None:
-                dfloc = dfloc.loc[dfloc.state == state, :]
-            elif site is not None:
-                dfloc = dfloc.loc[dfloc.station_id == site, :]
-
-            urls = ish.build_urls(dates=dates, sites=dfloc, lite=True)
-            if urls.empty:
-                raise ValueError("No data URLs found")
-            files = urls.name.tolist()
-
-        if not files:
-            raise ValueError("Must provide either 'files' or 'dates'.")
-
-        # Use base class to open
+        # Use base class to open via super()
         df = super().open_dataset(
             files,
+            dates,
+            box=box,
+            country=country,
+            state=state,
+            site=site,
+            resample=resample,
+            window=window,
+            n_procs=n_procs,
+            verbose=verbose,
+            source=source,
             read_method=read_ish_lite_file,
             as_xarray=False,
             lazy=lazy,

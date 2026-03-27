@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -26,8 +26,8 @@ class PandoraReader(GEOMSReader):
 
     def open_dataset(
         self,
-        files: str | list[str] | None = None,
-        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         siteid: str | None = None,
         instrument: str | None = None,
         product: str | None = "no2",
@@ -59,19 +59,14 @@ class PandoraReader(GEOMSReader):
         xr.Dataset | pd.DataFrame
             The processed Pandora dataset.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Must provide either 'files' or 'dates'.")
-            files = self.build_urls(
-                dates, siteid=siteid, instrument=instrument, product=product, **kwargs
-            )
+        ds = super().open_dataset(
+            files, dates, siteid=siteid, instrument=instrument, product=product, **kwargs
+        )
 
-        if not files:
+        if ds is None or (hasattr(ds, "empty") and ds.empty):
             if as_xarray:
                 return xr.Dataset()
             return pd.DataFrame()
-
-        ds = super().open_dataset(files, **kwargs)
 
         # Apply harmonization explicitly as GEOMSReader.open_dataset calls geoms_preprocess
         # but doesn't call a reader-specific harmonize method from the base class properly

@@ -1,7 +1,7 @@
 """NESDIS EPS VIIRS Reader"""
 
 import datetime
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -20,8 +20,8 @@ class NESDISEPSVIIRSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -41,18 +41,13 @@ class NESDISEPSVIIRSReader(GriddedReader):
         xr.Dataset
             The NESDIS EPS VIIRS dataset.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
-            files = self.build_urls(dates)
-
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = nesdis_eps_viirs_preprocess
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, dates, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read NESDIS EPS VIIRS data.")

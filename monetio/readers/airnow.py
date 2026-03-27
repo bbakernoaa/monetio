@@ -68,19 +68,11 @@ class AirNowReader(PointReader):
             The loaded AirNow data.
         """
 
-        if files is None and dates is not None:
-            # Construct URLs from dates
+        if download:
             urls, fnames = build_urls(dates, daily=daily)
-
-            if download:
-                for url, fname in zip(urls, fnames):
-                    retrieve(url, fname)
-                files = fnames.tolist()
-            else:
-                files = urls.tolist()
-
-        if not files:
-            raise ValueError("Must provide either 'files' or 'dates'.")
+            for url, fname in zip(urls, fnames):
+                retrieve(url, fname)
+            files = fnames.tolist()
 
         # Define per-file preprocessing
         storage_options = kwargs.get("storage_options", {})
@@ -89,11 +81,17 @@ class AirNowReader(PointReader):
 
         read_func = partial(read_airnow_csv, daily=daily, storage_options=storage_options)
 
-        # Use base class to open
+        # Use base class to open via super()
         # We stay in long format if we are lazy to avoid expensive shuffles/computes
         # during the DataFrame stage.
         df = super().open_dataset(
             files,
+            dates,
+            download=download,
+            wide_fmt=wide_fmt,
+            n_procs=n_procs,
+            daily=daily,
+            bad_utcoffset=bad_utcoffset,
             read_method=read_func,
             as_xarray=False,
             lazy=lazy,
@@ -121,6 +119,18 @@ class AirNowReader(PointReader):
             return ds
 
         return df
+
+    def build_urls(
+        self,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        daily: bool = False,
+        **kwargs,
+    ) -> List[str]:
+        """
+        Construct AirNow URLs.
+        """
+        urls, _ = build_urls(dates, daily=daily)
+        return urls.tolist()
 
     def _fix_utcoffset_xarray(self, ds: xr.Dataset) -> xr.Dataset:
         """

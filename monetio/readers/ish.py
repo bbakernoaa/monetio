@@ -319,6 +319,45 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
 
 @register_reader("ish")
 class ISHReader(PointReader):
+    def build_urls(
+        self,
+        dates: Optional[pd.DatetimeIndex] = None,
+        box: Optional[List[float]] = None,
+        country: Optional[str] = None,
+        state: Optional[str] = None,
+        site: Optional[str] = None,
+        source: Optional[str] = None,
+        **kwargs,
+    ) -> List[str]:
+        """
+        Build ISH URLs based on dates and site filters.
+        """
+        ish = ISH()
+        if source is not None:
+            ish.source = source
+
+        dates = pd.to_datetime(dates)
+        if ish.history is None:
+            ish.read_ish_history(dates=dates)
+        dfloc_urls = ish.history.copy()
+
+        if box is not None:
+            dfloc_urls = ish.subset_sites(
+                latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3]
+            )
+        elif country is not None:
+            dfloc_urls = dfloc_urls.loc[dfloc_urls.ctry == country, :]
+        elif state is not None:
+            dfloc_urls = dfloc_urls.loc[dfloc_urls.state == state, :]
+        elif site is not None:
+            dfloc_urls = dfloc_urls.loc[dfloc_urls.station_id == site, :]
+
+        urls = ish.build_urls(dates=dates, sites=dfloc_urls)
+        if urls.empty:
+            return []
+        # build_urls returns a DataFrame with a 'name' column
+        return urls["name"].tolist()
+
     def open_dataset(
         self,
         files: Optional[Union[str, List[str]]] = None,
@@ -412,16 +451,33 @@ class ISHReader(PointReader):
             urls = ish.build_urls(dates=dates, sites=dfloc_urls)
             if urls.empty:
                 raise ValueError("No data URLs found")
-            files = urls.name.tolist()
-
-        if files is None:
-            raise ValueError("Must provide either 'files' or 'dates'.")
+            files = urls["name"].tolist()
 
         if download:
-            files = ish.get_url_file_objs(files)
+            urls = self.build_urls(
+                dates=dates, box=box, country=country, state=state, site=site, source=source
+            )
+            files = ish.get_url_file_objs(urls)
 
-        # Use driver directly to avoid extra harmonize calls that might clash
-        df = self.driver.open(files, read_method=read_ish_file, lazy=lazy, **kwargs)
+        # Use driver via super()
+        df = super().open_dataset(
+            files,
+            dates,
+            box=box,
+            country=country,
+            state=state,
+            site=site,
+            resample=resample,
+            window=window,
+            download=download,
+            n_procs=n_procs,
+            verbose=verbose,
+            source=source,
+            read_method=read_ish_file,
+            as_xarray=False,
+            lazy=lazy,
+            **kwargs,
+        )
 
         # Filtering by date if requested
         if dates is not None:

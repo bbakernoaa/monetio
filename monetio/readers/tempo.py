@@ -1,6 +1,6 @@
 """TEMPO Reader"""
 
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import xarray as xr
 
@@ -16,7 +16,8 @@ class TEMPOReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         group: Optional[Union[str, List[str]]] = None,
         variable_dict: Optional[Dict] = None,
         **kwargs,
@@ -68,8 +69,8 @@ class TEMPOReader(GriddedReader):
             g_kwargs = kwargs.copy()
             g_kwargs["group"] = g
             try:
-                # Open without the preprocessor at this stage
-                ds_g = super().open_dataset(files, **g_kwargs)
+                # Open without the preprocessor at this stage via super()
+                ds_g = super().open_dataset(files, dates, group=group, variable_dict=variable_dict, **g_kwargs)
                 dsets.append(ds_g)
             except Exception:
                 # Not all groups may be present in all files

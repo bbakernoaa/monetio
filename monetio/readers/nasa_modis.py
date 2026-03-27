@@ -1,6 +1,6 @@
 """NASA MODIS Reader"""
 
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -15,14 +15,21 @@ class NASAMODISReader(GriddedReader):
     Reader for NASA MODIS HDF files.
     """
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads NASA MODIS swath data.
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path(s) or URL(s).
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         **kwargs : dict
             Additional arguments passed to XarrayDriver.open.
 
@@ -34,7 +41,7 @@ class NASAMODISReader(GriddedReader):
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = nasa_modis_preprocess
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, dates, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read NASA MODIS data.")

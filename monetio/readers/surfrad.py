@@ -2,7 +2,7 @@
 
 import io
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -158,7 +158,7 @@ class SURFRADReader(PointReader):
     def open_dataset(
         self,
         files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[datetime, List[datetime], pd.DatetimeIndex]] = None,
+        dates: Optional[Any] = None,
         sites: Optional[List[str]] = None,
         as_xarray: bool = True,
         lazy: bool = False,
@@ -171,7 +171,7 @@ class SURFRADReader(PointReader):
         ----------
         files : Union[str, List[str]], optional
             File paths or URLs. If None, uses `dates` and `sites` to discover files.
-        dates : Union[datetime, List[datetime], pd.DatetimeIndex], optional
+        dates : Any, optional
             Dates to retrieve if `files` is None.
         sites : List[str], optional
             Site abbreviations (e.g. ['tbl', 'bon', 'fpk', 'gwn', 'psu', 'sxf', 'dra']).
@@ -199,8 +199,16 @@ class SURFRADReader(PointReader):
             if k not in ["expand2d", "wide_fmt", "pivot", "as_xarray", "lazy"]
         }
 
-        # We use read_surfrad as the custom read_method
-        df = self.driver.open(files, read_method=read_surfrad, lazy=lazy, **driver_kwargs)
+        # We use read_surfrad as the custom read_method via super()
+        df = super().open_dataset(
+            files,
+            dates,
+            sites=sites,
+            read_method=read_surfrad,
+            as_xarray=False,
+            lazy=lazy,
+            **driver_kwargs,
+        )
 
         # Post-processing: Harmonize column names
         df = self._postprocess(df)
@@ -243,7 +251,8 @@ class SURFRADReader(PointReader):
     def build_urls(
         self,
         dates: Union[datetime, List[datetime], pd.DatetimeIndex],
-        sites: List[str],
+        sites: List[str] = None,
+        **kwargs,
     ) -> List[str]:
         """
         Discover available URLs for the given dates and sites.
@@ -260,6 +269,9 @@ class SURFRADReader(PointReader):
         List[str]
             List of URLs.
         """
+        if sites is None:
+            raise ValueError("Must specify 'sites' to build URLs for SURFRAD.")
+
         baseurl = "https://gml.noaa.gov/aftp/data/radiation/surfrad/"
 
         # Site mapping from abbreviation to directory name
@@ -274,7 +286,7 @@ class SURFRADReader(PointReader):
         }
 
         urls = []
-        dates = pd.DatetimeIndex(np.atleast_1d(dates))
+        dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
 
         for date in dates:
             for site in sites:

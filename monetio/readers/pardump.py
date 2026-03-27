@@ -1,6 +1,7 @@
 """PARDUMP Reader"""
 
 import datetime
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -13,11 +14,23 @@ from .drivers import FileUtility
 class PardumpReader(PointReader):
     fixed_location = False
 
-    def open_dataset(self, files, drange=None, century=2000, verbose=False, **kwargs):
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        drange=None,
+        century=2000,
+        verbose=False,
+        **kwargs,
+    ):
         """
         Reads HYSPLIT PARDUMP binary files.
         """
-        file_list = FileUtility.expand_paths(files)
+        res = self._prepare_files(files, dates, **kwargs)
+        if isinstance(res, (pd.DataFrame, xr.Dataset)):
+            return res
+
+        file_list = FileUtility.expand_paths(res)
 
         dfs = []
         for f in file_list:
@@ -29,9 +42,11 @@ class PardumpReader(PointReader):
             return pd.DataFrame()
 
         if len(dfs) == 1:
-            return dfs[0]
+            df = dfs[0]
         else:
-            return pd.concat(dfs)
+            df = pd.concat(dfs)
+
+        return df
 
 
 # -----------------------------------------------------------------------------

@@ -17,7 +17,8 @@ class UFSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         convert_to_ppb: bool = True,
         mech: str = "cb6r3_ae6_aq",
         var_list: Optional[List[str]] = None,
@@ -30,8 +31,10 @@ class UFSReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         convert_to_ppb : bool, optional
             Convert gas species from ppmV to ppbV, by default True.
         mech : str, optional
@@ -55,6 +58,12 @@ class UFSReader(GriddedReader):
         >>> reader = UFSReader()
         >>> ds = reader.open_dataset("aqm.t12z.dyn.f*.nc", surf_only=True)
         """
+        if files is None:
+            if dates is not None and hasattr(self, "build_urls"):
+                files = self.build_urls(dates, **kwargs)
+            else:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+
         dict_sum = dict_species_sums(mech=mech)
 
         list_calc_sum = []
@@ -162,7 +171,16 @@ class UFSReader(GriddedReader):
             ]
 
         # Open dataset
-        ds = self.driver.open(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            dates,
+            convert_to_ppb=convert_to_ppb,
+            mech=mech,
+            var_list=var_list,
+            fname_pm25=fname_pm25,
+            surf_only=surf_only,
+            **kwargs,
+        )
 
         # Subset if var_list
         if var_list is not None:

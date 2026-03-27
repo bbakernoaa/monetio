@@ -1,7 +1,7 @@
 """TROPOMI Reader"""
 
 import warnings
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import xarray as xr
 
@@ -17,7 +17,8 @@ class TROPOMIReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         group: Optional[Union[str, List[str]]] = None,
         calculate_pressure: bool = True,
         qa_threshold: Optional[float] = None,
@@ -82,8 +83,15 @@ class TROPOMIReader(GriddedReader):
             g_kwargs = kwargs.copy()
             g_kwargs["group"] = g
             try:
-                # We open without the TROPOMI preprocess at this stage
-                ds_g = super().open_dataset(files, **g_kwargs)
+                # We open without the TROPOMI preprocess at this stage via super()
+                ds_g = super().open_dataset(
+                    files,
+                    dates,
+                    group=group,
+                    calculate_pressure=calculate_pressure,
+                    qa_threshold=qa_threshold,
+                    **g_kwargs,
+                )
                 dsets.append(ds_g)
             except Exception as e:
                 warnings.warn(f"Could not open group {g}: {e}")

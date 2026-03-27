@@ -1,5 +1,7 @@
 """TOLNet Reader"""
 
+from typing import Any, List, Optional, Union
+
 import pandas as pd
 import xarray as xr
 
@@ -10,14 +12,21 @@ from .sat_utils import update_history
 
 @register_reader("tolnet")
 class TOLNetReader(GriddedReader):
-    def open_dataset(self, files, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Retrieve and load TOLNet data.
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File paths or URLs to read.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         **kwargs : dict
             Additional arguments passed to the driver.
 
@@ -38,8 +47,11 @@ class TOLNetReader(GriddedReader):
         # but returning Datasets.
         # Actually, let's keep it simple for now and just use the unified driver if we can,
         # or refactor the loop to be more backend-agnostic.
+        res = self._prepare_files(files, dates, **kwargs)
+        if isinstance(res, xr.Dataset):
+            return res
 
-        file_list = FileUtility.expand_paths(files)
+        file_list = FileUtility.expand_paths(res)
 
         if not file_list:
             return xr.Dataset()

@@ -223,5 +223,119 @@ def openaq(dates, output, n_procs, lazy, as_pandas, wide_fmt):
     handle_save(obj, output, as_pandas)
 
 
+@cli.command()
+@common_options
+@click.option("--product", default="inst1_2d_asm_Nx", help="MERRA-2 product name.")
+def merra2(dates, output, n_procs, lazy, as_pandas, product):
+    """Retrieve and process MERRA-2 data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading MERRA-2 {product} data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "merra2",
+        dates=d,
+        product=product,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
+@common_options
+@click.option("--site", help="Specific station ID.")
+@click.option("--resample", is_flag=True, help="Resample data.")
+@click.option("--window", default="h", help="Resampling window.")
+def ish(dates, output, n_procs, lazy, as_pandas, site, resample, window):
+    """Retrieve and process ISH data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading ISH data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "ish",
+        dates=d,
+        site=site,
+        resample=resample,
+        window=window,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
+@common_options
+@click.option("--site", help="Specific station ID.")
+def ish_lite(dates, output, n_procs, lazy, as_pandas, site):
+    """Retrieve and process ISH Lite data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading ISH Lite data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "ish_lite",
+        dates=d,
+        site=site,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
+@common_options
+@click.option("--hour", default=0, help="Forecast cycle hour.")
+@click.option("--lead-time", default=0, help="Forecast lead time.")
+def gfs(dates, output, n_procs, lazy, as_pandas, hour, lead_time):
+    """Retrieve and process GFS data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading GFS data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "gfs",
+        dates=d,
+        hour=hour,
+        lead_time=lead_time,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
+@common_options
+@click.option("--siteid", help="ACTRIS/EBAS site ID (e.g. 'NO0042G').")
+def actris(dates, output, n_procs, lazy, as_pandas, siteid):
+    """Retrieve and process ACTRIS/EBAS data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading ACTRIS data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "actris",
+        dates=d,
+        siteid=siteid,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
+@cli.command()
+@common_options
+@click.option("--siteid", help="EARLINET site ID.")
+def earlinet(dates, output, n_procs, lazy, as_pandas, siteid):
+    """Retrieve and process EARLINET lidar data."""
+    d = parse_dates(dates)
+    click.echo(f"Loading EARLINET data for {d if d is not None else 'default dates'}...")
+    obj = monetio.load(
+        "earlinet",
+        dates=d,
+        siteid=siteid,
+        n_procs=n_procs,
+        lazy=lazy,
+        as_xarray=not as_pandas,
+    )
+    handle_save(obj, output, as_pandas)
+
+
 if __name__ == "__main__":
     cli()

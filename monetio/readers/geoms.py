@@ -1,7 +1,7 @@
 """GEOMS Reader"""
 
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -20,7 +20,8 @@ class GEOMSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         rename_all: bool = True,
         squeeze: bool = True,
         **kwargs: Any,
@@ -30,8 +31,10 @@ class GEOMSReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         rename_all : bool, optional
             Whether to rename all variables to lowercase/standard names, by default True.
         squeeze : bool, optional
@@ -52,8 +55,11 @@ class GEOMSReader(GriddedReader):
         # Note: GEOMS files (especially HDF4) often require custom logic that
         # open_mfdataset might not handle natively without a complex engine.
         # We maintain a loop but ensure laziness where possible.
+        res = self._prepare_files(files, dates, **kwargs)
+        if isinstance(res, xr.Dataset):
+            return res
 
-        file_list = FileUtility.expand_paths(files)
+        file_list = FileUtility.expand_paths(res)
 
         dsets = []
         for f in file_list:

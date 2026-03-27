@@ -1,7 +1,7 @@
 """Chimere Reader"""
 
 from functools import partial
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 import xarray as xr
 
@@ -17,7 +17,8 @@ class ChimereReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         var_list: list[str] = None,
         surf_only: bool = False,
         **kwargs: Any,
@@ -27,8 +28,10 @@ class ChimereReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         var_list : list of str, optional
             List of variable names meant to be kept for the analysis, by default None.
         surf_only : bool, optional
@@ -53,7 +56,7 @@ class ChimereReader(GriddedReader):
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
 
-        ds = self.driver.open(files, **kwargs)
+        ds = super().open_dataset(files, dates, var_list=var_list, surf_only=surf_only, **kwargs)
 
         ds = self.harmonize(ds)
 

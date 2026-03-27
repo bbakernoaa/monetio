@@ -1,7 +1,7 @@
 """MOPITT Reader"""
 
 import datetime
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,8 @@ class MOPITTReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -29,8 +30,10 @@ class MOPITTReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path(s) or URL(s).
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         **kwargs : dict
             Additional arguments passed to XarrayDriver.open.
 
@@ -45,7 +48,7 @@ class MOPITTReader(GriddedReader):
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, dates, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read MOPITT L3 data.")

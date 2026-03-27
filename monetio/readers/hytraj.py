@@ -1,7 +1,7 @@
 """HYTRAJ Reader"""
 
 import re
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,8 @@ class HYTRAJReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         taglist: Optional[List] = None,
         renumber: bool = False,
         as_xarray: bool = True,
@@ -55,7 +56,16 @@ class HYTRAJReader(PointReader):
         # Filter out taglist for driver
         driver_kwargs = {k: v for k, v in kwargs.items() if k not in ["taglist", "renumber"]}
 
-        df = self.driver.open(files, read_method=read_hytraj_file, lazy=lazy, **driver_kwargs)
+        df = super().open_dataset(
+            files,
+            dates,
+            taglist=taglist,
+            renumber=renumber,
+            read_method=read_hytraj_file,
+            as_xarray=False,
+            lazy=lazy,
+            **driver_kwargs,
+        )
 
         if taglist is not None:
             # For dask, tagging should ideally happen inside read_hytraj_file

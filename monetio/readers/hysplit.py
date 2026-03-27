@@ -1,6 +1,7 @@
 """HYSPLIT Reader"""
 
 import datetime
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -15,7 +16,8 @@ from .sat_utils import update_history
 class HYSPLITReader(GriddedReader):
     def open_dataset(
         self,
-        files,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         drange=None,
         century=None,
         verbose=False,
@@ -26,7 +28,14 @@ class HYSPLITReader(GriddedReader):
         """
         Reads HYSPLIT binary concentration (cdump) files.
         """
-        file_list = FileUtility.expand_paths(files)
+        res = self._prepare_files(files, dates, **kwargs)
+        if isinstance(res, xr.Dataset):
+            return res
+
+        file_list = FileUtility.expand_paths(res)
+
+        if not file_list:
+            return xr.Dataset()
 
         if len(file_list) == 1:
             ds = open_dataset_hysplit(

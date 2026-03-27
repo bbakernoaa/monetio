@@ -210,8 +210,16 @@ class SOLRADReader(PointReader):
             if k not in ["expand2d", "wide_fmt", "pivot", "as_xarray", "lazy"]
         }
 
-        # We use read_solrad as the custom read_method
-        df = self.driver.open(files, read_method=read_solrad, lazy=lazy, **driver_kwargs)
+        # We use read_solrad as the custom read_method via super()
+        df = super().open_dataset(
+            files,
+            dates,
+            sites=sites,
+            read_method=read_solrad,
+            as_xarray=False,
+            lazy=lazy,
+            **driver_kwargs,
+        )
 
         # Post-processing: Harmonize column names
         df = self._postprocess(df)
@@ -254,7 +262,8 @@ class SOLRADReader(PointReader):
     def build_urls(
         self,
         dates: Union[datetime, List[datetime], pd.DatetimeIndex],
-        sites: List[str],
+        sites: List[str] = None,
+        **kwargs,
     ) -> List[str]:
         """
         Discover available URLs for the given dates and sites.
@@ -271,10 +280,13 @@ class SOLRADReader(PointReader):
         List[str]
             List of URLs.
         """
+        if sites is None:
+            raise ValueError("Must specify 'sites' to build URLs for SOLRAD.")
+
         baseurl = "https://gml.noaa.gov/aftp/data/radiation/solrad/"
 
         urls = []
-        dates = pd.DatetimeIndex(np.atleast_1d(dates))
+        dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
 
         for date in dates:
             for site in sites:

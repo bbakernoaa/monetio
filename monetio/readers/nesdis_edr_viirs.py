@@ -2,7 +2,7 @@
 
 import datetime
 import os
-from typing import Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -22,36 +22,18 @@ class NESDISEDRVIIRSReader(GriddedReader):
     Available via FTP.
     """
 
-    def open_dataset(
+    def retrieve(
         self,
-        date: Union[datetime.datetime, str, pd.Timestamp],
+        dates: Optional[Any] = None,
         resolution: str = "high",
         datapath: str = ".",
         lazy: bool = False,
         **kwargs,
     ) -> xr.Dataset:
         """
-        Reads NESDIS EDR VIIRS data.
-
-        Parameters
-        ----------
-        date : datetime.datetime, str, or pd.Timestamp
-            Date to retrieve.
-        resolution : str, optional
-            'high' (0.10 deg) or 'low' (0.25 deg). Default is 'high'.
-        datapath : str, optional
-            Local path to store downloaded files. Default is '.'.
-        lazy : bool, optional
-            Whether to read data lazily using Dask, by default False.
-        **kwargs : dict
-            Additional arguments.
-
-        Returns
-        -------
-        xr.Dataset
-            The NESDIS EDR VIIRS dataset.
+        Retrieves and reads NESDIS EDR VIIRS data.
         """
-        date = pd.Timestamp(date)
+        date = pd.Timestamp(dates)
 
         if not os.path.exists(datapath):
             os.makedirs(datapath)
@@ -69,6 +51,17 @@ class NESDISEDRVIIRSReader(GriddedReader):
         ds = update_history(ds, "Read NESDIS EDR VIIRS data.")
 
         return ds
+
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs,
+    ) -> xr.Dataset:
+        """
+        Reads NESDIS EDR VIIRS data.
+        """
+        return super().open_dataset(files, dates, **kwargs)
 
     def download_data(
         self, date: pd.Timestamp, resolution: str = "high", datapath: str = "."

@@ -1,6 +1,6 @@
 """NCEP GRIB Reader"""
 
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import xarray as xr
@@ -15,14 +15,21 @@ class NCEPGribReader(GriddedReader):
     Reader for NCEP GRIB files.
     """
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs: Any) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> xr.Dataset:
         """
         Reads NCEP GRIB files.
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         **kwargs : Any
             Additional arguments passed to xarray.open_mfdataset or the driver.
 
@@ -37,6 +44,12 @@ class NCEPGribReader(GriddedReader):
         >>> reader = NCEPGribReader()
         >>> ds = reader.open_dataset("gfs.*.grib2", engine="pynio")
         """
+        if files is None:
+            if dates is not None and hasattr(self, "build_urls"):
+                files = self.build_urls(dates, **kwargs)
+            else:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+
         # Ensure we have engine='pynio' if not specified
         # Note: pynio is often used for these files but might be hard to install.
         if "engine" not in kwargs:
@@ -49,7 +62,7 @@ class NCEPGribReader(GriddedReader):
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = ncep_grib_preprocess
 
-        ds = self.driver.open(files, **kwargs)
+        ds = super().open_dataset(files, dates, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read NCEP GRIB data.")

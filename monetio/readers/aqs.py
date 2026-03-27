@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 
 @register_reader("aqs")
 class AQSReader(PointReader):
+    def build_urls(self, dates, param: Optional[Union[str, List[str]]] = None, daily: bool = False, **kwargs) -> List[str]:
+        """Build multiple URLs for given parameters and dates in parallel."""
+        a = AQS()
+        urls, _ = a.build_urls(param=param, dates=dates, daily=daily)
+        return urls
+
     def open_dataset(
         self,
         files: Optional[Union[str, List[str]]] = None,
@@ -79,25 +85,15 @@ class AQSReader(PointReader):
         """
         a = AQS()
 
-        if files is None:
-            if dates is None:
-                raise ValueError("Must provide either 'files' or 'dates'.")
-
-            # Build URLs
+        if download:
+            urls, fnames = a.build_urls(dates, param=param, daily=daily)
+            for url, fname in zip(urls, fnames):
+                a.retrieve(url, fname)
+            files = fnames
+        elif local:
             params = a._get_param_list(param)
-            urls, fnames = a.build_urls(params, dates, daily=daily)
-
-            if not urls:
-                return pd.DataFrame()
-
-            if download:
-                for url, fname in zip(urls, fnames):
-                    a.retrieve(url, fname)
-                files = fnames
-            elif local:
-                files = fnames
-            else:
-                files = urls
+            _, fnames = a.build_urls(params, dates, daily=daily)
+            files = fnames
 
         # Use PandasDriver via base class
         # Pass a partial of load_aqs_file as the read_method
@@ -105,6 +101,14 @@ class AQSReader(PointReader):
 
         df = super().open_dataset(
             files,
+            dates,
+            param=param,
+            daily=daily,
+            network=network,
+            download=download,
+            local=local,
+            wide_fmt=wide_fmt,
+            n_procs=n_procs,
             read_method=read_func,
             as_xarray=False,
             lazy=lazy,
@@ -319,8 +323,9 @@ class AQS:
         fname = f"{fname_prefix}{code}{year}.zip"
         return url, fname
 
-    def build_urls(self, params: List[str], dates, daily: bool = False) -> tuple:
+    def build_urls(self, dates, param: Optional[Union[str, List[str]]] = None, daily: bool = False, **kwargs) -> tuple:
         """Build multiple URLs for given parameters and dates in parallel."""
+        params = self._get_param_list(param)
         import concurrent.futures
 
         import requests

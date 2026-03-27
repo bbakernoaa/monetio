@@ -2,7 +2,7 @@
 E-PROFILE (European ALC network) Reader
 """
 
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -19,8 +19,8 @@ class EPROFILEReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
-        dates: Optional[Union[pd.DatetimeIndex, List, pd.Timestamp, str]] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -40,16 +40,11 @@ class EPROFILEReader(GriddedReader):
         xr.Dataset
             The loaded E-PROFILE data.
         """
-        if files is None and dates is not None:
-            # Placeholder for build_urls if E-PROFILE hub provides a predictable URL pattern
-            # For now, we expect files to be provided.
-            raise NotImplementedError("Retrieval from dates is not yet implemented for E-PROFILE.")
-
         # Default to combined dimensions if not specified
         kwargs.setdefault("combine", "by_coords")
 
-        # Use XarrayDriver (via GriddedReader) to open
-        ds = super().open_dataset(files, preprocess=eprofile_preprocess, **kwargs)
+        # Use XarrayDriver (via GriddedReader) to open via super()
+        ds = super().open_dataset(files, dates, preprocess=eprofile_preprocess, **kwargs)
 
         return ds
 

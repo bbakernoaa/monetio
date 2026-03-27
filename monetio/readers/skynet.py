@@ -59,21 +59,14 @@ class SKYNETReader(PointReader):
         Union[pd.DataFrame, xr.Dataset]
             The loaded SKYNET data.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Must provide either 'files' or 'dates'.")
-            files = self.build_urls(dates, siteid=siteid, product=product, **kwargs)
-
-        if not files:
-            if as_xarray:
-                return xr.Dataset()
-            return pd.DataFrame()
-
         # Define per-file preprocessing
         read_func = read_skynet_csv
 
         df = super().open_dataset(
             files,
+            dates,
+            siteid=siteid,
+            product=product,
             read_method=read_func,
             as_xarray=False,
             lazy=lazy,

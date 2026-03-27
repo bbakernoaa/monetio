@@ -1,7 +1,7 @@
 """NDBC Buoy Reader"""
 
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, List, Union
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -16,9 +16,39 @@ if TYPE_CHECKING:
 
 @register_reader("ndbc")
 class NDBCReader(PointReader):
+    def build_urls(
+        self,
+        dates: Optional[Any] = None,
+        stations: Union[str, List[str]] = None,
+        years: Union[int, List[int]] = None,
+        realtime: bool = True,
+        **kwargs,
+    ) -> List[str]:
+        """
+        Construct NDBC URLs.
+        """
+        if dates is not None:
+            from datetime import datetime
+
+            if years is None:
+                dates_dt = pd.to_datetime(dates)
+                if hasattr(dates_dt, "year"):
+                    years = [dates_dt.year]
+                else:
+                    years = sorted(list(dates_dt.year.unique()))
+                # If dates are provided and they are old, set realtime to False
+                if min(years) < datetime.now().year:
+                    realtime = False
+
+        if stations is None:
+            raise ValueError("Must provide 'stations' to build URLs for NDBC.")
+
+        return build_urls(stations, years=years, realtime=realtime)
+
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         stations: Union[str, List[str]] = None,
         years: Union[int, List[int]] = None,
         realtime: bool = True,
@@ -35,6 +65,8 @@ class NDBCReader(PointReader):
         ----------
         files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         stations : Union[str, List[str]], optional
             Station IDs to retrieve if files are not provided.
         years : Union[int, List[int]], optional
@@ -57,20 +89,18 @@ class NDBCReader(PointReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded NDBC data.
         """
-        if files is None:
-            if stations is None:
-                raise ValueError("Must provide either 'files' or 'stations'.")
-            files = build_urls(stations, years=years, realtime=realtime)
-
-        if not files:
-            raise ValueError("No files found or URLs built.")
-
         # Define per-file preprocessing
         read_func = partial(read_ndbc)
 
-        # Use base class to open
+        # Use base class to open via super()
         df = super().open_dataset(
             files,
+            dates,
+            stations=stations,
+            years=years,
+            realtime=realtime,
+            wide_fmt=wide_fmt,
+            n_procs=n_procs,
             read_method=read_func,
             as_xarray=False,
             lazy=lazy,

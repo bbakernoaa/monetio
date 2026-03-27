@@ -59,17 +59,14 @@ class MERRA2Reader(GriddedReader):
         if username and password:
             setup_netrc(username, password)
 
-        if files is None:
-            if dates is None:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
-            files = self.build_urls(dates, product=product)
-
         if "preprocess" not in kwargs:
             from functools import partial
 
             kwargs["preprocess"] = partial(merra2_preprocess, product=product)
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(
+            files, dates, product=product, username=username, password=password, **kwargs
+        )
 
         # Update history
         ds = update_history(ds, f"Read MERRA-2 {product} data.")
@@ -104,11 +101,23 @@ class MERRA2Reader(GriddedReader):
         # Product mapping to GES DISC OPeNDAP paths
         # Format: (ShortName.Version, CollectionName)
         prod_map = {
+            # 2D Collections
             "inst1_2d_asm_Nx": ("M2I1NXASM.5.12.4", "inst1_2d_asm_Nx"),
             "tavg1_2d_slv_Nx": ("M2T1NXSLV.5.12.4", "tavg1_2d_slv_Nx"),
+            "tavg1_2d_flx_Nx": ("M2T1NXFLX.5.12.4", "tavg1_2d_flx_Nx"),
+            "tavg1_2d_rad_Nx": ("M2T1NXRAD.5.12.4", "tavg1_2d_rad_Nx"),
+            "tavg1_2d_aer_Nx": ("M2T1NXAER.5.12.4", "tavg1_2d_aer_Nx"),
+            "inst1_2d_lnd_Nx": ("M2I1NXLND.5.12.4", "inst1_2d_lnd_Nx"),
+            # 3D Collections (Pressure levels)
             "inst3_3d_asm_Np": ("M2I3NPASM.5.12.4", "inst3_3d_asm_Np"),
             "inst3_3d_chm_Np": ("M2I3NPCHM.5.12.4", "inst3_3d_chm_Np"),
+            "tavg3_3d_asm_Np": ("M2T3NPASM.5.12.4", "tavg3_3d_asm_Np"),
+            "tavg3_3d_chm_Np": ("M2T3NPCHM.5.12.4", "tavg3_3d_chm_Np"),
+            "tavg3_3d_aer_Np": ("M2T3NPAER.5.12.4", "tavg3_3d_aer_Np"),
+            # 3D Collections (Model levels)
             "inst3_3d_asm_Nv": ("M2I3NVASM.5.12.4", "inst3_3d_asm_Nv"),
+            "inst3_3d_chm_Nv": ("M2I3NVCHM.5.12.4", "inst3_3d_chm_Nv"),
+            "tavg3_3d_asm_Nv": ("M2T3NVASM.5.12.4", "tavg3_3d_asm_Nv"),
         }
 
         if product not in prod_map:

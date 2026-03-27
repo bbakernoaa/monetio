@@ -66,54 +66,37 @@ class OpenAQReader(PointReader):
         if (
             files is not None
             and dates is None
-            and isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp, list, str))
+            and isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp))
         ):
-            # If it's a string or list, it could be files.
-            # But if it's a DatetimeIndex or a single datetime, it's definitely dates.
-            if isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp)):
-                dates = files
-                files = None
-            elif isinstance(files, list) and len(files) > 0 and isinstance(files[0], datetime):
-                dates = files
-                files = None
+            dates = files
+            files = None
+        elif (
+            files is not None
+            and dates is None
+            and isinstance(files, list)
+            and len(files) > 0
+            and isinstance(files[0], datetime)
+        ):
+            dates = files
+            files = None
 
-        if files is None and dates is not None:
-            files = build_urls(dates)
-
-        # Use a more robust check for files
-        has_files = files is not None
-        if has_files:
-            if isinstance(files, (list, pd.Series, np.ndarray)):
-                has_files = len(files) > 0
-            elif isinstance(files, str):
-                has_files = True
-            else:
-                try:
-                    has_files = bool(files)
-                except ValueError:
-                    has_files = len(files) > 0
-
-        if not has_files:
-            # Return empty object of correct type
-            if lazy:
-                import dask.dataframe as dd
-
-                df = dd.from_pandas(pd.DataFrame(), npartitions=1)
-            else:
-                df = pd.DataFrame()
-
-            if as_xarray:
-                return xr.Dataset()
-            return df
-
-        # Use base class to open
+        # Use base class to open via super()
         df = super().open_dataset(
             files,
+            dates,
+            n_procs=n_procs,
+            wide_fmt=wide_fmt,
             read_method=read_openaq_json,
             as_xarray=False,
             lazy=lazy,
             **kwargs,
         )
+
+        # Check for empty result from super().open_dataset
+        if df is None or (hasattr(df, "empty") and df.empty):
+            if as_xarray:
+                return xr.Dataset()
+            return df
 
         # Post-processing
         # We only perform wide_fmt here if NOT lazy, to avoid the hidden compute in _post_process
@@ -323,6 +306,16 @@ class OpenAQReader(PointReader):
                 ds = ds.rename(rename_dict)
 
         return ds
+
+    def build_urls(
+        self,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        **kwargs,
+    ) -> List[str]:
+        """
+        Construct OpenAQ S3 URLs for the given dates.
+        """
+        return build_urls(dates)
 
 
 def build_urls(dates: Union[pd.DatetimeIndex, List[datetime], datetime, str]) -> List[str]:

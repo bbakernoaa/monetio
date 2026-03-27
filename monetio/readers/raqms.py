@@ -21,7 +21,8 @@ class RAQMSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         convert_to_ppb: bool = True,
         var_list: Optional[List[str]] = None,
         surf_only: bool = False,
@@ -32,8 +33,10 @@ class RAQMSReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         convert_to_ppb : bool, optional
             Convert gas species from ppv to ppbv, by default True.
         var_list : list of str, optional
@@ -55,12 +58,16 @@ class RAQMSReader(GriddedReader):
         >>> ds = reader.open_dataset("uwhyb_*.nc")
         """
         # RAQMS check file format
-        if isinstance(files, str):
-            fpaths = sorted(glob(files))
-        else:
-            fpaths = sorted(files)
+        res = self._prepare_files(files, dates, **kwargs)
+        if isinstance(res, xr.Dataset):
+            return res
 
-        if not fpaths or not all(
+        if isinstance(res, str):
+            fpaths = sorted(glob(res))
+        else:
+            fpaths = sorted(res)
+
+        if fpaths and not all(
             fp.endswith(".nc") and "uwhyb" in os.path.basename(fp) for fp in fpaths
         ):
             raise ValueError(
@@ -91,7 +98,15 @@ class RAQMSReader(GriddedReader):
 
         # 2. Open the dataset using standard xarray (via XarrayDriver)
         # Use fpaths instead of files to ensure consistent set of files
-        ds = self.driver.open(fpaths, **kwargs)
+        ds = super().open_dataset(
+            fpaths,
+            dates,
+            files=files,
+            convert_to_ppb=convert_to_ppb,
+            var_list=var_list,
+            surf_only=surf_only,
+            **kwargs,
+        )
 
         # Update history
         ds = update_history(ds, "Read RAQMS data.")

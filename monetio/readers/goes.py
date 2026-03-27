@@ -1,7 +1,7 @@
 """GOES Reader"""
 
 import datetime
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -20,8 +20,8 @@ class GOESReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         satellite: str = "16",
         product: str = "ABI-L2-AODF",
         **kwargs,
@@ -47,18 +47,13 @@ class GOESReader(GriddedReader):
         xr.Dataset
             The GOES dataset.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
-            files = self.build_urls(dates, satellite=satellite, product=product)
-
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = goes_preprocess
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, dates, satellite=satellite, product=product, **kwargs)
 
         # Update history
         ds = update_history(ds, f"Read GOES-{satellite} {product} data.")

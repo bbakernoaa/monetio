@@ -188,10 +188,25 @@ class AERONETReader(PointReader):
 
         df = super().open_dataset(
             files,
+            dates,
+            product=product,
+            inv_type=inv_type,
+            latlonbox=latlonbox,
+            siteid=siteid,
+            daily=daily,
+            lunar=lunar,
+            freq=freq,
+            detect_dust=detect_dust,
+            add_diagnostics=add_diagnostics,
+            interp_to_aod_values=interp_to_aod_values,
+            n_procs=n_procs,
             read_method=read_func,
             as_xarray=False,
             lazy=use_dask,
             meta=meta,
+            retries=retries,
+            backoff_factor=backoff_factor,
+            n_chunks=n_chunks,
             **kwargs,
         )
 

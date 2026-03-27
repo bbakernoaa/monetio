@@ -1,6 +1,6 @@
 """MODIS ORNL Reader"""
 
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -25,9 +25,9 @@ class MODISORNLReader(GriddedReader):
     Reader for MODIS data from ORNL web service.
     """
 
-    def open_dataset(
+    def retrieve(
         self,
-        date: Union[pd.Timestamp, str],
+        dates: Optional[Any] = None,
         product: str = "MOD12A2H",
         band: str = "Lai_500m",
         quality_control: Optional[Any] = None,
@@ -35,41 +35,20 @@ class MODISORNLReader(GriddedReader):
         longitude: float = 0,
         kmAboveBelow: int = 100,
         kmLeftRight: int = 100,
-        **kwargs,
+        **kwargs: Any,
     ) -> xr.Dataset:
         """
-        Reads MODIS data from ORNL.
-
-        Parameters
-        ----------
-        date : pd.Timestamp or str
-            Date to retrieve.
-        product : str, optional
-            MODIS product.
-        band : str, optional
-            Product band.
-        quality_control : optional
-            Quality control filter.
-        latitude : float, optional
-            Center latitude.
-        longitude : float, optional
-            Center longitude.
-        kmAboveBelow : int, optional
-            Kilometers above/below center.
-        kmLeftRight : int, optional
-            Kilometers left/right center.
-
-        Returns
-        -------
-        xr.Dataset
-            The MODIS ORNL dataset.
+        Retrieves MODIS data from ORNL.
         """
         if not HAS_SUDS:
             raise ImportError(
                 "Please install a suds client (pip install suds-jurko or suds-community)"
             )
 
-        date = pd.to_datetime(date)
+        date = pd.to_datetime(dates)
+        if isinstance(date, pd.DatetimeIndex):
+            date = date[0]
+
         m = _get_single_retrieval(
             date,
             product=product,
@@ -87,6 +66,17 @@ class MODISORNLReader(GriddedReader):
         ds = update_history(ds, f"Read MODIS ORNL {product} {band} data.")
 
         return ds
+
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> xr.Dataset:
+        """
+        Reads MODIS data from ORNL.
+        """
+        return super().open_dataset(files, dates, **kwargs)
 
 
 class MODISData:

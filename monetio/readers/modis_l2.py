@@ -1,6 +1,6 @@
 """MODIS L2 Swath Reader"""
 
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -17,7 +17,8 @@ class MODISL2Reader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         variable_dict: dict = None,
         **kwargs,
     ) -> xr.Dataset:
@@ -26,8 +27,10 @@ class MODISL2Reader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path(s) or URL(s).
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         variable_dict : dict, optional
             Dictionary of variables to read with metadata (scale, minimum, maximum, quality_flag).
         **kwargs : dict
@@ -51,7 +54,7 @@ class MODISL2Reader(GriddedReader):
             # or the user can pass drop_variables.
             pass
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, dates, variable_dict=variable_dict, **kwargs)
 
         # Filter to requested variables if variable_dict is provided
         if variable_dict is not None:

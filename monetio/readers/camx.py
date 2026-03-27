@@ -1,7 +1,7 @@
 """CAMx Reader"""
 
 from functools import partial
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import xarray as xr
@@ -22,7 +22,8 @@ class CAMxReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         earth_radius: float = 6370000,
         convert_to_ppb: bool = True,
         drop_duplicates: bool = False,
@@ -33,8 +34,10 @@ class CAMxReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         earth_radius : float, optional
             Earth radius in meters, by default 6370000.
         convert_to_ppb : bool, optional
@@ -69,7 +72,14 @@ class CAMxReader(GriddedReader):
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
 
-        ds = self.driver.open(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            dates,
+            earth_radius=earth_radius,
+            convert_to_ppb=convert_to_ppb,
+            drop_duplicates=drop_duplicates,
+            **kwargs,
+        )
 
         # 3. Finalize
         if drop_duplicates:

@@ -119,13 +119,18 @@ def test_merra2_open_dataset_with_dates(monkeypatch):
     """Test open_dataset with dates instead of files."""
     reader = MERRA2Reader()
 
-    def mock_open(self, files, **kwargs):
+    # Mock build_urls instead of open_dataset to test the dispatch logic
+    def mock_build_urls(self, dates, **kwargs):
+        return ["https://mock-url.nc"]
+
+    monkeypatch.setattr(MERRA2Reader, "build_urls", mock_build_urls)
+
+    # Mock driver.open to return a dummy dataset
+    def mock_driver_open(self, files, **kwargs):
         return xr.Dataset(attrs={"files_opened": files})
 
-    # Mock the XarrayDriver.open (or GriddedReader.open_dataset indirectly)
-    # Actually it's easier to mock the super().open_dataset or the build_urls
-    monkeypatch.setattr("monetio.readers.base.GriddedReader.open_dataset", mock_open)
+    monkeypatch.setattr("monetio.readers.drivers.XarrayDriver.open", mock_driver_open)
 
     ds = reader.open_dataset(dates="2024-01-01", product="inst1_2d_asm_Nx")
     assert "files_opened" in ds.attrs
-    assert "MERRA2_400.inst1_2d_asm_Nx.20240101.nc4" in ds.attrs["files_opened"][0]
+    assert "https://mock-url.nc" in ds.attrs["files_opened"]

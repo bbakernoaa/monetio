@@ -217,18 +217,25 @@ class CRNReader(PointReader):
         Union[xr.Dataset, pd.DataFrame]
             The loaded dataset.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
+        if download:
             files, _ = self.build_urls(
                 dates, daily=daily, sub_hourly=sub_hourly, latlonbox=latlonbox
             )
-
-        if download:
             files = self.retrieve(files)
 
-        # We use read_crn as the custom read_method
-        df = self.driver.open(files, read_method=read_crn, lazy=lazy, **kwargs)
+        # We use read_crn as the custom read_method via super()
+        df = super().open_dataset(
+            files,
+            dates,
+            daily=daily,
+            sub_hourly=sub_hourly,
+            download=download,
+            latlonbox=latlonbox,
+            read_method=read_crn,
+            as_xarray=False,
+            lazy=lazy,
+            **kwargs,
+        )
 
         # Post-processing: Merge with monitor info and fix columns
         df = self._postprocess(df, latlonbox=latlonbox)
@@ -342,7 +349,8 @@ class CRNReader(PointReader):
         daily: bool = False,
         sub_hourly: bool = False,
         latlonbox: Optional[List[float]] = None,
-    ) -> Tuple[List[str], List[str]]:
+        **kwargs,
+    ) -> List[str]:
         """
         Discover available URLs for the given dates and monitors.
 
@@ -402,13 +410,11 @@ class CRNReader(PointReader):
 
                     rest = f"{y}-{state}_{site}_{vector}.txt"
                     url = f"{year_url}{fname_prefix}{rest}"
-                    fname = f"{fname_prefix}{rest}"
 
                     if fs.exists(url):
                         urls.append(url)
-                        fnames.append(fname)
 
-        return urls, fnames
+        return urls
 
     def retrieve(self, urls: Union[str, List[str]]) -> List[str]:
         """

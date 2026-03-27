@@ -1,6 +1,6 @@
 """MPLNET Reader"""
 
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import xarray as xr
 
@@ -14,14 +14,21 @@ class MPLNETReader(GriddedReader):
     Reader for MPLNET (NASA Micro-Pulse Lidar Network) V3 NetCDF data.
     """
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Retrieve and load MPLNET data.
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         **kwargs : dict
             Additional arguments passed to xarray.open_mfdataset.
 
@@ -33,8 +40,8 @@ class MPLNETReader(GriddedReader):
         # Default to combined dimensions if not specified
         kwargs.setdefault("combine", "by_coords")
 
-        # Use XarrayDriver (via GriddedReader) to open
-        ds = super().open_dataset(files, preprocess=mplnet_preprocess, **kwargs)
+        # Use XarrayDriver (via GriddedReader) to open via super()
+        ds = super().open_dataset(files, dates, preprocess=mplnet_preprocess, **kwargs)
 
         return ds
 

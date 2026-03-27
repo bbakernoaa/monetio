@@ -8,7 +8,7 @@ https://docs.openaq.org/aws/about
 import logging
 import warnings
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Union
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 import pandas as pd
 import xarray as xr
@@ -29,8 +29,8 @@ class OpenAQAWSReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         siteid: Union[str, List[str]] = None,
         country: Union[str, List[str]] = None,
         provider: Union[str, List[str]] = None,
@@ -79,32 +79,41 @@ class OpenAQAWSReader(PointReader):
         if (
             files is not None
             and dates is None
-            and isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp, list, str))
+            and isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp))
         ):
-            if isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp)):
-                dates = files
-                files = None
-            elif isinstance(files, list) and len(files) > 0 and isinstance(files[0], datetime):
-                dates = files
-                files = None
+            dates = files
+            files = None
+        elif (
+            files is not None
+            and dates is None
+            and isinstance(files, list)
+            and len(files) > 0
+            and isinstance(files[0], datetime)
+        ):
+            dates = files
+            files = None
 
         read_func = read_openaq_aws_csv
+        if not find_paths:
+            read_func = read_openaq_aws_csv_robust
 
-        if files is None and dates is not None:
-            dates = _to_datetime_index(dates).dropna()
-            if dates.empty:
-                raise ValueError("must provide at least one datetime-like")
+        # Use base class to open via super()
+        df = super().open_dataset(
+            files,
+            dates,
+            siteid=siteid,
+            country=country,
+            provider=provider,
+            find_paths=find_paths,
+            wide_fmt=wide_fmt,
+            n_procs=n_procs,
+            read_method=read_func,
+            as_xarray=False,
+            lazy=lazy,
+            **kwargs,
+        )
 
-            if find_paths:
-                paths = get_paths(dates, siteid=siteid, country=country, provider=provider)
-                files = [f"s3://{p}" for p in paths]
-            else:
-                if siteid is None:
-                    raise ValueError("must provide `siteid` when `find_paths` is false")
-                files = build_urls(dates, siteid)
-                read_func = read_openaq_aws_csv_robust
-
-        if not files:
+        if df is None or (hasattr(df, "empty") and df.empty):
             # Handle empty
             if lazy:
                 import dask.dataframe as dd
@@ -119,6 +128,13 @@ class OpenAQAWSReader(PointReader):
         # Use base class to open
         df = super().open_dataset(
             files,
+            dates,
+            siteid=siteid,
+            country=country,
+            provider=provider,
+            find_paths=find_paths,
+            wide_fmt=wide_fmt,
+            n_procs=n_procs,
             read_method=read_func,
             as_xarray=False,
             lazy=lazy,
@@ -144,6 +160,30 @@ class OpenAQAWSReader(PointReader):
             return ds
 
         return df
+
+    def build_urls(
+        self,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        siteid: Union[str, List[str]] = None,
+        country: Union[str, List[str]] = None,
+        provider: Union[str, List[str]] = None,
+        find_paths: bool = True,
+        **kwargs,
+    ) -> List[str]:
+        """
+        Construct OpenAQ S3 URLs for the given dates and filters.
+        """
+        dates = _to_datetime_index(dates).dropna()
+        if dates.empty:
+            return []
+
+        if find_paths:
+            paths = get_paths(dates, siteid=siteid, country=country, provider=provider)
+            return [f"s3://{p}" for p in paths]
+        else:
+            if siteid is None:
+                raise ValueError("must provide `siteid` when `find_paths` is false")
+            return build_urls(dates, siteid)
 
 
 def read_openaq_aws_csv(fp: str, **kwargs) -> pd.DataFrame:

@@ -1,5 +1,5 @@
 import abc
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -35,19 +35,71 @@ class BaseReader(abc.ABC):
 
     @abc.abstractmethod
     def open_dataset(
-        self, files: Union[str, List[str]], **kwargs
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs,
     ) -> Union[xr.Dataset, pd.DataFrame]:
         """
         Main entry point to read data.
 
         Args:
             files: File path, list of paths, or glob pattern.
+            dates: Dates to retrieve if files are not provided.
             **kwargs: Reader-specific arguments.
 
         Returns:
             xarray.Dataset (for models/sat) or pandas.DataFrame (for point obs).
         """
         pass
+
+    def _standardize_dates(self, dates: Any) -> Optional[pd.DatetimeIndex]:
+        """
+        Standardize dates input to a pandas DatetimeIndex.
+        """
+        if dates is None:
+            return None
+        d = pd.to_datetime(dates)
+        if isinstance(d, pd.DatetimeIndex):
+            return d
+        return pd.DatetimeIndex(np.atleast_1d(d))
+
+    def _prepare_files(self, files: Any, dates: Any, **kwargs: Any) -> Any:
+        """
+        Resolve files or retrieve data if files are not provided.
+        Returns either a list of files/URLs or the retrieved dataset directly.
+        """
+        if files is not None:
+            return files
+
+        if dates is not None:
+            dates = self._standardize_dates(dates)
+            if hasattr(self, "retrieve"):
+                return self.retrieve(dates=dates, **kwargs)
+            elif hasattr(self, "build_urls"):
+                files = self.build_urls(dates, **kwargs)
+                if isinstance(files, pd.Series):
+                    files = files.tolist()
+                elif isinstance(files, pd.DataFrame):
+                    if "name" in files.columns:
+                        files = files.name.tolist()
+                    elif "url" in files.columns:
+                        files = files.url.tolist()
+                    else:
+                        files = files.iloc[:, 0].tolist()
+                return files
+
+        raise ValueError(
+            f"Reader {self.__class__.__name__} requires either 'files' or 'dates' "
+            "(and must support retrieval if 'files' is None)."
+        )
+
+    def build_urls(self, dates: Any, **kwargs: Any) -> Union[str, List[str]]:
+        """
+        Construct URLs for the given dates.
+        Must be implemented by subclasses that support retrieval.
+        """
+        raise NotImplementedError(f"Reader {self.__class__.__name__} does not implement build_urls.")
 
     def harmonize(self, ds):
         """
@@ -65,12 +117,21 @@ class GriddedReader(BaseReader):
     def __init__(self):
         self.driver = XarrayDriver()
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Uses XarrayDriver to open files.
         Readers can override this to add pre/post processing.
         """
-        ds = self.driver.open(files, **kwargs)
+        res = self._prepare_files(files, dates, **kwargs)
+        if isinstance(res, xr.Dataset):
+            return res
+
+        ds = self.driver.open(res, **kwargs)
         return self.harmonize(ds)
 
 
@@ -86,8 +147,9 @@ class PointReader(BaseReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
-        read_method: str = "read_csv",
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        read_method: Union[str, callable] = "read_csv",
         as_xarray: bool = True,
         lazy: bool = False,
         meta: Union[pd.DataFrame, pd.Series, dict, tuple, None] = None,
@@ -98,9 +160,11 @@ class PointReader(BaseReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
-        read_method : str, optional
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
+        read_method : str or callable, optional
             The pandas/dask reading method to use, by default "read_csv".
         as_xarray : bool, optional
             If True, return an xarray.Dataset, by default True.
@@ -116,7 +180,21 @@ class PointReader(BaseReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded dataset.
         """
-        df = self.driver.open(files, read_method=read_method, lazy=lazy, meta=meta, **kwargs)
+        res = self._prepare_files(files, dates, **kwargs)
+
+        # Check for retrieved objects (DataFrames or Datasets)
+        # Note: Dask DataFrames also match here if they are imported.
+        try:
+            import dask.dataframe as dd
+
+            is_df = isinstance(res, (pd.DataFrame, dd.DataFrame))
+        except ImportError:
+            is_df = isinstance(res, pd.DataFrame)
+
+        if is_df or isinstance(res, xr.Dataset):
+            return res
+
+        df = self.driver.open(res, read_method=read_method, lazy=lazy, meta=meta, **kwargs)
 
         df = self.harmonize(df)
 

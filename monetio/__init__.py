@@ -143,13 +143,13 @@ _READER_MODULES = {
 }
 
 
-def load(source: str, files=None, **kwargs):
+def load(source: str, files=None, dates=None, **kwargs):
     """
     Universal load function.
 
     Usage:
         ds = monetio.load("cmaq", files="/path/to/data*.nc")
-        df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
+        df = monetio.load("airnow", dates="2023-01-01")
 
     Available sources:
         Models: cmaq, camx, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, ufs, wrfchem, grib2
@@ -174,7 +174,7 @@ def load(source: str, files=None, **kwargs):
     reader_cls = READER_REGISTRY[source]
     reader = reader_cls()
 
-    return reader.open_dataset(files=files, **kwargs)
+    return reader.open_dataset(files=files, dates=dates, **kwargs)
 
 
 def rename_latlon(ds):

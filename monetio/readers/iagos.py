@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import os
-from typing import TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 import pandas as pd
 import xarray as xr
@@ -27,8 +27,8 @@ class IAGOSReader(PointReader):
 
     def open_dataset(
         self,
-        files: str | list[str] | None = None,
-        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
@@ -54,21 +54,12 @@ class IAGOSReader(PointReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded IAGOS data.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Must provide either 'files' or 'dates'.")
-            files = self.build_urls(dates, **kwargs)
-
-        if not files:
-            if as_xarray:
-                return xr.Dataset()
-            return pd.DataFrame()
-
-        # IAGOS data is NetCDF. We use xr.open_mfdataset for robustness.
-        # It handles both single and multiple files, and laziness.
-        ds = xr.open_mfdataset(files, combine="nested", concat_dim="time", **kwargs)
-
-        ds = self.harmonize(ds)
+        # IAGOS data is NetCDF. We use XarrayDriver via super() for robustness.
+        ds = super().open_dataset(
+            files,
+            dates,
+            **kwargs,
+        )
 
         if not as_xarray:
             return ds.to_dataframe().reset_index()

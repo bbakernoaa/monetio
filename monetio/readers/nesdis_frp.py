@@ -2,7 +2,7 @@
 
 import datetime
 import os
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -21,41 +21,18 @@ class NESDISFRPReader(GriddedReader):
     Reader for NESDIS Fire Radiative Power (FRP) data on FV3 C384 grid.
     """
 
-    def open_dataset(
+    def retrieve(
         self,
-        date: Union[datetime.datetime, str, pd.Timestamp],
+        dates: Optional[Any] = None,
         ftype: str = "meanFRP",
         datapath: str = ".",
         lazy: bool = False,
         **kwargs,
     ) -> xr.Dataset:
         """
-        Reads NESDIS FRP data.
-
-        Parameters
-        ----------
-        date : datetime.datetime, str, or pd.Timestamp
-            Date to retrieve.
-        ftype : str, optional
-            Type of FRP data (e.g., 'meanFRP'). Default is 'meanFRP'.
-        datapath : str, optional
-            Local path to store downloaded files. Default is '.'.
-        lazy : bool, optional
-            Whether to read data lazily using Dask, by default False.
-        **kwargs : dict
-            Additional arguments.
-
-        Returns
-        -------
-        xr.Dataset
-            The NESDIS FRP dataset.
-
-        Examples
-        --------
-        >>> reader = NESDISFRPReader()
-        >>> ds = reader.open_dataset("2023-01-01", ftype="meanFRP")
+        Retrieves and reads NESDIS FRP data.
         """
-        date = pd.Timestamp(date)
+        date = pd.Timestamp(dates)
 
         if not os.path.exists(datapath):
             os.makedirs(datapath, exist_ok=True)
@@ -83,6 +60,17 @@ class NESDISFRPReader(GriddedReader):
         ds = update_history(ds, f"Read NESDIS {ftype} data from {len(files)} tiles.")
 
         return ds
+
+    def open_dataset(
+        self,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
+        **kwargs,
+    ) -> xr.Dataset:
+        """
+        Reads NESDIS FRP data.
+        """
+        return super().open_dataset(files, dates, **kwargs)
 
     def download_data(
         self, date: pd.Timestamp, ftype: str = "meanFRP", datapath: str = "."

@@ -20,7 +20,8 @@ class WRFChemReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         convert_to_ppb: bool = True,
         mech: str = "racm_esrl_vcp",
         var_list: Optional[List[str]] = None,
@@ -33,8 +34,10 @@ class WRFChemReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         convert_to_ppb : bool, optional
             Convert gas species from ppmV to ppbV, by default True.
         mech : str, optional
@@ -53,6 +56,12 @@ class WRFChemReader(GriddedReader):
         xarray.Dataset
             The processed WRF-Chem dataset.
         """
+        if files is None:
+            if dates is not None and hasattr(self, "build_urls"):
+                files = self.build_urls(dates, **kwargs)
+            else:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = partial(
                 wrfchem_preprocess,
@@ -68,7 +77,16 @@ class WRFChemReader(GriddedReader):
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
 
-        ds = self.driver.open(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            dates,
+            convert_to_ppb=convert_to_ppb,
+            mech=mech,
+            var_list=var_list,
+            surf_only=surf_only,
+            surf_only_nc=surf_only_nc,
+            **kwargs,
+        )
 
         ds = self.harmonize(ds)
 

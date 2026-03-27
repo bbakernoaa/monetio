@@ -68,11 +68,6 @@ class OMPSNadirReader(GriddedReader):
         >>> reader = OMPSNadirReader()
         >>> ds = reader.open_dataset(dates='2024-01-01', product='v8toz')
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
-            files = self.build_urls(dates, satellite=satellite, product=product)
-
         if group is None:
             if product.lower() == "tc_sdr":
                 groups = ["All_Data/OMPS-TC-SDR_All", "All_Data/OMPS-TC-GEO_All"]
@@ -119,8 +114,16 @@ class OMPSNadirReader(GriddedReader):
                 g_files = files
 
             try:
-                # Open without the preprocessor at this stage
-                ds_g = super().open_dataset(g_files, **g_kwargs)
+                # Open without the preprocessor at this stage via super()
+                ds_g = super().open_dataset(
+                    g_files,
+                    dates,
+                    satellite=satellite,
+                    product=product,
+                    group=group,
+                    files=files,
+                    **g_kwargs,
+                )
                 dsets.append(ds_g)
             except (OSError, RuntimeError, ValueError):
                 # Not all groups may be present in all files

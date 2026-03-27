@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 from io import StringIO
-from typing import TYPE_CHECKING, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, List, NamedTuple, Optional, TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -22,8 +22,8 @@ from .base import PointReader, register_reader
 class GMLOzonesondeReader(PointReader):
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         location: Union[str, List[str]] = None,
         n_procs: int = 1,
         errors: str = "raise",
@@ -58,34 +58,24 @@ class GMLOzonesondeReader(PointReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded ozonesonde data.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
-
-            dates = pd.to_datetime(dates)
-            if isinstance(dates, pd.Timestamp):
-                dates = pd.DatetimeIndex([dates])
-
-            df_urls = discover_files(location=location)
-            # Filter by date
-            mask = df_urls["time"].between(dates.min(), dates.max(), inclusive="both")
-            urls = df_urls.loc[mask, "url"].tolist()
-
-            if not urls:
-                raise RuntimeError(
-                    f"No files found for dates {dates.min()} to {dates.max()} "
-                    f"at location(s) {location}."
-                )
-            files = urls
-
         # Filter out arguments that are not for the reader function
         reader_kwargs = {
             k: v for k, v in kwargs.items() if k not in ["expand2d", "pivot", "wide_fmt"]
         }
 
-        # Use PandasDriver to open files
+        # Use PandasDriver to open files via super()
         # We pass read_100m as the read_method
-        df = self.driver.open(files, read_method=read_100m, lazy=lazy, **reader_kwargs)
+        df = super().open_dataset(
+            files,
+            dates,
+            location=location,
+            n_procs=n_procs,
+            errors=errors,
+            read_method=read_100m,
+            as_xarray=False,
+            lazy=lazy,
+            **reader_kwargs,
+        )
 
         if not lazy and n_procs > 1:
             # If dask is installed, we can use it for parallel loading even if as_xarray is False
@@ -113,6 +103,26 @@ class GMLOzonesondeReader(PointReader):
             return ds
 
         return df
+
+    def build_urls(self, dates, location=None, **kwargs):
+        """
+        Discover files based on dates and location.
+        """
+        dates = pd.to_datetime(dates)
+        if isinstance(dates, pd.Timestamp):
+            dates = pd.DatetimeIndex([dates])
+
+        df_urls = discover_files(location=location)
+        # Filter by date
+        mask = df_urls["time"].between(dates.min(), dates.max(), inclusive="both")
+        urls = df_urls.loc[mask, "url"].tolist()
+
+        if not urls:
+            raise RuntimeError(
+                f"No files found for dates {dates.min()} to {dates.max()} "
+                f"at location(s) {location}."
+            )
+        return urls
 
 
 # -----------------------------------------------------------------------------

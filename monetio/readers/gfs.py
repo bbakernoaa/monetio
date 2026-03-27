@@ -47,17 +47,16 @@ class NCEPPDSReader(GriddedReader):
         xr.Dataset
             The dataset.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
-            files = self.build_urls(dates, hour=hour, lead_time=lead_time, product=product)
-
-        if "engine" not in kwargs:
-            kwargs["engine"] = "grib2io"
-
         # grib2io engine generally requires local files or file-like objects.
         # XarrayDriver handles S3 URLs by opening them via fsspec.
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            dates,
+            hour=hour,
+            lead_time=lead_time,
+            product=product,
+            **kwargs,
+        )
 
         # Apply Aero Protocol harmonization
         ds = self.harmonize(ds)

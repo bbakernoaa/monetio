@@ -1,7 +1,7 @@
 """IMPROVE Reader"""
 
 from functools import partial
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -26,7 +26,8 @@ class IMPROVEReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         add_meta: bool = False,
         delimiter: str = "\t",
         as_xarray: bool = True,
@@ -39,8 +40,10 @@ class IMPROVEReader(PointReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         add_meta : bool, optional
             Whether to add site metadata, by default False.
         delimiter : str, optional
@@ -73,6 +76,10 @@ class IMPROVEReader(PointReader):
 
         df = super().open_dataset(
             files,
+            dates,
+            add_meta=add_meta,
+            delimiter=delimiter,
+            pivot=pivot,
             read_method=read_func,
             as_xarray=False,
             lazy=lazy,

@@ -4,7 +4,7 @@ import logging
 import zipfile
 from datetime import datetime
 from io import BytesIO
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -314,13 +314,18 @@ class IGRA2Reader(PointReader):
     def build_urls(
         self,
         dates: Optional[pd.DatetimeIndex] = None,
+        site: Optional[Union[str, List[str]]] = None,
         sites: Optional[Union[str, List[str]]] = None,
         source: str = "ncei",
         derived: bool = False,
+        **kwargs: Any,
     ) -> List[str]:
         """
         Construct IGRA2 URLs.
         """
+        if sites is None:
+            sites = site
+
         if source != "ncei":
             raise ValueError("Only 'ncei' source is currently supported for IGRA2.")
 
@@ -357,13 +362,18 @@ class IGRA2Reader(PointReader):
         """
         Retrieve and load IGRA2 data.
         """
-        if files is None:
-            if site is None:
-                raise ValueError("Must provide either 'files' or 'site'.")
-            files = self.build_urls(sites=site, derived=derived)
-
         read_method = read_igra2_derived if derived else read_igra2
-        df = self.driver.open(files, read_method=read_method, lazy=lazy, **kwargs)
+        df = super().open_dataset(
+            files,
+            dates,
+            site=site,
+            derived=derived,
+            add_metadata=add_metadata,
+            read_method=read_method,
+            as_xarray=False,
+            lazy=lazy,
+            **kwargs,
+        )
 
         if add_metadata:
             stations = self.read_station_list()

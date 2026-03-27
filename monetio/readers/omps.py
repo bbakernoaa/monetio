@@ -1,7 +1,7 @@
 """OMPS Reader"""
 
 import datetime
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -19,7 +19,8 @@ class OMPSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         product: str = "nmto3_l2",
         **kwargs,
     ) -> xr.Dataset:
@@ -50,7 +51,7 @@ class OMPSReader(GriddedReader):
 
         # L2 data often has different cross-track dimensions if not carefully selected,
         # but standard products should be consistent.
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, dates, product=product, **kwargs)
 
         # Update history
         ds = update_history(ds, f"Read OMPS {product} data.")

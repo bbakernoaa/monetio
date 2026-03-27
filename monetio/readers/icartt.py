@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -134,7 +134,8 @@ class ICARTTReader(PointReader):
 
     def open_dataset(
         self,
-        files: str | list[str],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
@@ -144,8 +145,10 @@ class ICARTTReader(PointReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
@@ -158,6 +161,12 @@ class ICARTTReader(PointReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded ICARTT data.
         """
+        if files is None:
+            if dates is not None and hasattr(self, "build_urls"):
+                files = self.build_urls(dates, **kwargs)
+            else:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+
         # We need metadata from the first file to setup lazy processing
         file_list = FileUtility.expand_paths(files)
         if not file_list:
@@ -166,7 +175,14 @@ class ICARTTReader(PointReader):
         header = parse_icartt_header(file_list[0])
 
         # Open data
-        df = self.driver.open(files, read_method=read_icartt, lazy=lazy, **kwargs)
+        df = super().open_dataset(
+            files,
+            dates,
+            read_method=read_icartt,
+            as_xarray=False,
+            lazy=lazy,
+            **kwargs,
+        )
 
         if lazy:
             # For Dask, we apply scaling and missing values via map_partitions

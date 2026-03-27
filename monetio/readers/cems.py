@@ -1,7 +1,7 @@
 """CEMS Reader"""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -25,10 +25,33 @@ class CEMSReader(PointReader):
     Reader for Continuous Emissions Monitoring System (CEMS) data.
     """
 
+    def build_urls(
+        self,
+        dates: Optional[Any] = None,
+        states: Union[str, List[str]] = "md",
+        **kwargs: dict,
+    ) -> List[str]:
+        """
+        Build CEMS URLs.
+        """
+        dates = pd.to_datetime(dates)
+        if isinstance(dates, pd.Timestamp):
+            dates = pd.DatetimeIndex([dates])
+
+        if isinstance(states, str):
+            states = [states]
+
+        # Discovery logic
+        files = []
+        for dt in dates.to_period("M").to_timestamp().unique():
+            for st in states:
+                files.append(build_url(dt, st))
+        return files
+
     def open_dataset(
         self,
         files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
+        dates: Optional[Any] = None,
         states: Union[str, List[str]] = "md",
         n_procs: int = 1,
         as_xarray: bool = True,
@@ -42,7 +65,7 @@ class CEMSReader(PointReader):
         ----------
         files : Union[str, List[str]], optional
             File paths or URLs to read. If None, uses `dates` and `states` to discover files.
-        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+        dates : Any, optional
             Dates to retrieve.
         states : Union[str, List[str]], optional
             States to retrieve (e.g., 'md'), by default 'md'.
@@ -67,29 +90,23 @@ class CEMSReader(PointReader):
         >>> reader = CEMSReader()
         >>> ds = reader.open_dataset(dates="2023-01-01", states="md")
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Either 'files' or 'dates' must be provided.")
-
-            dates = pd.to_datetime(dates)
-            if isinstance(dates, pd.Timestamp):
-                dates = pd.DatetimeIndex([dates])
-
-            if isinstance(states, str):
-                states = [states]
-
-            # Discovery logic
-            files = []
-            for dt in dates.to_period("M").to_timestamp().unique():
-                for st in states:
-                    files.append(build_url(dt, st))
-
         # Filter out arguments that are not for the reader function
         reader_kwargs = {
-            k: v for k, v in kwargs.items() if k not in ["expand2d", "pivot", "wide_fmt"]
+            k: v
+            for k, v in kwargs.items()
+            if k not in ["expand2d", "pivot", "wide_fmt", "states"]
         }
 
-        df = self.driver.open(files, read_method=read_cems, lazy=lazy, **reader_kwargs)
+        df = super().open_dataset(
+            files,
+            dates,
+            states=states,
+            n_procs=n_procs,
+            read_method=read_cems,
+            as_xarray=False,
+            lazy=lazy,
+            **reader_kwargs,
+        )
 
         df = self.harmonize(df)
 

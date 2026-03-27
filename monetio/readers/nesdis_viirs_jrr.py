@@ -67,7 +67,7 @@ class VIIRSJRRReader(GriddedReader):
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, dates, satellite=satellite, product=product, **kwargs)
 
         # Update history
         ds = update_history(ds, f"Read NESDIS VIIRS JRR {product} data from {satellite}.")

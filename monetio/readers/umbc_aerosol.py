@@ -1,6 +1,6 @@
 """UMBC Aerosol Reader (CL51)"""
 
-from typing import List, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -18,7 +18,8 @@ class UMBCAerosolReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -26,8 +27,10 @@ class UMBCAerosolReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : Union[str, List[str]], optional
             File path, list of paths, or glob pattern.
+        dates : Any, optional
+            Dates to retrieve if files are not provided.
         **kwargs : dict
             Additional arguments passed to the driver.
 
@@ -36,17 +39,24 @@ class UMBCAerosolReader(GriddedReader):
         xr.Dataset
             The processed UMBC Aerosol dataset.
         """
+        res = self._prepare_files(files, dates, **kwargs)
+        if isinstance(res, xr.Dataset):
+            return res
+
         # We don't use XarrayDriver directly because the file structure is custom
         # and better handled by a custom loading logic that can be dask-ified.
 
         from .drivers import FileUtility
 
-        file_list = FileUtility.expand_paths(files)
+        file_list = FileUtility.expand_paths(res)
 
         dsets = []
         for f in file_list:
             ds = self._read_file(f)
             dsets.append(ds)
+
+        if not dsets:
+            return xr.Dataset()
 
         if len(dsets) == 1:
             ds = dsets[0]

@@ -1,7 +1,7 @@
 """PAMS Reader"""
 
 import json
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -25,7 +25,8 @@ class PAMSReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs: Any,
@@ -56,13 +57,26 @@ class PAMSReader(PointReader):
         >>> reader = PAMSReader()
         >>> ds = reader.open_dataset("pams_data*.json")
         """
+        if files is None:
+            if dates is not None and hasattr(self, "build_urls"):
+                files = self.build_urls(dates, **kwargs)
+            else:
+                raise ValueError("Either 'files' or 'dates' must be provided.")
+
         # Filter out arguments that are not for the reader function
         reader_kwargs = {
             k: v for k, v in kwargs.items() if k not in ["expand2d", "pivot", "wide_fmt"]
         }
 
-        # Use PandasDriver to open files
-        df = self.driver.open(files, read_method=read_pams, lazy=lazy, **reader_kwargs)
+        # Use PandasDriver to open files via super()
+        df = super().open_dataset(
+            files,
+            dates,
+            read_method=read_pams,
+            as_xarray=False,
+            lazy=lazy,
+            **reader_kwargs,
+        )
 
         df = self.harmonize(df)
 

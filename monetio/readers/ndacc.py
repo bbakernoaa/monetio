@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -26,8 +26,8 @@ class NDACCReader(GEOMSReader):
 
     def open_dataset(
         self,
-        files: str | list[str] | None = None,
-        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
+        files: Optional[Union[str, List[str]]] = None,
+        dates: Optional[Any] = None,
         siteid: str | None = None,
         instrument: str | None = None,
         as_xarray: bool = True,
@@ -56,17 +56,12 @@ class NDACCReader(GEOMSReader):
         Union[xr.Dataset, pd.DataFrame]
             The processed NDACC dataset.
         """
-        if files is None:
-            if dates is None:
-                raise ValueError("Must provide either 'files' or 'dates'.")
-            files = self.build_urls(dates, siteid=siteid, instrument=instrument, **kwargs)
+        ds = super().open_dataset(files, dates, siteid=siteid, instrument=instrument, **kwargs)
 
-        if not files:
+        if ds is None or (hasattr(ds, "empty") and ds.empty):
             if as_xarray:
                 return xr.Dataset()
             return pd.DataFrame()
-
-        ds = super().open_dataset(files, **kwargs)
 
         if not as_xarray:
             return ds.to_dataframe().reset_index()

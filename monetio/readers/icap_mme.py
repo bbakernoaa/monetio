@@ -83,8 +83,10 @@ class ICAPMMEReader(GriddedReader):
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
 
-        # Use XarrayDriver to open (Lazy by default)
-        ds = self.driver.open(files, **kwargs)
+        # Use XarrayDriver to open via super()
+        ds = super().open_dataset(
+            files, dates, product=product, data_var=data_var, download=download, **kwargs
+        )
 
         ds = self.harmonize(ds)
 
@@ -92,6 +94,19 @@ class ICAPMMEReader(GriddedReader):
         ds = update_history(ds, "Read ICAP-MME data.")
 
         return ds
+
+    def build_urls(
+        self,
+        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+        product: str = "MMC",
+        data_var: str = "dustaod550",
+        **kwargs: Any,
+    ) -> List[str]:
+        """
+        Build ICAP-MME URLs.
+        """
+        urls, _ = build_urls(dates, filetype=product, data_var=data_var)
+        return urls
 
 
 def build_urls(

@@ -2,7 +2,7 @@
 
 import functools
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -152,6 +152,19 @@ class NADPReader(PointReader):
     Reader for National Atmospheric Deposition Program (NADP) data.
     """
 
+    def build_urls(
+        self,
+        dates: Optional[Any] = None,
+        network: str = "NTN",
+        siteid: Optional[str] = None,
+        weekly: bool = True,
+        **kwargs,
+    ) -> List[str]:
+        """
+        Build URLs for NADP data.
+        """
+        return [self.build_url(network=network, siteid=siteid, weekly=weekly)]
+
     def open_dataset(
         self,
         files: Optional[Union[str, List[str]]] = None,
@@ -190,14 +203,21 @@ class NADPReader(PointReader):
         Union[xr.Dataset, pd.DataFrame]
             The loaded dataset.
         """
-        if files is None:
-            files = self.build_url(network=network, siteid=siteid, weekly=weekly)
-
         # We use read_nadp as the custom read_method
         def _reader(f, **inner_kwargs):
             return read_nadp(f, network=network, **inner_kwargs)
 
-        df = self.driver.open(files, read_method=_reader, lazy=lazy, **kwargs)
+        df = super().open_dataset(
+            files,
+            dates,
+            network=network,
+            siteid=siteid,
+            weekly=weekly,
+            read_method=_reader,
+            as_xarray=False,
+            lazy=lazy,
+            **kwargs,
+        )
 
         # Filter by dates if provided
         if dates is not None:
