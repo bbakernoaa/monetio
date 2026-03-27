@@ -1,13 +1,12 @@
 """OMPS Reader"""
 
-import datetime
 from typing import List, Union
 
 import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import apply_lazy_conversion, standardize_satellite_coords, update_history
+from .sat_utils import standardize_satellite_coords, tai93_to_datetime, update_history
 
 
 @register_reader("omps")
@@ -151,15 +150,7 @@ def _preprocess_nmto3_l2(ds: xr.Dataset) -> xr.Dataset:
 
     # Handle Time (Lazy)
     if "time_raw" in ds.variables:
-        # Time is seconds since 1993-01-01
-        ref_date = datetime.datetime(1993, 1, 1)
-
-        def _convert_time(t):
-            return pd.to_datetime(t, unit="s", origin=ref_date)
-
-        # Use standardized utility for lazy conversion
-        ds["time"] = apply_lazy_conversion(ds["time_raw"], _convert_time, "datetime64[ns]")
-
+        ds["time"] = tai93_to_datetime(ds["time_raw"])
         ds = ds.set_coords("time")
         if "time_raw" in ds.variables:
             ds = ds.drop_vars("time_raw")

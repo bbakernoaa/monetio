@@ -265,6 +265,31 @@ def jpss_time_to_datetime(
     return apply_lazy_conversion(time_array, _convert, "datetime64[ns]")
 
 
+def tai93_to_datetime(time_array: xr.DataArray) -> xr.DataArray:
+    """
+    Convert TAI93 time (seconds since 1993-01-01) to datetime64[ns].
+
+    Parameters
+    ----------
+    time_array : xr.DataArray
+        Input time array in seconds since 1993-01-01 00:00:00 UTC.
+
+    Returns
+    -------
+    xr.DataArray
+        Time array in datetime64[ns].
+
+    Examples
+    --------
+    >>> ds["time"] = tai93_to_datetime(ds["Scan_Start_Time"])
+    """
+
+    def _convert(t):
+        return pd.to_datetime(t, unit="s", origin="1993-01-01")
+
+    return apply_lazy_conversion(time_array, _convert, "datetime64[ns]")
+
+
 def add_time_coord(
     ds: xr.Dataset,
     time_val: Optional[datetime.datetime] = None,

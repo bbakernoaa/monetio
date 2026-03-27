@@ -2,11 +2,10 @@
 
 from typing import List, Union
 
-import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import standardize_satellite_coords, update_history
+from .sat_utils import standardize_satellite_coords, tai93_to_datetime, update_history
 
 
 @register_reader("modis_l2")
@@ -94,20 +93,7 @@ def modis_l2_preprocess(ds: xr.Dataset, variable_dict: dict = None) -> xr.Datase
 
     # 2. Add time coordinate if Scan_Start_Time is present
     if "Scan_Start_Time" in ds.variables and "time" not in ds.coords:
-        # Seconds since 1993-01-01 00:00:00 UTC
-        epoch_1993 = pd.Timestamp("1993-01-01", tz="UTC")
-
-        def _calc_time(s):
-            return (epoch_1993.to_datetime64() + (s * 1e9).astype("timedelta64[ns]")).astype(
-                "datetime64[ns]"
-            )
-
-        ds["time"] = xr.apply_ufunc(
-            _calc_time,
-            ds["Scan_Start_Time"],
-            dask="parallelized",
-            output_dtypes=["datetime64[ns]"],
-        )
+        ds["time"] = tai93_to_datetime(ds["Scan_Start_Time"])
         ds = ds.set_coords("time")
 
     # 3. Apply variable_dict transformations (scale, minimum, maximum)

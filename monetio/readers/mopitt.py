@@ -1,14 +1,12 @@
 """MOPITT Reader"""
 
-import datetime
 from typing import List, Union
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import standardize_satellite_coords, update_history
+from .sat_utils import standardize_satellite_coords, tai93_to_datetime, update_history
 
 MOPITT_MISSING = -9999.0
 
@@ -110,11 +108,11 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
             if isinstance(start_time, (list, np.ndarray)):
                 start_time = start_time[0]
             # MOPITT uses seconds since 1993-01-01
-            dt = datetime.datetime(1993, 1, 1) + datetime.timedelta(seconds=float(start_time))
-            time_val = pd.to_datetime(dt)
+            # Wrap in DataArray to use standardized utility
+            time_da = xr.DataArray([float(start_time)], dims=("time",))
             if "time" not in ds.dims:
                 ds = ds.expand_dims("time")
-            ds = ds.assign_coords(time=("time", [time_val]))
+            ds = ds.assign_coords(time=tai93_to_datetime(time_da))
 
     # 4. Handle Missing Values
     for var in ds.data_vars:
