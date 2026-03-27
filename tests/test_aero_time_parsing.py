@@ -48,3 +48,17 @@ def test_tai93_to_datetime_precision():
     res = tai93_to_datetime(da)
 
     np.testing.assert_array_equal(res.values, [expected])
+
+
+def test_tai93_to_datetime_2d():
+    """Verify that 2D arrays (swaths) are handled correctly."""
+    times = np.array([[0.0, 3600.0], [86400.0, 86400.0 + 3600.0]])
+    expected = pd.to_datetime(
+        ["1993-01-01T00:00:00", "1993-01-01T01:00:00", "1993-01-02T00:00:00", "1993-01-02T01:00:00"]
+    ).values.astype("datetime64[ns]")
+
+    da = xr.DataArray(times, dims=("y", "x"))
+    res = tai93_to_datetime(da)
+
+    assert res.shape == (2, 2)
+    np.testing.assert_array_equal(res.values.ravel(), expected)

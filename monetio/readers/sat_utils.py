@@ -285,7 +285,8 @@ def tai93_to_datetime(time_array: xr.DataArray) -> xr.DataArray:
     """
 
     def _convert(t):
-        return pd.to_datetime(t, unit="s", origin="1993-01-01")
+        # pd.to_datetime expects 1D input
+        return pd.to_datetime(t.ravel(), unit="s", origin="1993-01-01").values.reshape(t.shape)
 
     return apply_lazy_conversion(time_array, _convert, "datetime64[ns]")
 
