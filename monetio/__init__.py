@@ -89,6 +89,7 @@ _READER_MODULES = {
     # Models
     "cmaq": ".readers.cmaq",
     "camx": ".readers.camx",
+    "chimere": ".readers.chimere",
     "hysplit": ".readers.hysplit",
     "hytraj": ".readers.hytraj",
     "icap_mme": ".readers.icap_mme",
@@ -113,10 +114,15 @@ _READER_MODULES = {
     "ish_lite": ".readers.ish_lite",
     "nadp": ".readers.nadp",
     "openaq": ".readers.openaq",
+    "openaq_v2": ".readers.openaq_v2",
+    "openaq_aws": ".readers.openaq_aws",
     "pams": ".readers.pams",
     "ndbc": ".readers.ndbc",
     "surfrad": ".readers.surfrad",
     "solrad": ".readers.solrad",
+    "ndacc": ".readers.ndacc",
+    "pandora": ".readers.pandora",
+    "skynet": ".readers.skynet",
     # Profile
     "icartt": ".readers.icartt",
     "tolnet": ".readers.tolnet",
@@ -125,12 +131,16 @@ _READER_MODULES = {
     "igra2": ".readers.igra2",
     "mplnet": ".readers.mplnet",
     "earlinet": ".readers.earlinet",
+    "actris": ".readers.actris",
+    "iagos": ".readers.iagos",
+    "umbc_aerosol": ".readers.umbc_aerosol",
     # Sat
     "goes": ".readers.goes",
     "nesdis_edr_viirs": ".readers.nesdis_edr_viirs",
     "nesdis_eps_viirs": ".readers.nesdis_eps_viirs",
     "modis_ornl": ".readers.modis_ornl",
     "nasa_modis": ".readers.nasa_modis",
+    "modis_l2": ".readers.modis_l2",
     "nesdis_frp": ".readers.nesdis_frp",
     "omps": ".readers.omps",
     "omps_nadir": ".readers.omps_nadir",
@@ -152,10 +162,10 @@ def load(source: str, files=None, **kwargs):
         df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
 
     Available sources:
-        Models: cmaq, camx, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, ufs, wrfchem, grib2
-        Obs: airnow, aeronet, aqs, cems, crn, improve, ish, ish_lite, nadp, openaq, pams
-        Profile: icartt, tolnet, geoms, gml_ozonesonde, igra2
-        Sat: goes, nesdis_edr_viirs, nesdis_eps_viirs, modis_ornl, nasa_modis, nesdis_frp, omps, omps_nadir, viirs_jrr
+        Models: cmaq, camx, chimere, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, ufs, wrfchem, grib2, gfs, gefs, gdas
+        Obs: airnow, aeronet, aqs, cems, crn, eprofile, improve, ish, ish_lite, nadp, ndacc, ndbc, openaq, openaq_v2, openaq_aws, pams, pandora, skynet, solrad, surfrad
+        Profile: actris, earlinet, geoms, gml_ozonesonde, iagos, icartt, igra2, mplnet, tolnet, umbc_aerosol
+        Sat: goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, tempo, tropomi, viirs_jrr
     """
     if source not in READER_REGISTRY:
         if source in _READER_MODULES:
