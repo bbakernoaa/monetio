@@ -1,3 +1,4 @@
+import warnings
 from typing import List, Union
 
 import fsspec
@@ -84,21 +85,22 @@ class XarrayDriver:
     Supports S3 via fsspec.
     """
 
-    def open(self, files: Union[str, List[str]], use_dask: bool = True, **kwargs) -> xr.Dataset:
+    def open(self, files: Union[str, List[str]], use_dask: bool = False, **kwargs) -> xr.Dataset:
         # Expand wildcards (supports S3 globbing now)
         file_list = FileUtility.expand_paths(files)
 
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
 
-        # Handle 'lazy' keyword which is common in modern MONETIO readers but not xr.open_dataset
+        # Handle 'lazy' keyword
         if "lazy" in xr_kwargs:
             use_dask = xr_kwargs.pop("lazy")
 
+        # If laziness or specific chunking is requested, ensure Dask auto-chunking is used.
         if use_dask and "chunks" not in xr_kwargs:
             xr_kwargs["chunks"] = {}
 
-        # Extract preprocess and read_method if present
+        # Extract MONETIO-specific keywords
         preprocess = xr_kwargs.pop("preprocess", None)
         read_method = xr_kwargs.pop("read_method", None)
 
@@ -106,10 +108,6 @@ class XarrayDriver:
             # Case A: Single File (Optimized)
             if len(file_list) == 1:
                 filename = file_list[0]
-
-                # 'open_dataset' does not support 'preprocess', so we must remove it
-                if "preprocess" in xr_kwargs:
-                    del xr_kwargs["preprocess"]
 
                 # Remove open_mfdataset specific arguments
                 for k in [
@@ -128,22 +126,23 @@ class XarrayDriver:
 
                 if read_method:
                     ds = read_method(filename, **xr_kwargs)
-                # If S3 or HTTP, we open a file-like object to pass to xarray
-                elif filename.startswith("s3://") or filename.startswith("http"):
-                    fs = FileUtility.get_fs(filename)
-                    # 'open_dataset' needs a file object or a specific engine for remote
-                    file_obj = fs.open(filename)
-                    try:
-                        ds = xr.open_dataset(file_obj, engine="h5netcdf", **xr_kwargs)
-                    except Exception:
-                        ds = xr.open_dataset(file_obj, **xr_kwargs)
                 else:
-                    try:
-                        ds = xr.open_dataset(filename, engine="h5netcdf", **xr_kwargs)
-                    except Exception:
-                        ds = xr.open_dataset(filename, **xr_kwargs)
+                    # Logic for standard engine/remote access
+                    if filename.startswith("s3://") or filename.startswith("http"):
+                        fs = FileUtility.get_fs(filename)
+                        file_obj = fs.open(filename)
+                    else:
+                        file_obj = filename
 
-                # Apply preprocess manually
+                    if "engine" in xr_kwargs:
+                        ds = xr.open_dataset(file_obj, **xr_kwargs)
+                    else:
+                        try:
+                            ds = xr.open_dataset(file_obj, engine="h5netcdf", **xr_kwargs)
+                        except Exception:
+                            ds = xr.open_dataset(file_obj, **xr_kwargs)
+
+                # Apply preprocess manually for single file
                 if preprocess:
                     ds = preprocess(ds)
 
@@ -152,16 +151,11 @@ class XarrayDriver:
             # Case B: Multiple Files (dataset)
             else:
                 if read_method:
-                    # We need to manually open and combine if using a custom read_method
-                    # because xr.open_mfdataset doesn't support it directly.
-                    if use_dask:
-                        # For lazy, we follow the Aero Protocol and maintain laziness.
-                        # dsets will be a list of xarray objects which are already dask-backed
-                        # if read_method correctly uses chunks.
-                        dsets = [read_method(f, **xr_kwargs) for f in file_list]
-                    else:
-                        # For eager, we load everything into memory.
-                        dsets = [read_method(f, **xr_kwargs) for f in file_list]
+                    # Custom read_method path (e.g. TOLNet)
+                    dsets = [read_method(f, **xr_kwargs) for f in file_list]
+
+                    if preprocess:
+                        dsets = [preprocess(ds) for ds in dsets]
 
                     # Combine logic (backend-agnostic)
                     try:
@@ -172,19 +166,26 @@ class XarrayDriver:
                             compat="override",
                         )
                     except ValueError:
-                        # Fallback to concat if combine_by_coords fails
-                        return xr.concat(dsets, dim="time", coords="different", data_vars="minimal")
+                        # Fallback to concat if combine_by_coords fails.
+                        return xr.concat(
+                            dsets,
+                            dim=xr_kwargs.get("concat_dim", "time"),
+                            coords="different",
+                            data_vars="minimal",
+                        )
 
-                # xr.open_mfdataset handles URLs intelligently if 'parallel=True'
-                # But generally, passing a list of S3 URLs works if backend supports it.
-                if file_list[0].startswith("s3://"):
-                    # For S3, open_mfdataset often prefers fsspec objects explicitly
+                # Standard path: use xr.open_mfdataset
+                if preprocess:
+                    xr_kwargs["preprocess"] = preprocess
+
+                if "engine" in xr_kwargs:
+                    return xr.open_mfdataset(file_list, **xr_kwargs)
+
+                # Fallback engine logic
+                try:
                     return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
-                else:
-                    try:
-                        return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
-                    except Exception:
-                        return xr.open_mfdataset(file_list, **xr_kwargs)
+                except Exception:
+                    return xr.open_mfdataset(file_list, **xr_kwargs)
 
         except Exception as e:
             raise OSError(f"XarrayDriver failed to open files. Error: {e}")
