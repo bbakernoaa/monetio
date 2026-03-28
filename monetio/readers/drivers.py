@@ -1,4 +1,3 @@
-import warnings
 from typing import List, Union
 
 import fsspec
@@ -56,13 +55,10 @@ class FileUtility:
                 # For S3/Local it works.
                 if path_input.startswith("http"):
                     # Fallback: treat as single file if glob chars present but http (unlikely to work)
-                    # Or raise error.
-                    # For now, assume S3/Local for globs.
                     pass
 
                 files = sorted(fs.glob(path_input))
                 # fs.glob usually returns paths without the protocol (e.g. 'bucket/file.nc')
-                # We might need to prepend 's3://' again if it was stripped
                 if path_input.startswith("s3://") and files and not files[0].startswith("s3://"):
                     files = [f"s3://{f}" for f in files]
 
@@ -71,7 +67,6 @@ class FileUtility:
                 return files
             else:
                 # It is a specific single file
-                # For http, exists() might involve HEAD request
                 if not path_input.startswith("http") and not fs.exists(path_input):
                     raise FileNotFoundError(f"File not found: {path_input}")
                 return [path_input]
@@ -86,18 +81,35 @@ class XarrayDriver:
     """
 
     def open(self, files: Union[str, List[str]], use_dask: bool = False, **kwargs) -> xr.Dataset:
+        """
+        Open gridded data backend-agnostically.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path(s), URL(s), or glob pattern.
+        use_dask : bool, optional
+            Whether to use Dask for lazy loading, by default False.
+        **kwargs : dict
+            Additional arguments passed to xarray open functions.
+
+        Returns
+        -------
+        xr.Dataset
+            The loaded dataset.
+        """
         # Expand wildcards (supports S3 globbing now)
         file_list = FileUtility.expand_paths(files)
 
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
 
-        # Handle 'lazy' keyword
+        # Handle 'lazy' keyword: Eager by default per Aero Protocol.
         if "lazy" in xr_kwargs:
             use_dask = xr_kwargs.pop("lazy")
 
         # If laziness or specific chunking is requested, ensure Dask auto-chunking is used.
-        if use_dask and "chunks" not in xr_kwargs:
+        if (use_dask or "chunks" in xr_kwargs) and "chunks" not in xr_kwargs:
             xr_kwargs["chunks"] = {}
 
         # Extract MONETIO-specific keywords
@@ -109,8 +121,8 @@ class XarrayDriver:
             if len(file_list) == 1:
                 filename = file_list[0]
 
-                # Remove open_mfdataset specific arguments
-                for k in [
+                # Remove open_mfdataset specific arguments to prevent TypeError in xr.open_dataset
+                mfdataset_keys = [
                     "combine",
                     "concat_dim",
                     "parallel",
@@ -120,9 +132,9 @@ class XarrayDriver:
                     "ids",
                     "infer_order",
                     "join",
-                ]:
-                    if k in xr_kwargs:
-                        del xr_kwargs[k]
+                ]
+                for k in mfdataset_keys:
+                    xr_kwargs.pop(k, None)
 
                 if read_method:
                     ds = read_method(filename, **xr_kwargs)
@@ -134,15 +146,15 @@ class XarrayDriver:
                     else:
                         file_obj = filename
 
-                    if "engine" in xr_kwargs:
-                        ds = xr.open_dataset(file_obj, **xr_kwargs)
-                    else:
+                    if "engine" not in xr_kwargs:
                         try:
                             ds = xr.open_dataset(file_obj, engine="h5netcdf", **xr_kwargs)
                         except Exception:
                             ds = xr.open_dataset(file_obj, **xr_kwargs)
+                    else:
+                        ds = xr.open_dataset(file_obj, **xr_kwargs)
 
-                # Apply preprocess manually for single file
+                # Apply preprocess manually
                 if preprocess:
                     ds = preprocess(ds)
 
@@ -167,24 +179,21 @@ class XarrayDriver:
                         )
                     except ValueError:
                         # Fallback to concat if combine_by_coords fails.
+                        concat_dim = xr_kwargs.get("concat_dim", "time")
                         return xr.concat(
-                            dsets,
-                            dim=xr_kwargs.get("concat_dim", "time"),
-                            coords="different",
-                            data_vars="minimal",
+                            dsets, dim=concat_dim, coords="different", data_vars="minimal"
                         )
 
                 # Standard path: use xr.open_mfdataset
                 if preprocess:
                     xr_kwargs["preprocess"] = preprocess
 
-                if "engine" in xr_kwargs:
-                    return xr.open_mfdataset(file_list, **xr_kwargs)
-
-                # Fallback engine logic
-                try:
-                    return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
-                except Exception:
+                if "engine" not in xr_kwargs:
+                    try:
+                        return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
+                    except Exception:
+                        return xr.open_mfdataset(file_list, **xr_kwargs)
+                else:
                     return xr.open_mfdataset(file_list, **xr_kwargs)
 
         except Exception as e:
@@ -246,8 +255,6 @@ class PandasDriver:
             for f in file_list:
                 if f.startswith("s3://"):
                     # Pandas can read S3 URLs directly if s3fs is installed!
-                    # We just pass the URL string "s3://bucket/file.csv"
-                    # optionally storage_options={'anon': True} can be passed in kwargs
                     if "storage_options" not in kwargs:
                         kwargs["storage_options"] = {"anon": True}  # Default to public
                     df = reader_func(f, **kwargs)
