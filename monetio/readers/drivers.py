@@ -98,8 +98,9 @@ class XarrayDriver:
         if use_dask and "chunks" not in xr_kwargs:
             xr_kwargs["chunks"] = {}
 
-        # Extract preprocess if present
-        preprocess = xr_kwargs.get("preprocess", None)
+        # Extract preprocess and read_method if present
+        preprocess = xr_kwargs.pop("preprocess", None)
+        read_method = xr_kwargs.pop("read_method", None)
 
         try:
             # Case A: Single File (Optimized)
@@ -125,8 +126,10 @@ class XarrayDriver:
                     if k in xr_kwargs:
                         del xr_kwargs[k]
 
+                if read_method:
+                    ds = read_method(filename, **xr_kwargs)
                 # If S3 or HTTP, we open a file-like object to pass to xarray
-                if filename.startswith("s3://") or filename.startswith("http"):
+                elif filename.startswith("s3://") or filename.startswith("http"):
                     fs = FileUtility.get_fs(filename)
                     # 'open_dataset' needs a file object or a specific engine for remote
                     file_obj = fs.open(filename)
@@ -148,6 +151,30 @@ class XarrayDriver:
 
             # Case B: Multiple Files (dataset)
             else:
+                if read_method:
+                    # We need to manually open and combine if using a custom read_method
+                    # because xr.open_mfdataset doesn't support it directly.
+                    if use_dask:
+                        # For lazy, we follow the Aero Protocol and maintain laziness.
+                        # dsets will be a list of xarray objects which are already dask-backed
+                        # if read_method correctly uses chunks.
+                        dsets = [read_method(f, **xr_kwargs) for f in file_list]
+                    else:
+                        # For eager, we load everything into memory.
+                        dsets = [read_method(f, **xr_kwargs) for f in file_list]
+
+                    # Combine logic (backend-agnostic)
+                    try:
+                        return xr.combine_by_coords(
+                            dsets,
+                            data_vars="minimal",
+                            coords="minimal",
+                            compat="override",
+                        )
+                    except ValueError:
+                        # Fallback to concat if combine_by_coords fails
+                        return xr.concat(dsets, dim="time", coords="different", data_vars="minimal")
+
                 # xr.open_mfdataset handles URLs intelligently if 'parallel=True'
                 # But generally, passing a list of S3 URLs works if backend supports it.
                 if file_list[0].startswith("s3://"):
