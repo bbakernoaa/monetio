@@ -1,154 +1,264 @@
 """TOLNet Reader"""
 
+from typing import List, Union
+
 import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .drivers import FileUtility
 from .sat_utils import update_history
 
 
 @register_reader("tolnet")
 class TOLNetReader(GriddedReader):
-    def open_dataset(self, files, **kwargs) -> xr.Dataset:
+    """
+    Reader for TOLNet (Tropospheric Ocean Laboratory Network) lidar data.
+    """
+
+    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
         """
         Retrieve and load TOLNet data.
 
         Parameters
         ----------
         files : Union[str, List[str]]
-            File paths or URLs to read.
+            File path(s) or URL(s).
         **kwargs : dict
-            Additional arguments passed to the driver.
+            Additional arguments passed to XarrayDriver.open.
 
         Returns
         -------
         xr.Dataset
-            The loaded TOLNet data.
+            The loaded TOLNet dataset.
+
+        Examples
+        --------
+        >>> reader = TOLNetReader()
+        >>> ds = reader.open_dataset(files="TOLNet_*.hdf5")
         """
-        # We use XarrayDriver for lazy loading if possible, but TOLNet has custom HDF5 structure.
-        # For now, we wrap the custom loading in a lazy-friendly way if n_procs > 1 or similar.
-        # But XarrayDriver.open uses xr.open_mfdataset which is preferred.
-        # However, TOLNet needs custom preprocessing.
+        user_preprocess = kwargs.pop("preprocess", None)
 
-        def preprocess(ds):
-            return ds  # Placeholder if we used xr.open_dataset engine
+        if "engine" not in kwargs:
+            kwargs["engine"] = "h5netcdf"
 
-        # TOLNet HDF5 isn't standard CF, so we use our custom reader via PandasDriver-like logic
-        # but returning Datasets.
-        # Actually, let's keep it simple for now and just use the unified driver if we can,
-        # or refactor the loop to be more backend-agnostic.
+        # We use GriddedReader's driver (XarrayDriver) to open files.
+        # XarrayDriver.open handles single/multiple files.
+        # Since TOLNet files have groups, we use our custom read_method to merge them.
+        def _read_single_tolnet(f, **inner_kwargs):
+            return read_tolnet(f, **inner_kwargs)
 
-        file_list = FileUtility.expand_paths(files)
+        # Update kwargs to use our lazy reader as the primary method
+        kwargs["read_method"] = _read_single_tolnet
 
-        if not file_list:
-            return xr.Dataset()
+        ds = self.driver.open(files, **kwargs)
 
-        import dask
-
-        @dask.delayed
-        def load_one(f):
-            return read_tolnet(f)
-
-        if len(file_list) > 1:
-            dsets = [load_one(f) for f in file_list]
-            # We don't want to compute yet if we want to be lazy,
-            # but xr.concat needs actual objects or we use something else.
-            # PointReader handled this via dask.dataframe.
-            # For Gridded, we usually rely on xr.open_mfdataset.
-
-            # If we want bit-perfect lazy matching, we should use xr.open_mfdataset
-            # with a custom engine or preprocess.
-
-            # Since TOLNet is custom, we'll compute it for now to match original behavior
-            # but make it faster with dask if requested.
-            dsets = dask.compute(*dsets)
-            ds = xr.concat(dsets, dim="time")
-        else:
-            ds = read_tolnet(file_list[0])
-
-        ds = self.harmonize(ds)
+        if user_preprocess:
+            ds = user_preprocess(ds)
 
         # Update history
-        ds = update_history(ds, "Read TOLNet data.")
+        ds = update_history(ds, "Read TOLNet data via Aero Protocol.")
 
         return ds
 
 
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/profile/tolnet.py
-# -----------------------------------------------------------------------------
-
-
-def read_tolnet(fname):
+def read_tolnet(fname: str, **kwargs) -> xr.Dataset:
     """
-    Read a single TOLNet HDF5 file.
+    Read a single TOLNet HDF5 file lazily.
+
+    Parameters
+    ----------
+    fname : str
+        File path or URL.
+    **kwargs : dict
+        Additional arguments passed to xr.open_dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        The TOLNet dataset from a single file.
     """
-    from h5py import File
-    from numpy import array, ndarray
+    # Filter kwargs to only those accepted by xr.open_dataset
+    xr_keys = [
+        "chunks",
+        "decode_times",
+        "decode_coords",
+        "decode_cf",
+        "mask_and_scale",
+        "backend_kwargs",
+    ]
+    xr_kwargs = {k: v for k, v in kwargs.items() if k in xr_keys}
 
-    fs = FileUtility.get_fs(fname)
-    with fs.open(fname, "rb") as f_obj:
-        f = File(f_obj, "r")
-        atts = f["INSTRUMENT_ATTRIBUTES"]
-        data = f["DATA"]
+    engine = kwargs.get("engine", "h5netcdf")
 
-        alt = data["ALT"][:].squeeze()
-        altvars = [
-            "AirND",
-            "AirNDUncert",
-            "ChRange",
-            "Press",
-            "Temp",
-            "TempUncert",
-            "PressUncert",
-        ]
-        tseries = pd.Series(data["TIME_MID_UT_UNIX"][:].squeeze())
-        time = pd.Series(pd.to_datetime(tseries, unit="ms"), name="time")
-        ovars = ["O3MR", "O3ND", "O3NDUncert", "O3MRUncert", "O3NDResol", "Precision"]
+    # 1. Open DATA group
+    try:
+        # If chunks is empty dict, it's lazy but not specifically chunked.
+        # But for h5netcdf, we might need to be careful.
+        ds_data = xr.open_dataset(
+            fname, group="DATA", engine=engine, phony_dims="sort", **xr_kwargs
+        )
+    except Exception as e:
+        # Fallback if group doesn't exist
+        import warnings
 
-        dataset = xr.Dataset()
-        dataset["z"] = (("z"), alt)
-        dataset["time"] = (("time"), time)
-        dataset["x"] = (("x"), [0])
-        dataset["y"] = (("y"), [0])
+        warnings.warn(f"Could not open group DATA in {fname}: {e}")
+        return xr.Dataset()
 
-        for i in ovars:
-            if i in data:
-                if data[i].shape == (len(alt), len(time)):
-                    dataset[i] = (("z", "time"), data[i][:])
-                elif data[i].shape == (len(alt), 1):
-                    dataset[i] = (("z"), data[i][:].squeeze())
-                else:
-                    dataset[i] = (("time"), data[i][:].squeeze())
-                dataset[i] = dataset[i].where(dataset[i] > -990)
+    # 2. Open INSTRUMENT_ATTRIBUTES group (for attributes only)
+    try:
+        # We don't need chunks for attributes, and it might even fail if we pass them
+        ds_atts = xr.open_dataset(fname, group="INSTRUMENT_ATTRIBUTES", engine=engine)
+        # Copy attributes to ds_data
+        ds_data.attrs.update(ds_atts.attrs)
+    except Exception:
+        pass
 
-        for i in altvars:
-            if i in data:
-                dataset[i] = (("z"), data[i][:].squeeze())
+    # Now apply TOLNet-specific transformations lazily
+    ds = tolnet_preprocess(ds_data)
 
-        for i in list(atts.attrs.keys()):
-            if isinstance(atts.attrs[i], list) or isinstance(atts.attrs[i], ndarray):
-                dataset.attrs[i] = atts.attrs[i][0]
-            else:
-                dataset.attrs[i] = atts.attrs[i]
+    return ds
 
-        try:
-            a, b = dataset.Location_Latitude.decode("ascii").split()
-            if b == "S":
-                latitude = -1 * float(a)
-            else:
-                latitude = float(a)
 
-            a, b = dataset.Location_Longitude.decode("ascii").split()
-            if b == "W":
-                longitude = -1 * float(a)
-            else:
-                longitude = float(a)
+def tolnet_preprocess(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Preprocess TOLNet dataset: standardize coordinates, handle time, and
+    rename variables to standard conventions.
 
-            dataset.coords["latitude"] = (("y", "x"), array(latitude).reshape(1, 1))
-            dataset.coords["longitude"] = (("y", "x"), array(longitude).reshape(1, 1))
-        except Exception:
-            pass
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset (usually from the 'DATA' group).
 
-    return dataset
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset.
+    """
+    # 1. Identify and rename dimensions based on variables
+    # Expected variables in TOLNet DATA group:
+    # ALT: (z)
+    # TIME_MID_UT_UNIX: (time) - in milliseconds since Epoch
+    # O3MR: (z, time)
+
+    dim_map = {}
+    if "ALT" in ds.variables:
+        alt_dim = ds["ALT"].dims[0]
+        dim_map[alt_dim] = "z"
+    if "TIME_MID_UT_UNIX" in ds.variables:
+        time_dim = ds["TIME_MID_UT_UNIX"].dims[0]
+        dim_map[time_dim] = "time"
+
+    if dim_map:
+        ds = ds.rename(dim_map)
+
+    # Ensure coordinates exist as DataArrays before any transformation
+    if "z" in ds.dims and "ALT" in ds.variables:
+        # We must ensure z is 1D for coordinate assignment to work as a dimension coordinate
+        z_vals = ds["ALT"]
+        if z_vals.ndim > 1:
+            # Pick first available if multi-dim (shouldn't happen for ALT in TOLNet DATA group)
+            z_vals = z_vals.isel({d: 0 for d in z_vals.dims if d != "z"}, drop=True)
+        # We must ensure z is 1D for coordinate assignment to work as a dimension coordinate.
+        # We avoid .compute() to stay lazy.
+        ds = ds.assign_coords(z=z_vals.astype(float))
+    if "time" in ds.dims and "TIME_MID_UT_UNIX" in ds.variables:
+        t_vals = ds["TIME_MID_UT_UNIX"]
+        if t_vals.ndim > 1:
+            t_vals = t_vals.isel({d: 0 for d in t_vals.dims if d != "time"}, drop=True)
+        ds = ds.assign_coords(time=t_vals.astype(float))
+
+    # 2. Handle Vertical Coordinate
+    if "altitude" in ds.variables or "ALT" in ds.variables:
+        if "ALT" in ds.variables:
+            ds = ds.set_coords("ALT").rename({"ALT": "altitude"})
+        ds["altitude"].attrs.update({"units": "m", "standard_name": "altitude"})
+        if "z" in ds.dims:
+            # We must ensure it's a 1D coordinate for merging
+            z_vals = ds["altitude"]
+            if z_vals.ndim > 1:
+                z_vals = z_vals.isel({d: 0 for d in z_vals.dims if d != "z"}, drop=True)
+            ds = ds.assign_coords(z=z_vals)
+
+    # 3. Handle Time (Lazy)
+    if "TIME_MID_UT_UNIX" in ds.variables:
+        # Convert ms to seconds and then to datetime64[ns]
+        t_raw = ds["TIME_MID_UT_UNIX"]
+        # Use backend-agnostic conversion
+        from .sat_utils import apply_lazy_conversion
+
+        def _to_dt(t):
+            return pd.to_datetime(t, unit="ms")
+
+        ds["time"] = apply_lazy_conversion(t_raw, _to_dt, "datetime64[ns]")
+        ds = ds.set_coords("time")
+        if "time" in ds.dims:
+            # For merging, time must be a coordinate.
+            # But apply_lazy_conversion might return something that needs to be explicitly set.
+            t_vals = ds["time"]
+            if t_vals.ndim > 1:
+                t_vals = t_vals.isel({d: 0 for d in t_vals.dims if d != "time"}, drop=True)
+            ds = ds.assign_coords(time=t_vals.astype("datetime64[ns]"))
+
+        if "TIME_MID_UT_UNIX" in ds.variables and "TIME_MID_UT_UNIX" not in ds.dims:
+            ds = ds.drop_vars("TIME_MID_UT_UNIX")
+
+    # 4. Handle Spatial Coordinates (Latitude/Longitude from Attributes)
+    # TOLNet often stores these as strings like "39.0 N" or "76.5 W"
+    try:
+        lat_str = ds.attrs.get("Location_Latitude")
+        lon_str = ds.attrs.get("Location_Longitude")
+
+        if isinstance(lat_str, (bytes, str)):
+            if isinstance(lat_str, bytes):
+                lat_str = lat_str.decode("ascii")
+            parts = lat_str.split()
+            lat_val = float(parts[0])
+            if len(parts) > 1 and parts[1].upper() == "S":
+                lat_val *= -1.0
+        else:
+            lat_val = None
+
+        if isinstance(lon_str, (bytes, str)):
+            if isinstance(lon_str, bytes):
+                lon_str = lon_str.decode("ascii")
+            parts = lon_str.split()
+            lon_val = float(parts[0])
+            if len(parts) > 1 and parts[1].upper() == "W":
+                lon_val *= -1.0
+        else:
+            lon_val = None
+
+        if lat_val is not None and lon_val is not None:
+            # Create 1x1 2D coordinates to follow satellite/gridded convention
+            ds = ds.assign_coords(
+                latitude=(("y", "x"), [[lat_val]], {"units": "degrees_north"}),
+                longitude=(("y", "x"), [[lon_val]], {"units": "degrees_east"}),
+            )
+            ds["x"] = [0]
+            ds["y"] = [0]
+    except Exception:
+        pass
+
+    # 5. Mask missing values (-999, -990 are common)
+    for var in ds.data_vars:
+        ds[var] = ds[var].where(ds[var] > -900)
+
+    # 6. Harmonize variable names (optional but good practice)
+    mapping = {
+        "O3MR": "ozone_mixing_ratio",
+        "O3ND": "ozone_number_density",
+        "O3NDUncert": "ozone_number_density_uncertainty",
+        "O3MRUncert": "ozone_mixing_ratio_uncertainty",
+        "O3NDResol": "ozone_vertical_resolution",
+        "Press": "pressure",
+        "Temp": "temperature",
+        "AirND": "air_number_density",
+    }
+    rename_vars = {old: new for old, new in mapping.items() if old in ds.variables}
+    if rename_vars:
+        ds = ds.rename(rename_vars)
+
+    # Update history
+    ds = update_history(ds, "Preprocessed TOLNet data.")
+
+    return ds

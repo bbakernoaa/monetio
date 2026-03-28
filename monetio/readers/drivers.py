@@ -55,13 +55,10 @@ class FileUtility:
                 # For S3/Local it works.
                 if path_input.startswith("http"):
                     # Fallback: treat as single file if glob chars present but http (unlikely to work)
-                    # Or raise error.
-                    # For now, assume S3/Local for globs.
                     pass
 
                 files = sorted(fs.glob(path_input))
                 # fs.glob usually returns paths without the protocol (e.g. 'bucket/file.nc')
-                # We might need to prepend 's3://' again if it was stripped
                 if path_input.startswith("s3://") and files and not files[0].startswith("s3://"):
                     files = [f"s3://{f}" for f in files]
 
@@ -70,7 +67,6 @@ class FileUtility:
                 return files
             else:
                 # It is a specific single file
-                # For http, exists() might involve HEAD request
                 if not path_input.startswith("http") and not fs.exists(path_input):
                     raise FileNotFoundError(f"File not found: {path_input}")
                 return [path_input]
@@ -84,34 +80,49 @@ class XarrayDriver:
     Supports S3 via fsspec.
     """
 
-    def open(self, files: Union[str, List[str]], use_dask: bool = True, **kwargs) -> xr.Dataset:
+    def open(self, files: Union[str, List[str]], use_dask: bool = False, **kwargs) -> xr.Dataset:
+        """
+        Open gridded data backend-agnostically.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path(s), URL(s), or glob pattern.
+        use_dask : bool, optional
+            Whether to use Dask for lazy loading, by default False.
+        **kwargs : dict
+            Additional arguments passed to xarray open functions.
+
+        Returns
+        -------
+        xr.Dataset
+            The loaded dataset.
+        """
         # Expand wildcards (supports S3 globbing now)
         file_list = FileUtility.expand_paths(files)
 
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
 
-        # Handle 'lazy' keyword which is common in modern MONETIO readers but not xr.open_dataset
+        # Handle 'lazy' keyword: Eager by default per Aero Protocol.
         if "lazy" in xr_kwargs:
             use_dask = xr_kwargs.pop("lazy")
 
-        if use_dask and "chunks" not in xr_kwargs:
+        # If laziness or specific chunking is requested, ensure Dask auto-chunking is used.
+        if (use_dask or "chunks" in xr_kwargs) and "chunks" not in xr_kwargs:
             xr_kwargs["chunks"] = {}
 
-        # Extract preprocess if present
-        preprocess = xr_kwargs.get("preprocess", None)
+        # Extract MONETIO-specific keywords
+        preprocess = xr_kwargs.pop("preprocess", None)
+        read_method = xr_kwargs.pop("read_method", None)
 
         try:
             # Case A: Single File (Optimized)
             if len(file_list) == 1:
                 filename = file_list[0]
 
-                # 'open_dataset' does not support 'preprocess', so we must remove it
-                if "preprocess" in xr_kwargs:
-                    del xr_kwargs["preprocess"]
-
-                # Remove open_mfdataset specific arguments
-                for k in [
+                # Remove open_mfdataset specific arguments to prevent TypeError in xr.open_dataset
+                mfdataset_keys = [
                     "combine",
                     "concat_dim",
                     "parallel",
@@ -121,24 +132,27 @@ class XarrayDriver:
                     "ids",
                     "infer_order",
                     "join",
-                ]:
-                    if k in xr_kwargs:
-                        del xr_kwargs[k]
+                ]
+                for k in mfdataset_keys:
+                    xr_kwargs.pop(k, None)
 
-                # If S3 or HTTP, we open a file-like object to pass to xarray
-                if filename.startswith("s3://") or filename.startswith("http"):
-                    fs = FileUtility.get_fs(filename)
-                    # 'open_dataset' needs a file object or a specific engine for remote
-                    file_obj = fs.open(filename)
-                    try:
-                        ds = xr.open_dataset(file_obj, engine="h5netcdf", **xr_kwargs)
-                    except Exception:
-                        ds = xr.open_dataset(file_obj, **xr_kwargs)
+                if read_method:
+                    ds = read_method(filename, **xr_kwargs)
                 else:
-                    try:
-                        ds = xr.open_dataset(filename, engine="h5netcdf", **xr_kwargs)
-                    except Exception:
-                        ds = xr.open_dataset(filename, **xr_kwargs)
+                    # Logic for standard engine/remote access
+                    if filename.startswith("s3://") or filename.startswith("http"):
+                        fs = FileUtility.get_fs(filename)
+                        file_obj = fs.open(filename)
+                    else:
+                        file_obj = filename
+
+                    if "engine" not in xr_kwargs:
+                        try:
+                            ds = xr.open_dataset(file_obj, engine="h5netcdf", **xr_kwargs)
+                        except Exception:
+                            ds = xr.open_dataset(file_obj, **xr_kwargs)
+                    else:
+                        ds = xr.open_dataset(file_obj, **xr_kwargs)
 
                 # Apply preprocess manually
                 if preprocess:
@@ -148,16 +162,39 @@ class XarrayDriver:
 
             # Case B: Multiple Files (dataset)
             else:
-                # xr.open_mfdataset handles URLs intelligently if 'parallel=True'
-                # But generally, passing a list of S3 URLs works if backend supports it.
-                if file_list[0].startswith("s3://"):
-                    # For S3, open_mfdataset often prefers fsspec objects explicitly
-                    return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
-                else:
+                if read_method:
+                    # Custom read_method path (e.g. TOLNet)
+                    dsets = [read_method(f, **xr_kwargs) for f in file_list]
+
+                    if preprocess:
+                        dsets = [preprocess(ds) for ds in dsets]
+
+                    # Combine logic (backend-agnostic)
+                    try:
+                        return xr.combine_by_coords(
+                            dsets,
+                            data_vars="minimal",
+                            coords="minimal",
+                            compat="override",
+                        )
+                    except ValueError:
+                        # Fallback to concat if combine_by_coords fails.
+                        concat_dim = xr_kwargs.get("concat_dim", "time")
+                        return xr.concat(
+                            dsets, dim=concat_dim, coords="different", data_vars="minimal"
+                        )
+
+                # Standard path: use xr.open_mfdataset
+                if preprocess:
+                    xr_kwargs["preprocess"] = preprocess
+
+                if "engine" not in xr_kwargs:
                     try:
                         return xr.open_mfdataset(file_list, engine="h5netcdf", **xr_kwargs)
                     except Exception:
                         return xr.open_mfdataset(file_list, **xr_kwargs)
+                else:
+                    return xr.open_mfdataset(file_list, **xr_kwargs)
 
         except Exception as e:
             raise OSError(f"XarrayDriver failed to open files. Error: {e}")
@@ -218,8 +255,6 @@ class PandasDriver:
             for f in file_list:
                 if f.startswith("s3://"):
                     # Pandas can read S3 URLs directly if s3fs is installed!
-                    # We just pass the URL string "s3://bucket/file.csv"
-                    # optionally storage_options={'anon': True} can be passed in kwargs
                     if "storage_options" not in kwargs:
                         kwargs["storage_options"] = {"anon": True}  # Default to public
                     df = reader_func(f, **kwargs)
