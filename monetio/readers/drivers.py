@@ -80,7 +80,13 @@ class XarrayDriver:
     Supports S3 via fsspec.
     """
 
-    def open(self, files: Union[str, List[str]], use_dask: bool = False, use_kerchunk: bool = False, **kwargs) -> xr.Dataset:
+    def open(
+        self,
+        files: Union[str, List[str]],
+        use_dask: bool = False,
+        use_kerchunk: bool = False,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Open gridded data backend-agnostically.
 
@@ -134,7 +140,9 @@ class XarrayDriver:
             dicts = []
             for f in file_list:
                 if f.startswith("s3://"):
-                    fs = fsspec.filesystem("s3", anon=xr_kwargs.get("storage_options", {}).get("anon", True))
+                    fs = fsspec.filesystem(
+                        "s3", anon=xr_kwargs.get("storage_options", {}).get("anon", True)
+                    )
                 elif f.startswith("http://") or f.startswith("https://"):
                     fs = fsspec.filesystem("http")
                 else:
@@ -185,7 +193,13 @@ class XarrayDriver:
             for k in mfdataset_keys:
                 xr_kwargs.pop(k, None)
 
-            ds = xr.open_dataset(mapper, engine="zarr", backend_kwargs={"consolidated": False}, consolidated=False, **xr_kwargs)
+            ds = xr.open_dataset(
+                mapper,
+                engine="zarr",
+                backend_kwargs={"consolidated": False},
+                consolidated=False,
+                **xr_kwargs,
+            )
 
             if preprocess:
                 ds = preprocess(ds)
