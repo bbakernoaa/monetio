@@ -119,7 +119,7 @@ SHCOLS = [
 
 def read_crn(filename: str, **kwargs: dict) -> pd.DataFrame:
     """
-    Read a single CRN file.
+    Read a single CRN (US Climate Reference Network) file.
 
     Parameters
     ----------
@@ -132,6 +132,10 @@ def read_crn(filename: str, **kwargs: dict) -> pd.DataFrame:
     -------
     pd.DataFrame
         The loaded data.
+
+    Examples
+    --------
+    >>> df = read_crn("CRNH0203-2023-AL_Fairhope_3_NE.txt")
     """
     nanvals = [-99999, -9999.0]
     if "CRND0103" in filename:
@@ -157,15 +161,18 @@ def read_crn(filename: str, **kwargs: dict) -> pd.DataFrame:
         )
 
     # Vectorized date parsing using parse_yyyymmdd_hhmm
+    # We avoid .values to promote backend-agnostic behavior.
+    # Note: df is a pd.DataFrame here since it's called per-file in the driver,
+    # but the parser logic handles arrays robustly.
     if not is_daily:
         if "UTC_DATE" in df.columns and "UTC_TIME" in df.columns:
-            df["time"] = parse_yyyymmdd_hhmm(df["UTC_DATE"].values, df["UTC_TIME"].values)
+            df["time"] = parse_yyyymmdd_hhmm(df["UTC_DATE"], df["UTC_TIME"])
         if "LST_DATE" in df.columns and "LST_TIME" in df.columns:
-            df["time_local"] = parse_yyyymmdd_hhmm(df["LST_DATE"].values, df["LST_TIME"].values)
+            df["time_local"] = parse_yyyymmdd_hhmm(df["LST_DATE"], df["LST_TIME"])
     else:
         if "LST_DATE" in df.columns:
             # For daily, time is at midnight
-            df["time_local"] = parse_yyyymmdd_hhmm(df["LST_DATE"].values, 0)
+            df["time_local"] = parse_yyyymmdd_hhmm(df["LST_DATE"], 0)
 
     return df
 
@@ -303,6 +310,11 @@ class CRNReader(PointReader):
         -------
         pd.DataFrame
             Station metadata.
+
+        Examples
+        --------
+        >>> reader = CRNReader()
+        >>> monitors = reader.get_monitor_df(latlonbox=[32.0, -114.0, 35.0, -110.0])
         """
         import monetio
 
@@ -361,6 +373,11 @@ class CRNReader(PointReader):
         -------
         Tuple[List[str], List[str]]
             List of URLs and filenames.
+
+        Examples
+        --------
+        >>> reader = CRNReader()
+        >>> urls, fnames = reader.build_urls(dates="2023-01-01", daily=True)
         """
         baseurl = "https://www1.ncdc.noaa.gov/pub/data/uscrn/products/"
         monitors = self.get_monitor_df(latlonbox=latlonbox)

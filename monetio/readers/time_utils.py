@@ -102,54 +102,60 @@ def parse_yyyymmdd_hhmm(yyyymmdd: np.ndarray, hhmm: np.ndarray) -> np.ndarray:
 
     Parameters
     ----------
-    yyyymmdd : np.ndarray
+    yyyymmdd : np.ndarray or array-like
         Array of dates in YYYYMMDD format.
-    hhmm : np.ndarray
+    hhmm : np.ndarray or array-like
         Array of times in HHMM or HHMMSS format.
 
     Returns
     -------
     np.ndarray
         Array of datetime64[ns] objects.
+
+    Examples
+    --------
+    >>> parse_yyyymmdd_hhmm([20230101], [1200])
+    array(['2023-01-01T12:00:00.000000000'], dtype='datetime64[ns]')
     """
-    yyyymmdd = np.asanyarray(yyyymmdd)
-    hhmm = np.asanyarray(hhmm)
+    # Use asanyarray to handle scalars, lists, and arrays robustly.
+    # When called via xr.apply_ufunc with dask='parallelized', the inputs are NumPy arrays,
+    # so asanyarray is safe and necessary for backend-agnostic math.
+    y = np.asanyarray(yyyymmdd)
+    h = np.asanyarray(hhmm)
 
     # Use float for intermediate to handle NaNs if present
-    years = (yyyymmdd // 10000).astype(float)
-    months = ((yyyymmdd // 100) % 100).astype(float)
-    days = (yyyymmdd % 100).astype(float)
+    years = (y // 10000).astype(float)
+    months = ((y // 100) % 100).astype(float)
+    days = (y % 100).astype(float)
 
     # HHMMSS check: 2400 is the threshold (HHMM max is 2359)
-    # We use nanmax safely.
     try:
-        is_hhmmss = (
-            np.nanmax(hhmm) >= 10000 if hhmm.size > 0 and not np.all(np.isnan(hhmm)) else False
-        )
+        # Use nanmax safely for arrays, or standard max for scalars
+        h_max = np.nanmax(h) if h.size > 0 else 0
+        is_hhmmss = h_max >= 10000
     except (ValueError, TypeError):
         is_hhmmss = False
 
     if is_hhmmss:
-        hours = (hhmm // 10000).astype(float)
-        minutes = ((hhmm // 100) % 100).astype(float)
-        seconds = (hhmm % 100).astype(float)
+        hours = (h // 10000).astype(float)
+        minutes = ((h // 100) % 100).astype(float)
+        seconds = (h % 100).astype(float)
     else:
-        hours = (hhmm // 100).astype(float)
-        minutes = (hhmm % 100).astype(float)
-        seconds = 0.0
+        hours = (h // 100).astype(float)
+        minutes = (h % 100).astype(float)
+        seconds = np.zeros_like(h, dtype=float)
 
-    df = pd.DataFrame(
-        {
-            "year": years.ravel(),
-            "month": months.ravel(),
-            "day": days.ravel(),
-            "hour": hours.ravel(),
-            "minute": minutes.ravel(),
-            "second": seconds if isinstance(seconds, float) else seconds.ravel(),
-        }
-    )
+    df_dict = {
+        "year": years.ravel(),
+        "month": months.ravel(),
+        "day": days.ravel(),
+        "hour": hours.ravel(),
+        "minute": minutes.ravel(),
+        "second": seconds.ravel(),
+    }
 
     # Use coerce to handle any invalid dates produced by math on NaNs
-    return (
-        pd.to_datetime(df, errors="coerce").values.astype("datetime64[ns]").reshape(yyyymmdd.shape)
-    )
+    res = pd.to_datetime(pd.DataFrame(df_dict), errors="coerce")
+
+    # Return with original shape
+    return res.values.astype("datetime64[ns]").reshape(y.shape)
