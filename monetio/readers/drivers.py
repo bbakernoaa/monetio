@@ -80,7 +80,14 @@ class XarrayDriver:
     Supports S3 via fsspec.
     """
 
-    def open(self, files: Union[str, List[str]], use_dask: bool = False, **kwargs) -> xr.Dataset:
+    def open(
+        self,
+        files: Union[str, List[str]],
+        use_dask: bool = False,
+        use_kerchunk: bool = False,
+        kerchunk_file: str = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Open gridded data backend-agnostically.
 
@@ -90,6 +97,13 @@ class XarrayDriver:
             File path(s), URL(s), or glob pattern.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
+        use_kerchunk : bool, optional
+            Whether to use Kerchunk to create a virtual Zarr dataset, by default False.
+            Useful for large datasets to avoid xarray.open_mfdataset overhead.
+        kerchunk_file : str, optional
+            Path to save/load the Kerchunk reference JSON file. If provided and the file
+            exists, the references will be loaded from it. If the file does not exist,
+            the references will be computed and saved to this path.
         **kwargs : dict
             Additional arguments passed to xarray open functions.
 
@@ -115,6 +129,110 @@ class XarrayDriver:
         # Extract MONETIO-specific keywords
         preprocess = xr_kwargs.pop("preprocess", None)
         read_method = xr_kwargs.pop("read_method", None)
+
+        if use_kerchunk:
+            try:
+                import ujson  # noqa: F401
+                import zarr  # noqa: F401
+                from kerchunk.combine import MultiZarrToZarr
+                from kerchunk.hdf import SingleHdf5ToZarr
+            except ImportError:
+                raise ImportError(
+                    "kerchunk requires 'kerchunk', 'ujson', and 'zarr'. "
+                    "Install with `pip install kerchunk ujson zarr`."
+                )
+
+            import os
+
+            refs = None
+            if kerchunk_file is not None and os.path.exists(kerchunk_file):
+                try:
+                    with open(kerchunk_file) as f_ref:
+                        refs = ujson.load(f_ref)
+                except Exception as e:
+                    import warnings
+
+                    warnings.warn(f"Failed to load kerchunk_file {kerchunk_file}: {e}")
+                    refs = None
+
+            if refs is None:
+                dicts = []
+                for f in file_list:
+                    if f.startswith("s3://"):
+                        fs = fsspec.filesystem(
+                            "s3", anon=xr_kwargs.get("storage_options", {}).get("anon", True)
+                        )
+                    elif f.startswith("http://") or f.startswith("https://"):
+                        fs = fsspec.filesystem("http")
+                    else:
+                        fs = fsspec.filesystem("file")
+
+                    with fs.open(f, "rb") as infile:
+                        h5chunks = SingleHdf5ToZarr(infile, f)
+                        dicts.append(h5chunks.translate())
+
+                if len(dicts) == 1:
+                    refs = dicts[0]
+                else:
+                    concat_dim = xr_kwargs.get("concat_dim", "time")
+                    mzz = MultiZarrToZarr(dicts, concat_dims=[concat_dim])
+                    refs = mzz.translate()
+
+                if kerchunk_file is not None:
+                    try:
+                        with open(kerchunk_file, "w") as f_ref:
+                            ujson.dump(refs, f_ref)
+                    except Exception as e:
+                        import warnings
+
+                        warnings.warn(f"Failed to save kerchunk_file {kerchunk_file}: {e}")
+
+            remote_protocol = "file"
+            remote_options = {}
+            if file_list[0].startswith("s3://"):
+                remote_protocol = "s3"
+                remote_options = dict(xr_kwargs.get("storage_options", {}))
+                if "anon" not in remote_options:
+                    remote_options["anon"] = True
+            elif file_list[0].startswith("http"):
+                remote_protocol = "http"
+
+            mapper = fsspec.get_mapper(
+                "reference://",
+                fo=refs,
+                remote_protocol=remote_protocol,
+                remote_options=remote_options,
+            )
+
+            # Clean up xr_kwargs for open_dataset
+            mfdataset_keys = [
+                "combine",
+                "concat_dim",
+                "parallel",
+                "compat",
+                "data_vars",
+                "coords",
+                "ids",
+                "infer_order",
+                "join",
+                "engine",
+                "storage_options",
+            ]
+            for k in mfdataset_keys:
+                xr_kwargs.pop(k, None)
+
+            ds = xr.open_dataset(
+                mapper,
+                engine="zarr",
+                backend_kwargs={"consolidated": False},
+                consolidated=False,
+                **xr_kwargs,
+            )
+
+            if preprocess:
+                ds = preprocess(ds)
+
+            return ds
 
         try:
             # Case A: Single File (Optimized)
