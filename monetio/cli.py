@@ -242,6 +242,7 @@ def kerchunk(files, output, concat_dim):
 
     # Expand any glob strings (e.g. s3://bucket/*.nc)
     from monetio.readers.drivers import FileUtility
+
     expanded_files = []
     for f in files:
         try:
