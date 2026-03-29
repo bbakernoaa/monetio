@@ -223,5 +223,35 @@ def openaq(dates, output, n_procs, lazy, as_pandas, wide_fmt):
     handle_save(obj, output, as_pandas)
 
 
+@cli.command()
+@click.argument("files", nargs=-1)
+@click.option(
+    "--output", "-o", required=True, help="Output JSON file path for the Kerchunk reference."
+)
+@click.option(
+    "--concat-dim", default="time", help="Dimension to concatenate along (default 'time')."
+)
+def kerchunk(files, output, concat_dim):
+    """
+    Pre-process files into a single Kerchunk reference JSON map.
+    Especially useful for large geospatial datasets (MERRA2, GFS, etc.).
+    """
+    if not files:
+        click.echo("Error: No files provided.")
+        return
+
+    click.echo(f"Kerchunking {len(files)} file(s) into {output}...")
+    from monetio.readers.drivers import XarrayDriver
+
+    # We use XarrayDriver.open to handle the parsing natively and drop the dataset payload.
+    # It automatically saves the references to `kerchunk_file`.
+    xd = XarrayDriver()
+    try:
+        xd.open(list(files), use_kerchunk=True, kerchunk_file=output, concat_dim=concat_dim)
+        click.echo(f"Successfully generated {output}")
+    except Exception as e:
+        click.echo(f"Error generating Kerchunk reference: {e}")
+
+
 if __name__ == "__main__":
     cli()
