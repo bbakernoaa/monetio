@@ -102,20 +102,55 @@ class MERRA2Reader(GriddedReader):
             dates = pd.to_datetime(dates)
 
         # Product mapping to GES DISC OPeNDAP paths
-        # Format: (ShortName.Version, CollectionName)
+        # Format: (ShortName.Version, CollectionName, ServerNumber)
         prod_map = {
-            "inst1_2d_asm_Nx": ("M2I1NXASM.5.12.4", "inst1_2d_asm_Nx"),
-            "tavg1_2d_slv_Nx": ("M2T1NXSLV.5.12.4", "tavg1_2d_slv_Nx"),
-            "inst3_3d_asm_Np": ("M2I3NPASM.5.12.4", "inst3_3d_asm_Np"),
-            "inst3_3d_chm_Np": ("M2I3NPCHM.5.12.4", "inst3_3d_chm_Np"),
-            "inst3_3d_asm_Nv": ("M2I3NVASM.5.12.4", "inst3_3d_asm_Nv"),
+            "inst1_2d_asm_Nx": ("M2I1NXASM.5.12.4", "inst1_2d_asm_Nx", "4"),
+            "inst1_2d_int_Nx": ("M2I1NXINT.5.12.4", "inst1_2d_int_Nx", "4"),
+            "inst1_2d_lfo_Nx": ("M2I1NXLFO.5.12.4", "inst1_2d_lfo_Nx", "4"),
+            "inst3_2d_gas_Nx": ("M2I3NXGAS.5.12.4", "inst3_2d_gas_Nx", "4"),
+            "statD_2d_slv_Nx": ("M2SDNXSLV.5.12.4", "statD_2d_slv_Nx", "4"),
+            "tavg1_2d_adg_Nx": ("M2T1NXADG.5.12.4", "tavg1_2d_adg_Nx", "4"),
+            "tavg1_2d_aer_Nx": ("M2T1NXAER.5.12.4", "tavg1_2d_aer_Nx", "4"),
+            "tavg1_2d_chm_Nx": ("M2T1NXCHM.5.12.4", "tavg1_2d_chm_Nx", "4"),
+            "tavg1_2d_csp_Nx": ("M2T1NXCSP.5.12.4", "tavg1_2d_csp_Nx", "4"),
+            "tavg1_2d_flx_Nx": ("M2T1NXFLX.5.12.4", "tavg1_2d_flx_Nx", "4"),
+            "tavg1_2d_int_Nx": ("M2T1NXINT.5.12.4", "tavg1_2d_int_Nx", "4"),
+            "tavg1_2d_lfo_Nx": ("M2T1NXLFO.5.12.4", "tavg1_2d_lfo_Nx", "4"),
+            "tavg1_2d_lnd_Nx": ("M2T1NXLND.5.12.4", "tavg1_2d_lnd_Nx", "4"),
+            "tavg1_2d_ocn_Nx": ("M2T1NXOCN.5.12.4", "tavg1_2d_ocn_Nx", "4"),
+            "tavg1_2d_rad_Nx": ("M2T1NXRAD.5.12.4", "tavg1_2d_rad_Nx", "4"),
+            "tavg1_2d_slv_Nx": ("M2T1NXSLV.5.12.4", "tavg1_2d_slv_Nx", "4"),
+            "tavg3_2d_glc_Nx": ("M2T3NXGLC.5.12.4", "tavg3_2d_glc_Nx", "4"),
+            "inst3_3d_asm_Np": ("M2I3NPASM.5.12.4", "inst3_3d_asm_Np", "5"),
+            "inst3_3d_aer_Nv": ("M2I3NVAER.5.12.4", "inst3_3d_aer_Nv", "5"),
+            "inst3_3d_asm_Nv": ("M2I3NVASM.5.12.4", "inst3_3d_asm_Nv", "5"),
+            "inst3_3d_chm_Nv": ("M2I3NVCHM.5.12.4", "inst3_3d_chm_Nv", "5"),
+            "inst3_3d_gas_Nv": ("M2I3NVGAS.5.12.4", "inst3_3d_gas_Nv", "5"),
+            "inst6_3d_ana_Np": ("M2I6NPANA.5.12.4", "inst6_3d_ana_Np", "5"),
+            "inst6_3d_ana_Nv": ("M2I6NVANA.5.12.4", "inst6_3d_ana_Nv", "5"),
+            "tavg3_3d_mst_Ne": ("M2T3NEMST.5.12.4", "tavg3_3d_mst_Ne", "5"),
+            "tavg3_3d_nav_Ne": ("M2T3NENAV.5.12.4", "tavg3_3d_nav_Ne", "5"),
+            "tavg3_3d_trb_Ne": ("M2T3NETRB.5.12.4", "tavg3_3d_trb_Ne", "5"),
+            "tavg3_3d_cld_Np": ("M2T3NPCLD.5.12.4", "tavg3_3d_cld_Np", "5"),
+            "tavg3_3d_mst_Np": ("M2T3NPMST.5.12.4", "tavg3_3d_mst_Np", "5"),
+            "tavg3_3d_odt_Np": ("M2T3NPODT.5.12.4", "tavg3_3d_odt_Np", "5"),
+            "tavg3_3d_qdt_Np": ("M2T3NPQDT.5.12.4", "tavg3_3d_qdt_Np", "5"),
+            "tavg3_3d_rad_Np": ("M2T3NPRAD.5.12.4", "tavg3_3d_rad_Np", "5"),
+            "tavg3_3d_tdt_Np": ("M2T3NPTDT.5.12.4", "tavg3_3d_tdt_Np", "5"),
+            "tavg3_3d_trb_Np": ("M2T3NPTRB.5.12.4", "tavg3_3d_trb_Np", "5"),
+            "tavg3_3d_udt_Np": ("M2T3NPUDT.5.12.4", "tavg3_3d_udt_Np", "5"),
+            "tavg3_3d_asm_Nv": ("M2T3NVASM.5.12.4", "tavg3_3d_asm_Nv", "5"),
+            "tavg3_3d_cld_Nv": ("M2T3NVCLD.5.12.4", "tavg3_3d_cld_Nv", "5"),
+            "tavg3_3d_mst_Nv": ("M2T3NVMST.5.12.4", "tavg3_3d_mst_Nv", "5"),
+            "tavg3_3d_rad_Nv": ("M2T3NVRAD.5.12.4", "tavg3_3d_rad_Nv", "5"),
+            "inst3_3d_chm_Np": ("M2I3NPCHM.5.12.4", "inst3_3d_chm_Np", "5"),
         }
 
         if product not in prod_map:
             raise ValueError(f"Unknown product: {product}. Available: {list(prod_map.keys())}")
 
-        short_name, coll_name = prod_map[product]
-        base_url = f"https://goldsmr4.gesdisc.eosdis.nasa.gov/opendap/MERRA2/{short_name}"
+        short_name, coll_name, server = prod_map[product]
+        base_url = f"https://goldsmr{server}.gesdisc.eosdis.nasa.gov/opendap/MERRA2/{short_name}"
 
         urls = []
         for d in dates.floor("D").unique():
