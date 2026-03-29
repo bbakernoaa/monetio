@@ -240,6 +240,21 @@ def kerchunk(files, output, concat_dim):
         click.echo("Error: No files provided.")
         return
 
+    # Expand any glob strings (e.g. s3://bucket/*.nc)
+    from monetio.readers.drivers import FileUtility
+    expanded_files = []
+    for f in files:
+        try:
+            expanded_files.extend(FileUtility.expand_paths(f))
+        except FileNotFoundError:
+            pass
+
+    if not expanded_files:
+        click.echo("Error: No valid files found matching patterns.")
+        return
+
+    files = expanded_files
+
     click.echo(f"Kerchunking {len(files)} file(s) into {output}...")
     from monetio.readers.drivers import XarrayDriver
 

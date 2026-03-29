@@ -93,6 +93,21 @@ monetio aqs -d 2023-01-01 -p OZONE -p PM2.5 -o epa_data.nc
 monetio openaq -d 2023-01-01 -o openaq_global.csv --as-pandas
 ```
 
+
+## Pre-processing Large Datasets (Kerchunk)
+
+For very large gridded datasets (e.g., MERRA2, GFS, RRFS), `xarray.open_mfdataset` can be slow to build the initial coordinate map. MONETIO provides a command to pre-process these files into a single Kerchunk reference JSON file. This allows instant loading of the virtual Zarr dataset later.
+
+```bash
+monetio kerchunk "s3://noaa-rrfs-pds/rrfs_a/20230101/00/control/rrfs.t00z.prslev.f*.nc" -o rrfs_cache.json
+```
+
+Options:
+- `-o, --output PATH`: (Required) Path to save the output JSON reference file.
+- `--concat-dim TEXT`: Dimension to concatenate the files along (default: `time`).
+
+Once generated, you can load the data natively using the Python API by passing `use_kerchunk=True` and `kerchunk_file="rrfs_cache.json"` to the reader.
+
 ## Data Handling
 
 ### NetCDF vs. CSV
