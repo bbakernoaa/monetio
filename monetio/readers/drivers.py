@@ -84,8 +84,8 @@ class XarrayDriver:
         self,
         files: Union[str, List[str]],
         use_dask: bool = False,
-        use_kerchunk: bool = False,
-        kerchunk_file: str = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -97,11 +97,11 @@ class XarrayDriver:
             File path(s), URL(s), or glob pattern.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
-        use_kerchunk : bool, optional
-            Whether to use Kerchunk to create a virtual Zarr dataset, by default False.
+        use_virtualizarr : bool, optional
+            Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
             Useful for large datasets to avoid xarray.open_mfdataset overhead.
-        kerchunk_file : str, optional
-            Path to save/load the Kerchunk reference JSON file. If provided and the file
+        virtualizarr_file : str, optional
+            Path to save/load the VirtualiZarr reference JSON file. If provided and the file
             exists, the references will be loaded from it. If the file does not exist,
             the references will be computed and saved to this path.
         **kwargs : dict
@@ -130,62 +130,83 @@ class XarrayDriver:
         preprocess = xr_kwargs.pop("preprocess", None)
         read_method = xr_kwargs.pop("read_method", None)
 
-        if use_kerchunk:
+        if use_virtualizarr:
             try:
                 import ujson  # noqa: F401
                 import zarr  # noqa: F401
-                from kerchunk.combine import MultiZarrToZarr
-                from kerchunk.hdf import SingleHdf5ToZarr
+                from obspec_utils.registry import ObjectStoreRegistry
+                from obstore.store import HTTPStore, LocalStore, S3Store
+                from virtualizarr import open_virtual_mfdataset
+                from virtualizarr.parsers import HDFParser
             except ImportError:
                 raise ImportError(
-                    "kerchunk requires 'kerchunk', 'ujson', and 'zarr'. "
-                    "Install with `pip install kerchunk ujson zarr`."
+                    "virtualizarr v2 requires 'virtualizarr', 'obstore', 'obspec_utils', 'ujson', and 'zarr'. "
+                    "Install with `pip install virtualizarr obstore obspec_utils ujson zarr`."
                 )
 
             import os
 
             refs = None
-            if kerchunk_file is not None and os.path.exists(kerchunk_file):
+            if virtualizarr_file is not None and os.path.exists(virtualizarr_file):
                 try:
-                    with open(kerchunk_file) as f_ref:
+                    with open(virtualizarr_file) as f_ref:
                         refs = ujson.load(f_ref)
                 except Exception as e:
                     import warnings
 
-                    warnings.warn(f"Failed to load kerchunk_file {kerchunk_file}: {e}")
+                    warnings.warn(f"Failed to load virtualizarr_file {virtualizarr_file}: {e}")
                     refs = None
 
             if refs is None:
-                dicts = []
-                for f in file_list:
-                    if f.startswith("s3://"):
-                        fs = fsspec.filesystem(
-                            "s3", anon=xr_kwargs.get("storage_options", {}).get("anon", True)
-                        )
-                    elif f.startswith("http://") or f.startswith("https://"):
-                        fs = fsspec.filesystem("http")
-                    else:
-                        fs = fsspec.filesystem("file")
+                registry = ObjectStoreRegistry()
 
-                    with fs.open(f, "rb") as infile:
-                        h5chunks = SingleHdf5ToZarr(infile, f)
-                        dicts.append(h5chunks.translate())
+                if file_list[0].startswith("s3://"):
+                    remote_options = dict(xr_kwargs.get("storage_options", {}))
+                    bucket_name = file_list[0].replace("s3://", "").split("/")[0]
+                    s3_config = {}
+                    if remote_options.get("anon", True):
+                        s3_config["skip_signature"] = "true"
+                    if "client_kwargs" in remote_options and "region_name" in remote_options["client_kwargs"]:
+                        s3_config["region"] = remote_options["client_kwargs"]["region_name"]
 
-                if len(dicts) == 1:
-                    refs = dicts[0]
+                    store = S3Store(bucket_name, config=s3_config)
+                    registry.register(f"s3://{bucket_name}", store)
+                elif file_list[0].startswith("http://") or file_list[0].startswith("https://"):
+                    store = HTTPStore()
+                    registry.register("http://", store)
+                    registry.register("https://", store)
                 else:
-                    concat_dim = xr_kwargs.get("concat_dim", "time")
-                    mzz = MultiZarrToZarr(dicts, concat_dims=[concat_dim])
-                    refs = mzz.translate()
+                    store = LocalStore(prefix="/")
+                    registry.register("file:///", store)
+                    file_list = [f"file://{f}" if not f.startswith("file://") else f for f in file_list]
 
-                if kerchunk_file is not None:
+                concat_dim = xr_kwargs.get("concat_dim", "time")
+                try:
+                    vds = open_virtual_mfdataset(
+                        file_list,
+                        registry=registry,
+                        parser=HDFParser(),
+                        combine="nested",
+                        concat_dim=concat_dim
+                    )
+                except ValueError:
+                    vds = open_virtual_mfdataset(
+                        file_list,
+                        registry=registry,
+                        parser=HDFParser(),
+                        combine="by_coords"
+                    )
+
+                refs = vds.vz.to_kerchunk()
+
+                if virtualizarr_file is not None:
                     try:
-                        with open(kerchunk_file, "w") as f_ref:
+                        with open(virtualizarr_file, "w") as f_ref:
                             ujson.dump(refs, f_ref)
                     except Exception as e:
                         import warnings
 
-                        warnings.warn(f"Failed to save kerchunk_file {kerchunk_file}: {e}")
+                        warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
 
             remote_protocol = "file"
             remote_options = {}
@@ -196,6 +217,9 @@ class XarrayDriver:
                     remote_options["anon"] = True
             elif file_list[0].startswith("http"):
                 remote_protocol = "http"
+                # file_list for fsspec mapper should not start with file:// if they are local
+            elif file_list[0].startswith("file://"):
+                pass
 
             mapper = fsspec.get_mapper(
                 "reference://",

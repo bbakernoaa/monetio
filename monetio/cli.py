@@ -223,17 +223,17 @@ def openaq(dates, output, n_procs, lazy, as_pandas, wide_fmt):
     handle_save(obj, output, as_pandas)
 
 
-@cli.command()
+@cli.command(name="virtualizarr")
 @click.argument("files", nargs=-1)
 @click.option(
-    "--output", "-o", required=True, help="Output JSON file path for the Kerchunk reference."
+    "--output", "-o", required=True, help="Output JSON file path for the VirtualiZarr reference."
 )
 @click.option(
     "--concat-dim", default="time", help="Dimension to concatenate along (default 'time')."
 )
-def kerchunk(files, output, concat_dim):
+def virtualizarr(files, output, concat_dim):
     """
-    Pre-process files into a single Kerchunk reference JSON map.
+    Pre-process files into a single VirtualiZarr reference JSON map.
     Especially useful for large geospatial datasets (MERRA2, GFS, etc.).
     """
     if not files:
@@ -256,17 +256,17 @@ def kerchunk(files, output, concat_dim):
 
     files = expanded_files
 
-    click.echo(f"Kerchunking {len(files)} file(s) into {output}...")
+    click.echo(f"Virtualizing {len(files)} file(s) into {output}...")
     from monetio.readers.drivers import XarrayDriver
 
     # We use XarrayDriver.open to handle the parsing natively and drop the dataset payload.
-    # It automatically saves the references to `kerchunk_file`.
+    # It automatically saves the references to `virtualizarr_file`.
     xd = XarrayDriver()
     try:
-        xd.open(list(files), use_kerchunk=True, kerchunk_file=output, concat_dim=concat_dim)
+        xd.open(list(files), use_virtualizarr=True, virtualizarr_file=output, concat_dim=concat_dim)
         click.echo(f"Successfully generated {output}")
     except Exception as e:
-        click.echo(f"Error generating Kerchunk reference: {e}")
+        click.echo(f"Error generating VirtualiZarr reference: {e}")
 
 
 if __name__ == "__main__":
