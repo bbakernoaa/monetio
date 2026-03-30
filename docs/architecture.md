@@ -14,7 +14,7 @@ We are moving to a unified reader system located in `monetio/readers/`.
 - **Discovery**: The `monetio.load()` function provides a single entry point for all data sources.
 - **Maintainability**: Common logic (like S3 access, coordinate renaming, and lazy loading) is centralized in drivers and base classes.
 - **Lazy Loading**: Readers are registered and loaded only when needed, reducing initial import time.
-- **Performance (Kerchunk)**: For large gridded datasets (MERRA2, GFS, ICAP), readers leverage `use_kerchunk=True` via the Xarray driver to bypass `open_mfdataset` overhead. By pre-computing references to `kerchunk_file`, datasets map into memory virtually via the Zarr engine.
+- **Performance (VirtualiZarr)**: For large gridded datasets (MERRA2, GFS, ICAP), readers leverage `use_virtualizarr=True` via the Xarray driver to bypass `open_mfdataset` overhead. By pre-computing references to `virtualizarr_file`, datasets map into memory virtually via the Zarr engine.
 
 
 ## Deprecation of Legacy Modules
