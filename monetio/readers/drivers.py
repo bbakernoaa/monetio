@@ -166,7 +166,10 @@ class XarrayDriver:
                     s3_config = {}
                     if remote_options.get("anon", True):
                         s3_config["skip_signature"] = "true"
-                    if "client_kwargs" in remote_options and "region_name" in remote_options["client_kwargs"]:
+                    if (
+                        "client_kwargs" in remote_options
+                        and "region_name" in remote_options["client_kwargs"]
+                    ):
                         s3_config["region"] = remote_options["client_kwargs"]["region_name"]
 
                     store = S3Store(bucket_name, config=s3_config)
@@ -178,7 +181,9 @@ class XarrayDriver:
                 else:
                     store = LocalStore(prefix="/")
                     registry.register("file:///", store)
-                    file_list = [f"file://{f}" if not f.startswith("file://") else f for f in file_list]
+                    file_list = [
+                        f"file://{f}" if not f.startswith("file://") else f for f in file_list
+                    ]
 
                 concat_dim = xr_kwargs.get("concat_dim", "time")
                 try:
@@ -187,14 +192,11 @@ class XarrayDriver:
                         registry=registry,
                         parser=HDFParser(),
                         combine="nested",
-                        concat_dim=concat_dim
+                        concat_dim=concat_dim,
                     )
                 except ValueError:
                     vds = open_virtual_mfdataset(
-                        file_list,
-                        registry=registry,
-                        parser=HDFParser(),
-                        combine="by_coords"
+                        file_list, registry=registry, parser=HDFParser(), combine="by_coords"
                     )
 
                 refs = vds.vz.to_kerchunk()
