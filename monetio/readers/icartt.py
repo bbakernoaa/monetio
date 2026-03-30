@@ -28,8 +28,13 @@ def parse_icartt_header(filename: str) -> dict[str, Any]:
 
     Returns
     -------
-    Dict[str, Any]
+    dict[str, Any]
         Dictionary containing header metadata.
+
+    Examples
+    --------
+    >>> header = parse_icartt_header("test.ict")
+    >>> print(header["PI"])
     """
     fs = FileUtility.get_fs(filename)
     header = {}
@@ -88,7 +93,7 @@ def parse_icartt_header(filename: str) -> dict[str, Any]:
     return header
 
 
-def read_icartt(filename: str, **kwargs) -> pd.DataFrame:
+def read_icartt(filename: str, **kwargs: Any) -> pd.DataFrame:
     """
     Reads a single ICARTT file into a pandas DataFrame.
     Data is returned unscaled and with raw missing values to allow lazy processing.
@@ -102,8 +107,12 @@ def read_icartt(filename: str, **kwargs) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame
+    pandas.DataFrame
         Data from the ICARTT file.
+
+    Examples
+    --------
+    >>> df = read_icartt("test.ict")
     """
     header = parse_icartt_header(filename)
     if not header:
@@ -137,14 +146,14 @@ class ICARTTReader(PointReader):
         files: str | list[str],
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
         Retrieve and load ICARTT data with lazy scaling and missing value handling.
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : str or list of str
             File path, list of paths, or glob pattern.
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
@@ -155,8 +164,13 @@ class ICARTTReader(PointReader):
 
         Returns
         -------
-        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+        xarray.Dataset or pandas.DataFrame or dask.dataframe.DataFrame
             The loaded ICARTT data.
+
+        Examples
+        --------
+        >>> reader = ICARTTReader()
+        >>> ds = reader.open_dataset("*.ict", lazy=True)
         """
         # We need metadata from the first file to setup lazy processing
         file_list = FileUtility.expand_paths(files)
@@ -201,7 +215,19 @@ class ICARTTReader(PointReader):
         return df
 
     def harmonize(self, df: pd.DataFrame | dd.DataFrame) -> pd.DataFrame | dd.DataFrame:
-        """Standardize coordinate column names."""
+        """
+        Standardize coordinate column names.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame or dask.dataframe.DataFrame
+            Input dataframe.
+
+        Returns
+        -------
+        pandas.DataFrame or dask.dataframe.DataFrame
+            Harmonized dataframe.
+        """
         rename_dict = {}
         for col in df.columns:
             lcol = col.lower()
@@ -226,53 +252,92 @@ def icartt_preprocess(ds: xr.Dataset, header: dict[str, Any]) -> xr.Dataset:
 
     Parameters
     ----------
-    ds : xr.Dataset
+    ds : xarray.Dataset
         Input dataset.
-    header : Dict[str, Any]
+    header : dict[str, Any]
         Header metadata including scales and missing values.
 
     Returns
     -------
-    xr.Dataset
-        Processed dataset.
+    xarray.Dataset
+        Processed dataset with scaling and missing values applied.
+
+    Examples
+    --------
+    >>> header = parse_icartt_header("file.ict")
+    >>> ds = icartt_preprocess(ds, header)
     """
     scales = header.get("scales", [])
     missing_values = header.get("missing_values", [])
     var_names = header.get("var_names", [])
 
-    # DVARs start from index 1 (0 is IVAR)
+    # Create a mapping of original names to current dataset names (handles harmonization)
+    col_map = {}
+    for orig_name in var_names:
+        if orig_name in ds.variables:
+            col_map[orig_name] = orig_name
+        else:
+            for c in ds.variables:
+                if c.lower() == orig_name.lower():
+                    col_map[orig_name] = c
+                    break
+
+    # We use a dictionary to collect updates and apply them in one go
+    updates = {}
+
+    # The ICARTT spec says scales/missing are for [DVAR1, DVAR2, ...]
+    # IVAR (index 0 in var_names) is NOT scaled or masked in the same way.
     for i, (scale, miss) in enumerate(zip(scales, missing_values)):
         if i + 1 >= len(var_names):
             break
-        orig_col = var_names[i + 1]
 
-        # Find the column in ds, handling harmonization
-        col = None
-        if orig_col in ds.variables:
-            col = orig_col
-        else:
-            # Check harmonized names
-            for c in ds.variables:
-                if c.lower() == orig_col.lower():
-                    col = c
-                    break
+        orig_col = var_names[i + 1]
+        col = col_map.get(orig_col)
 
         if col is None:
             continue
 
-        # Handle missing values
-        try:
-            miss_val = float(miss)
-            # Use a small tolerance for floating point comparison
-            # We must use .data to avoid issues with xarray wrappers if any
-            # but usually .where works fine.
-            # Let's try to be very explicit.
-            ds[col] = ds[col].where(np.abs(ds[col].astype(float) - miss_val) > 1e-4)
-        except (ValueError, TypeError):
-            ds[col] = ds[col].where(ds[col].astype(str).str.strip() != miss.strip())
+        da = ds[col]
 
-        # Scaling
+        # 1. Handle Missing Values
+        try:
+            # Numeric missing value
+            miss_val = float(miss)
+            # We cast to float to support NaNs after masking
+            da = da.astype(float)
+            # Backend-agnostic lazy masking
+            mask = np.abs(da - miss_val) < 1e-5
+            da = da.where(~mask)
+        except (ValueError, TypeError):
+            # String/categorical missing value
+            # Avoid .str accessor on DataArray
+            mask = xr.apply_ufunc(
+                lambda x: np.char.strip(x.astype(str)) == str(miss).strip(),
+                da,
+                dask="parallelized",
+                output_dtypes=[bool],
+            )
+            da = da.where(~mask).astype(float)
+
+        # 2. Apply Scaling
         if scale != 1.0:
-            ds[col] = ds[col].astype(float) * scale
+            # If not already float, cast it
+            if not np.issubdtype(da.dtype, np.floating):
+                da = da.astype(float)
+            da = da * scale
+
+        updates[col] = da
+
+    # If IVAR was scaled and time was already created, we may need to adjust time.
+    # However, conventionally IVAR (time) scale is 1.0.
+    # If a reader needs specific IVAR handling, it should be done here.
+
+    ds = ds.assign(updates)
+
+    # If we adjusted IVAR and it is 'time' or used for 'time', and 'time' is already a coord,
+    # it might be tricky. But since ICARTTReader.open_dataset calls this AFTER to_xarray,
+    # 'time' is already a coordinate if it was in the dataframe.
+
+    ds = update_history(ds, "Applied ICARTT scaling and missing value masking.")
 
     return ds
