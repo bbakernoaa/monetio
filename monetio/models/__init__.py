@@ -35,5 +35,3 @@ __all__ = [
     "raqms",
     "ufs",
 ]
-
-__name__ = "models"

@@ -48,7 +48,6 @@ __all__ = [
     "skynet",
 ]
 
-__name__ = "obs"
 
 # ish = ish_mod.ISH()
 # airnow = airnow_mod.AirNow()
