@@ -27,4 +27,3 @@ __all__ = [
     "nesdis_eps_viirs",
     "nesdis_frp",
 ]
-
