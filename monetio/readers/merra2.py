@@ -26,6 +26,7 @@ class MERRA2Reader(GriddedReader):
         product: str = "inst1_2d_asm_Nx",
         username: Optional[str] = None,
         password: Optional[str] = None,
+        virtualizarr: Optional[str] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -68,6 +69,9 @@ class MERRA2Reader(GriddedReader):
             from functools import partial
 
             kwargs["preprocess"] = partial(merra2_preprocess, product=product)
+
+        if virtualizarr is not None:
+            kwargs["virtualizarr_file"] = virtualizarr
 
         ds = super().open_dataset(files, **kwargs)
 

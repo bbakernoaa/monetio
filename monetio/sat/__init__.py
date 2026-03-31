@@ -28,4 +28,3 @@ __all__ = [
     "nesdis_frp",
 ]
 
-__name__ = "sat"

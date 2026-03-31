@@ -36,4 +36,3 @@ __all__ = [
     "ufs",
 ]
 
-__name__ = "models"

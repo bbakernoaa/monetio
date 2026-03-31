@@ -1,88 +1,7 @@
 import importlib
 
-from . import grids
-from .models import (
-    camx,
-    chimere,
-    cmaq,
-    hysplit,
-    hytraj,
-    ncep_grib,
-    pardump,
-    raqms,
-)
-from .obs import (
-    aeronet,
-    airnow,
-    aqs,
-    cems,
-    crn,
-    improve,
-    ish,
-    ish_lite,
-    nadp,
-    openaq,
-    openaq_v2,
-    openaq_v3,
-    pams,
-)
-from .profile import geoms, gml_ozonesonde, icartt, tolnet
-from .readers.base import READER_REGISTRY
-from .sat import goes
-
 __version__ = "0.2.7"
 
-__all__ = [
-    "__version__",
-    "load",
-    #
-    # utility functions
-    "rename_latlon",
-    "rename_to_monet_latlon",
-    "dataset_to_monet",
-    "coards_to_netcdf",
-    #
-    # utility modules
-    "grids",
-    #
-    # point obs
-    "airnow",
-    "aeronet",
-    "aqs",
-    "cems",  # TODO: module with add_data
-    "crn",
-    "improve",  # TODO: module with add_data
-    "ish",
-    "ish_lite",
-    "nadp",
-    "openaq",
-    "openaq_v2",
-    "openaq_v3",
-    "pams",
-    #
-    # profile obs
-    "geoms",
-    "gml_ozonesonde",
-    "icartt",
-    "tolnet",
-    #
-    # satellite obs
-    "goes",
-    #
-    # models
-    "camx",
-    "cmaq",
-    "hysplit",
-    "hytraj",
-    "icap_mme",
-    "ncep_grib",
-    "pardump",
-    "raqms",
-    "chimere",
-    "gfs",
-    "gefs",
-    "gdas",
-]
 
 # Map reader names to their module paths for lazy loading
 _READER_MODULES = {
@@ -168,6 +87,8 @@ def load(source: str, files=None, **kwargs):
         Profile: actris, earlinet, geoms, gml_ozonesonde, iagos, icartt, igra2, mplnet, tolnet, umbc_aerosol
         Sat: goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, tempo, tropomi, viirs_jrr
     """
+    from .readers.base import READER_REGISTRY
+
     if source not in READER_REGISTRY:
         if source in _READER_MODULES:
             # Lazy import
@@ -186,6 +107,88 @@ def load(source: str, files=None, **kwargs):
     reader = reader_cls()
 
     return reader.open_dataset(files=files, **kwargs)
+
+
+from . import grids
+from .models import (
+    camx,
+    chimere,
+    cmaq,
+    hysplit,
+    hytraj,
+    ncep_grib,
+    pardump,
+    raqms,
+)
+from .obs import (
+    aeronet,
+    airnow,
+    aqs,
+    cems,
+    crn,
+    improve,
+    ish,
+    ish_lite,
+    nadp,
+    openaq,
+    openaq_v2,
+    openaq_v3,
+    pams,
+)
+from .profile import geoms, gml_ozonesonde, icartt, tolnet
+from .sat import goes
+
+__all__ = [
+    "__version__",
+    "load",
+    #
+    # utility functions
+    "rename_latlon",
+    "rename_to_monet_latlon",
+    "dataset_to_monet",
+    "coards_to_netcdf",
+    #
+    # utility modules
+    "grids",
+    #
+    # point obs
+    "airnow",
+    "aeronet",
+    "aqs",
+    "cems",  # TODO: module with add_data
+    "crn",
+    "improve",  # TODO: module with add_data
+    "ish",
+    "ish_lite",
+    "nadp",
+    "openaq",
+    "openaq_v2",
+    "openaq_v3",
+    "pams",
+    #
+    # profile obs
+    "geoms",
+    "gml_ozonesonde",
+    "icartt",
+    "tolnet",
+    #
+    # satellite obs
+    "goes",
+    #
+    # models
+    "camx",
+    "cmaq",
+    "hysplit",
+    "hytraj",
+    "icap_mme",
+    "ncep_grib",
+    "pardump",
+    "raqms",
+    "chimere",
+    "gfs",
+    "gefs",
+    "gdas",
+]
 
 
 def rename_latlon(ds):
