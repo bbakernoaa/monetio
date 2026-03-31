@@ -1,17 +1,8 @@
 """CMAQ variable specifications and diagnostic definitions."""
 
-from typing import Dict, List, NamedTuple, Optional
+from typing import Dict
 
-
-class DiagnosticSpec(NamedTuple):
-    """Specification for a derived diagnostic variable."""
-
-    variables: List[str]
-    weights: Optional[List[float]] = None
-    units: str = "unknown"
-    long_name: str = "unknown"
-    name: str = "unknown"
-
+from .base import DiagnosticSpec
 
 # Core species groups
 AITKEN = [
