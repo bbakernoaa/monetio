@@ -6,10 +6,15 @@ from typing import Any, List, Optional, Union
 import numpy as np
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import (
+    GriddedReader,
+    _convert_to_ppb,
+    add_lazy_diagnostic,
+    register_reader,
+)
 from .sat_utils import update_history
 from .time_utils import parse_wrf_times
-from .wrfchem_specs import DIAGNOSTICS, DiagnosticSpec
+from .wrfchem_specs import DIAGNOSTICS
 
 
 @register_reader("wrfchem")
@@ -179,91 +184,6 @@ def wrfchem_preprocess(
     return ds
 
 
-def add_lazy_diagnostic(ds: xr.Dataset, name: str, spec: DiagnosticSpec) -> xr.Dataset:
-    """
-    Adds a lazy diagnostic variable to the dataset if constituent variables exist.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset.
-    name : str
-        Name of the diagnostic variable.
-    spec : DiagnosticSpec
-        Specification for the diagnostic.
-
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with diagnostic added if possible.
-    """
-    # 1. Check if name already exists as a data variable
-    if name in ds.data_vars:
-        return ds
-
-    # 2. Check for pre-calculated WRF-Chem aliases (e.g. PM2_5_DRY)
-    wrf_aliases = {
-        "PM25": ["PM2_5_DRY", "PM25_TOT", "PM2_5"],
-        "PM10": ["PM10_DRY", "PM10_TOT", "PM10"],
-    }
-
-    aliases = wrf_aliases.get(name, [])
-    for alias in aliases:
-        if alias in ds.data_vars:
-            ds[name] = ds[alias].copy()
-            ds[name].attrs.update(
-                {"units": spec.units, "name": spec.name, "long_name": spec.long_name}
-            )
-            # Update history
-            ds = update_history(ds, f"Added lazy diagnostic: {name} (using alias {alias}).")
-            return ds
-
-    # 3. Identify constituent variables available in the dataset
-    available_vars = [v for v in spec.variables if v in ds.data_vars]
-    if not available_vars:
-        return ds
-
-    # If weights are provided, they must match the full variable list in spec
-    if spec.weights is not None:
-        weights_map = dict(zip(spec.variables, spec.weights))
-        weights = [weights_map[v] for v in available_vars]
-    else:
-        weights = [1.0] * len(available_vars)
-
-    # 4. Compute lazy sum with unit synchronization
-    with xr.set_options(keep_attrs=True):
-        # Use first variable as base
-        v0 = available_vars[0]
-        new_var = ds[v0] * weights[0]
-        base_units = ds[v0].attrs.get("units", "").lower()
-
-        for i in range(1, len(available_vars)):
-            v = available_vars[i]
-            v_var = ds[v]
-            v_units = v_var.attrs.get("units", "").lower()
-
-            # Unit synchronization (e.g. ppmV vs ppbV)
-            if v_units != base_units:
-                if "ppm" in v_units and "ppb" in base_units:
-                    v_var = v_var * 1000.0
-                elif "ppb" in v_units and "ppm" in base_units:
-                    v_var = v_var / 1000.0
-
-            new_var = new_var + v_var * weights[i]
-
-    # Inherit units from constituent variables if available, otherwise use spec
-    units = ds[v0].attrs.get("units", spec.units)
-
-    ds[name] = new_var.assign_attrs(
-        {"units": units, "name": spec.name, "long_name": spec.long_name}
-    )
-
-    # Update history
-    ds = update_history(ds, f"Added lazy diagnostic: {name} (sum of {', '.join(available_vars)}).")
-
-    return ds
-
-
 def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
     """
     Parse WRF 'Times' character array into a 'time' coordinate lazily.
@@ -313,37 +233,6 @@ def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
 
     # Update history
     ds = update_history(ds, "Optimized time parsing.")
-
-    return ds
-
-
-def _convert_to_ppb(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Lazy conversion of ppmv to ppbV.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset.
-
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with converted units.
-    """
-    to_convert = [
-        v for v in ds.data_vars if "units" in ds[v].attrs and "ppmv" in ds[v].attrs["units"].lower()
-    ]
-
-    if not to_convert:
-        return ds
-
-    for v in to_convert:
-        ds[v] = ds[v] * 1000.0
-        ds[v].attrs["units"] = "ppbV"
-
-    # Update history
-    ds = update_history(ds, f"Converted {', '.join(to_convert)} from ppmV to ppbV.")
 
     return ds
 
