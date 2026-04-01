@@ -4,38 +4,48 @@ import numpy as np
 import pandas as pd
 
 
-def parse_ioapi_times(yyyymmdd: np.ndarray, hhmmss: np.ndarray) -> np.ndarray:
+def parse_ioapi_times(yyyymmdd, hhmmss):
     """
     Vectorized parsing of IOAPI (CMAQ/CAMx) TFLAG dates and times.
 
     Parameters
     ----------
-    yyyymmdd : np.ndarray
+    yyyymmdd : np.ndarray or array-like
         Array of dates in YYYYDDD format (Julian day).
-    hhmmss : np.ndarray
+    hhmmss : np.ndarray or array-like
         Array of times in HHMMSS format.
 
     Returns
     -------
     np.ndarray
         Array of datetime64[ns] objects.
-    """
-    # 1. Extract components using math
-    years = (yyyymmdd // 1000).astype(int)
-    days = (yyyymmdd % 1000).astype(int)
 
-    hours = (hhmmss // 10000).astype(int)
-    minutes = ((hhmmss // 100) % 100).astype(int)
-    seconds = (hhmmss % 100).astype(int)
+    Examples
+    --------
+    >>> parse_ioapi_times([2023001], [120000])
+    array(['2023-01-01T12:00:00.000000000'], dtype='datetime64[ns]')
+    """
+    y = np.asanyarray(yyyymmdd)
+    h = np.asanyarray(hhmmss)
+
+    # 1. Extract components using math
+    years = (y // 1000).astype(int)
+    days = (y % 1000).astype(int)
+
+    hours = (h // 10000).astype(int)
+    minutes = ((h // 100) % 100).astype(int)
+    seconds = (h % 100).astype(int)
 
     # 2. Convert to nanoseconds since epoch
     # We use pandas to handle the variable year starts (leap years)
-    # This part is vectorized and fast.
-    # We use np.unique to avoid repeated parsing of the same year
     unique_years = np.unique(years)
-    year_to_start = {y: pd.to_datetime(str(y), format="%Y").to_datetime64() for y in unique_years}
+    year_to_start = {
+        y_val: pd.to_datetime(str(y_val), format="%Y").to_datetime64() for y_val in unique_years
+    }
 
-    year_starts = np.array([year_to_start[y] for y in years], dtype="datetime64[ns]")
+    year_starts = np.array(
+        [year_to_start[y_val] for y_val in years.ravel()], dtype="datetime64[ns]"
+    ).reshape(y.shape)
 
     # 3. Combine using datetime arithmetic
     # Julian day 1 is the first day of the year (0 offset)
@@ -50,40 +60,47 @@ def parse_ioapi_times(yyyymmdd: np.ndarray, hhmmss: np.ndarray) -> np.ndarray:
     return (year_starts + day_offset + time_offset).astype("datetime64[ns]")
 
 
-def parse_wrf_times(times_arr: np.ndarray) -> np.ndarray:
+def parse_wrf_times(times_arr):
     """
     Vectorized parsing of WRF/RAQMS character array or string times.
 
     Parameters
     ----------
-    times_arr : np.ndarray
+    times_arr : np.ndarray or array-like
         Array of times as strings or character arrays.
 
     Returns
     -------
     np.ndarray
         Array of datetime64[ns] objects.
+
+    Examples
+    --------
+    >>> parse_wrf_times(["2023-01-01_12:00:00"])
+    array(['2023-01-01T12:00:00.000000000'], dtype='datetime64[ns]')
     """
-    if times_arr.ndim > 1:
+    t = np.asanyarray(times_arr)
+
+    if t.ndim > 1:
         # It's likely a character array (..., DateStrLen)
-        last_dim = times_arr.shape[-1]
-        if times_arr.dtype.kind == "U":
+        last_dim = t.shape[-1]
+        if t.dtype.kind == "U":
             # Unicode: join along the last axis
-            orig_shape = times_arr.shape
-            flat_times = times_arr.reshape(-1, last_dim)
+            orig_shape = t.shape
+            flat_times = t.reshape(-1, last_dim)
             s = np.array(["".join(row) for row in flat_times])
             s = s.reshape(orig_shape[:-1])
         else:
             # Bytes: use view if C-contiguous
-            if times_arr.flags.c_contiguous:
-                s = times_arr.view(f"S{last_dim}").squeeze(-1)
+            if t.flags.c_contiguous:
+                s = t.view(f"S{last_dim}").squeeze(-1)
             else:
-                orig_shape = times_arr.shape
-                flat_times = times_arr.reshape(-1, last_dim)
+                orig_shape = t.shape
+                flat_times = t.reshape(-1, last_dim)
                 s = np.array([b"".join(row) for row in flat_times])
                 s = s.reshape(orig_shape[:-1])
     else:
-        s = times_arr
+        s = t
 
     # Replace '_' with ' ' for pandas compatibility (WRF format: YYYY-MM-DD_HH:MM:SS)
     if s.dtype.kind in {"S", "a"}:
@@ -96,7 +113,7 @@ def parse_wrf_times(times_arr: np.ndarray) -> np.ndarray:
     return pd.to_datetime(s.ravel()).values.astype("datetime64[ns]").reshape(s.shape)
 
 
-def parse_yyyymmdd_hhmm(yyyymmdd: np.ndarray, hhmm: np.ndarray) -> np.ndarray:
+def parse_yyyymmdd_hhmm(yyyymmdd, hhmm):
     """
     Vectorized parsing of YYYYMMDD and HHMM (or HHMMSS) dates and times.
 
@@ -117,9 +134,6 @@ def parse_yyyymmdd_hhmm(yyyymmdd: np.ndarray, hhmm: np.ndarray) -> np.ndarray:
     >>> parse_yyyymmdd_hhmm([20230101], [1200])
     array(['2023-01-01T12:00:00.000000000'], dtype='datetime64[ns]')
     """
-    # Use asanyarray to handle scalars, lists, and arrays robustly.
-    # When called via xr.apply_ufunc with dask='parallelized', the inputs are NumPy arrays,
-    # so asanyarray is safe and necessary for backend-agnostic math.
     y = np.asanyarray(yyyymmdd)
     h = np.asanyarray(hhmm)
 
