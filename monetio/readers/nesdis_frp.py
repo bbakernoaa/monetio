@@ -23,11 +23,11 @@ class NESDISFRPReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
         date: Union[datetime.datetime, str, pd.Timestamp] = None,
         ftype: str = "meanFRP",
         datapath: str = ".",
         lazy: bool = False,
+        files: Union[str, List[str]] = None,
         **kwargs,
     ) -> xr.Dataset:
         """

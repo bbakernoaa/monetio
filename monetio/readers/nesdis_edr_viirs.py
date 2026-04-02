@@ -24,11 +24,11 @@ class NESDISEDRVIIRSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
         date: Union[datetime.datetime, str, pd.Timestamp] = None,
         resolution: str = "high",
         datapath: str = ".",
         lazy: bool = False,
+        files: Union[str, List[str]] = None,
         **kwargs,
     ) -> xr.Dataset:
         """

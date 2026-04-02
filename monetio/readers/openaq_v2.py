@@ -20,12 +20,12 @@ class OpenAQV2Reader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
         dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
         parameters: List[str] = None,
         country: Union[str, List[str]] = None,
         sites: List[str] = None,
         wide_fmt: bool = True,
+        files: Union[str, List[str]] = None,
         **kwargs,
     ) -> Union[pd.DataFrame, "xr.Dataset"]:
         """

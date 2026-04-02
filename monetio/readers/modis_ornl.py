@@ -27,7 +27,6 @@ class MODISORNLReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
         date: Union[pd.Timestamp, str] = None,
         product: str = "MOD12A2H",
         band: str = "Lai_500m",
@@ -36,6 +35,7 @@ class MODISORNLReader(GriddedReader):
         longitude: float = 0,
         kmAboveBelow: int = 100,
         kmLeftRight: int = 100,
+        files: Union[str, List[str]] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
