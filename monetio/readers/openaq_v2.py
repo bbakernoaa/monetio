@@ -25,6 +25,7 @@ class OpenAQV2Reader(PointReader):
         country: Union[str, List[str]] = None,
         sites: List[str] = None,
         wide_fmt: bool = True,
+        files: Union[str, List[str]] = None,
         **kwargs,
     ) -> Union[pd.DataFrame, "xr.Dataset"]:
         """

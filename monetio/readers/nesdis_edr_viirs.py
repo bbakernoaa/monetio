@@ -2,7 +2,7 @@
 
 import datetime
 import os
-from typing import Union
+from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -24,10 +24,11 @@ class NESDISEDRVIIRSReader(GriddedReader):
 
     def open_dataset(
         self,
-        date: Union[datetime.datetime, str, pd.Timestamp],
+        date: Union[datetime.datetime, str, pd.Timestamp] = None,
         resolution: str = "high",
         datapath: str = ".",
         lazy: bool = False,
+        files: Union[str, List[str]] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
