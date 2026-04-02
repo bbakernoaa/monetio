@@ -184,7 +184,9 @@ def _get_single_retrieval(
 
     # Parse data
     subset_data = data.subset[0].split(",")[5:]
-    grid_data = np.array([float(x) for x in subset_data]).reshape(metadata["nrows"], metadata["ncols"])
+    grid_data = np.array([float(x) for x in subset_data]).reshape(
+        metadata["nrows"], metadata["ncols"]
+    )
 
     # Apply scaling
     if metadata["scale"] != 1.0:

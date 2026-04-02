@@ -1,8 +1,8 @@
+from unittest.mock import MagicMock, patch
+
 import numpy as np
-import pandas as pd
 import pytest
 import xarray as xr
-from unittest.mock import MagicMock, patch
 
 from monetio.readers.modis_ornl import MODISORNLReader, _get_latlon, _make_xarray_dataset
 
@@ -56,6 +56,7 @@ def test_make_xarray_dataset_eager_lazy():
     # Lazy
     try:
         import dask.array as da
+
         grid_lazy = da.from_array(grid_data, chunks=(4, 5))
         ds_lazy = _make_xarray_dataset(grid_lazy, metadata)
         assert hasattr(ds_lazy["test_band"].data, "dask")
