@@ -67,7 +67,10 @@ def test_make_xarray_dataset_eager_lazy():
         pytest.skip("Dask not installed")
 
 
-@patch("monetio.readers.modis_ornl.Client")
+@pytest.mark.skipif(
+    not pytest.importorskip("monetio.readers.modis_ornl").HAS_SUDS, reason="suds not installed"
+)
+@patch("monetio.readers.modis_ornl.Client", create=True)
 def test_modis_ornl_reader_mock(mock_client):
     """Test MODISORNLReader with mocked SOAP service."""
     # Setup mock
