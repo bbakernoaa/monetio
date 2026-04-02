@@ -20,6 +20,7 @@ class OpenAQV2Reader(PointReader):
 
     def open_dataset(
         self,
+        files: Union[str, List[str]] = None,
         dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
         parameters: List[str] = None,
         country: Union[str, List[str]] = None,
@@ -32,13 +33,13 @@ class OpenAQV2Reader(PointReader):
 
         Parameters
         ----------
-        dates : Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str]
+        dates : Union[pd.DatetimeIndex, list[datetime.datetime], datetime.datetime, str]
             Dates to retrieve.
-        parameters : List[str], optional
+        parameters : list[str], optional
             Species to retrieve, by default ['pm25', 'o3'].
-        country : Union[str, List[str]], optional
+        country : Union[str, list[str]], optional
             Country code(s).
-        sites : List[str], optional
+        sites : list[str], optional
             Site ID(s).
         wide_fmt : bool, optional
             Whether to return data in wide format, by default True.

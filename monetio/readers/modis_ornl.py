@@ -1,6 +1,6 @@
 """MODIS ORNL Reader"""
 
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, List
 
 import numpy as np
 import pandas as pd
@@ -27,7 +27,8 @@ class MODISORNLReader(GriddedReader):
 
     def open_dataset(
         self,
-        date: Union[pd.Timestamp, str],
+        files: Union[str, List[str]] = None,
+        date: Union[pd.Timestamp, str] = None,
         product: str = "MOD12A2H",
         band: str = "Lai_500m",
         quality_control: Optional[Any] = None,
@@ -123,7 +124,7 @@ def _nearest(items: pd.DatetimeIndex, pivot: pd.Timestamp) -> pd.Timestamp:
     Parameters
     ----------
     items : pd.DatetimeIndex
-        List of available dates.
+        list of available dates.
     pivot : pd.Timestamp
         Target date.
 
