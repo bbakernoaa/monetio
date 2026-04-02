@@ -87,7 +87,7 @@ class NESDISFRPReader(GriddedReader):
 
     def download_data(
         self, date: pd.Timestamp, ftype: str = "meanFRP", datapath: str = "."
-    ) -> list[str]:
+    ) -> List[str]:
         """
         Download NESDIS FRP data from the GSCE server.
 
@@ -102,8 +102,8 @@ class NESDISFRPReader(GriddedReader):
 
         Returns
         -------
-        list[str]
-            list of paths to the downloaded files.
+        List[str]
+            List of paths to the downloaded files.
         """
         yyyymmdd = date.strftime("%Y%m%d")
         url_ftype = f"&files={ftype}."

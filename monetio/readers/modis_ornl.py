@@ -1,6 +1,6 @@
 """MODIS ORNL Reader"""
 
-from typing import Any, Optional, Union, List
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -124,7 +124,7 @@ def _nearest(items: pd.DatetimeIndex, pivot: pd.Timestamp) -> pd.Timestamp:
     Parameters
     ----------
     items : pd.DatetimeIndex
-        list of available dates.
+        List of available dates.
     pivot : pd.Timestamp
         Target date.
 

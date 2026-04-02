@@ -33,13 +33,13 @@ class OpenAQV2Reader(PointReader):
 
         Parameters
         ----------
-        dates : Union[pd.DatetimeIndex, list[datetime.datetime], datetime.datetime, str]
+        dates : Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str]
             Dates to retrieve.
-        parameters : list[str], optional
+        parameters : List[str], optional
             Species to retrieve, by default ['pm25', 'o3'].
-        country : Union[str, list[str]], optional
+        country : Union[str, List[str]], optional
             Country code(s).
-        sites : list[str], optional
+        sites : List[str], optional
             Site ID(s).
         wide_fmt : bool, optional
             Whether to return data in wide format, by default True.
