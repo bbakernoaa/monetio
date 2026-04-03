@@ -1,9 +1,11 @@
-import numpy as np
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
 import xarray as xr
-from unittest.mock import patch
+
 from monetio.readers.ish import ISHReader, read_ish_file
+
 
 @pytest.fixture
 def mock_history():
@@ -22,6 +24,7 @@ def mock_history():
             "end": [pd.Timestamp("2025-01-01"), pd.Timestamp("2025-01-01")],
         }
     )
+
 
 def test_ish_eager_lazy_consistency(tmp_path, mock_history):
     """Verify that Eager (Pandas) and Lazy (Dask) backends produce identical results."""
@@ -51,13 +54,14 @@ def test_ish_eager_lazy_consistency(tmp_path, mock_history):
     assert ds_eager.state.values[0] == "MD"
     assert ds_lazy.state.compute().values[0] == "MD"
 
+
 def test_ish_resampling_eager_lazy(tmp_path, mock_history):
     """Verify resampling works identically for Eager and Lazy backends."""
     # Create 3 hours of data
     lines = [
         "0054722244003582020090100004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02001+01001100001",
         "0054722244003582020090101004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02101+01101100101",
-        "0054722244003582020090102004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02201+01201100201"
+        "0054722244003582020090102004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02201+01201100201",
     ]
 
     fn = tmp_path / "722244-00358-2020"
@@ -82,6 +86,7 @@ def test_ish_resampling_eager_lazy(tmp_path, mock_history):
 
     xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
 
+
 def test_ish_metadata_merging_robustness(tmp_path, mock_history):
     """Test that metadata merging handles missing sites gracefully."""
     line1 = "0054722244003582020090100004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02561+01841101851"
@@ -104,6 +109,7 @@ def test_ish_metadata_merging_robustness(tmp_path, mock_history):
     assert ds.siteid.values[0] == "72224400358"
     assert ds.state.values[0] == "MD"
 
+
 def test_read_ish_file_timeout(tmp_path):
     """Test that timeout is propagated correctly (via mock)."""
     fn = tmp_path / "dummy.gz"
@@ -111,6 +117,7 @@ def test_read_ish_file_timeout(tmp_path):
 
     with patch("monetio.readers.drivers.FileUtility.get_fs") as mock_get_fs:
         from unittest.mock import MagicMock
+
         mock_fs = MagicMock()
         mock_get_fs.return_value = mock_fs
 

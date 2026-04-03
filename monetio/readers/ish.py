@@ -11,8 +11,7 @@ import xarray as xr
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
-from ..util import normalize_pandas_freq
-from ..util import force_object_strings
+from ..util import force_object_strings, normalize_pandas_freq
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
