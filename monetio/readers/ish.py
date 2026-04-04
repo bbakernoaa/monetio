@@ -11,12 +11,60 @@ import xarray as xr
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
-from ..util import normalize_pandas_freq
+from ..util import force_object_strings, normalize_pandas_freq
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
 
 logger = logging.getLogger(__name__)
+
+
+def add_ish_metadata(
+    df: Union[pd.DataFrame, "dd.DataFrame"],
+    history: pd.DataFrame,
+) -> Union[pd.DataFrame, "dd.DataFrame"]:
+    """
+    Add ISH station metadata to the dataframe.
+
+    Parameters
+    ----------
+    df : Union[pd.DataFrame, dd.DataFrame]
+        Input dataframe.
+    history : pd.DataFrame
+        ISH history/metadata dataframe.
+
+    Returns
+    -------
+    Union[pd.DataFrame, dd.DataFrame]
+        Dataframe with metadata merged.
+    """
+    try:
+        import dask.dataframe as dd
+
+        is_dask = isinstance(df, dd.DataFrame)
+    except ImportError:
+        is_dask = False
+
+    # Ensure siteid is object for reliable merging
+    df = df.assign(siteid=df.siteid.astype(object))
+
+    # Prepare metadata for merging
+    dfloc = history.rename(columns={"station_id": "siteid", "ctry": "country"})
+    dfloc = force_object_strings(dfloc.drop_duplicates(subset=["siteid"]))
+
+    if is_dask:
+        dfloc_wrap = dd.from_pandas(dfloc, npartitions=1)
+        dfloc_wrap = force_object_strings(dfloc_wrap)
+    else:
+        dfloc_wrap = dfloc
+
+    # Merge
+    df = df.merge(dfloc_wrap, on="siteid", how="left")
+
+    # Update history
+    df = update_history(df, "Added ISH station metadata.")
+
+    return df
 
 
 class ISH:
@@ -253,28 +301,19 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
     tries = 0
     while tries <= request_retries:
         try:
-            if str(fname).startswith("http") or str(fname).startswith("ftp"):
-                import io
+            # Use FileUtility for all protocols (Local, S3, HTTP, FTP)
+            fs = FileUtility.get_fs(fname)
 
-                import requests
+            # Ensure timeout is passed for remote filesystems if not already in storage_options
+            if (
+                str(fname).startswith(("http", "ftp"))
+                and "client_kwargs" not in storage_options
+                and "timeout" not in storage_options
+            ):
+                storage_options["timeout"] = request_timeout
 
-                r = requests.get(fname, timeout=request_timeout, stream=True)
-                r.raise_for_status()
-                content = r.content
-                if compression == "gzip":
-                    import gzip
-
-                    with gzip.open(io.BytesIO(content), "rb") as f:
-                        frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
-                else:
-                    frame_as_array = np.genfromtxt(
-                        io.BytesIO(content), delimiter=ISH.WIDTHS, dtype=ISH.DTYPES
-                    )
-            else:
-                # Use FileUtility
-                fs = FileUtility.get_fs(fname)
-                with fs.open(fname, "rb", compression=compression, **storage_options) as f:
-                    frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
+            with fs.open(fname, "rb", compression=compression, **storage_options) as f:
+                frame_as_array = np.genfromtxt(f, delimiter=ISH.WIDTHS, dtype=ISH.DTYPES)
             break
         except Exception as e:
             tries += 1
@@ -435,26 +474,10 @@ class ISHReader(PointReader):
         # Merge with metadata
         if ish.history is None:
             ish.read_ish_history()
-        dfloc = ish.history.copy()
 
-        if lazy:
-            import dask.dataframe as dd
-
-            df = df.assign(siteid=df.siteid.astype(object))
-            dfloc_dask = dd.from_pandas(
-                dfloc.rename(columns={"station_id": "siteid"}), npartitions=1
-            ).assign(siteid=lambda x: x.siteid.astype(object))
-            df = df.merge(dfloc_dask, on="siteid", how="left")
-        else:
-            df["siteid"] = df["siteid"].astype(object)
-            df = df.merge(dfloc.rename(columns={"station_id": "siteid"}), on="siteid", how="left")
-
-        df = df.rename(columns={"ctry": "country"})
+        df = add_ish_metadata(df, ish.history)
 
         df = self.harmonize(df)
-
-        if not lazy and hasattr(df, "compute"):
-            df = df.compute(num_workers=n_procs)
 
         if as_xarray:
             from ..util import ds_to_2d
@@ -541,15 +564,7 @@ class ISHReader(PointReader):
                         .reset_index()
                     )
                     # Re-join metadata
-                    meta_to_restore = dfloc.rename(
-                        columns={"ctry": "country", "station_id": "siteid"}
-                    )
-                    # Avoid duplicate columns during merge
-                    cols_to_drop = [
-                        c for c in meta_to_restore.columns if c in df.columns and c != "siteid"
-                    ]
-                    df = df.drop(columns=cols_to_drop)
-                    df = df.merge(meta_to_restore, on="siteid", how="left")
+                    df = add_ish_metadata(df, ish.history)
             else:
                 import warnings
 
