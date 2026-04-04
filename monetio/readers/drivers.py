@@ -314,23 +314,43 @@ class XarrayDriver:
                         dsets = [preprocess(ds) for ds in dsets]
 
                     # Combine logic (backend-agnostic)
-                    try:
-                        return xr.combine_by_coords(
-                            dsets,
-                            data_vars="minimal",
-                            coords="minimal",
-                            compat="override",
-                        )
-                    except ValueError:
-                        # Fallback to concat if combine_by_coords fails.
-                        concat_dim = xr_kwargs.get("concat_dim", "time")
-                        return xr.concat(
-                            dsets, dim=concat_dim, coords="different", data_vars="minimal"
-                        )
+                    concat_dim = xr_kwargs.get("concat_dim")
+                    if concat_dim is not None:
+                        # If a explicit dimension is given, we use nested combination
+                        # or direct concatenation if nested combine fails.
+                        try:
+                            return xr.combine_nested(
+                                dsets,
+                                concat_dim=concat_dim,
+                                data_vars="minimal",
+                                coords="minimal",
+                                compat="override",
+                            )
+                        except (ValueError, TypeError):
+                            return xr.concat(
+                                dsets, dim=concat_dim, coords="different", data_vars="minimal"
+                            )
+                    else:
+                        try:
+                            return xr.combine_by_coords(
+                                dsets,
+                                data_vars="minimal",
+                                coords="minimal",
+                                compat="override",
+                            )
+                        except (ValueError, TypeError):
+                            # Fallback to concat if combine_by_coords fails.
+                            return xr.concat(
+                                dsets, dim="time", coords="different", data_vars="minimal"
+                            )
 
                 # Standard path: use xr.open_mfdataset
                 if preprocess:
                     xr_kwargs["preprocess"] = preprocess
+
+                # If concat_dim is provided, ensure we use nested combine to avoid xarray errors
+                if "concat_dim" in xr_kwargs and "combine" not in xr_kwargs:
+                    xr_kwargs["combine"] = "nested"
 
                 if "engine" not in xr_kwargs:
                     try:
