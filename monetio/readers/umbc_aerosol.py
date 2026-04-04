@@ -1,7 +1,7 @@
 """UMBC Aerosol Reader (CL51)"""
 
 import warnings
-from typing import List, Optional, Union
+from typing import List, Union
 
 import numpy as np
 import pandas as pd

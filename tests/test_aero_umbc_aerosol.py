@@ -1,8 +1,9 @@
 import numpy as np
-import pandas as pd
 import pytest
 import xarray as xr
+
 from monetio.readers.umbc_aerosol import UMBCAerosolReader
+
 
 @pytest.fixture
 def mock_umbc_hdf5(tmp_path):
@@ -26,6 +27,7 @@ def mock_umbc_hdf5(tmp_path):
 
     return str(fn)
 
+
 def test_umbc_aerosol_eager_lazy(mock_umbc_hdf5):
     """Verify UMBCAerosolReader works with both Eager and Lazy backends."""
     reader = UMBCAerosolReader()
@@ -43,6 +45,7 @@ def test_umbc_aerosol_eager_lazy(mock_umbc_hdf5):
     ds_lazy = reader.open_dataset(mock_umbc_hdf5, lazy=True)
     try:
         import dask.array as da
+
         assert isinstance(ds_lazy.bsc.data, da.Array)
     except ImportError:
         pytest.skip("Dask not installed")
@@ -55,6 +58,7 @@ def test_umbc_aerosol_eager_lazy(mock_umbc_hdf5):
     assert "Preprocessed UMBC Aerosol data" in ds_eager.attrs["history"]
     assert "Read UMBC Aerosol data" in ds_eager.attrs["history"]
 
+
 def test_umbc_aerosol_multi_file(tmp_path):
     """Verify UMBCAerosolReader handles multiple files via XarrayDriver."""
     import h5py
@@ -65,7 +69,7 @@ def test_umbc_aerosol_multi_file(tmp_path):
         with h5py.File(fn, "w") as f:
             data = f.create_group("DATA")
             data.create_dataset("Altitude_m", data=np.linspace(0, 100, 5))
-            data.create_dataset("UnixTime_UTC", data=[1600000000 + i*3600])
+            data.create_dataset("UnixTime_UTC", data=[1600000000 + i * 3600])
             data.create_dataset("Profile_bsc", data=np.random.rand(1, 5))
             f.create_group("Instrument_Attributes").attrs["Location_lat"] = 40.0
         files.append(str(fn))
