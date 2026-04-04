@@ -59,11 +59,18 @@ class MODISORNLReader(GriddedReader):
             Kilometers above/below center.
         kmLeftRight : int, optional
             Kilometers left/right center.
+        **kwargs : dict
+            Additional arguments.
 
         Returns
         -------
         xr.Dataset
             The MODIS ORNL dataset.
+
+        Examples
+        --------
+        >>> reader = MODISORNLReader()
+        >>> ds = reader.open_dataset(date='2020-01-01', product='MOD15A2H', band='Lai_500m')
         """
         if not HAS_SUDS:
             raise ImportError(
@@ -71,7 +78,7 @@ class MODISORNLReader(GriddedReader):
             )
 
         date = pd.to_datetime(date)
-        m = _get_single_retrieval(
+        ds = _get_single_retrieval(
             date,
             product=product,
             band=band,
@@ -82,39 +89,10 @@ class MODISORNLReader(GriddedReader):
             kmLeftRight=kmLeftRight,
         )
 
-        ds = _make_xarray_dataset(m)
-
         # Update history
         ds = update_history(ds, f"Read MODIS ORNL {product} {band} data.")
 
         return ds
-
-
-class MODISData:
-    def __init__(self):
-        self.server = None
-        self.product = None
-        self.latitude = None
-        self.longitude = None
-        self.band = None
-        self.nrows = None
-        self.ncols = None
-        self.cellsize = None
-        self.scale = None
-        self.units = None
-        self.yllcorner = None
-        self.xllcorner = None
-        self.kmAboveBelow = 0
-        self.kmLeftRight = 0
-        self.dateStr = []
-        self.dateInt = []
-        self.data = []
-        self.isScaled = False
-
-    def applyScale(self):
-        if not self.isScaled:
-            self.data = self.data * self.scale
-            self.isScaled = True
 
 
 def _nearest(items: pd.DatetimeIndex, pivot: pd.Timestamp) -> pd.Timestamp:
@@ -145,9 +123,9 @@ def _get_single_retrieval(
     lon: float,
     kmAboveBelow: int,
     kmLeftRight: int,
-) -> MODISData:
+) -> xr.Dataset:
     """
-    Retrieve a single MODIS subset from ORNL.
+    Retrieve a single MODIS subset from ORNL and return as xr.Dataset.
 
     Parameters
     ----------
@@ -170,8 +148,8 @@ def _get_single_retrieval(
 
     Returns
     -------
-    MODISData
-        Object containing retrieved data and metadata.
+    xr.Dataset
+        Dataset containing retrieved data and metadata.
     """
     client = Client(DEFAULT_WSDL)
 
@@ -188,63 +166,80 @@ def _get_single_retrieval(
         lat, lon, product, band, date_str, date_str, kmAboveBelow, kmLeftRight
     )
 
-    m = MODISData()
-    m.server = DEFAULT_WSDL
-    m.product = product
-    m.band = band
-    m.latitude = lat
-    m.longitude = lon
-    m.nrows = int(data.nrows)
-    m.ncols = int(data.ncols)
-    m.cellsize = data.cellsize
-    m.scale = data.scale
-    m.units = data.units
-    m.yllcorner = data.yllcorner
-    m.xllcorner = data.xllcorner
-    m.dateInt = [int(target_date.strftime("%Y%j"))]
+    # Extract metadata
+    metadata = {
+        "server": DEFAULT_WSDL,
+        "product": product,
+        "band": band,
+        "latitude": lat,
+        "longitude": lon,
+        "nrows": int(data.nrows),
+        "ncols": int(data.ncols),
+        "cellsize": data.cellsize,
+        "scale": data.scale,
+        "units": data.units,
+        "yllcorner": data.yllcorner,
+        "xllcorner": data.xllcorner,
+        "date_int": int(target_date.strftime("%Y%j")),
+    }
 
     # Parse data
     subset_data = data.subset[0].split(",")[5:]
-    m.data = np.array([float(x) for x in subset_data]).reshape(1, -1)
+    grid_data = np.array([float(x) for x in subset_data]).reshape(
+        metadata["nrows"], metadata["ncols"]
+    )
 
-    m.applyScale()
-    return m
+    # Apply scaling
+    if metadata["scale"] != 1.0:
+        grid_data = grid_data * metadata["scale"]
+
+    ds = _make_xarray_dataset(grid_data, metadata)
+
+    return ds
 
 
-def _make_xarray_dataset(m: MODISData) -> xr.Dataset:
+def _make_xarray_dataset(grid_data: np.ndarray, metadata: dict) -> xr.Dataset:
     """
-    Create an xarray Dataset from MODISData.
+    Create an xarray Dataset from raw data and metadata.
 
     Parameters
     ----------
-    m : MODISData
-        Object containing data and metadata.
+    grid_data : np.ndarray
+        2D grid data.
+    metadata : dict
+        Metadata dictionary.
 
     Returns
     -------
     xr.Dataset
         The formatted dataset.
     """
-    # Reshape and flip to match standard orientation if needed
-    # The original code did: m.data.reshape(m.ncols, m.nrows, order='C')[::-1, :]
-    # which resulted in (x, y) dims.
-    grid_data = m.data.reshape(m.nrows, m.ncols)
-
-    ds = xr.Dataset(
-        data_vars={m.band: (("y", "x"), grid_data)},
-        coords={"time": [pd.to_datetime(str(m.dateInt[0]), format="%Y%j")]},
-    )
+    band = metadata["band"]
+    # We use expand_dims later to add the time dimension to the data variables
+    ds = xr.Dataset(data_vars={band: (("y", "x"), grid_data)})
     ds = ds.expand_dims("time")
+    ds = ds.assign_coords({"time": [pd.to_datetime(str(metadata["date_int"]), format="%Y%j")]})
 
     # Add lat/lon
-    lon, lat = _get_latlon(m.xllcorner, m.yllcorner, m.cellsize, m.ncols, m.nrows)
+    lon, lat = _get_latlon(
+        metadata["xllcorner"],
+        metadata["yllcorner"],
+        metadata["cellsize"],
+        metadata["ncols"],
+        metadata["nrows"],
+    )
     ds = ds.assign_coords(
-        latitude=(("y", "x"), lat, {"units": "degrees_north", "standard_name": "latitude"}),
-        longitude=(("y", "x"), lon, {"units": "degrees_east", "standard_name": "longitude"}),
+        latitude=(("y", "x"), lat.data, {"units": "degrees_north", "standard_name": "latitude"}),
+        longitude=(("y", "x"), lon.data, {"units": "degrees_east", "standard_name": "longitude"}),
     )
 
-    ds[m.band].attrs.update({"units": m.units, "long_name": m.band, "product": m.product})
-    ds.attrs["server"] = m.server
+    ds[band].attrs.update(
+        {"units": metadata["units"], "long_name": band, "product": metadata["product"]}
+    )
+    ds.attrs["server"] = metadata["server"]
+
+    # Update history
+    ds = update_history(ds, "Created xarray Dataset from MODIS ORNL subset.")
 
     return ds
 
