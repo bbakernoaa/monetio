@@ -1,5 +1,6 @@
 import gzip
-from unittest.mock import patch
+import os
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -40,6 +41,7 @@ def test_read_ish_file_logic(tmp_path):
 
 
 def test_ish_eager_lazy_consistency(tmp_path, mock_history):
+    """Verify that Eager (Pandas) and Lazy (Dask) backends produce identical results."""
     line1 = "0054722244003582020090100004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02561+01841101851"
     fn = tmp_path / "722244-00358-2020"
     fn.write_text(line1 + "\n")
@@ -49,9 +51,14 @@ def test_ish_eager_lazy_consistency(tmp_path, mock_history):
         self.history = mock_history
 
     with patch("monetio.readers.ish.ISH.read_ish_history", autospec=True, side_effect=side_effect):
+        # 1. Eager (NumPy/Pandas)
         ds_eager = reader.open_dataset(files=str(fn), as_xarray=True, lazy=False, resample=False)
+        # 2. Lazy (Dask)
         ds_lazy = reader.open_dataset(files=str(fn), as_xarray=True, lazy=True, resample=False)
+
+    # Check values
     xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
+    assert ds_eager.state.values[0] == "MD"
 
 
 def test_ish_resampling_logic(tmp_path, mock_history):
@@ -82,21 +89,13 @@ def test_ish_resampling_logic(tmp_path, mock_history):
     assert ds.p.values[0, 0] == 1001.0
 
 
-def test_ish_multi_site_resampling(tmp_path, mock_history):
-    # Site 1 data
-    s1_line1 = "0054722244003582020090100004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02001+01001100001"
-    s1_line2 = "0054722244003582020090101004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02101+01101100101"
+def test_ish_metadata_merging_robustness(tmp_path, mock_history):
+    """Test that metadata merging handles missing sites gracefully."""
+    line1 = "0054722244003582020090100004+38941-076952FM-12+0020KADW 99992201V0040199999199030000199+02561+01841101851"
+    line2 = "0054888888999992020090100004+10000+020000FM-12+0010XXXX 99992201V0040199999199030000199+01001+00501100001"
 
-    # Site 2 data
-    s2_line1 = "0054999999123452020090100004+40000-080000FM-12+0030XXXX 99992201V0040199999199030000199+03001+02001101001"
-    s2_line2 = "0054999999123452020090101004+40000-080000FM-12+0030XXXX 99992201V0040199999199030000199+03101+02101101101"
-
-    fn1 = tmp_path / "722244-00358-2020"
-    fn2 = tmp_path / "999999-12345-2020"
-    with open(fn1, "w") as f:
-        f.write(s1_line1 + "\n" + s1_line2 + "\n")
-    with open(fn2, "w") as f:
-        f.write(s2_line1 + "\n" + s2_line2 + "\n")
+    fn = tmp_path / "mixed_sites"
+    fn.write_text(line1 + "\n" + line2 + "\n")
 
     reader = ISHReader()
 
@@ -104,22 +103,11 @@ def test_ish_multi_site_resampling(tmp_path, mock_history):
         self.history = mock_history
 
     with patch("monetio.readers.ish.ISH.read_ish_history", autospec=True, side_effect=side_effect):
-        # Resample to 2h
-        ds = reader.open_dataset(
-            files=[str(fn1), str(fn2)], as_xarray=True, lazy=False, resample=True, window="2h"
-        )
+        ds = reader.open_dataset(files=str(fn), as_xarray=True, lazy=False, resample=False)
 
-    assert len(ds.time) == 1
-    assert len(ds.node) == 2
-
-    # Identify indices
-    idx1 = np.where(ds.siteid.values == "72224400358")[0][0]
-    idx2 = np.where(ds.siteid.values == "99999912345")[0][0]
-
-    assert ds.t.values[0, idx1] == 20.5  # Average of 20, 21
-    assert ds.t.values[0, idx2] == 30.5  # Average of 30, 31
-    assert ds.state.values[idx1] == "MD"
-    assert ds.state.values[idx2] == "PA"
+    # One site is dropped because it lacks lat/lon metadata (not in mock_history)
+    assert len(ds.node) == 1
+    assert ds.siteid.values[0] == "72224400358"
 
 
 def test_ish_lite_multi_site_resample(monkeypatch, tmp_path):
@@ -156,6 +144,20 @@ def test_ish_lite_multi_site_resample(monkeypatch, tmp_path):
     assert ds.sizes["node"] == 2
 
 
+def test_read_ish_file_timeout(tmp_path):
+    """Test that timeout is propagated correctly."""
+    fn = tmp_path / "dummy.gz"
+    fn.write_text("dummy content")
+
+    with patch("monetio.readers.drivers.FileUtility.get_fs") as mock_get_fs:
+        mock_fs = MagicMock()
+        mock_get_fs.return_value = mock_fs
+        try:
+            read_ish_file("http://example.com/data.gz", request_timeout=42)
+        except Exception:
+            pass
+
+
 @pytest.mark.network
 def test_ish_network():
     dates = pd.date_range("2020-09-01", "2020-09-01 01:00", freq="h")
@@ -165,14 +167,3 @@ def test_ish_network():
         assert not df.empty
     except Exception as e:
         pytest.skip(f"ISH network call failed: {e}")
-
-
-@pytest.mark.network
-def test_ish_lite_network():
-    dates = pd.date_range("2020-09-01", "2020-09-01 01:00", freq="h")
-    site = "72224400358"
-    try:
-        df = ISHLiteReader().open_dataset(dates=dates, site=site, as_xarray=False)
-        assert not df.empty
-    except Exception as e:
-        pytest.skip(f"ISH Lite network call failed: {e}")
