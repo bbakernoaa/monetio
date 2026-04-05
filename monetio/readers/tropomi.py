@@ -121,14 +121,19 @@ def tropomi_preprocess(
     ds : xr.Dataset
         Input dataset from a single file/group (or merged groups).
     calculate_pressure : bool, optional
-        Whether to calculate pressure levels.
+        Whether to calculate pressure levels, by default True.
     qa_threshold : float, optional
-        Quality value threshold for masking.
+        Quality value threshold for masking. If provided, variables are masked
+        where 'qa_value' is less than this threshold.
 
     Returns
     -------
     xr.Dataset
         Processed dataset.
+
+    Examples
+    --------
+    >>> ds = tropomi_preprocess(ds, qa_threshold=0.75)
     """
     # 1. Standardize dimensions and coordinates
     # TROPOMI uses 'scanline' and 'ground_pixel'
@@ -157,6 +162,7 @@ def tropomi_preprocess(
             ds["height_m_mid"] = h_mid.assign_attrs({"long_name": "mid-layer height"})
             break
 
+    # 5. Coordinate and Dimension Harmonization
     if "time" in ds.coords and "time" not in ds.dims:
         if ds.coords["time"].dims == ("y",):
             ds = ds.swap_dims({"y": "time"})
@@ -167,17 +173,23 @@ def tropomi_preprocess(
             if "y" in ds[var].dims:
                 ds[var] = ds[var].rename({"y": "time"})
 
-    # 5. Quality Flagging (Lazy)
+    # 6. Quality Flagging (Lazy & Vectorized)
     if qa_threshold is not None and "qa_value" in ds.data_vars:
         # Mask all data variables where qa_value < threshold
-        # We exclude coordinates and the qa_value itself from masking
+        # We preserve the qa_value itself and coordinates
         qa = ds["qa_value"]
-        for var in ds.data_vars:
-            if var != "qa_value":
-                ds[var] = ds[var].where(qa >= qa_threshold)
+        mask = qa >= qa_threshold
+        # Dataset-level where is vectorized and lazy-safe
+        ds = ds.where(mask)
+        # Restore the original qa_value (unmasked)
+        ds["qa_value"] = qa
 
     # Update history
-    ds = update_history(ds, "Preprocessed TROPOMI data.")
+    ds = update_history(
+        ds,
+        "Preprocessed TROPOMI data: standardized coordinates, handled time, "
+        "and optionally applied quality flagging and pressure calculation.",
+    )
 
     return ds
 
@@ -185,8 +197,23 @@ def tropomi_preprocess(
 def _add_pressure_levels(ds: xr.Dataset) -> xr.Dataset:
     """
     Calculate mid-layer and interface pressure levels for TROPOMI lazily.
+
     Supports NO2/HCHO (TM5), CO/CH4 style pressure definitions, and existing
     pressure variables (O3 Profile, AER_LH).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset containing variables required for pressure calculation.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 'pres_pa_mid' and optionally 'troppres' added.
+
+    Examples
+    --------
+    >>> ds = _add_pressure_levels(ds)
     """
     # 1. NO2/HCHO style (TM5 constant a, b)
     if all(v in ds.data_vars for v in ["tm5_constant_a", "tm5_constant_b", "surface_pressure"]):
