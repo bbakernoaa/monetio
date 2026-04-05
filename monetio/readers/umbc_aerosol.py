@@ -1,5 +1,6 @@
 """UMBC Aerosol Reader (CL51)"""
 
+import warnings
 from typing import List, Union
 
 import numpy as np
@@ -7,7 +8,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import update_history
+from .sat_utils import apply_lazy_conversion, update_history
 
 
 @register_reader("umbc_aerosol")
@@ -27,78 +28,136 @@ class UMBCAerosolReader(GriddedReader):
         Parameters
         ----------
         files : Union[str, List[str]]
-            File path, list of paths, or glob pattern.
+            File path(s) or URL(s).
         **kwargs : dict
-            Additional arguments passed to the driver.
+            Additional arguments passed to XarrayDriver.open.
 
         Returns
         -------
         xr.Dataset
-            The processed UMBC Aerosol dataset.
+            The UMBC Aerosol dataset.
+
+        Examples
+        --------
+        >>> reader = UMBCAerosolReader()
+        >>> ds = reader.open_dataset(files="UMBC_CL51_*.h5")
         """
-        # We don't use XarrayDriver directly because the file structure is custom
-        # and better handled by a custom loading logic that can be dask-ified.
+        # UMBC CL51 HDF5 files have 'DATA' and 'Instrument_Attributes' groups
+        groups = ["DATA", "Instrument_Attributes"]
 
-        from .drivers import FileUtility
+        user_preprocess = kwargs.pop("preprocess", None)
 
-        file_list = FileUtility.expand_paths(files)
+        if "engine" not in kwargs:
+            kwargs["engine"] = "h5netcdf"
 
         dsets = []
-        for f in file_list:
-            ds = self._read_file(f)
-            dsets.append(ds)
+        all_attrs = {}
+        for g in groups:
+            g_kwargs = kwargs.copy()
+            g_kwargs["group"] = g
+            try:
+                # We open without the UMBC preprocess at this stage
+                ds_g = super().open_dataset(files, **g_kwargs)
+                dsets.append(ds_g)
+                # Manually collect attributes from groups
+                all_attrs.update(ds_g.attrs)
+            except Exception as e:
+                warnings.warn(f"Could not open group {g}: {e}")
 
-        if len(dsets) == 1:
-            ds = dsets[0]
-        else:
-            ds = xr.concat(dsets, dim="time")
+        if not dsets:
+            raise RuntimeError("No groups could be opened.")
 
-        ds = self.harmonize(ds)
+        # Merge groups
+        # We use compat='no_conflicts' as coordinates should be identical
+        ds = xr.merge(dsets, compat="no_conflicts")
+        ds.attrs.update(all_attrs)
+
+        # Now apply UMBC preprocessing to the merged dataset
+        ds = umbc_aerosol_preprocess(ds)
+
+        if user_preprocess:
+            ds = user_preprocess(ds)
 
         # Update history
         ds = update_history(ds, "Read UMBC Aerosol data.")
 
         return ds
 
-    def _read_file(self, fname: str) -> xr.Dataset:
-        """Reads a single CL51 HDF5 file."""
-        import h5py
 
-        with h5py.File(fname, "r") as f:
-            atts = f["Instrument_Attributes"]
-            data = f["DATA"]
+def umbc_aerosol_preprocess(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Preprocess UMBC Aerosol dataset: standardize coordinates and handle time.
 
-            # altitude variables
-            alt = data["Altitude_m"][:].squeeze()
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset from merged 'DATA' and 'Instrument_Attributes' groups.
 
-            # time variables
-            time = pd.to_datetime(data["UnixTime_UTC"][:], unit="s")
-            # Back Scatter
-            bsc = data["Profile_bsc"][:]
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset.
+    """
+    # 1. Handle renaming and dimensions
+    if "Altitude_m" in ds.variables:
+        ds = ds.rename({"Altitude_m": "altitude"})
+        if ds["altitude"].ndim == 1:
+            a_dim = ds["altitude"].dims[0]
+            if a_dim != "z":
+                ds = ds.rename({a_dim: "z"})
+            ds = ds.set_coords("altitude")
 
-            ds = xr.Dataset()
-            ds["z"] = (("z"), alt)
-            ds["time"] = (("time"), time)
-            ds["x"] = (("x"), [0.0])
-            ds["y"] = (("y"), [0.0])
+    if "Profile_bsc" in ds.variables:
+        ds = ds.rename({"Profile_bsc": "bsc"})
 
-            ds["bsc"] = (("time", "z"), bsc)
+    if "UnixTime_UTC" in ds.variables:
 
-            # Attributes
-            for k, v in atts.attrs.items():
-                if isinstance(v, (list, np.ndarray)) and len(v) > 0:
-                    ds.attrs[k] = v[0]
-                else:
-                    ds.attrs[k] = v
+        def _convert_time(t):
+            return pd.to_datetime(t, unit="s").astype("datetime64[ns]")
 
-            # Coordinates
-            try:
-                lat = float(ds.attrs.get("Location_lat", 0.0))
-                lon = float(ds.attrs.get("Location_lon", 0.0))
-            except (TypeError, ValueError):
-                lat, lon = 0.0, 0.0
+        time_da = apply_lazy_conversion(ds["UnixTime_UTC"], _convert_time, "datetime64[ns]")
+        u_dim = ds["UnixTime_UTC"].dims[0]
 
-            ds.coords["latitude"] = (("y", "x"), np.array([[lat]]))
-            ds.coords["longitude"] = (("y", "x"), np.array([[lon]]))
+        # Assign time as a coordinate and swap dimension
+        ds = ds.assign_coords(time=time_da)
+        if u_dim != "time":
+            ds = ds.swap_dims({u_dim: "time"})
 
-            return ds
+        if "UnixTime_UTC" in ds.data_vars:
+            ds = ds.drop_vars("UnixTime_UTC")
+
+    # 2. Handle Coordinates (Latitude/Longitude) from Attributes
+    # Extract from merged attributes (from Instrument_Attributes group)
+    lat = ds.attrs.get("Location_lat", 0.0)
+    lon = ds.attrs.get("Location_lon", 0.0)
+
+    # Handle case where attributes are stored as lists/arrays
+    if isinstance(lat, (list, np.ndarray)) and len(lat) > 0:
+        lat = lat[0]
+    if isinstance(lon, (list, np.ndarray)) and len(lon) > 0:
+        lon = lon[0]
+
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except (TypeError, ValueError):
+        lat, lon = 0.0, 0.0
+
+    # Ensure x and y dimensions exist for consistency with other lidar readers
+    if "x" not in ds.dims:
+        ds = ds.expand_dims("x")
+        ds["x"] = [0.0]
+    if "y" not in ds.dims:
+        ds = ds.expand_dims("y")
+        ds["y"] = [0.0]
+
+    ds.coords["latitude"] = (("y", "x"), np.array([[lat]]))
+    ds.coords["longitude"] = (("y", "x"), np.array([[lon]]))
+
+    ds.coords["latitude"].attrs.update({"units": "degrees_north", "standard_name": "latitude"})
+    ds.coords["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
+
+    # Update history
+    ds = update_history(ds, "Preprocessed UMBC Aerosol data via Aero Protocol.")
+
+    return ds
