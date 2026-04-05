@@ -241,3 +241,36 @@ def test_tropomi_multi_group(monkeypatch):
     assert ds_merged.surface_pressure.shape == (3, 4)
     assert "time" in ds_merged.coords
     assert ds_merged.time.size == 3
+
+
+def test_tropomi_eager_lazy_consistency():
+    """
+    Strict Aero Protocol Check: Verify Eager (NumPy) and Lazy (Dask)
+    produce identical results for TROPOMI preprocessing.
+    """
+    # Create a base dataset
+    ds = xr.Dataset(
+        {
+            "no2": (("scanline", "ground_pixel"), np.random.rand(10, 10).astype(np.float32)),
+            "qa_value": (("scanline", "ground_pixel"), np.random.rand(10, 10).astype(np.float32)),
+            "delta_time": (("scanline",), np.arange(10, dtype="int32")),
+        },
+        coords={
+            "latitude": (("scanline", "ground_pixel"), np.random.rand(10, 10).astype(np.float32)),
+            "longitude": (("scanline", "ground_pixel"), np.random.rand(10, 10).astype(np.float32)),
+            "time": ((), np.datetime64("2023-01-01")),
+        },
+    )
+
+    # 1. Eager result
+    ds_eager = tropomi_preprocess(ds.copy(), qa_threshold=0.5)
+
+    # 2. Lazy result
+    ds_lazy = ds.copy().chunk({"scanline": 5, "ground_pixel": 5})
+    ds_lazy_out = tropomi_preprocess(ds_lazy, qa_threshold=0.5)
+
+    # Verify laziness
+    assert ds_lazy_out.no2.chunks is not None
+
+    # Compute and compare
+    xr.testing.assert_allclose(ds_eager, ds_lazy_out.compute())
