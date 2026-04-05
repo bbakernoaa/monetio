@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
 import xarray as xr
+
 from monetio.readers.tropomi import TROPOMIReader
+
 
 @pytest.fixture
 def mock_tropomi_file(tmp_path):
@@ -20,7 +22,7 @@ def mock_tropomi_file(tmp_path):
         prod.createDimension("scanline", scanline)
         prod.createDimension("ground_pixel", ground_pixel)
         prod.createDimension("layer", layer)
-        prod.createDimension("time", scanline) # Per scanline time to avoid alignment error
+        prod.createDimension("time", scanline)  # Per scanline time to avoid alignment error
 
         # Create variables
         lat = prod.createVariable("latitude", "f4", ("scanline", "ground_pixel"))
@@ -40,7 +42,9 @@ def mock_tropomi_file(tmp_path):
         qa = prod.createVariable("qa_value", "f4", ("scanline", "ground_pixel"))
         qa[:] = np.ones((scanline, ground_pixel))
 
-        no2 = prod.createVariable("nitrogendioxide_tropospheric_column", "f4", ("scanline", "ground_pixel"))
+        no2 = prod.createVariable(
+            "nitrogendioxide_tropospheric_column", "f4", ("scanline", "ground_pixel")
+        )
         no2[:] = np.random.rand(scanline, ground_pixel)
 
         # SUPPORT_DATA/INPUT_DATA
@@ -51,6 +55,7 @@ def mock_tropomi_file(tmp_path):
         ps[:] = np.full((scanline, ground_pixel), 101325.0)
 
     return str(fn)
+
 
 def test_tropomi_eager_lazy(mock_tropomi_file):
     """Verify TROPOMIReader works with both Eager and Lazy backends."""
@@ -66,12 +71,14 @@ def test_tropomi_eager_lazy(mock_tropomi_file):
     ds_lazy = reader.open_dataset(files=mock_tropomi_file, lazy=True, calculate_pressure=False)
     try:
         import dask.array as da
+
         assert isinstance(ds_lazy.nitrogendioxide_tropospheric_column.data, da.Array)
     except ImportError:
         pass
 
     # 3. Equality
     xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
+
 
 def test_tropomi_qa_flagging(mock_tropomi_file):
     """Verify QA threshold masking works."""
