@@ -11,6 +11,15 @@
 - [s3fs](https://github.com/fsspec/s3fs)
 - [scipy](https://scipy.org/)
 
+## Optional Dependencies
+
+Some features require additional packages:
+
+- **Cubed backend**: `cubed` and `cubed-xarray`
+- **VirtualiZarr**: `virtualizarr`, `obstore`, `obspec_utils`, `ujson`, and `zarr`
+- **GRIB2 support**: `grib2io`
+- **HDF4 support**: `pyhdf`
+
 ## Instructions
 
 MONETIO is a pure Python package. The easiest way to install it is using `pip` or `conda`.
