@@ -39,8 +39,8 @@ def test_add_lazy_diagnostic_eager_vs_lazy():
     assert hasattr(ds_lazy["sum_var"].data, "dask")
     np.testing.assert_allclose(ds_lazy["sum_var"].values, 6.5)
 
-    # Cross-check
-    xr.testing.assert_identical(ds_eager, ds_lazy.compute())
+    # Cross-check. Use assert_allclose to ignore timestamp differences in history attribute.
+    xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
 
 
 def test_add_lazy_diagnostic_unit_sync():
