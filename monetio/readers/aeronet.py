@@ -538,7 +538,7 @@ def _build_single_url(d1, d2, product, inv_type, daily, lunar, siteid, latlonbox
         # Restore validation for test_add_data_bad_siteid
         retries = kwargs.get("retries", 5)
         valid_sites = get_valid_sites(retries=retries)
-        if not valid_sites.empty and siteid not in valid_sites.siteid.values:
+        if not valid_sites.empty and siteid not in valid_sites.siteid.unique():
             raise ValueError(f"invalid site {siteid!r}")
         loc_ = f"&site={siteid}"
     elif latlonbox is not None:
@@ -752,6 +752,64 @@ def _dust_detect(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _vectorized_tspack_interp(wvs: np.ndarray, aods: np.ndarray, new_wvs: np.ndarray) -> np.ndarray:
+    """
+    Vectorized interpolation kernel using pytspack.
+
+    Parameters
+    ----------
+    wvs : np.ndarray
+        Source wavelengths, 1D.
+    aods : np.ndarray
+        Source AOD values, 2D (n_points, n_wvs).
+    new_wvs : np.ndarray
+        Target wavelengths, 1D.
+
+    Returns
+    -------
+    np.ndarray
+        Interpolated AOD values, 2D (n_points, n_new_wvs).
+    """
+    import pytspack
+
+    n_points, n_wvs = aods.shape
+    n_new = len(new_wvs)
+    out = np.full((n_points, n_new), np.nan)
+
+    # Try to identify API
+    try:
+        tspack = pytspack.TsPack()
+        has_new_api = True
+    except (AttributeError, TypeError):
+        has_new_api = False
+
+    for i in range(n_points):
+        row = aods[i, :]
+        mask = ~np.isnan(row)
+        if mask.sum() < 2:
+            continue
+
+        # Sort if necessary (AERONET columns usually are, but just in case)
+        row_wvs = wvs[mask]
+        row_aod = row[mask]
+        if not np.all(np.diff(row_wvs) > 0):
+            idx = np.argsort(row_wvs)
+            row_wvs = row_wvs[idx]
+            row_aod = row_aod[idx]
+
+        try:
+            if has_new_api:
+                interp = tspack.interpolate(row_wvs, row_aod)
+                out[i, :] = interp(new_wvs)
+            else:
+                x, y, yp, sigma = pytspack.tspsi(row_wvs, row_aod)
+                out[i, :] = pytspack.hval(new_wvs, x, y, yp, sigma)
+        except Exception:
+            continue
+
+    return out
+
+
 def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray]) -> pd.DataFrame:
     """Interpolate AOD to new wavelengths."""
     try:
@@ -768,40 +826,21 @@ def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray
         # Re-raise as RuntimeError to match expected behavior in tests
         raise RuntimeError("You must install pytspack before using this function.")
 
-    def _tspack_aod_interp(row, new_wv):
-        aod_columns = [c for c in row.index if c.startswith("aod_") and c.endswith("nm")]
-        aods = row[aod_columns]
-        wv = [float(c.replace("aod_", "").replace("nm", "")) for c in aod_columns]
-
-        a = pd.DataFrame({"aod": aods, "wv": wv}).dropna()
-        a = a.sort_values(by="wv")
-        if len(a) < 2:
-            return new_wv * np.nan
-        else:
-            try:
-                try:
-                    # New API
-                    interp = pytspack.TsPack().interpolate(a.wv.values, a.aod.values)
-                    return interp(new_wv)
-                except AttributeError:
-                    # Old API
-                    x, y, yp, sigma = pytspack.tspsi(a.wv.values, a.aod.values)
-                    return pytspack.hval(new_wv, x, y, yp, sigma)
-            except RuntimeError as e:
-                raise RuntimeError(f"pytspack is installed but not usable: {e}")
-
     new_wv = np.asarray(new_wv)
-    # Copy to avoid fragmentation warning when adding many columns
     df = df.copy()
-    names = "aod_" + pd.Series(new_wv.astype(int).astype(str)) + "nm"
 
-    if df.empty:
-        for name in names:
-            df[name] = np.array([], dtype=float)
+    aod_columns = [c for c in df.columns if c.startswith("aod_") and c.endswith("nm")]
+    if not aod_columns:
         return df
 
-    out = df.apply(_tspack_aod_interp, axis=1, result_type="expand", new_wv=new_wv)
-    out.columns = names.values
+    wvs = np.array([float(c.replace("aod_", "").replace("nm", "")) for c in aod_columns])
+
+    # We use a helper function to perform the interpolation
+    # This is much faster than row-wise apply
+    out_values = _vectorized_tspack_interp(wvs, df[aod_columns].to_numpy(), new_wv)
+
+    names = "aod_" + pd.Series(new_wv.astype(int).astype(str)) + "nm"
+    out = pd.DataFrame(out_values, columns=names.to_numpy(), index=df.index)
 
     dup_names = list(set(df.columns) & set(out.columns))
     if dup_names:
@@ -818,7 +857,12 @@ def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray
             if ename in df.columns:
                 df = df.rename(columns={ename: f"{ename}{suff}"})
 
-    return pd.concat([df, out], axis=1)
+    df = pd.concat([df, out], axis=1)
+
+    # Update history for provenance
+    df = update_history(df, f"Interpolated AOD to new wavelengths: {new_wv}")
+
+    return df
 
 
 def add_angstrom_exponent(
