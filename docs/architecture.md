@@ -15,6 +15,7 @@ We are moving to a unified reader system located in `monetio/readers/`.
 - **Maintainability**: Common logic (like S3 access, coordinate renaming, and lazy loading) is centralized in drivers and base classes.
 - **Lazy Loading**: Readers are registered and loaded only when needed, reducing initial import time.
 - **Performance (VirtualiZarr)**: For large gridded datasets (MERRA2, GFS, ICAP), readers leverage `use_virtualizarr=True` via the Xarray driver to bypass `open_mfdataset` overhead. By pre-computing references to `virtualizarr_file`, datasets map into memory virtually via the Zarr engine.
+- **Parallelism (Cubed)**: Experimental support for [Cubed](https://github.com/cubed-dev/cubed) as a lazy-loading backend is available via `use_cubed=True` in `monetio.load()` for gridded data sources. This requires `cubed` and `cubed-xarray` to be installed.
 
 
 ## Deprecation of Legacy Modules

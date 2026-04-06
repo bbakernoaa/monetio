@@ -84,6 +84,7 @@ class XarrayDriver:
         self,
         files: Union[str, List[str]],
         use_dask: bool = False,
+        use_cubed: bool = False,
         use_virtualizarr: bool = False,
         virtualizarr_file: str = None,
         **kwargs,
@@ -97,6 +98,8 @@ class XarrayDriver:
             File path(s), URL(s), or glob pattern.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
+        use_cubed : bool, optional
+            Whether to use Cubed for lazy loading, by default False.
         use_virtualizarr : bool, optional
             Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
             Useful for large datasets to avoid xarray.open_mfdataset overhead.
@@ -112,18 +115,29 @@ class XarrayDriver:
         xr.Dataset
             The loaded dataset.
         """
-        # Expand wildcards (supports S3 globbing now)
-        file_list = FileUtility.expand_paths(files)
-
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
+
+        if use_cubed:
+            try:
+                import cubed  # noqa: F401
+                import cubed_xarray  # noqa: F401
+            except ImportError:
+                raise ImportError(
+                    "The 'cubed' backend requires 'cubed' and 'cubed-xarray'. "
+                    "Install with `pip install cubed cubed-xarray`."
+                )
+            xr_kwargs["chunked_array_type"] = "cubed"
+
+        # Expand wildcards (supports S3 globbing now)
+        file_list = FileUtility.expand_paths(files)
 
         # Handle 'lazy' keyword: Eager by default per Aero Protocol.
         if "lazy" in xr_kwargs:
             use_dask = xr_kwargs.pop("lazy")
 
-        # If laziness or specific chunking is requested, ensure Dask auto-chunking is used.
-        if (use_dask or "chunks" in xr_kwargs) and "chunks" not in xr_kwargs:
+        # If laziness or specific chunking is requested, ensure auto-chunking is used.
+        if (use_dask or use_cubed or "chunks" in xr_kwargs) and "chunks" not in xr_kwargs:
             xr_kwargs["chunks"] = {}
 
         # Extract MONETIO-specific keywords
