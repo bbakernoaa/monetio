@@ -3,7 +3,7 @@
 import os
 from datetime import datetime
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -11,6 +11,7 @@ import xarray as xr
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
+    import timezonefinder
 from numpy import nan
 
 from ..util import long_to_wide
@@ -104,6 +105,7 @@ class AirNowReader(PointReader):
         # We only perform wide_fmt here if NOT lazy, to avoid the hidden compute in long_to_wide
         do_wide = wide_fmt and not lazy
         df = self._post_process(df, daily=daily, wide_fmt=do_wide, bad_utcoffset=bad_utcoffset)
+
         df = self.harmonize(df)
 
         if not lazy and hasattr(df, "compute"):
@@ -111,6 +113,15 @@ class AirNowReader(PointReader):
 
         if as_xarray:
             ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
+
+            # Ensure history from _post_process and harmonize is there
+            # even if lost in DataFrame stage (Dask doesn't support .attrs)
+            for msg in [
+                "Post-processed and filtered AirNow data.",
+                "Harmonized and dropped NaN locations.",
+            ]:
+                if msg not in ds.attrs.get("history", ""):
+                    ds = update_history(ds, msg)
 
             if bad_utcoffset == "fix" and "utcoffset" in ds.variables:
                 ds = self._fix_utcoffset_xarray(ds)
@@ -139,16 +150,30 @@ class AirNowReader(PointReader):
 
         def _get_uo_vec(lat, lon, current_uo):
             # Only fix if current_uo is 0 and longitude is far from 0
-            # We use a vectorized wrapper
+            # We use a vectorized approach
             mask = (current_uo == 0) & (np.abs(lon) > 20)
             if not np.any(mask):
                 return current_uo
 
             res = current_uo.copy().astype(float)
-            # For masked indices, compute real offset
-            for i in np.where(mask.ravel())[0]:
-                idx = np.unravel_index(i, mask.shape)
-                res[idx] = get_utcoffset(lat[idx], lon[idx])
+
+            # Identify indices where mask is True
+            idx = np.where(mask)
+
+            # Get lat/lon at those indices
+            lats_to_fix = lat[idx]
+            lons_to_fix = lon[idx]
+
+            # Find unique locations to fix to minimize TimezoneFinder calls
+            locs = np.stack([lats_to_fix, lons_to_fix], axis=-1)
+            unique_locs, inverse = np.unique(locs, axis=0, return_inverse=True)
+
+            # Compute unique offsets
+            unique_offsets = np.array([get_utcoffset(la, lo) for la, lo in unique_locs])
+
+            # Broadcast unique offsets back to all masked positions
+            res[idx] = unique_offsets[inverse]
+
             return res
 
         new_uo = xr.apply_ufunc(
@@ -264,6 +289,13 @@ class AirNowReader(PointReader):
             subset = [c for c in ["time", "latitude", "longitude", "siteid"] if c in df.columns]
             df = df.drop_duplicates(subset=subset)
 
+        # Update history
+        try:
+            df = update_history(df, "Post-processed and filtered AirNow data.")
+        except AttributeError:
+            # For dask DataFrames that don't support attrs
+            pass
+
         return df
 
 
@@ -289,6 +321,12 @@ def build_urls(
     -------
     tuple
         (urls, filenames) as pandas.Series.
+
+    Examples
+    --------
+    >>> urls, fnames = build_urls("2023-01-01")
+    >>> print(urls[0])
+    s3://files.airnowtech.org/airnow/2023/20230101/HourlyData_2023010100.dat
     """
     dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
     if daily:
@@ -312,7 +350,7 @@ def build_urls(
     return pd.Series(urls, index=None), pd.Series(fnames, index=None)
 
 
-def retrieve(url: str, fname: str):
+def retrieve(url: str, fname: str) -> None:
     """
     Retrieve a file from a URL (S3 or HTTP) and save it locally.
 
@@ -322,6 +360,10 @@ def retrieve(url: str, fname: str):
         The URL to retrieve.
     fname : str
         The local filename to save to.
+
+    Examples
+    --------
+    >>> retrieve("s3://files.airnowtech.org/airnow/2023/20230101/HourlyData_2023010100.dat", "HourlyData_2023010100.dat")
     """
     if not os.path.isfile(fname):
         if url.startswith("s3://"):
@@ -342,7 +384,7 @@ def retrieve(url: str, fname: str):
 
 
 def read_airnow_csv(
-    fn: str, daily: bool = False, storage_options: dict = None, **kwargs
+    fn: str, daily: bool = False, storage_options: Optional[dict] = None, **kwargs
 ) -> pd.DataFrame:
     """
     Read a single AirNow CSV file.
@@ -362,6 +404,10 @@ def read_airnow_csv(
     -------
     pd.DataFrame
         The loaded data.
+
+    Examples
+    --------
+    >>> df = read_airnow_csv("HourlyData_2023010100.dat")
     """
     hourly_cols = [
         "date",
@@ -422,7 +468,9 @@ def read_airnow_csv(
 
 
 def filter_bad_values(
-    df: Union[pd.DataFrame, "dd.DataFrame"], max: float = 3000.0, bad_utcoffset: str = "drop"
+    df: Union[pd.DataFrame, "dd.DataFrame"],
+    max_val: float = 3000.0,
+    bad_utcoffset: str = "drop",
 ) -> Union[pd.DataFrame, "dd.DataFrame"]:
     """
     Filter bad values and handle zero UTC offsets.
@@ -441,10 +489,14 @@ def filter_bad_values(
     -------
     Union[pd.DataFrame, dd.DataFrame]
         Filtered dataframe.
+
+    Examples
+    --------
+    >>> df = filter_bad_values(df, max=1000.0, bad_utcoffset="fix")
     """
     from numpy import nan
 
-    df["obs"] = df["obs"].where((df.obs <= max) & (df.obs >= 0), nan)
+    df["obs"] = df["obs"].where((df.obs <= max_val) & (df.obs >= 0), nan)
 
     if "utcoffset" in df.columns:
         bad_rows = df.query("utcoffset == 0 and abs(longitude) > 20")
@@ -480,7 +532,7 @@ def filter_bad_values(
 
 
 @lru_cache(maxsize=1)
-def _get_tf(*, in_memory: bool = True):
+def _get_tf(*, in_memory: bool = True) -> "timezonefinder.TimezoneFinder":
     """Get the TimezoneFinder instance."""
     from ..util import _import_required
 
@@ -505,6 +557,10 @@ def get_utcoffset(lat: float, lon: float) -> float:
     -------
     float
         UTC offset in hours.
+
+    Examples
+    --------
+    >>> offset = get_utcoffset(40.0, -80.0)
     """
     import warnings
 
@@ -546,5 +602,9 @@ def get_station_locations(
     -------
     Union[pd.DataFrame, dd.DataFrame]
         Dataframe with site metadata.
+
+    Examples
+    --------
+    >>> df = get_station_locations(df)
     """
     return add_monitor_metadata(df, airnow=True)
