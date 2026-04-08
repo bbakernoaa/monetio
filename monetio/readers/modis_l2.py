@@ -29,6 +29,7 @@ class MODISL2Reader(GriddedReader):
             File path(s) or URL(s).
         variable_dict : dict, optional
             Dictionary of variables to read with metadata (scale, minimum, maximum, quality_flag).
+            Example: `{'AOD_550': {'scale': 0.001, 'quality_flag': 3}}`
         **kwargs : dict
             Additional arguments passed to the reader.
 
@@ -36,6 +37,12 @@ class MODISL2Reader(GriddedReader):
         -------
         xr.Dataset
             The processed MODIS dataset.
+
+        Examples
+        --------
+        >>> reader = MODISL2Reader()
+        >>> vdict = {'Deep_Blue_Aerosol_Optical_Depth_550_Land': {'scale': 0.001}}
+        >>> ds = reader.open_dataset('MYD04_L2.A2023126.1830.061.2023127154555.hdf', variable_dict=vdict)
         """
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = lambda ds: modis_l2_preprocess(ds, variable_dict=variable_dict)
@@ -82,6 +89,11 @@ def modis_l2_preprocess(ds: xr.Dataset, variable_dict: dict = None) -> xr.Datase
     -------
     xr.Dataset
         Processed dataset.
+
+    Examples
+    --------
+    >>> vdict = {'AOD': {'scale': 0.001, 'quality_flag': 2}, 'Quality_Assurance': {}}
+    >>> ds = modis_l2_preprocess(ds, variable_dict=vdict)
     """
     # 1. Standardize dimensions and coordinates
     # MODIS L2 uses 'Cell_Along_Swath' and 'Cell_Across_Swath'
@@ -97,6 +109,7 @@ def modis_l2_preprocess(ds: xr.Dataset, variable_dict: dict = None) -> xr.Datase
         ds = ds.set_coords("time")
 
     # 3. Apply variable_dict transformations (scale, minimum, maximum)
+    quality_masks = []
     if variable_dict:
         for varname, meta in variable_dict.items():
             if varname in ds.variables:
@@ -108,22 +121,23 @@ def modis_l2_preprocess(ds: xr.Dataset, variable_dict: dict = None) -> xr.Datase
                     ds[varname] = ds[varname].where(ds[varname] <= meta["maximum"])
 
                 if "quality_flag" in meta:
-                    # Store info for masking in next step
-                    ds.attrs["_quality_flag_var"] = varname
-                    ds.attrs["_quality_flag_thresh"] = meta["quality_flag"]
+                    # Collect quality flags for batch masking
+                    quality_masks.append((varname, meta["quality_flag"]))
 
-    # 4. Apply Quality Flag masking
-    if "_quality_flag_var" in ds.attrs:
-        q_var = ds.attrs["_quality_flag_var"]
-        q_thresh = ds.attrs["_quality_flag_thresh"]
-        quality_flag = ds[q_var]
-        for varname in ds.data_vars:
-            if varname != q_var:
-                ds[varname] = ds[varname].where(quality_flag < q_thresh)
+    # 4. Apply Quality Flag masking (Lazy & Vectorized)
+    if quality_masks:
+        combined_mask = None
+        for q_var, q_thresh in quality_masks:
+            mask = ds[q_var] >= q_thresh
+            if combined_mask is None:
+                combined_mask = mask
+            else:
+                combined_mask = combined_mask & mask
 
-        # Clean up temporary attrs
-        del ds.attrs["_quality_flag_var"]
-        del ds.attrs["_quality_flag_thresh"]
+        if combined_mask is not None:
+            for varname in ds.data_vars:
+                # Mask all data variables by the combined quality flag
+                ds[varname] = ds[varname].where(combined_mask)
 
     ds = update_history(ds, "Preprocessed MODIS L2 data via Aero Protocol.")
 
