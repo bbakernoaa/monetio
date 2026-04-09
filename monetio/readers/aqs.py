@@ -13,7 +13,7 @@ import xarray as xr
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
-from monetio.util import force_object_strings, long_to_wide
+from monetio.util import force_object_strings
 
 from .base import PointReader, register_reader
 from .epa_utils import add_monitor_metadata, standardize_epa_units
@@ -74,8 +74,16 @@ class AQSReader(PointReader):
 
         Returns
         -------
-        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+        Union[pd.DataFrame, xr.Dataset]
             The loaded AQS data.
+
+        Examples
+        --------
+        >>> from monetio.readers.aqs import AQSReader
+        >>> # Load OZONE data for a specific date
+        >>> ds = AQSReader().open_dataset(dates='2023-06-01', param='OZONE')
+        >>> # Load daily PM2.5 data lazily
+        >>> ds_lazy = AQSReader().open_dataset(dates='2023-01-01', param='PM2.5', daily=True, lazy=True)
         """
         a = AQS()
 
@@ -134,18 +142,15 @@ class AQSReader(PointReader):
         if meta:
             df = a.add_metadata(df, daily=daily, network=network)
 
-        # We only perform wide_fmt here if NOT lazy, to avoid the hidden compute in long_to_wide
-        do_wide = wide_fmt and not lazy
-        if do_wide:
-            df = long_to_wide(df)
-
+        # Restore harmonize call to ensure data quality
         df = self.harmonize(df)
 
+        # Handle eager compute for Dask-backed objects if requested
         if not lazy and is_dask:
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
-            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
+            ds = self.to_xarray(df, expand2d=wide_fmt, wide_fmt=wide_fmt, **kwargs)
             # Update history
             ds = update_history(ds, "Read AQS data.")
 
@@ -228,7 +233,26 @@ class AQS:
         return rcolumn
 
     def load_aqs_file(self, url: str, network: Optional[str] = None) -> pd.DataFrame:
-        """Load a single AQS file."""
+        """
+        Load a single AQS file.
+
+        Parameters
+        ----------
+        url : str
+            URL or local path to the AQS file.
+        network : str, optional
+            Network to filter, by default None.
+
+        Returns
+        -------
+        pd.DataFrame
+            The loaded AQS data.
+
+        Examples
+        --------
+        >>> a = AQS()
+        >>> df = a.load_aqs_file("https://aqs.epa.gov/aqsweb/airdata/hourly_44201_2023.zip")
+        """
         if "daily" in url:
             df = pd.read_csv(
                 url,
@@ -264,7 +288,7 @@ class AQS:
             if "Date Local" in df.columns and "Time Local" in df.columns:
                 df["time_local"] = pd.to_datetime(df["Date Local"] + " " + df["Time Local"])
 
-            df.columns = self.columns_rename(df.columns.values)
+            df.columns = self.columns_rename(df.columns.tolist())
             # Remove duplicate time_local if it was created from 'Time Local'
             df = df.loc[:, ~df.columns.duplicated()]
 
