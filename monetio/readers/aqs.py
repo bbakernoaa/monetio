@@ -13,7 +13,7 @@ import xarray as xr
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
-from monetio.util import force_object_strings, long_to_wide
+from monetio.util import force_object_strings
 
 from .base import PointReader, register_reader
 from .epa_utils import add_monitor_metadata, standardize_epa_units

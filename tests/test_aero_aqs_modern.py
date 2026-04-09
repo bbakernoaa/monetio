@@ -1,8 +1,9 @@
-import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+
 from monetio.readers.aqs import AQSReader
+
 
 def create_mock_aqs_file(fn, daily=False):
     if daily:
@@ -51,10 +52,15 @@ def create_mock_aqs_file(fn, daily=False):
             "Latitude": [34.0, 34.0, 34.0],
             "Longitude": [-86.0, -86.0, -86.0],
             "Sample Measurement": [40.0, 42.0, 10.0],
-            "Units of Measure": ["Parts per billion", "Parts per billion", "Micrograms/cubic meter (LC)"],
+            "Units of Measure": [
+                "Parts per billion",
+                "Parts per billion",
+                "Micrograms/cubic meter (LC)",
+            ],
             "Parameter Name": ["Ozone", "Ozone", "PM2.5 - Local Conditions"],
         }
     pd.DataFrame(data).to_csv(fn, index=False)
+
 
 @pytest.mark.parametrize("wide_fmt", [True, False])
 def test_aqs_eager_lazy_consistency(tmp_path, wide_fmt):
@@ -65,10 +71,14 @@ def test_aqs_eager_lazy_consistency(tmp_path, wide_fmt):
     dates = pd.to_datetime(["2023-01-01"])
 
     # Eager (NumPy)
-    ds_eager = reader.open_dataset(files=str(fn), dates=dates, lazy=False, as_xarray=True, wide_fmt=wide_fmt)
+    ds_eager = reader.open_dataset(
+        files=str(fn), dates=dates, lazy=False, as_xarray=True, wide_fmt=wide_fmt
+    )
 
     # Lazy (Dask)
-    ds_lazy = reader.open_dataset(files=str(fn), dates=dates, lazy=True, as_xarray=True, wide_fmt=wide_fmt)
+    ds_lazy = reader.open_dataset(
+        files=str(fn), dates=dates, lazy=True, as_xarray=True, wide_fmt=wide_fmt
+    )
 
     # Check that eager result is NOT lazy
     if wide_fmt:
@@ -88,7 +98,7 @@ def test_aqs_eager_lazy_consistency(tmp_path, wide_fmt):
     xr.testing.assert_allclose(
         ds_eager.drop_vars("history", errors="ignore"),
         ds_lazy.compute().drop_vars("history", errors="ignore"),
-        atol=1e-5
+        atol=1e-5,
     )
 
     # Check history
@@ -97,6 +107,7 @@ def test_aqs_eager_lazy_consistency(tmp_path, wide_fmt):
     assert "history" in ds_lazy.attrs
     assert "Read AQS data" in ds_lazy.attrs["history"]
 
+
 def test_aqs_daily_eager_lazy_consistency(tmp_path):
     fn = tmp_path / "test_aqs_daily.csv"
     create_mock_aqs_file(fn, daily=True)
@@ -104,14 +115,19 @@ def test_aqs_daily_eager_lazy_consistency(tmp_path):
     reader = AQSReader()
     dates = pd.to_datetime(["2023-01-01"])
 
-    ds_eager = reader.open_dataset(files=str(fn), dates=dates, daily=True, lazy=False, as_xarray=True, wide_fmt=True)
-    ds_lazy = reader.open_dataset(files=str(fn), dates=dates, daily=True, lazy=True, as_xarray=True, wide_fmt=True)
+    ds_eager = reader.open_dataset(
+        files=str(fn), dates=dates, daily=True, lazy=False, as_xarray=True, wide_fmt=True
+    )
+    ds_lazy = reader.open_dataset(
+        files=str(fn), dates=dates, daily=True, lazy=True, as_xarray=True, wide_fmt=True
+    )
 
     xr.testing.assert_allclose(
         ds_eager.drop_vars("history", errors="ignore"),
         ds_lazy.compute().drop_vars("history", errors="ignore"),
-        atol=1e-5
+        atol=1e-5,
     )
+
 
 def test_aqs_no_hidden_compute(tmp_path):
     fn = tmp_path / "test_aqs_lazy.csv"
@@ -124,7 +140,9 @@ def test_aqs_no_hidden_compute(tmp_path):
     # if it doesn't fail and it remains a dask array, it's likely not computed.
     # In MONETIO, many things use .compute() internally which we want to avoid.
 
-    ds_lazy = reader.open_dataset(files=str(fn), dates=dates, lazy=True, as_xarray=True, wide_fmt=True)
+    ds_lazy = reader.open_dataset(
+        files=str(fn), dates=dates, lazy=True, as_xarray=True, wide_fmt=True
+    )
 
     # If it reached here without raising and is still dask-backed, we are good.
     assert hasattr(ds_lazy.OZONE.data, "dask")
