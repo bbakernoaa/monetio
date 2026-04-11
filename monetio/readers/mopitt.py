@@ -65,6 +65,11 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
     -------
     xr.Dataset
         Processed dataset with standard names and derived variables.
+
+    Examples
+    --------
+    >>> ds = xr.open_dataset("MOP03-20230101-L3V95.hdf", engine="h5netcdf")
+    >>> ds = mopitt_preprocess(ds)
     """
     # 1. Expand Mapping
     # MOPITT L3 HDF5 structure: /HDFEOS/GRIDS/MOP03/Data Fields/
@@ -88,9 +93,10 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
         "HDFEOS/GRIDS/MOP03/Data Fields/APrioriCOMixingRatioProfileNight": "apriori_co_profile_night",
     }
 
-    for old, new in mapping.items():
-        if old in ds.variables:
-            ds = ds.rename({old: new})
+    actual_rename = {old: new for old, new in mapping.items() if old in ds.variables}
+    if actual_rename:
+        ds = ds.rename(actual_rename)
+        ds = update_history(ds, f"Renamed variables: {list(actual_rename.values())}")
 
     # Ensure pressure levels are coordinates
     for p_var in ["pressure_levels", "pressure_levels_ak"]:
@@ -113,10 +119,12 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
             if "time" not in ds.dims:
                 ds = ds.expand_dims("time")
             ds = ds.assign_coords(time=tai93_to_datetime(time_da))
+            ds = update_history(ds, "Assigned time coordinate from StartTime attribute.")
 
-    # 4. Handle Missing Values
-    for var in ds.data_vars:
-        ds[var] = ds[var].where(ds[var] != MOPITT_MISSING)
+    # 4. Handle Missing Values (Vectorized)
+    with xr.set_options(keep_attrs=True):
+        ds = ds.where(ds != MOPITT_MISSING)
+    ds = update_history(ds, f"Applied vectorized missing value mask (value: {MOPITT_MISSING}).")
 
     # 5. Calculate Pressure (Lazy)
     if "co_ak_column" in ds.data_vars and "surface_pressure" in ds.data_vars:
@@ -139,12 +147,28 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
 def _add_mopitt_pressure(ds: xr.Dataset) -> xr.Dataset:
     """
     Calculate 3D pressure array lazily for MOPITT.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with 'pressure' variable added.
+
+    Examples
+    --------
+    >>> ds = _add_mopitt_pressure(ds)
     """
     if "pressure_levels_ak" not in ds.coords:
         return ds
 
     # Ensure pressure levels are in ascending order (100 to 1000 hPa)
+    # Xarray's sortby is lazy if the coordinate is already in memory (typical for L3)
     ds_sorted = ds.sortby("pressure_levels_ak", ascending=True)
+
     alt = ds_sorted.coords["pressure_levels_ak"]
     if "time" in alt.dims:
         alt = alt.isel(time=0, drop=True)
@@ -177,6 +201,20 @@ def _add_mopitt_pressure(ds: xr.Dataset) -> xr.Dataset:
 def _combine_mopitt_apriori(ds: xr.Dataset) -> xr.Dataset:
     """
     Combine surface and profile a priori values lazily.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with combined 'apriori_co_profile'.
+
+    Examples
+    --------
+    >>> ds = _combine_mopitt_apriori(ds)
     """
     prof = ds["apriori_co_profile"]
     surf = ds["apriori_co_surf"]
