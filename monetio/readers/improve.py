@@ -8,7 +8,6 @@ import xarray as xr
 
 from ..util import force_object_strings
 from .base import PointReader, register_reader
-from .drivers import FileUtility
 from .epa_utils import add_monitor_metadata
 from .sat_utils import update_history
 
@@ -80,12 +79,10 @@ class IMPROVEReader(PointReader):
         )
 
         # Check for empty (Backend-agnostic)
-        is_empty = False
         if dd is not None and isinstance(df, dd.DataFrame):
-            if df.npartitions == 0:
-                is_empty = True
-        elif len(df) == 0:
-            is_empty = True
+            is_empty = df.npartitions == 0
+        else:
+            is_empty = df.empty
 
         if is_empty:
             if as_xarray:
@@ -95,6 +92,7 @@ class IMPROVEReader(PointReader):
         if add_meta:
             df = self.add_metadata(df)
 
+        # Re-harmonize to drop sites without metadata (NaN lat/lon)
         df = self.harmonize(df)
 
         if as_xarray:
@@ -163,8 +161,6 @@ def read_improve_file(fname: str, delimiter: str = "\t", **kwargs: Any) -> pd.Da
     --------
     >>> df = read_improve_file("site_data.txt")
     """
-    fs = FileUtility.get_fs(fname)
-
     # Determine storage options if S3
     storage_options = kwargs.get("storage_options")
     if fname.startswith("s3://") and storage_options is None:
@@ -173,7 +169,9 @@ def read_improve_file(fname: str, delimiter: str = "\t", **kwargs: Any) -> pd.Da
     # Find the data section
     skiprows = 0
     try:
-        with fs.open(fname, "r") as f:
+        import fsspec
+
+        with fsspec.open(fname, "r", **(storage_options or {})) as f:
             for i, line in enumerate(f):
                 if line.strip() == "Data":
                     skiprows = i + 1
