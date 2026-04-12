@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 
 @register_reader("openaq_aws")
 class OpenAQAWSReader(PointReader):
-    """OpenAQ AWS Archive Reader"""
+    """
+    Reader for OpenAQ archive data on AWS S3.
+    """
 
     def open_dataset(
         self,
@@ -36,13 +38,12 @@ class OpenAQAWSReader(PointReader):
         provider: Union[str, List[str]] = None,
         find_paths: bool = True,
         wide_fmt: bool = False,
-        n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
-        Add OpenAQ data from AWS Open Data.
+        Retrieves OpenAQ archive data from AWS Open Data.
 
         Parameters
         ----------
@@ -51,7 +52,7 @@ class OpenAQAWSReader(PointReader):
         dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
             Dates to retrieve if files are not provided.
         siteid : Union[str, List[str]], optional
-            Site ID(s) to filter by.
+            Site ID(s) (location_id) to filter by.
         country : Union[str, List[str]], optional
             Country code(s) to filter by.
         provider : Union[str, List[str]], optional
@@ -59,20 +60,23 @@ class OpenAQAWSReader(PointReader):
         find_paths : bool, optional
             Whether to find paths via S3 listing (slow), by default True.
         wide_fmt : bool, optional
-            Whether to return data in wide format, by default False.
-        n_procs : int, optional
-            Number of processors for dask compute, by default 1.
+            Whether to return data in wide format, by default True.
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
             Whether to return a dask-backed object, by default False.
         **kwargs : dict
-            Additional arguments.
+            Additional arguments passed to the reader and driver.
 
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded dataset.
+
+        Examples
+        --------
+        >>> reader = OpenAQAWSReader()
+        >>> ds = reader.open_dataset(dates='2023-01-01', siteid='7073', wide_fmt=True)
         """
 
         # For backward compatibility, if the first argument looks like dates, swap them.
@@ -117,6 +121,7 @@ class OpenAQAWSReader(PointReader):
             return df
 
         # Use base class to open
+        # We pass wide_fmt=False here and handle it in to_xarray to maintain laziness.
         df = super().open_dataset(
             files,
             read_method=read_func,
@@ -125,25 +130,121 @@ class OpenAQAWSReader(PointReader):
             **kwargs,
         )
 
-        # Post-processing
-        df = self.harmonize(df)
+        if as_xarray:
+            # Defer wide_fmt expansion to to_xarray (via ds_to_2d) to keep it lazy.
+            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
 
+            # Update history
+            ds = update_history(ds, "Read OpenAQ AWS archive data.")
+            return ds
+
+        # For pandas path, we can apply wide_fmt here if requested
         if wide_fmt:
             from ..util import long_to_wide
 
             df = long_to_wide(df)
 
-        if not lazy and hasattr(df, "compute"):
-            df = df.compute(num_workers=n_procs)
-
-        if as_xarray:
-            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
-
-            # Update history
-            ds = update_history(ds, "Read OpenAQ AWS data.")
-            return ds
-
         return df
+
+    def harmonize(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"]
+    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
+        """
+        Harmonize OpenAQ AWS data.
+
+        Parameters
+        ----------
+        df : Union[pd.DataFrame, dd.DataFrame]
+            Input dataframe.
+
+        Returns
+        -------
+        Union[pd.DataFrame, dd.DataFrame]
+            Harmonized dataframe.
+        """
+        # Rename parameter/unit to variable/units for MONETIO consistency
+        df = df.rename(columns={"parameter": "variable", "unit": "units", "value": "obs"})
+
+        # Unit Conversions (Lazy friendly)
+        # Consistent with real-time OpenAQ reader
+        ppm_to_ugm3 = {
+            "o3": 1990,
+            "co": 1160,
+            "no2": 1900,
+            "no": 1240,
+            "so2": 2650,
+            "ch4": 664,
+            "co2": 1820,
+        }
+        ppm_to_ugm3["nox"] = ppm_to_ugm3["no2"]
+
+        def _convert_units(df_part):
+            if df_part.empty:
+                return df_part
+            for vn, f in ppm_to_ugm3.items():
+                if "variable" in df_part.columns and "units" in df_part.columns:
+                    # Match both standard and special characters
+                    is_ug = (df_part.variable == vn) & (
+                        df_part.units.isin(["µg/m³", "ug/m3", "ugm-3", "µgm-3"])
+                    )
+                    df_part.loc[is_ug, "obs"] /= f
+                    df_part.loc[is_ug, "units"] = "ppm"
+            return df_part
+
+        try:
+            import dask.dataframe as dd
+
+            is_dask = isinstance(df, dd.DataFrame)
+        except ImportError:
+            is_dask = False
+
+        if is_dask:
+            df = df.map_partitions(_convert_units)
+        else:
+            df = _convert_units(df)
+
+        # Update history
+        df = update_history(df, "Harmonized OpenAQ AWS columns and converted units.")
+
+        return super().harmonize(df)
+
+    def to_xarray(
+        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs
+    ) -> xr.Dataset:
+        """
+        Convert to Xarray with consistent naming for OpenAQ variables.
+        """
+        ds = super().to_xarray(df, expand2d=expand2d, **kwargs)
+
+        if expand2d:
+            # Rename variables to match MONETIO convention (e.g. o3_ppm, pm25_ugm3)
+            # consistent with real-time OpenAQReader.
+            ppm_vars = ["o3", "co", "no2", "no", "so2", "ch4", "co2", "nox"]
+            ugm3_vars = ["pm1", "pm25", "pm4", "pm10", "bc"]
+
+            rename_dict = {}
+            for v in ppm_vars:
+                if v in ds.data_vars:
+                    rename_dict[v] = f"{v}_ppm"
+                    if f"{v}_unit" in ds.data_vars:
+                        ds = ds.drop_vars(f"{v}_unit")
+            for v in ugm3_vars:
+                if v in ds.data_vars:
+                    rename_dict[v] = f"{v}_ugm3"
+                    if f"{v}_unit" in ds.data_vars:
+                        ds = ds.drop_vars(f"{v}_unit")
+
+            if rename_dict:
+                ds = ds.rename(rename_dict)
+
+            # Scientific Hygiene: update units in attributes if not already set correctly
+            for v in ds.data_vars:
+                if "_ppm" in v:
+                    ds[v].attrs["units"] = "ppm"
+                elif "_ugm3" in v:
+                    ds[v].attrs["units"] = "µg m-3"
+
+        return ds
 
 
 def read_openaq_aws_csv(fp: str, **kwargs) -> pd.DataFrame:
@@ -162,6 +263,10 @@ def read_openaq_aws_csv(fp: str, **kwargs) -> pd.DataFrame:
     pd.DataFrame
         OpenAQ archive data.
     """
+    # Filter out MONETIO internal keywords to prevent TypeError in pd.read_csv
+    skip = ["lazy", "as_xarray", "wide_fmt", "dates", "siteid", "country", "provider", "find_paths"]
+    csv_kwargs = {k: v for k, v in kwargs.items() if k not in skip}
+
     df = pd.read_csv(
         fp,
         dtype={
@@ -176,7 +281,7 @@ def read_openaq_aws_csv(fp: str, **kwargs) -> pd.DataFrame:
             8: float,  # value
         },
         parse_dates=["datetime"],
-        **kwargs,
+        **csv_kwargs,
     )
 
     # Normalize to web API column names
@@ -184,6 +289,7 @@ def read_openaq_aws_csv(fp: str, **kwargs) -> pd.DataFrame:
         df = df.rename(columns={"sensors_id": "sensor_id"})
     if "unit" in df.columns:
         df = df.rename(columns={"unit": "units"})
+
     df = df.rename(
         columns={
             "location_id": "siteid",
@@ -205,7 +311,8 @@ def read_openaq_aws_csv_robust(fp: str, **kwargs) -> pd.DataFrame:
     """Try to read a file, returning empty DF if not found."""
     try:
         return read_openaq_aws_csv(fp, **kwargs)
-    except FileNotFoundError:
+    except Exception:
+        # Many archive files might be missing or empty
         return pd.DataFrame(
             columns=[
                 "siteid",
@@ -442,7 +549,6 @@ def add_data(
         provider=provider,
         find_paths=find_paths,
         wide_fmt=wide_fmt,
-        n_procs=n_procs,
         as_xarray=False,  # Return DataFrame by default for add_data legacy
         **kwargs,
     )
