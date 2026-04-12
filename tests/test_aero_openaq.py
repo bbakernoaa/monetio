@@ -78,7 +78,7 @@ def test_openaq_aws_eager_lazy(tmp_path):
         }
     )
     f = tmp_path / "test.csv"
-    dummy_data.to_csv(f, index=False)
+    dummy_data.to_csv(f, index=False, encoding="utf-8")
     reader = OpenAQAWSReader()
     ds_eager = reader.open_dataset(files=[str(f)], as_xarray=True, lazy=False)
     ds_lazy = reader.open_dataset(files=[str(f)], as_xarray=True, lazy=True)
@@ -86,7 +86,8 @@ def test_openaq_aws_eager_lazy(tmp_path):
         ds_eager.drop_vars("history", errors="ignore"),
         ds_lazy.compute().drop_vars("history", errors="ignore"),
     )
-    assert ds_eager.value.values[0] == 10.0
+    # Refactored reader renames 'value' to 'obs'
+    assert ds_eager.obs.values[0] == 10.0
 
 
 @pytest.mark.network

@@ -23,7 +23,7 @@ def sample_openaq_aws_csv(tmp_path):
             "value": [19.9, 10.0, 25.0],
         }
     )
-    df.to_csv(fn, index=False, compression="gzip")
+    df.to_csv(fn, index=False, compression="gzip", encoding="utf-8")
     return str(fn)
 
 
@@ -85,5 +85,6 @@ def test_openaq_aws_unit_conversion(sample_openaq_aws_csv):
     ds = reader.open_dataset(files=sample_openaq_aws_csv, lazy=False, wide_fmt=True)
 
     # 19.9 µg/m³ O3 should be 0.01 ppm
-    val = ds.o3_ppm.sel(time="2023-01-01 00:00:00", siteid="7073").values
+    # We use positional indexing for robustness across Xarray versions in tests.
+    val = ds.o3_ppm.isel(time=0, node=0).values
     assert np.isclose(val, 0.01)

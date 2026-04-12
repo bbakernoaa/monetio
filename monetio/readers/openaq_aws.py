@@ -37,7 +37,7 @@ class OpenAQAWSReader(PointReader):
         country: Union[str, List[str]] = None,
         provider: Union[str, List[str]] = None,
         find_paths: bool = True,
-        wide_fmt: bool = True,
+        wide_fmt: bool = False,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
@@ -537,7 +537,7 @@ def add_data(
     country=None,
     provider=None,
     find_paths=True,
-    wide_fmt=True,
+    wide_fmt=False,
     n_procs=1,
     **kwargs,
 ):
