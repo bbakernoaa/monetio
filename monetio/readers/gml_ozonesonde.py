@@ -7,30 +7,32 @@ from typing import TYPE_CHECKING, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import requests
 import xarray as xr
 
+from .base import PointReader, register_reader
+from .drivers import FileUtility
 from .sat_utils import update_history
 
 if TYPE_CHECKING:
-    pass
-
-from .base import PointReader, register_reader
+    import dask.dataframe as dd
 
 
 @register_reader("gml_ozonesonde")
 class GMLOzonesondeReader(PointReader):
+    """
+    Reader for GML Ozonesonde data (.l100 files).
+    """
+
     def open_dataset(
         self,
         files: Union[str, List[str]] = None,
         dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
         location: Union[str, List[str]] = None,
-        n_procs: int = 1,
         errors: str = "raise",
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
-    ) -> Union[pd.DataFrame, xr.Dataset, Union[pd.DataFrame, xr.Dataset]]:
+    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
         Retrieve and load GML Ozonesonde data.
 
@@ -42,8 +44,6 @@ class GMLOzonesondeReader(PointReader):
             Dates to retrieve.
         location : Union[str, List[str]], optional
             Locations to retrieve (e.g., 'Boulder, Colorado').
-        n_procs : int, optional
-            Number of processors for dask compute (if not lazy), by default 1.
         errors : str, optional
             Whether to 'raise' or 'warn' on read errors, by default 'raise'.
         as_xarray : bool, optional
@@ -57,6 +57,11 @@ class GMLOzonesondeReader(PointReader):
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded ozonesonde data.
+
+        Examples
+        --------
+        >>> reader = GMLOzonesondeReader()
+        >>> ds = reader.open_dataset(dates="2023-12-27", location="Boulder, Colorado")
         """
         if files is None:
             if dates is None:
@@ -86,13 +91,6 @@ class GMLOzonesondeReader(PointReader):
         # Use PandasDriver to open files
         # We pass read_100m as the read_method
         df = self.driver.open(files, read_method=read_100m, lazy=lazy, **reader_kwargs)
-
-        if not lazy and n_procs > 1:
-            # If dask is installed, we can use it for parallel loading even if as_xarray is False
-            # but usually PandasDriver.open(lazy=False) already loaded them sequentially.
-            # Actually, if we want parallel sequential load, we'd need to handle it in driver.
-            # For now, we follow the ish.py pattern if they use n_procs.
-            pass
 
         df = self.harmonize(df)
 
@@ -139,12 +137,17 @@ _FILES_L100_CACHE = {location: None for location in LOCATIONS}
 
 
 def retry(func):
+    """
+    Retry decorator for network operations.
+    """
     import time
     from functools import wraps
     from random import random as rand
 
     @wraps(func)
     def wrapper(*args, **kwargs):
+        import requests
+
         for i in range(RETRIES):
             try:
                 res = func(*args, **kwargs)
@@ -162,9 +165,32 @@ def retry(func):
     return wrapper
 
 
-def discover_files(location=None, *, n_threads=3, cache=True):
+def discover_files(
+    location: Optional[Union[str, List[str]]] = None,
+    n_threads: int = 3,
+    cache: bool = True,
+) -> pd.DataFrame:
+    """
+    Discover GML Ozonesonde .l100 files.
+
+    Parameters
+    ----------
+    location : str or list of str, optional
+        Locations to discover, by default None (all locations).
+    n_threads : int, optional
+        Number of threads for discovery, by default 3.
+    cache : bool, optional
+        Whether to cache results, by default True.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns ['location', 'time', 'fn', 'url'].
+    """
     import itertools
     from multiprocessing.pool import ThreadPool
+
+    import requests
 
     base = "https://gml.noaa.gov/aftp/data/ozwv/Ozonesonde"
     if location is None:
@@ -179,7 +205,7 @@ def discover_files(location=None, *, n_threads=3, cache=True):
 
     @retry
     def get_files(location):
-        cached = _FILES_L100_CACHE[location]
+        cached = _FILES_L100_CACHE.get(location)
         if cached is not None:
             return cached
         url_location = "South Pole, Antartica" if location == "South Pole, Antarctica" else location
@@ -213,7 +239,12 @@ def discover_files(location=None, *, n_threads=3, cache=True):
     return df
 
 
-def add_data(dates, *, location=None, n_procs=1, errors="raise", **kwargs):
+def add_data(
+    dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+    location: Optional[Union[str, List[str]]] = None,
+    errors: str = "raise",
+    **kwargs,
+) -> pd.DataFrame:
     """
     Reads GML Ozonesonde data.
 
@@ -223,8 +254,6 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise", **kwargs):
         Dates to retrieve.
     location : str or list of str, optional
         Locations to retrieve, by default None (all locations).
-    n_procs : int, optional
-        Number of processors for dask compute, by default 1.
     errors : str, optional
         Whether to 'raise' or 'warn' on read errors, by default 'raise'.
     **kwargs : dict
@@ -236,7 +265,7 @@ def add_data(dates, *, location=None, n_procs=1, errors="raise", **kwargs):
         The loaded ozonesonde data.
     """
     return GMLOzonesondeReader().open_dataset(
-        dates=dates, location=location, n_procs=n_procs, errors=errors, as_xarray=False, **kwargs
+        dates=dates, location=location, errors=errors, as_xarray=False, **kwargs
     )
 
 
@@ -279,7 +308,7 @@ Level   Press    Alt   Pottp   Temp   FtempV   Hum  Ozone  Ozone   Ozone  Ptemp 
 """
 
 
-def read_100m(fp_or_url):
+def read_100m(fp_or_url: str, **kwargs) -> pd.DataFrame:
     """
     Reads a GML 100m average file (.l100).
 
@@ -287,24 +316,17 @@ def read_100m(fp_or_url):
     ----------
     fp_or_url : str
         File path or URL.
+    **kwargs : dict
+        Additional arguments passed to FileUtility.get_fs.
 
     Returns
     -------
     pd.DataFrame
         The loaded data with metadata in attrs.
     """
-    if isinstance(fp_or_url, str) and fp_or_url.startswith(("http://", "https://")):
-
-        @retry
-        def get_text():
-            r = requests.get(fp_or_url, timeout=TIMEOUT)
-            r.raise_for_status()
-            return r.text
-
-        text = get_text()
-    else:
-        with open(fp_or_url) as f:
-            text = f.read()
+    fs = FileUtility.get_fs(fp_or_url)
+    with fs.open(fp_or_url, "rb") as f:
+        text = f.read().decode("utf-8", errors="ignore")
 
     blocks = text.replace("\r", "").split("\n\n")
     nblocks = len(blocks)
@@ -369,7 +391,10 @@ def read_100m(fp_or_url):
     na_values = {c.name: c.na_val for c in col_info if c.na_val is not None}
 
     # Robust check for column count
-    first_data_line = data_block.splitlines()[2]
+    data_lines = [line for line in data_block.splitlines() if line.strip()]
+    if len(data_lines) < 3:
+        raise ValueError("Data block is too short.")
+    first_data_line = data_lines[2]
     ncols = len(first_data_line.split())
     if ncols != len(names):
         raise ValueError(f"Expected {len(names)} columns in data block, got {ncols}")
@@ -384,12 +409,19 @@ def read_100m(fp_or_url):
         na_values=na_values,
     )
 
-    df["time"] = pd.Timestamp(f"{meta['Launch Date']} {meta['Launch Time']}").tz_localize(None)
-    df["latitude"] = float(meta["Latitude"])
-    df["longitude"] = float(meta["Longitude"])
-    df["station"] = meta["Station"]
-    df["station_height_str"] = meta["Station Height"]
-    df["flight_number"] = meta["Flight Number"]
+    # Vectorized time construction
+    try:
+        df["time"] = pd.to_datetime(f"{meta['Launch Date']} {meta['Launch Time']}").tz_localize(
+            None
+        )
+    except (KeyError, ValueError):
+        df["time"] = pd.NaT
+
+    df["latitude"] = float(meta.get("Latitude", np.nan))
+    df["longitude"] = float(meta.get("Longitude", np.nan))
+    df["station"] = meta.get("Station", "")
+    df["station_height_str"] = meta.get("Station Height", "")
+    df["flight_number"] = meta.get("Flight Number", "")
 
     # Site normalization
     repl = {
