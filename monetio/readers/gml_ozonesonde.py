@@ -411,7 +411,9 @@ def read_100m(fp_or_url: str, **kwargs) -> pd.DataFrame:
 
     # Vectorized time construction
     try:
-        df["time"] = pd.to_datetime(f"{meta['Launch Date']} {meta['Launch Time']}").tz_localize(None)
+        df["time"] = pd.to_datetime(f"{meta['Launch Date']} {meta['Launch Time']}").tz_localize(
+            None
+        )
     except (KeyError, ValueError):
         df["time"] = pd.NaT
 
