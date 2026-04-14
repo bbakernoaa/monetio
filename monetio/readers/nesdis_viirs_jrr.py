@@ -1,13 +1,48 @@
 """NESDIS VIIRS JRR Reader"""
 
 import datetime
-from typing import List, Union
+from typing import List, Optional, Union
 
 import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
 from .sat_utils import add_time_coord, standardize_satellite_coords, update_history
+
+JRR_SPECS = {
+    "AOD": {
+        "rename": {"AOD550": "aod_550"},
+        "metadata": {
+            "aod_550": {
+                "long_name": "Aerosol Optical Thickness at 550nm",
+                "units": "1",
+                "standard_name": "atmosphere_optical_thickness_due_to_ambient_aerosol",
+            }
+        },
+        "qa_var": "AOD_Quality_Flag",
+    },
+    "ADP": {
+        "rename": {},
+        "metadata": {
+            "Smoke": {
+                "long_name": "Aerosol Detection Product: Smoke",
+                "units": "1",
+                "standard_name": "is_smoke",
+            },
+            "Dust": {
+                "long_name": "Aerosol Detection Product: Dust",
+                "units": "1",
+                "standard_name": "is_dust",
+            },
+            "Ash": {
+                "long_name": "Aerosol Detection Product: Ash",
+                "units": "1",
+                "standard_name": "is_ash",
+            },
+        },
+        "qa_var": "ADP_Quality_Flag",
+    },
+}
 
 
 @register_reader("nesdis_viirs_jrr")
@@ -25,6 +60,7 @@ class VIIRSJRRReader(GriddedReader):
         dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
         satellite: str = "snpp",
         product: str = "AOD",
+        qa_threshold: Optional[float] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -41,6 +77,8 @@ class VIIRSJRRReader(GriddedReader):
             Default is 'snpp'.
         product : str, optional
             JRR product: 'AOD' (default), 'ADP', 'CloudMask', 'CloudHeight', etc.
+        qa_threshold : float, optional
+            Quality threshold for masking, by default None.
         **kwargs : dict
             Additional arguments passed to XarrayDriver.open.
 
@@ -57,7 +95,9 @@ class VIIRSJRRReader(GriddedReader):
         if "preprocess" not in kwargs:
             from functools import partial
 
-            kwargs["preprocess"] = partial(viirs_jrr_preprocess, product=product)
+            kwargs["preprocess"] = partial(
+                viirs_jrr_preprocess, product=product, qa_threshold=qa_threshold
+            )
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
@@ -129,7 +169,9 @@ class VIIRSJRRReader(GriddedReader):
         return sorted(urls)
 
 
-def viirs_jrr_preprocess(ds: xr.Dataset, product: str = "AOD") -> xr.Dataset:
+def viirs_jrr_preprocess(
+    ds: xr.Dataset, product: str = "AOD", qa_threshold: Optional[float] = None
+) -> xr.Dataset:
     """
     Preprocess VIIRS JRR dataset.
 
@@ -139,6 +181,8 @@ def viirs_jrr_preprocess(ds: xr.Dataset, product: str = "AOD") -> xr.Dataset:
         Input dataset.
     product : str, optional
         Product type, by default "AOD".
+    qa_threshold : float, optional
+        Quality threshold for masking, by default None.
 
     Returns
     -------
@@ -148,20 +192,32 @@ def viirs_jrr_preprocess(ds: xr.Dataset, product: str = "AOD") -> xr.Dataset:
     ds = standardize_satellite_coords(ds)
     ds = add_time_coord(ds, time_attr="time_coverage_start")
 
-    # Product-specific renaming
-    if product.upper() == "AOD":
-        if "AOD550" in ds.data_vars:
-            ds = ds.rename({"AOD550": "aod_550"})
-            ds["aod_550"].attrs.update(
-                {
-                    "long_name": "Aerosol Optical Thickness at 550nm",
-                    "units": "1",
-                    "standard_name": "atmosphere_optical_thickness_due_to_ambient_aerosol",
-                }
-            )
-    elif product.upper() == "ADP":
-        # ADP already has descriptive names like 'Smoke', 'Dust', 'Ash'
-        pass
+    spec = JRR_SPECS.get(product.upper(), {})
+
+    # 1. Product-specific renaming
+    rename_dict = {k: v for k, v in spec.get("rename", {}).items() if k in ds.data_vars}
+    if rename_dict:
+        ds = ds.rename(rename_dict)
+
+    # 2. Attribute assignment
+    for var, attrs in spec.get("metadata", {}).items():
+        if var in ds.data_vars:
+            ds[var].attrs.update(attrs)
+
+    # 3. Quality Flagging (Lazy & Vectorized)
+    qa_var = spec.get("qa_var")
+    if qa_threshold is not None and qa_var in ds.variables:
+        # Mask data variables where quality is below threshold
+        # We assume higher is better or use exact match for bitmasks if needed.
+        # For JRR, we use >= threshold logic similar to TROPOMI/MODIS.
+        mask = ds[qa_var] >= qa_threshold
+        # Keep qa_var and coords, mask data_vars
+        qa = ds[qa_var].copy()
+        ds = ds.where(mask)
+        ds[qa_var] = qa
+
+    # Update history
+    ds = update_history(ds, f"Preprocessed NESDIS VIIRS JRR {product} data.")
 
     return ds
 
