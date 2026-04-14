@@ -31,8 +31,63 @@ def test_viirs_jrr_preprocess(product):
 
     if product == "AOD":
         assert "aod_550" in ds_out.data_vars
+        assert ds_out["aod_550"].attrs["units"] == "1"
     elif product == "ADP":
         assert "Smoke" in ds_out.data_vars
+        assert "long_name" in ds_out["Smoke"].attrs
+
+
+def test_viirs_jrr_preprocess_qa():
+    # Test quality masking
+    ds = xr.Dataset(
+        {
+            "AOD550": (("Rows", "Columns"), [[1.0, 2.0], [3.0, 4.0]]),
+            "AOD_Quality_Flag": (("Rows", "Columns"), [[0, 1], [2, 3]]),
+            "Latitude": (("Rows", "Columns"), np.zeros((2, 2))),
+            "Longitude": (("Rows", "Columns"), np.zeros((2, 2))),
+        },
+        attrs={"time_coverage_start": "2024-01-01T00:00:00Z"},
+    )
+
+    # Mask with threshold 2 (should keep 3.0 and 4.0)
+    ds_out = viirs_jrr_preprocess(ds, product="AOD", qa_threshold=2)
+
+    assert "aod_550" in ds_out.data_vars
+    # Use .item() or flat access for 0D/1D checks to be safe, but here they are 2D
+    assert np.isnan(ds_out.aod_550.values.flatten()[0])
+    assert np.isnan(ds_out.aod_550.values.flatten()[1])
+    assert ds_out.aod_550.values.flatten()[2] == 3.0
+    assert ds_out.aod_550.values.flatten()[3] == 4.0
+    # Quality flag itself should remain unmasked
+    assert ds_out.AOD_Quality_Flag.values.flatten()[0] == 0
+
+
+def test_viirs_jrr_eager_lazy_consistency():
+    import dask.array as da
+
+    # Create dummy dataset
+    data = np.random.rand(10, 10)
+    qa = np.random.randint(0, 4, (10, 10))
+
+    ds_eager = xr.Dataset(
+        {
+            "AOD550": (("y", "x"), data),
+            "AOD_Quality_Flag": (("y", "x"), qa),
+            "Latitude": (("y", "x"), np.zeros((10, 10))),
+            "Longitude": (("y", "x"), np.zeros((10, 10))),
+        },
+        attrs={"time_coverage_start": "2024-01-01T00:00:00Z"},
+    )
+
+    ds_lazy = ds_eager.chunk({"y": 5, "x": 5})
+
+    # Run preprocess
+    out_eager = viirs_jrr_preprocess(ds_eager, product="AOD", qa_threshold=2)
+    out_lazy = viirs_jrr_preprocess(ds_lazy, product="AOD", qa_threshold=2)
+
+    # Check consistency
+    xr.testing.assert_allclose(out_eager, out_lazy.compute())
+    assert isinstance(out_lazy.aod_550.data, da.Array)
 
 
 def test_viirs_jrr_build_urls(monkeypatch):
