@@ -11,10 +11,10 @@ import xarray as xr
 if TYPE_CHECKING:
     import dask.dataframe as dd
 
-from ..util import force_object_strings, normalize_pandas_freq
+from ..util import normalize_pandas_freq
 from .base import PointReader, register_reader
 from .drivers import FileUtility
-from .ish import ISH
+from .ish import ISH, add_ish_metadata
 from .sat_utils import update_history
 
 
@@ -33,9 +33,11 @@ def read_ish_lite_file(fname: str, **kwargs) -> pd.DataFrame:
     -------
     pd.DataFrame
         The loaded data in long format.
-    """
-    from numpy import nan
 
+    Examples
+    --------
+    >>> df = read_ish_lite_file('012345-67890-2023.gz')
+    """
     columns = [
         "year",
         "month",
@@ -53,7 +55,7 @@ def read_ish_lite_file(fname: str, **kwargs) -> pd.DataFrame:
 
     # Use FileUtility
     fs = FileUtility.get_fs(fname)
-    compression = "gzip" if fname.endswith(".gz") else None
+    compression = "gzip" if str(fname).endswith(".gz") else None
     storage_options = kwargs.get("storage_options", {})
 
     with fs.open(fname, "rb", compression=compression, **storage_options) as f:
@@ -63,21 +65,41 @@ def read_ish_lite_file(fname: str, **kwargs) -> pd.DataFrame:
             header=None,
             names=columns,
         )
-    # Create time column manually
-    df["time"] = pd.to_datetime(df[["year", "month", "day", "hour"]])
-    df.drop(["year", "month", "day", "hour"], axis=1, inplace=True)
 
+    if df.empty:
+        return df
+
+    # Vectorized time construction
+    df["time"] = pd.to_datetime(df[["year", "month", "day", "hour"]])
+    df = df.drop(columns=["year", "month", "day", "hour"])
+
+    # Extract siteid from filename (USAF + WBAN)
     filename = os.path.basename(fname).split("-")
-    siteid = filename[0] + filename[1]
-    for col in ["temp", "dew_pt_temp", "press", "ws", "precip_1hr", "precip_6hr"]:
-        df[col] /= 10.0
+    if len(filename) >= 2:
+        siteid = filename[0] + filename[1]
+    else:
+        siteid = "unknown"
+
+    # Scale values
+    scale_cols = ["temp", "dew_pt_temp", "press", "ws", "precip_1hr", "precip_6hr"]
+    for col in scale_cols:
+        if col in df.columns:
+            df[col] = df[col] / 10.0
+
     df["siteid"] = siteid
-    df = df.replace(-9999, nan)
+
+    # Clean missing values
+    df = df.replace(-999.9, np.nan).replace(-9999, np.nan)
+
     return df
 
 
 @register_reader("ish_lite")
 class ISHLiteReader(PointReader):
+    """
+    Reader for ISH (Integrated Surface Hourly) Lite data.
+    """
+
     def open_dataset(
         self,
         files: Optional[Union[str, List[str]]] = None,
@@ -117,7 +139,7 @@ class ISHLiteReader(PointReader):
         window : str, optional
             Resampling window (e.g., 'h'), by default 'h'.
         n_procs : int, optional
-            Number of processors for dask compute (if not lazy), by default 1.
+            Number of processors (deprecated, handled by dask), by default 1.
         verbose : bool, optional
             Whether to print verbose output, by default False.
         source : str, optional
@@ -149,18 +171,20 @@ class ISHLiteReader(PointReader):
             dates = pd.to_datetime(dates)
             if ish.history is None:
                 ish.read_ish_history(dates=dates)
-            dfloc = ish.history.copy()
+            dfloc_urls = ish.history.copy()
 
             if box is not None:
-                dfloc = ish.subset_sites(latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3])
+                dfloc_urls = ish.subset_sites(
+                    latmin=box[0], lonmin=box[1], latmax=box[2], lonmax=box[3]
+                )
             elif country is not None:
-                dfloc = dfloc.loc[dfloc.ctry == country, :]
+                dfloc_urls = dfloc_urls.loc[dfloc_urls.ctry == country, :]
             elif state is not None:
-                dfloc = dfloc.loc[dfloc.state == state, :]
+                dfloc_urls = dfloc_urls.loc[dfloc_urls.state == state, :]
             elif site is not None:
-                dfloc = dfloc.loc[dfloc.station_id == site, :]
+                dfloc_urls = dfloc_urls.loc[dfloc_urls.station_id == site, :]
 
-            urls = ish.build_urls(dates=dates, sites=dfloc, lite=True)
+            urls = ish.build_urls(dates=dates, sites=dfloc_urls, lite=True)
             if urls.empty:
                 raise ValueError("No data URLs found")
             files = urls.name.tolist()
@@ -168,47 +192,22 @@ class ISHLiteReader(PointReader):
         if not files:
             raise ValueError("Must provide either 'files' or 'dates'.")
 
-        # Use base class to open
-        df = super().open_dataset(
-            files,
-            read_method=read_ish_lite_file,
-            as_xarray=False,
-            lazy=lazy,
-            **kwargs,
-        )
+        # Use driver directly
+        df = self.driver.open(files, read_method=read_ish_lite_file, lazy=lazy, **kwargs)
 
-        # Filtering
+        # Filtering by date if requested
         if dates is not None:
             dates = pd.to_datetime(dates)
-            # Use exclusive upper bound to match unit test expectations
+            # Use exclusive upper bound to match unit test expectations in legacy
             df = df.loc[(df.time >= dates.min()) & (df.time < dates.max())]
-
-        df = df.replace(-999.9, np.nan)
 
         # Merge with metadata
         if ish.history is None:
             ish.read_ish_history()
-        dfloc = ish.history.copy()
-        dfloc = force_object_strings(dfloc)
 
-        if lazy:
-            import dask.dataframe as dd
-
-            df = df.assign(siteid=df.siteid.astype(object))
-            dfloc_dask = dd.from_pandas(dfloc, npartitions=1).assign(
-                station_id=lambda x: x.station_id.astype(object)
-            )
-            df = df.merge(dfloc_dask, how="left", left_on="siteid", right_on="station_id")
-        else:
-            df["siteid"] = df["siteid"].astype(object)
-            df = df.merge(dfloc, how="left", left_on="siteid", right_on="station_id")
-
-        df = df.rename(columns={"ctry": "country"}).drop(columns=["station_id"], errors="ignore")
+        df = add_ish_metadata(df, ish.history)
 
         df = self.harmonize(df)
-
-        if not lazy and hasattr(df, "compute"):
-            df = df.compute(num_workers=n_procs)
 
         if as_xarray:
             from ..util import ds_to_2d
@@ -235,13 +234,12 @@ class ISHLiteReader(PointReader):
                 pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
                 ds = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
 
-                # Identify metadata variables to preserve (those that don't vary with time)
+                # Identify metadata variables to preserve
                 metadata = xr.Dataset()
                 for c in meta_coords:
                     if c in ds.coords or c in ds.data_vars:
                         val = ds[c]
                         if "time" in val.dims:
-                            # If it varies with time, we take the first value per node
                             val = val.isel(time=0, drop=True)
                         metadata[c] = val
 
@@ -260,7 +258,6 @@ class ISHLiteReader(PointReader):
                 for c in metadata.coords:
                     ds.coords[c] = metadata.coords[c]
 
-                # Ensure siteid is correctly linked to node if it's the dimension
                 if "siteid" not in ds.coords and "siteid" not in ds.data_vars and "node" in ds.dims:
                     ds.coords["siteid"] = (("node",), ds.node.data)
 
@@ -297,13 +294,8 @@ class ISHLiteReader(PointReader):
                         .mean(numeric_only=True)
                         .reset_index()
                     )
-                    # Re-join metadata for pandas eager path
-                    df = df.merge(
-                        dfloc.rename(columns={"ctry": "country"}),
-                        how="left",
-                        left_on="siteid",
-                        right_on="station_id",
-                    ).drop(columns=["station_id"], errors="ignore")
+                    # Re-join metadata
+                    df = add_ish_metadata(df, ish.history)
             else:
                 import warnings
 
@@ -366,6 +358,11 @@ def add_data(
     -------
     Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
         The loaded ISH Lite data.
+
+    Examples
+    --------
+    >>> from monetio.readers.ish_lite import add_data
+    >>> ds = add_data(dates='2021-08-01', site='72406093721')
     """
     return ISHLiteReader().open_dataset(
         dates=dates,
