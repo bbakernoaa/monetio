@@ -1,5 +1,6 @@
 [tool.ruff]
 line-length = 100
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
@@ -18,7 +19,7 @@ name = "monetio"
 dynamic = ["version"]
 description = "The Model and Observation Evaluation Toolkit (MONET) I/O package"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Barry D. Baker", email = "barry.baker@noaa.gov"},
@@ -106,3 +107,6 @@ filterwarnings = [
     "ignore:np.find_common_type is deprecated.:DeprecationWarning::",
     "ignore:The current Dask DataFrame implementation is deprecated.:DeprecationWarning::",
 ]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true

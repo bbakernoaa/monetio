@@ -1,7 +1,5 @@
 """WRF-Chem variable specifications and diagnostic definitions."""
 
-from typing import Dict
-
 from .base import DiagnosticSpec
 
 # GOCART Species Groups
@@ -37,7 +35,7 @@ GOCART_PM10 = [
 ]
 
 # Diagnostic definitions
-DIAGNOSTICS: Dict[str, DiagnosticSpec] = {
+DIAGNOSTICS: dict[str, DiagnosticSpec] = {
     "PM25": DiagnosticSpec(
         variables=GOCART_PM25,
         weights=None,

@@ -1,7 +1,5 @@
 """TOLNet Reader"""
 
-from typing import List, Union
-
 import pandas as pd
 import xarray as xr
 
@@ -15,7 +13,7 @@ class TOLNetReader(GriddedReader):
     Reader for TOLNet (Tropospheric Ocean Laboratory Network) lidar data.
     """
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset:
         """
         Retrieve and load TOLNet data.
 
@@ -208,7 +206,7 @@ def tolnet_preprocess(ds: xr.Dataset) -> xr.Dataset:
         lat_str = ds.attrs.get("Location_Latitude")
         lon_str = ds.attrs.get("Location_Longitude")
 
-        if isinstance(lat_str, (bytes, str)):
+        if isinstance(lat_str, bytes | str):
             if isinstance(lat_str, bytes):
                 lat_str = lat_str.decode("ascii")
             parts = lat_str.split()
@@ -218,7 +216,7 @@ def tolnet_preprocess(ds: xr.Dataset) -> xr.Dataset:
         else:
             lat_val = None
 
-        if isinstance(lon_str, (bytes, str)):
+        if isinstance(lon_str, bytes | str):
             if isinstance(lon_str, bytes):
                 lon_str = lon_str.decode("ascii")
             parts = lon_str.split()

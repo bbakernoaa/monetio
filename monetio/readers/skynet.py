@@ -3,7 +3,7 @@
 import warnings
 from datetime import datetime
 from io import BytesIO
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -26,14 +26,14 @@ class SKYNETReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
-        siteid: Optional[str] = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
+        siteid: str | None = None,
         product: str = "AOT",
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs: dict,
-    ) -> Union[pd.DataFrame, xr.Dataset]:
+    ) -> pd.DataFrame | xr.Dataset:
         """
         Retrieve and load SKYNET data.
 
@@ -101,11 +101,11 @@ class SKYNETReader(PointReader):
 
     def build_urls(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
-        siteid: Optional[str] = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str,
+        siteid: str | None = None,
         product: str = "AOT",
         **kwargs: dict,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Construct SKYNET URLs.
         Note: The actual ISDC URL structure may vary. This is a placeholder.

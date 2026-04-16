@@ -1,7 +1,6 @@
 """TROPOMI Reader"""
 
 import warnings
-from typing import List, Optional, Union
 
 import xarray as xr
 
@@ -17,10 +16,10 @@ class TROPOMIReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
-        group: Optional[Union[str, List[str]]] = None,
+        files: str | list[str],
+        group: str | list[str] | None = None,
         calculate_pressure: bool = True,
-        qa_threshold: Optional[float] = None,
+        qa_threshold: float | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -110,7 +109,7 @@ class TROPOMIReader(GriddedReader):
 
 
 def tropomi_preprocess(
-    ds: xr.Dataset, calculate_pressure: bool = True, qa_threshold: Optional[float] = None
+    ds: xr.Dataset, calculate_pressure: bool = True, qa_threshold: float | None = None
 ) -> xr.Dataset:
     """
     Preprocess TROPOMI dataset: standardize coordinates, handle time, and

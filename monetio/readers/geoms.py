@@ -1,7 +1,7 @@
 """GEOMS Reader"""
 
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -20,7 +20,7 @@ class GEOMSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         rename_all: bool = True,
         squeeze: bool = True,
         **kwargs: Any,
@@ -358,7 +358,7 @@ def _mjd2000_to_datetime(x: np.ndarray) -> np.ndarray:
 
 def _read_hdf4(
     sd: Any,
-) -> Tuple[Dict[str, Tuple[Tuple[str, ...], np.ndarray, Dict[str, Any]]], Dict[str, Any]]:
+) -> tuple[dict[str, tuple[tuple[str, ...], np.ndarray, dict[str, Any]]], dict[str, Any]]:
     """
     Reads HDF4 datasets using pyhdf.
 

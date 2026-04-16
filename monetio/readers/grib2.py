@@ -1,7 +1,5 @@
 """Generalized GRIB2 Reader using grib2io"""
 
-from typing import List, Optional, Union
-
 import xarray as xr
 
 from .base import GriddedReader, register_reader
@@ -16,9 +14,9 @@ class Grib2Reader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         engine: str = "grib2io",
-        filters: Optional[dict] = None,
+        filters: dict | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """

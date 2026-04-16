@@ -1,7 +1,6 @@
 """MERRA-2 Reader"""
 
 import datetime
-from typing import List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -19,14 +18,12 @@ class MERRA2Reader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[
-            Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str]
-        ] = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
         product: str = "inst1_2d_asm_Nx",
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        virtualizarr: Optional[str] = None,
+        username: str | None = None,
+        password: str | None = None,
+        virtualizarr: str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -82,9 +79,9 @@ class MERRA2Reader(GriddedReader):
 
     def build_urls(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,
         product: str = "inst1_2d_asm_Nx",
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Build OPeNDAP URLs for MERRA-2 data based on dates and product.
 
@@ -100,7 +97,7 @@ class MERRA2Reader(GriddedReader):
         List[str]
             List of OPeNDAP URLs.
         """
-        if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
+        if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
         else:
             dates = pd.to_datetime(dates)
@@ -178,7 +175,7 @@ class MERRA2Reader(GriddedReader):
         return urls
 
 
-def merra2_preprocess(ds: xr.Dataset, product: Optional[str] = None) -> xr.Dataset:
+def merra2_preprocess(ds: xr.Dataset, product: str | None = None) -> xr.Dataset:
     """
     Preprocess MERRA-2 dataset: standardize coordinates and metadata.
 

@@ -1,7 +1,7 @@
 """NDBC Buoy Reader"""
 
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -18,9 +18,9 @@ if TYPE_CHECKING:
 class NDBCReader(PointReader):
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        stations: Union[str, List[str]] = None,
-        years: Union[int, List[int]] = None,
+        files: str | list[str] = None,
+        stations: str | list[str] = None,
+        years: int | list[int] = None,
         realtime: bool = True,
         wide_fmt: bool = True,
         n_procs: int = 1,
@@ -190,10 +190,10 @@ class NDBCReader(PointReader):
 
 
 def build_urls(
-    stations: Union[str, List[str]],
-    years: Union[int, List[int]] = None,
+    stations: str | list[str],
+    years: int | list[int] = None,
     realtime: bool = True,
-) -> List[str]:
+) -> list[str]:
     """
     Construct NDBC URLs.
     """
@@ -209,7 +209,7 @@ def build_urls(
         if years is None:
             # If no years provided, we might want to default to some, but better to error
             raise ValueError("Years must be provided for historical data.")
-        if isinstance(years, (int, str)):
+        if isinstance(years, int | str):
             years = [years]
         base_url = "https://www.ndbc.noaa.gov/data/historical/stdmet/"
         for s in stations:

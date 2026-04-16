@@ -1,10 +1,10 @@
 """AERONET Reader ."""
 
 import warnings
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import lru_cache, partial
 from io import BytesIO
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 
@@ -27,26 +27,26 @@ class AERONETReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
         product: str = "AOD15",
-        inv_type: Optional[str] = None,
-        latlonbox: Optional[List[float]] = None,
-        siteid: Optional[str] = None,
+        inv_type: str | None = None,
+        latlonbox: list[float] | None = None,
+        siteid: str | None = None,
         daily: bool = False,
         lunar: bool = False,
-        freq: Optional[str] = None,
+        freq: str | None = None,
         detect_dust: bool = False,
         add_diagnostics: bool = False,
-        interp_to_aod_values: Optional[Union[List[float], np.ndarray]] = None,
+        interp_to_aod_values: list[float] | np.ndarray | None = None,
         n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,
         retries: int = 5,
         backoff_factor: float = 2.0,
-        n_chunks: Optional[int] = None,
+        n_chunks: int | None = None,
         **kwargs: dict,
-    ) -> Union[pd.DataFrame, xr.Dataset]:
+    ) -> pd.DataFrame | xr.Dataset:
         """
         Retrieve and load AERONET data.
 
@@ -103,7 +103,7 @@ class AERONETReader(PointReader):
         if files is None:
             if dates is None:
                 # Default to today (use naive to avoid pd.date_range issues)
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 start = datetime(now.year, now.month, now.day)
                 dates = pd.date_range(start=start, end=now.replace(tzinfo=None), freq="h")
 
@@ -355,7 +355,7 @@ def get_valid_sites(retries: int = 5, backoff_factor: float = 2.0) -> pd.DataFra
         # Check if it's a connection error
         import requests
 
-        if isinstance(e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+        if isinstance(e, requests.exceptions.ConnectionError | requests.exceptions.Timeout):
             raise
 
         warnings.warn(f"Getting valid sites failed: {e}. Site validation will be skipped.")
@@ -365,18 +365,18 @@ def get_valid_sites(retries: int = 5, backoff_factor: float = 2.0) -> pd.DataFra
 
 
 def build_urls(
-    dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+    dates: pd.DatetimeIndex | list[datetime] | datetime | str,
     product: str = "AOD15",
     *,
-    inv_type: Optional[str] = None,
+    inv_type: str | None = None,
     daily: bool = False,
     lunar: bool = False,
-    siteid: Optional[str] = None,
-    latlonbox: Optional[List[float]] = None,
+    siteid: str | None = None,
+    latlonbox: list[float] | None = None,
     split_by_day: bool = False,
-    n_chunks: Optional[int] = None,
+    n_chunks: int | None = None,
     **kwargs: dict,
-) -> List[str]:
+) -> list[str]:
     """
     Construct AERONET URLs.
 
@@ -553,11 +553,11 @@ def _build_single_url(d1, d2, product, inv_type, daily, lunar, siteid, latlonbox
 def read_aeronet_csv(
     fn: str,
     *,
-    inv_type: Optional[str] = None,
-    interp_to_aod_values: Optional[Union[List[float], np.ndarray]] = None,
+    inv_type: str | None = None,
+    interp_to_aod_values: list[float] | np.ndarray | None = None,
     detect_dust: bool = False,
-    storage_options: Optional[dict] = None,
-    meta_df: Optional[pd.DataFrame] = None,
+    storage_options: dict | None = None,
+    meta_df: pd.DataFrame | None = None,
     **kwargs: dict,
 ) -> pd.DataFrame:
     """
@@ -605,7 +605,7 @@ def read_aeronet_csv(
         except Exception as e:
             import requests
 
-            if isinstance(e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+            if isinstance(e, requests.exceptions.ConnectionError | requests.exceptions.Timeout):
                 raise
 
             warnings.warn(f"Failed to fetch {fn}: {e}")
@@ -810,7 +810,7 @@ def _vectorized_tspack_interp(wvs: np.ndarray, aods: np.ndarray, new_wvs: np.nda
     return out
 
 
-def _calc_new_aod_values(df: pd.DataFrame, new_wv: Union[List[float], np.ndarray]) -> pd.DataFrame:
+def _calc_new_aod_values(df: pd.DataFrame, new_wv: list[float] | np.ndarray) -> pd.DataFrame:
     """Interpolate AOD to new wavelengths."""
     try:
         import pytspack
@@ -869,9 +869,9 @@ def add_angstrom_exponent(
     ds: xr.Dataset,
     wv1: float = 440.0,
     wv2: float = 870.0,
-    aod1_name: Optional[str] = None,
-    aod2_name: Optional[str] = None,
-    output_name: Optional[str] = None,
+    aod1_name: str | None = None,
+    aod2_name: str | None = None,
+    output_name: str | None = None,
 ) -> xr.Dataset:
     """
     Calculate the Angstrom Exponent (AE) between two wavelengths.
@@ -938,8 +938,8 @@ def add_aod_at_wavelength(
     target_wv: float = 550.0,
     base_wv: float = 500.0,
     ae_name: str = "440-870_angstrom_exponent",
-    base_aod_name: Optional[str] = None,
-    output_name: Optional[str] = None,
+    base_aod_name: str | None = None,
+    output_name: str | None = None,
 ) -> xr.Dataset:
     """
     Estimate AOD at a target wavelength using the Angstrom power law.

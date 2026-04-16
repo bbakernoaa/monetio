@@ -8,7 +8,7 @@ https://docs.openaq.org/aws/about
 import logging
 import warnings
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, Union
 
 import pandas as pd
 import xarray as xr
@@ -31,11 +31,11 @@ class OpenAQAWSReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
-        siteid: Union[str, List[str]] = None,
-        country: Union[str, List[str]] = None,
-        provider: Union[str, List[str]] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
+        siteid: str | list[str] = None,
+        country: str | list[str] = None,
+        provider: str | list[str] = None,
         find_paths: bool = True,
         wide_fmt: bool = False,
         as_xarray: bool = True,
@@ -83,9 +83,9 @@ class OpenAQAWSReader(PointReader):
         if (
             files is not None
             and dates is None
-            and isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp, list, str))
+            and isinstance(files, pd.DatetimeIndex | datetime | pd.Timestamp | list | str)
         ):
-            if isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp)):
+            if isinstance(files, pd.DatetimeIndex | datetime | pd.Timestamp):
                 dates = files
                 files = None
             elif isinstance(files, list) and len(files) > 0 and isinstance(files[0], datetime):

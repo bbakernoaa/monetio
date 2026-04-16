@@ -1,7 +1,6 @@
 """NESDIS EPS VIIRS Reader"""
 
 import datetime
-from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -20,8 +19,8 @@ class NESDISEPSVIIRSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -60,8 +59,8 @@ class NESDISEPSVIIRSReader(GriddedReader):
         return ds
 
     def build_urls(
-        self, dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str]
-    ) -> List[str]:
+        self, dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str
+    ) -> list[str]:
         """
         Build FTP URLs for NESDIS EPS VIIRS data based on dates.
 
@@ -75,7 +74,7 @@ class NESDISEPSVIIRSReader(GriddedReader):
         List[str]
             List of FTP URLs.
         """
-        if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
+        if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
         else:
             dates = pd.to_datetime(dates)

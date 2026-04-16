@@ -1,7 +1,5 @@
 """OMPS Reader"""
 
-from typing import List, Union
-
 import pandas as pd
 import xarray as xr
 
@@ -18,7 +16,7 @@ class OMPSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         product: str = "nmto3_l2",
         **kwargs,
     ) -> xr.Dataset:

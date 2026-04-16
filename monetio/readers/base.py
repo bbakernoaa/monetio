@@ -1,5 +1,5 @@
 import abc
-from typing import TYPE_CHECKING, Dict, List, NamedTuple, Optional, Union
+from typing import TYPE_CHECKING, NamedTuple, Union
 
 import numpy as np
 import pandas as pd
@@ -18,8 +18,8 @@ from .drivers import PandasDriver, XarrayDriver
 class DiagnosticSpec(NamedTuple):
     """Specification for a derived diagnostic variable."""
 
-    variables: List[str]
-    weights: Optional[List[float]] = None
+    variables: list[str]
+    weights: list[float] | None = None
     units: str = "unknown"
     long_name: str = "unknown"
     name: str = "unknown"
@@ -46,9 +46,7 @@ class BaseReader(abc.ABC):
     """
 
     @abc.abstractmethod
-    def open_dataset(
-        self, files: Union[str, List[str]], **kwargs
-    ) -> Union[xr.Dataset, pd.DataFrame]:
+    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset | pd.DataFrame:
         """
         Main entry point to read data.
 
@@ -77,7 +75,7 @@ class GriddedReader(BaseReader):
     def __init__(self):
         self.driver = XarrayDriver()
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset:
         """
         Uses XarrayDriver to open files.
         Readers can override this to add pre/post processing.
@@ -98,11 +96,11 @@ class PointReader(BaseReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         read_method: str = "read_csv",
         as_xarray: bool = True,
         lazy: bool = False,
-        meta: Union[pd.DataFrame, pd.Series, dict, tuple, None] = None,
+        meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -301,7 +299,7 @@ def add_lazy_diagnostic(
     ds: xr.Dataset,
     name: str,
     spec: DiagnosticSpec,
-    aliases: Optional[Dict[str, List[str]]] = None,
+    aliases: dict[str, list[str]] | None = None,
 ) -> xr.Dataset:
     """
     Adds a lazy diagnostic variable to the dataset if constituent variables exist.

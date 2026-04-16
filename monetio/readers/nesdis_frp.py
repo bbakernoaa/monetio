@@ -2,7 +2,6 @@
 
 import datetime
 import os
-from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -23,11 +22,11 @@ class NESDISFRPReader(GriddedReader):
 
     def open_dataset(
         self,
-        date: Union[datetime.datetime, str, pd.Timestamp] = None,
+        date: datetime.datetime | str | pd.Timestamp = None,
         ftype: str = "meanFRP",
         datapath: str = ".",
         lazy: bool = False,
-        files: Union[str, List[str]] = None,
+        files: str | list[str] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -87,7 +86,7 @@ class NESDISFRPReader(GriddedReader):
 
     def download_data(
         self, date: pd.Timestamp, ftype: str = "meanFRP", datapath: str = "."
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Download NESDIS FRP data from the GSCE server.
 

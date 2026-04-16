@@ -1,7 +1,7 @@
 import logging
 import sys
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from glob import glob
 
 import numpy as np
@@ -21,7 +21,7 @@ def read_dataset(fname, variable_dict):
     """
     from monetio.sat.hdfio import hdf_close, hdf_list, hdf_open, hdf_read
 
-    epoch_1993 = int(datetime(1993, 1, 1, tzinfo=timezone.utc).timestamp())
+    epoch_1993 = int(datetime(1993, 1, 1, tzinfo=UTC).timestamp())
 
     print("reading " + fname)
 

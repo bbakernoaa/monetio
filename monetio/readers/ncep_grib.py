@@ -1,6 +1,6 @@
 """NCEP GRIB Reader"""
 
-from typing import Any, List, Union
+from typing import Any
 
 import numpy as np
 import xarray as xr
@@ -15,7 +15,7 @@ class NCEPGribReader(GriddedReader):
     Reader for NCEP GRIB files.
     """
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs: Any) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], **kwargs: Any) -> xr.Dataset:
         """
         Reads NCEP GRIB files.
 

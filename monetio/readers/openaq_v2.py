@@ -2,7 +2,7 @@
 
 import datetime
 import logging
-from typing import List, Union
+from typing import Union
 
 import pandas as pd
 import xarray as xr
@@ -20,12 +20,12 @@ class OpenAQV2Reader(PointReader):
 
     def open_dataset(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
-        parameters: List[str] = None,
-        country: Union[str, List[str]] = None,
-        sites: List[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
+        parameters: list[str] = None,
+        country: str | list[str] = None,
+        sites: list[str] = None,
         wide_fmt: bool = True,
-        files: Union[str, List[str]] = None,
+        files: str | list[str] = None,
         **kwargs,
     ) -> Union[pd.DataFrame, "xr.Dataset"]:
         """

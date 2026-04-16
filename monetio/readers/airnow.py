@@ -3,7 +3,7 @@
 import os
 from datetime import datetime
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -25,8 +25,8 @@ from .sat_utils import update_history
 class AirNowReader(PointReader):
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
         download: bool = False,
         wide_fmt: bool = True,
         n_procs: int = 1,
@@ -305,7 +305,7 @@ class AirNowReader(PointReader):
 
 
 def build_urls(
-    dates: Union[pd.DatetimeIndex, List[datetime], datetime, str], daily: bool = False
+    dates: pd.DatetimeIndex | list[datetime] | datetime | str, daily: bool = False
 ) -> tuple:
     """
     Construct AirNow S3 URLs and filenames for the given dates.
@@ -384,7 +384,7 @@ def retrieve(url: str, fname: str) -> None:
 
 
 def read_airnow_csv(
-    fn: str, daily: bool = False, storage_options: Optional[dict] = None, **kwargs
+    fn: str, daily: bool = False, storage_options: dict | None = None, **kwargs
 ) -> pd.DataFrame:
     """
     Read a single AirNow CSV file.

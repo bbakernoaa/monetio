@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -185,16 +185,16 @@ class CRNReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[datetime, List[datetime], pd.DatetimeIndex]] = None,
+        files: str | list[str] | None = None,
+        dates: datetime | list[datetime] | pd.DatetimeIndex | None = None,
         daily: bool = False,
         sub_hourly: bool = False,
         download: bool = False,
-        latlonbox: Optional[List[float]] = None,
+        latlonbox: list[float] | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
-    ) -> Union[xr.Dataset, pd.DataFrame]:
+    ) -> xr.Dataset | pd.DataFrame:
         """
         Open CRN dataset.
 
@@ -252,7 +252,7 @@ class CRNReader(PointReader):
         return df
 
     def _postprocess(
-        self, df: Union[pd.DataFrame, "dd.DataFrame"], latlonbox: Optional[List[float]] = None
+        self, df: Union[pd.DataFrame, "dd.DataFrame"], latlonbox: list[float] | None = None
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         """
         Merge with station metadata and harmonize column names.
@@ -297,7 +297,7 @@ class CRNReader(PointReader):
 
         return df
 
-    def get_monitor_df(self, latlonbox: Optional[List[float]] = None) -> pd.DataFrame:
+    def get_monitor_df(self, latlonbox: list[float] | None = None) -> pd.DataFrame:
         """
         Load the CRN station metadata.
 
@@ -350,11 +350,11 @@ class CRNReader(PointReader):
 
     def build_urls(
         self,
-        dates: Union[datetime, List[datetime], pd.DatetimeIndex],
+        dates: datetime | list[datetime] | pd.DatetimeIndex,
         daily: bool = False,
         sub_hourly: bool = False,
-        latlonbox: Optional[List[float]] = None,
-    ) -> Tuple[List[str], List[str]]:
+        latlonbox: list[float] | None = None,
+    ) -> tuple[list[str], list[str]]:
         """
         Discover available URLs for the given dates and monitors.
 
@@ -427,7 +427,7 @@ class CRNReader(PointReader):
 
         return urls, fnames
 
-    def retrieve(self, urls: Union[str, List[str]]) -> List[str]:
+    def retrieve(self, urls: str | list[str]) -> list[str]:
         """
         Download files locally if they don't exist.
 

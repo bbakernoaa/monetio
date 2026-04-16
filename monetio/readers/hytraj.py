@@ -1,7 +1,6 @@
 """HYTRAJ Reader"""
 
 import re
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -22,13 +21,13 @@ class HYTRAJReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
-        taglist: Optional[List] = None,
+        files: str | list[str],
+        taglist: list | None = None,
         renumber: bool = False,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
-    ) -> Union[pd.DataFrame, xr.Dataset]:
+    ) -> pd.DataFrame | xr.Dataset:
         """
         Reads HYSPLIT trajectory (tdump) files.
 

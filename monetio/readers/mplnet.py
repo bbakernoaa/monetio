@@ -1,7 +1,5 @@
 """MPLNET Reader"""
 
-from typing import List, Union
-
 import xarray as xr
 
 from .base import GriddedReader, register_reader
@@ -14,7 +12,7 @@ class MPLNETReader(GriddedReader):
     Reader for MPLNET (NASA Micro-Pulse Lidar Network) V3 NetCDF data.
     """
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset:
         """
         Retrieve and load MPLNET data.
 

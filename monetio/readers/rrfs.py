@@ -1,7 +1,6 @@
 """RRFS Reader for AWS Open Data"""
 
 import datetime
-from typing import List, Union
 
 import pandas as pd
 import xarray as xr
@@ -18,13 +17,13 @@ class RRFSReader(NCEPPDSReader):
 
     def build_urls(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,
         hour: int = 0,
-        lead_time: Union[int, List[int]] = 0,
+        lead_time: int | list[int] = 0,
         product: str = "prslev.3km",
         domain: str = "conus",
         **kwargs,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Build S3 URLs for RRFS data.
 
@@ -46,7 +45,7 @@ class RRFSReader(NCEPPDSReader):
         List[str]
             List of S3 URLs.
         """
-        if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
+        if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
         else:
             dates = pd.to_datetime(dates)
@@ -71,10 +70,10 @@ class RRFSReader(NCEPPDSReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
         hour: int = 0,
-        lead_time: Union[int, List[int]] = 0,
+        lead_time: int | list[int] = 0,
         product: str = "prslev.3km",
         domain: str = "conus",
         **kwargs,

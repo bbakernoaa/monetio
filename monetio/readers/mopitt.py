@@ -1,7 +1,5 @@
 """MOPITT Reader"""
 
-from typing import List, Union
-
 import numpy as np
 import xarray as xr
 
@@ -19,7 +17,7 @@ class MOPITTReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -111,7 +109,7 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
         # Check for StartTime in attributes
         start_time = ds.attrs.get("StartTime")
         if start_time is not None:
-            if isinstance(start_time, (list, np.ndarray)):
+            if isinstance(start_time, list | np.ndarray):
                 start_time = start_time[0]
             # MOPITT uses seconds since 1993-01-01
             # Wrap in DataArray to use standardized utility

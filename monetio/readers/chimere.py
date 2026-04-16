@@ -1,7 +1,7 @@
 """Chimere Reader"""
 
 from functools import partial
-from typing import Any, List, Union
+from typing import Any
 
 import xarray as xr
 
@@ -17,7 +17,7 @@ class ChimereReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         var_list: list[str] = None,
         surf_only: bool = False,
         **kwargs: Any,
@@ -64,7 +64,7 @@ class ChimereReader(GriddedReader):
 
 
 def chimere_preprocess(
-    ds: xr.Dataset, *, var_list: List[str] = None, surf_only: bool = False
+    ds: xr.Dataset, *, var_list: list[str] = None, surf_only: bool = False
 ) -> xr.Dataset:
     """
     Preprocess function for a single Chimere file.

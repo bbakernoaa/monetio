@@ -1,7 +1,6 @@
 """NESDIS VIIRS JRR Reader"""
 
 import datetime
-from typing import List, Optional, Union
 
 import pandas as pd
 import xarray as xr
@@ -56,11 +55,11 @@ class VIIRSJRRReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
         satellite: str = "snpp",
         product: str = "AOD",
-        qa_threshold: Optional[float] = None,
+        qa_threshold: float | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -116,10 +115,10 @@ class VIIRSJRRReader(GriddedReader):
 
     def build_urls(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,
         satellite: str = "snpp",
         product: str = "AOD",
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Build S3 URLs for NESDIS VIIRS JRR data based on dates.
 
@@ -139,7 +138,7 @@ class VIIRSJRRReader(GriddedReader):
         """
         import s3fs
 
-        if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
+        if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
         else:
             dates = pd.to_datetime(dates)
@@ -170,7 +169,7 @@ class VIIRSJRRReader(GriddedReader):
 
 
 def viirs_jrr_preprocess(
-    ds: xr.Dataset, product: str = "AOD", qa_threshold: Optional[float] = None
+    ds: xr.Dataset, product: str = "AOD", qa_threshold: float | None = None
 ) -> xr.Dataset:
     """
     Preprocess VIIRS JRR dataset.

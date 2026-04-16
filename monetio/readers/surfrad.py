@@ -2,7 +2,7 @@
 
 import io
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -94,47 +94,66 @@ def read_surfrad(filename: str, **kwargs: dict) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        The loaded data.
+        The loaded data in long format.
+
+    Examples
+    --------
+    >>> df = read_surfrad("bon24001.dat")
     """
     # Use FileUtility to handle remote files
     fs = FileUtility.get_fs(filename)
-    with fs.open(filename, "r") as f:
-        # Read first two lines for metadata
-        # Some files might have encoding issues, so we read as bytes and decode
-        content = f.read()
-        if isinstance(content, bytes):
-            content = content.decode("utf-8", errors="ignore")
+    storage_options = kwargs.get("storage_options", {})
 
-        lines = content.splitlines()
-        if len(lines) < 3:
+    with fs.open(filename, "r", **storage_options) as f:
+        # Read metadata from first two lines
+        header_lines = []
+        for _ in range(2):
+            line = f.readline()
+            if not line:
+                break
+            header_lines.append(line.strip())
+
+        if len(header_lines) < 2:
             return pd.DataFrame()
 
-        station_name = lines[0].strip()
-        metadata_line = lines[1].split()
+        station_name = header_lines[0]
+        metadata_line = header_lines[1].split()
 
-        latitude = float(metadata_line[0])
-        longitude = float(metadata_line[1])
-        elevation = float(metadata_line[2])
-        # version = int(metadata_line[-1]) # not used currently
+        try:
+            latitude = float(metadata_line[0])
+            longitude = float(metadata_line[1])
+            elevation = float(metadata_line[2])
+        except (ValueError, IndexError):
+            # Fallback for malformed headers
+            latitude = np.nan
+            longitude = np.nan
+            elevation = np.nan
 
-        # Data starts from line 2
-        data_content = "\n".join(lines[2:])
-        df = pd.read_csv(
-            io.StringIO(data_content),
-            sep=r"\s+",
-            names=SURFRAD_COLUMNS,
-            header=None,
-            na_values=[-9999.9, -999.9, -99.9],
-            **kwargs,
-        )
+        # Reset pointer or read the rest
+        # For remote filesystems, it's often better to read the whole content if small
+        # SURFRAD files are daily and small (~100KB)
+        data_content = f.read()
 
-    # Add metadata as columns (will be coordinates in xarray)
+    # Data parsing
+    df = pd.read_csv(
+        io.StringIO(data_content),
+        sep=r"\s+",
+        names=SURFRAD_COLUMNS,
+        header=None,
+        na_values=[-9999.9, -999.9, -99.9],
+        **kwargs,
+    )
+
+    if df.empty:
+        return df
+
+    # Add metadata as columns
     df["latitude"] = latitude
     df["longitude"] = longitude
     df["elevation"] = elevation
     df["siteid"] = station_name
 
-    # Create time column
+    # Vectorized time construction
     # year, jday, hour, minute
     # jday is 1-indexed
     df["time"] = pd.to_datetime(
@@ -157,13 +176,13 @@ class SURFRADReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[datetime, List[datetime], pd.DatetimeIndex]] = None,
-        sites: Optional[List[str]] = None,
+        files: str | list[str] | None = None,
+        dates: datetime | list[datetime] | pd.DatetimeIndex | None = None,
+        sites: list[str] | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs,
-    ) -> Union[xr.Dataset, pd.DataFrame]:
+        **kwargs: dict,
+    ) -> Union[xr.Dataset, pd.DataFrame, "dd.DataFrame"]:
         """
         Open SURFRAD dataset.
 
@@ -184,8 +203,14 @@ class SURFRADReader(PointReader):
 
         Returns
         -------
-        Union[xr.Dataset, pd.DataFrame]
+        Union[xr.Dataset, pd.DataFrame, dd.DataFrame]
             The loaded dataset.
+
+        Examples
+        --------
+        >>> from monetio.readers.surfrad import SURFRADReader
+        >>> reader = SURFRADReader()
+        >>> ds = reader.open_dataset(dates="2024-01-01", sites=["bon"])
         """
         if files is None:
             if dates is None or sites is None:
@@ -211,7 +236,7 @@ class SURFRADReader(PointReader):
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
             # Update history for provenance
-            ds = update_history(ds, "Harmonized SURFRAD dataset.")
+            ds = update_history(ds, "Read SURFRAD dataset.")
             return ds
 
         return df
@@ -242,9 +267,9 @@ class SURFRADReader(PointReader):
 
     def build_urls(
         self,
-        dates: Union[datetime, List[datetime], pd.DatetimeIndex],
-        sites: List[str],
-    ) -> List[str]:
+        dates: datetime | list[datetime] | pd.DatetimeIndex,
+        sites: list[str],
+    ) -> list[str]:
         """
         Discover available URLs for the given dates and sites.
 

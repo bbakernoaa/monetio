@@ -4,7 +4,7 @@ import logging
 import zipfile
 from datetime import datetime
 from io import BytesIO
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -313,11 +313,11 @@ class IGRA2Reader(PointReader):
 
     def build_urls(
         self,
-        dates: Optional[pd.DatetimeIndex] = None,
-        sites: Optional[Union[str, List[str]]] = None,
+        dates: pd.DatetimeIndex | None = None,
+        sites: str | list[str] | None = None,
         source: str = "ncei",
         derived: bool = False,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Construct IGRA2 URLs.
         """
@@ -345,9 +345,9 @@ class IGRA2Reader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
-        site: Optional[Union[str, List[str]]] = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
+        site: str | list[str] | None = None,
         derived: bool = False,
         add_metadata: bool = True,
         as_xarray: bool = True,

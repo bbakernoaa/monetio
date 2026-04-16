@@ -2,7 +2,7 @@
 
 import functools
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -154,15 +154,15 @@ class NADPReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[datetime, List[datetime], pd.DatetimeIndex]] = None,
+        files: str | list[str] | None = None,
+        dates: datetime | list[datetime] | pd.DatetimeIndex | None = None,
         network: str = "NTN",
-        siteid: Optional[str] = None,
+        siteid: str | None = None,
         weekly: bool = True,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs: dict,
-    ) -> Union[xr.Dataset, pd.DataFrame]:
+    ) -> xr.Dataset | pd.DataFrame:
         """
         Open NADP dataset.
 
@@ -304,7 +304,7 @@ class NADPReader(PointReader):
         return meta
 
     def build_url(
-        self, network: str = "NTN", siteid: Optional[str] = None, weekly: bool = True
+        self, network: str = "NTN", siteid: str | None = None, weekly: bool = True
     ) -> str:
         """
         Build URL for NADP data.
