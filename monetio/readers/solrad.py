@@ -55,15 +55,23 @@ WIDTHS = [4, 3, 2, 2, 2, 2, 6, 6] + 5 * [7, 1] + 4 * [9]
 MADISON_WIDTHS = [4, 3, 2, 2, 2, 2, 6, 6] + 8 * [7, 1] + 7 * [9]
 
 
-# In the files, there is one space between columns.
-# To use read_fwf, we can either provide widths that include the space,
-# or better, use colspecs.
-def get_colspecs(widths):
+def get_colspecs(widths: List[int]) -> List[tuple]:
+    """
+    Generate colspecs for pd.read_fwf from widths.
+
+    Parameters
+    ----------
+    widths : List[int]
+        List of column widths.
+
+    Returns
+    -------
+    List[tuple]
+        List of (start, end) tuples.
+    """
     colspecs = []
     start = 0
     for w in widths:
-        # Each field of width w is followed by 1 space, except possibly the last
-        # But actually, the total width of the field including the trailing space is w+1.
         colspecs.append((start, start + w))
         start += w + 1
     return colspecs
@@ -75,7 +83,6 @@ MADISON_COLSPECS = get_colspecs(MADISON_WIDTHS)
 # Variable mapping for SOLRAD
 VARIABLE_MAP = {
     "zen": "solar_zenith",
-    # ghi, dni, dhi are already standard-ish
 }
 
 
@@ -93,7 +100,11 @@ def read_solrad(filename: str, **kwargs: dict) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        The loaded data.
+        The loaded data in long format.
+
+    Examples
+    --------
+    >>> df = read_solrad("abq24001.dat")
     """
     if "msn" in filename.lower():
         names = MADISON_HEADERS
@@ -104,33 +115,45 @@ def read_solrad(filename: str, **kwargs: dict) -> pd.DataFrame:
 
     # Use FileUtility to handle remote files
     fs = FileUtility.get_fs(filename)
-    with fs.open(filename, "r") as f:
-        content = f.read()
-        if isinstance(content, bytes):
-            content = content.decode("utf-8", errors="ignore")
+    storage_options = kwargs.get("storage_options", {})
 
-        lines = content.splitlines()
-        if len(lines) < 3:
+    with fs.open(filename, "r", **storage_options) as f:
+        # Read header for metadata
+        header_lines = []
+        for _ in range(2):
+            line = f.readline()
+            if not line:
+                break
+            header_lines.append(line.strip())
+
+        if len(header_lines) < 2:
             return pd.DataFrame()
 
-        station_name = lines[0].strip()
-        metadata_line = lines[1].split()
+        station_name = header_lines[0]
+        metadata_line = header_lines[1].split()
 
-        latitude = float(metadata_line[0])
-        longitude = float(metadata_line[1])
-        elevation = float(metadata_line[2])
-        # tz_offset = int(metadata_line[3])
+        try:
+            latitude = float(metadata_line[0])
+            longitude = float(metadata_line[1])
+            elevation = float(metadata_line[2])
+        except (ValueError, IndexError):
+            latitude = np.nan
+            longitude = np.nan
+            elevation = np.nan
 
-        # Data starts from line 2
-        data_content = "\n".join(lines[2:])
-        df = pd.read_fwf(
-            io.StringIO(data_content),
-            colspecs=colspecs,
-            header=None,
-            names=names,
-            na_values=-9999.9,
-            **kwargs,
-        )
+        data_content = f.read()
+
+    df = pd.read_fwf(
+        io.StringIO(data_content),
+        colspecs=colspecs,
+        header=None,
+        names=names,
+        na_values=-9999.9,
+        **kwargs,
+    )
+
+    if df.empty:
+        return df
 
     # Add metadata
     df["latitude"] = latitude
@@ -138,12 +161,10 @@ def read_solrad(filename: str, **kwargs: dict) -> pd.DataFrame:
     df["elevation"] = elevation
     df["siteid"] = station_name
 
-    # Create time column
-    # Ensure columns are integer and then format to string with zfill
-    # We use a custom converter to handle potential issues with read_fwf and NaN in time columns
+    # Vectorized time construction
+    # year(4), month(2), day(2), hour(2), minute(2)
     def to_str(series, n):
-        # Handle cases where column might be floating point because of NaNs, or already string
-        # We ensure they are numeric first to avoid '.0' in string conversion
+        # Handle cases where column might be floating point because of NaNs
         s = pd.to_numeric(series, errors="coerce").fillna(0).astype(int).astype(str)
         return s.str.zfill(n)
 
@@ -173,8 +194,8 @@ class SOLRADReader(PointReader):
         sites: Optional[List[str]] = None,
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs,
-    ) -> Union[xr.Dataset, pd.DataFrame]:
+        **kwargs: dict,
+    ) -> Union[xr.Dataset, pd.DataFrame, "dd.DataFrame"]:
         """
         Open SOLRAD dataset.
 
@@ -195,8 +216,14 @@ class SOLRADReader(PointReader):
 
         Returns
         -------
-        Union[xr.Dataset, pd.DataFrame]
+        Union[xr.Dataset, pd.DataFrame, dd.DataFrame]
             The loaded dataset.
+
+        Examples
+        --------
+        >>> from monetio.readers.solrad import SOLRADReader
+        >>> reader = SOLRADReader()
+        >>> ds = reader.open_dataset(dates="2024-01-01", sites=["abq"])
         """
         if files is None:
             if dates is None or sites is None:
@@ -222,7 +249,7 @@ class SOLRADReader(PointReader):
         if as_xarray:
             ds = self.to_xarray(df, **kwargs)
             # Update history for provenance
-            ds = update_history(ds, "Harmonized SOLRAD dataset.")
+            ds = update_history(ds, "Read SOLRAD dataset.")
             return ds
 
         return df

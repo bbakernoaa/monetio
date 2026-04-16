@@ -7,6 +7,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import PointReader, register_reader
+from .drivers import FileUtility
 from .sat_utils import update_history
 
 if TYPE_CHECKING:
@@ -47,7 +48,7 @@ class CEMSReader(PointReader):
         states : Union[str, List[str]], optional
             States to retrieve (e.g., 'md'), by default 'md'.
         n_procs : int, optional
-            Number of processors for dask compute (if not lazy), by default 1.
+            Number of processors (deprecated, handled by dask), by default 1.
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
@@ -59,11 +60,11 @@ class CEMSReader(PointReader):
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
-            The loaded CEMS data. If `as_xarray=True`, units are assigned
-            to individual data variables (e.g., 'lbs' for SO2).
+            The loaded CEMS data.
 
         Examples
         --------
+        >>> from monetio.readers.cems import CEMSReader
         >>> reader = CEMSReader()
         >>> ds = reader.open_dataset(dates="2023-01-01", states="md")
         """
@@ -97,17 +98,16 @@ class CEMSReader(PointReader):
             ds = self.to_xarray(df, **kwargs)
 
             # Retrieve unit mapping from dataframe attrs
-            # Note: pd.concat and Dask operations can drop attrs.
             unit_map = getattr(df, "attrs", {}).get("unit_mapping", {})
 
             if not unit_map:
-                # Eagerly peek at the first file to recover mapping if missing
+                # Eagerly peek at the first file if metadata is missing from attributes
+                # This only happens if attrs are lost during merge/concat
                 try:
-                    from .drivers import FileUtility
-
                     file_list = FileUtility.expand_paths(files)
                     if file_list:
-                        meta_df = read_cems(file_list[0])
+                        # We use a limited read to get headers and units
+                        meta_df = read_cems(file_list[0], nrows=5)
                         unit_map = meta_df.attrs.get("unit_mapping", {})
                 except Exception as e:
                     import warnings
@@ -126,11 +126,6 @@ class CEMSReader(PointReader):
             return ds
 
         return df
-
-
-# -----------------------------------------------------------------------------
-# Helper functions ported from monetio/obs/cems_mod.py
-# -----------------------------------------------------------------------------
 
 
 def build_url(date: datetime, state: str) -> str:
@@ -191,11 +186,28 @@ def read_cems(efile: str, **kwargs: dict) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        The loaded CEMS data.
+        The loaded CEMS data in long format.
+
+    Examples
+    --------
+    >>> df = read_cems("2023md01.zip")
     """
     from ..util import force_object_strings
 
-    dftemp = pd.read_csv(efile, sep=",", index_col=False, header=0, **kwargs)
+    # Use FileUtility for protocols and compression
+    fs = FileUtility.get_fs(efile)
+    storage_options = kwargs.pop("storage_options", {})
+
+    # Identify compression
+    compression = "zip" if str(efile).endswith(".zip") else "infer"
+
+    with fs.open(efile, "rb", **storage_options) as f:
+        dftemp = pd.read_csv(
+            f, sep=",", index_col=False, header=0, compression=compression, **kwargs
+        )
+
+    if dftemp.empty:
+        return dftemp
 
     # Standardize column names using a mapping
     rename_map = {
@@ -241,14 +253,14 @@ def read_cems(efile: str, **kwargs: dict) -> pd.DataFrame:
     dftemp.attrs["unit_mapping"] = {k: v for k, v in unit_map.items() if k in dftemp.columns}
 
     # Optimized vectorized time construction
-    if not dftemp.empty and "date" in dftemp.columns and "hour" in dftemp.columns:
-        dfmt = get_date_fmt(str(dftemp["date"].iloc[0]))
-        dftemp["time_local"] = pd.to_datetime(dftemp["date"], format=dfmt) + pd.to_timedelta(
-            dftemp["hour"], unit="h"
-        )
-        # For backend-agnostic loading, we need a 'time' column (UTC)
-        # CEMS data is local time. We set time = time_local for now.
-        dftemp["time"] = dftemp["time_local"]
+    if "date" in dftemp.columns and "hour" in dftemp.columns:
+        # Determine format from first non-null
+        first_date = dftemp["date"].dropna().iloc[0] if not dftemp["date"].dropna().empty else None
+        if first_date:
+            dfmt = get_date_fmt(str(first_date))
+            dftemp["time"] = pd.to_datetime(dftemp["date"], format=dfmt) + pd.to_timedelta(
+                dftemp["hour"], unit="h"
+            )
 
     dftemp = dftemp.drop(columns=["date", "hour", "year"], errors="ignore")
 
