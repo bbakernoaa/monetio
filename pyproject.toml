@@ -18,7 +18,7 @@ name = "monetio"
 dynamic = ["version"]
 description = "The Model and Observation Evaluation Toolkit (MONET) I/O package"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Barry D. Baker", email = "barry.baker@noaa.gov"},
