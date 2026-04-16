@@ -27,7 +27,6 @@ class PAMSReader(PointReader):
         self,
         files: Union[str, List[str]],
         as_xarray: bool = True,
-        lazy: bool = False,
         **kwargs: Any,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -39,11 +38,9 @@ class PAMSReader(PointReader):
             File paths or URLs to read.
         as_xarray : bool, optional
             Whether to return an xarray.Dataset, by default True.
-        lazy : bool, optional
-            Whether to return a dask-backed object, by default False.
         **kwargs : Any
             Additional arguments passed to the reader and driver.
-            Includes `expand2d`, `pivot`, and `wide_fmt` for Xarray conversion.
+            Includes `expand2d`, `pivot`, `wide_fmt`, and `lazy`.
 
         Returns
         -------
@@ -53,6 +50,7 @@ class PAMSReader(PointReader):
 
         Examples
         --------
+        >>> from monetio.readers.pams import PAMSReader
         >>> reader = PAMSReader()
         >>> ds = reader.open_dataset("pams_data*.json")
         """
@@ -62,7 +60,7 @@ class PAMSReader(PointReader):
         }
 
         # Use PandasDriver to open files
-        df = self.driver.open(files, read_method=read_pams, lazy=lazy, **reader_kwargs)
+        df = self.driver.open(files, read_method=read_pams, **reader_kwargs)
 
         df = self.harmonize(df)
 
@@ -70,45 +68,40 @@ class PAMSReader(PointReader):
         df = force_object_strings(df)
 
         if as_xarray:
-            # We must handle unit transfer BEFORE or AFTER expansion.
-            # If we expand (pivot), the variables change names.
-            ds = self.to_xarray(df, **kwargs)
-
-            # Retrieve unit mapping from dataframe attrs
-            # Note: pd.concat and Dask operations can drop attrs.
+            # Retrieve unit mapping from dataframe attrs before it's possibly lost
+            # in to_xarray or further transformations.
             unit_map = getattr(df, "attrs", {}).get("unit_mapping", {})
 
             if not unit_map:
-                # Eagerly peek at the first file to recover mapping if missing
+                # For Dask-backed DataFrames, attributes from the delayed read_pams
+                # are lost. We peek at the first file's metadata to recover them.
                 try:
-                    from .drivers import FileUtility
-
                     file_list = FileUtility.expand_paths(files)
                     if file_list:
+                        # Only read the first file's metadata
                         meta_df = read_pams(file_list[0])
                         unit_map = meta_df.attrs.get("unit_mapping", {})
-                except Exception as e:
-                    import warnings
+                except Exception:
+                    pass
 
-                    warnings.warn(f"PAMS unit mapping recovery failed: {e}")
+            # We must handle unit transfer BEFORE or AFTER expansion.
+            # If we expand (pivot), the variables change names.
+            ds = self.to_xarray(df, **kwargs)
 
             if unit_map:
                 for varname, unit in unit_map.items():
                     if varname in ds.data_vars:
                         ds[varname].attrs["units"] = unit
-                    elif varname == "obs" and "obs" in ds.data_vars:
+                    if varname == "obs" and "obs" in ds.data_vars:
                         ds["obs"].attrs["units"] = unit
 
             if "obs" in ds.data_vars and "units" not in ds["obs"].attrs:
                 # Fallback for non-pivoted or if mapping failed
-                is_lazy = False
-                if "units" in ds.variables:
-                    is_lazy = hasattr(ds["units"].data, "compute")
-                if not is_lazy:
+                if "units" in ds.variables and not hasattr(ds["units"].data, "dask"):
                     try:
                         # Extract units from the first element of 'units' coordinate/variable
                         # This works if 'units' is a string array/coordinate
-                        unit_val = str(ds["units"].values.flat[0])
+                        unit_val = str(ds["units"].values[0])
                         ds["obs"].attrs["units"] = unit_val
                     except (IndexError, AttributeError, KeyError):
                         pass
@@ -135,10 +128,11 @@ def read_pams(filename: str, **kwargs: Any) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        The loaded data.
+        The loaded PAMS data with standardized columns (siteid, time, obs, units).
 
     Examples
     --------
+    >>> from monetio.readers.pams import read_pams
     >>> df = read_pams("site_data.json")
     """
     # Determine storage options if S3
