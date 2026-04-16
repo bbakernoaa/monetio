@@ -1,9 +1,10 @@
 import json
-import os
-import pandas as pd
+
 import pytest
 import xarray as xr
+
 from monetio.readers.pams import PAMSReader
+
 
 def create_mock_pams_json(filepath, parameter="Ozone", units="Parts per billion"):
     data = {
@@ -18,7 +19,7 @@ def create_mock_pams_json(filepath, parameter="Ozone", units="Parts per billion"
                 "date_gmt": "2023-01-01",
                 "time_gmt": "12:00",
                 "latitude": 34.05,
-                "longitude": -118.24
+                "longitude": -118.24,
             },
             {
                 "state_code": "06",
@@ -30,18 +31,20 @@ def create_mock_pams_json(filepath, parameter="Ozone", units="Parts per billion"
                 "date_gmt": "2023-01-01",
                 "time_gmt": "13:00",
                 "latitude": 34.05,
-                "longitude": -118.24
-            }
+                "longitude": -118.24,
+            },
         ]
     }
-    with open(filepath, 'w') as f:
+    with open(filepath, "w") as f:
         json.dump(data, f)
+
 
 @pytest.fixture
 def mock_pams_files(tmp_path):
     f1 = tmp_path / "pams_1.json"
     create_mock_pams_json(f1, parameter="Ozone", units="Parts per billion")
     return str(f1)
+
 
 def test_pams_eager_lazy_consistency(mock_pams_files):
     reader = PAMSReader()
@@ -62,13 +65,14 @@ def test_pams_eager_lazy_consistency(mock_pams_files):
     assert ds_eager.Ozone.attrs["units"] == "ppb"
     assert ds_lazy.Ozone.attrs["units"] == "ppb"
 
+
 def test_pams_no_compute_on_open(mock_pams_files):
-    import dask
     from dask.callbacks import Callback
 
     class ComputeCounter(Callback):
         def __init__(self):
             self.compute_count = 0
+
         def _start(self, dsk):
             self.compute_count += 1
 
