@@ -1,7 +1,6 @@
 """OMPS Nadir Reader"""
 
 import datetime
-from typing import List, Union
 
 import pandas as pd
 import xarray as xr
@@ -25,11 +24,11 @@ class OMPSNadirReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
         satellite: str = "snpp",
         product: str = "v8toz",
-        group: Union[str, List[str]] = None,
+        group: str | list[str] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -145,10 +144,10 @@ class OMPSNadirReader(GriddedReader):
 
     def build_urls(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,
         satellite: str = "snpp",
         product: str = "v8toz",
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Build S3 URLs for OMPS Nadir data based on dates.
 
@@ -170,7 +169,7 @@ class OMPSNadirReader(GriddedReader):
 
         s3fs = _import_required("s3fs")
 
-        if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
+        if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
         else:
             dates = pd.to_datetime(dates)

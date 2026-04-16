@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 from io import StringIO
-from typing import TYPE_CHECKING, List, NamedTuple, Optional, Tuple, Union
+from typing import TYPE_CHECKING, NamedTuple, Union
 
 import numpy as np
 import pandas as pd
@@ -25,9 +25,9 @@ class GMLOzonesondeReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
-        location: Union[str, List[str]] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
+        location: str | list[str] = None,
         errors: str = "raise",
         as_xarray: bool = True,
         lazy: bool = False,
@@ -166,7 +166,7 @@ def retry(func):
 
 
 def discover_files(
-    location: Optional[Union[str, List[str]]] = None,
+    location: str | list[str] | None = None,
     n_threads: int = 3,
     cache: bool = True,
 ) -> pd.DataFrame:
@@ -240,8 +240,8 @@ def discover_files(
 
 
 def add_data(
-    dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
-    location: Optional[Union[str, List[str]]] = None,
+    dates: pd.DatetimeIndex | list[datetime] | datetime | str,
+    location: str | list[str] | None = None,
     errors: str = "raise",
     **kwargs,
 ) -> pd.DataFrame:
@@ -273,7 +273,7 @@ class ColInfo(NamedTuple):
     name: str
     long_name: str
     units: str
-    na_val: Optional[Union[str, Tuple[str, ...]]]
+    na_val: str | tuple[str, ...] | None
 
 
 COL_INFO_L100 = [

@@ -1,7 +1,5 @@
 """MODIS L2 Swath Reader"""
 
-from typing import List, Union
-
 import xarray as xr
 
 from .base import GriddedReader, register_reader
@@ -16,7 +14,7 @@ class MODISL2Reader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         variable_dict: dict = None,
         **kwargs,
     ) -> xr.Dataset:

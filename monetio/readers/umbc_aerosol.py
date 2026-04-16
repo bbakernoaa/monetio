@@ -1,7 +1,6 @@
 """UMBC Aerosol Reader (CL51)"""
 
 import warnings
-from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -19,7 +18,7 @@ class UMBCAerosolReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -132,9 +131,9 @@ def umbc_aerosol_preprocess(ds: xr.Dataset) -> xr.Dataset:
     lon = ds.attrs.get("Location_lon", 0.0)
 
     # Handle case where attributes are stored as lists/arrays
-    if isinstance(lat, (list, np.ndarray)) and len(lat) > 0:
+    if isinstance(lat, list | np.ndarray) and len(lat) > 0:
         lat = lat[0]
-    if isinstance(lon, (list, np.ndarray)) and len(lon) > 0:
+    if isinstance(lon, list | np.ndarray) and len(lon) > 0:
         lon = lon[0]
 
     try:

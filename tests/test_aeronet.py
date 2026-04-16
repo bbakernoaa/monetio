@@ -31,7 +31,7 @@ def is_connection_error(e):
 
     msg = str(e)
     return (
-        isinstance(e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout))
+        isinstance(e, requests.exceptions.ConnectionError | requests.exceptions.Timeout)
         or "Connection refused" in msg
         or "Max retries exceeded" in msg
         or "PandasDriver failed to open files" in msg
@@ -449,8 +449,9 @@ Time(hh:mm:ss),Date(dd:mm:yyyy),Site,Latitude,Longitude,AOD_440nm,AOD_675nm,AOD_
         resp.raise_for_status.return_value = None
         return resp
 
-    with patch("requests.Session.get", side_effect=mock_get), patch.dict(
-        sys.modules, {"pytspack": mock_pytspack}
+    with (
+        patch("requests.Session.get", side_effect=mock_get),
+        patch.dict(sys.modules, {"pytspack": mock_pytspack}),
     ):
         reader = AERONETReader()
 

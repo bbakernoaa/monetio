@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any
 
 import pandas as pd
 import xarray as xr
@@ -30,8 +30,8 @@ class ICAPMMEReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
         product: str = "MMC",
         data_var: str = "dustaod550",
         download: bool = False,
@@ -95,11 +95,11 @@ class ICAPMMEReader(GriddedReader):
 
 
 def build_urls(
-    dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
+    dates: pd.DatetimeIndex | list[datetime] | datetime | str,
     filetype: str = "MMC",
     data_var: str = "dustaod550",
     verbose: bool = True,
-) -> Tuple[List[str], List[str]]:
+) -> tuple[list[str], list[str]]:
     """
     Construct ICAP-MME URLs and filenames for the given dates.
 
@@ -147,9 +147,7 @@ def build_urls(
     return urls, fnames
 
 
-def retrieve(
-    url: str, fname: str, download: bool = False, verbose: bool = True
-) -> Union[str, Path]:
+def retrieve(url: str, fname: str, download: bool = False, verbose: bool = True) -> str | Path:
     """
     Retrieve or download an ICAP-MME file.
 

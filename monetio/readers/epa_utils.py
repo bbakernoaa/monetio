@@ -2,7 +2,7 @@
 
 import logging
 from functools import lru_cache
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import pandas as pd
 
@@ -99,7 +99,7 @@ def convert_statenames_to_abv(df: pd.DataFrame) -> pd.DataFrame:
 
 @lru_cache(maxsize=1)
 def read_monitor_file(
-    network: Optional[str] = None, airnow: bool = False, drop_latlon: bool = False
+    network: str | None = None, airnow: bool = False, drop_latlon: bool = False
 ) -> pd.DataFrame:
     """
     Read the EPA/AQS monitor location file.
@@ -333,11 +333,11 @@ def convert_epa_unit(
 
 def add_monitor_metadata(
     df: Union[pd.DataFrame, "dd.DataFrame"],
-    network: Optional[str] = None,
+    network: str | None = None,
     airnow: bool = False,
     daily: bool = False,
     left_on: str = "siteid",
-    history_msg: Optional[str] = None,
+    history_msg: str | None = None,
 ) -> Union[pd.DataFrame, "dd.DataFrame"]:
     """
     Add site metadata from the monitor file (AQS or AirNow).

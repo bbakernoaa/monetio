@@ -1,6 +1,6 @@
 """UFS-AQM Reader"""
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import numpy as np
 import xarray as xr
@@ -17,11 +17,11 @@ class UFSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         convert_to_ppb: bool = True,
         mech: str = "cb6r3_ae6_aq",
-        var_list: Optional[List[str]] = None,
-        fname_pm25: Optional[Union[str, List[str]]] = None,
+        var_list: list[str] | None = None,
+        fname_pm25: str | list[str] | None = None,
         surf_only: bool = False,
         **kwargs: Any,
     ) -> xr.Dataset:
@@ -256,7 +256,7 @@ class UFSReader(GriddedReader):
         return ds
 
 
-def dict_species_sums(mech: str) -> Dict[str, List]:
+def dict_species_sums(mech: str) -> dict[str, list]:
     """
     Returns species groups for sums based on mechanism.
 
@@ -490,7 +490,7 @@ def _convert_units(ds: xr.Dataset, convert_to_ppb: bool = True) -> xr.Dataset:
     return ds
 
 
-def _add_all_diagnostics(ds: xr.Dataset, list_calc_sum: List[str], dict_sum: Dict) -> xr.Dataset:
+def _add_all_diagnostics(ds: xr.Dataset, list_calc_sum: list[str], dict_sum: dict) -> xr.Dataset:
     """
     Adds all requested lazy diagnostics.
 
@@ -540,8 +540,8 @@ def _add_all_diagnostics(ds: xr.Dataset, list_calc_sum: List[str], dict_sum: Dic
 
 
 def add_multiple_lazy2(
-    ds: xr.Dataset, variables: List[str], weights: Optional[List[float]] = None
-) -> Optional[xr.DataArray]:
+    ds: xr.Dataset, variables: list[str], weights: list[float] | None = None
+) -> xr.DataArray | None:
     """
     Sums multiple variables lazily with optional weights.
 
@@ -579,7 +579,7 @@ def add_multiple_lazy2(
     return new
 
 
-def add_lazy_pm25(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
+def add_lazy_pm25(ds: xr.Dataset, dict_sum: dict) -> xr.Dataset:
     """
     Adds PM2.5 lazy diagnostic.
 
@@ -609,7 +609,7 @@ def add_lazy_pm25(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
     return ds
 
 
-def add_lazy_pm10(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
+def add_lazy_pm10(ds: xr.Dataset, dict_sum: dict) -> xr.Dataset:
     """
     Adds PM10 lazy diagnostic.
 
@@ -636,7 +636,7 @@ def add_lazy_pm10(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
     return ds
 
 
-def add_lazy_noy_g(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
+def add_lazy_noy_g(ds: xr.Dataset, dict_sum: dict) -> xr.Dataset:
     """
     Adds NOy gas lazy diagnostic.
 
@@ -662,7 +662,7 @@ def add_lazy_noy_g(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
     return ds
 
 
-def add_lazy_noy_a(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
+def add_lazy_noy_a(ds: xr.Dataset, dict_sum: dict) -> xr.Dataset:
     """
     Adds NOy aerosol lazy diagnostic.
 
@@ -688,7 +688,7 @@ def add_lazy_noy_a(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
     return ds
 
 
-def add_lazy_nox(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
+def add_lazy_nox(ds: xr.Dataset, dict_sum: dict) -> xr.Dataset:
     """
     Adds NOx lazy diagnostic.
 
@@ -714,7 +714,7 @@ def add_lazy_nox(ds: xr.Dataset, dict_sum: Dict) -> xr.Dataset:
     return ds
 
 
-def add_lazy_diagnostic_generic(ds: xr.Dataset, name: str, dict_sum: Dict) -> xr.Dataset:
+def add_lazy_diagnostic_generic(ds: xr.Dataset, name: str, dict_sum: dict) -> xr.Dataset:
     """
     Generic lazy diagnostic adder.
 

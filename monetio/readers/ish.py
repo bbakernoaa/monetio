@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -113,7 +113,7 @@ class ISH:
         self.verbose = False
         self.source = "aws"
 
-    def read_ish_history(self, dates: Optional[pd.DatetimeIndex] = None):
+    def read_ish_history(self, dates: pd.DatetimeIndex | None = None):
         """
         Read the ISH history file.
 
@@ -181,8 +181,8 @@ class ISH:
 
     def build_urls(
         self,
-        dates: Optional[pd.DatetimeIndex] = None,
-        sites: Optional[pd.DataFrame] = None,
+        dates: pd.DatetimeIndex | None = None,
+        sites: pd.DataFrame | None = None,
         lite: bool = False,
     ) -> pd.DataFrame:
         """
@@ -256,12 +256,12 @@ class ISH:
 
 
 def _clean_col(
-    series: pd.Series, missing_vals: Union[float, List[float]], multiplier: float = 1.0
+    series: pd.Series, missing_vals: float | list[float], multiplier: float = 1.0
 ) -> pd.Series:
     """
     Clean a numeric column by replacing missing values with NaN and applying a multiplier.
     """
-    if not isinstance(missing_vals, (list, tuple)):
+    if not isinstance(missing_vals, list | tuple):
         missing_vals = [missing_vals]
     series = series.astype(float)
     for mv in missing_vals:
@@ -360,18 +360,18 @@ def read_ish_file(fname: str, **kwargs) -> pd.DataFrame:
 class ISHReader(PointReader):
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
-        box: Optional[List[float]] = None,
-        country: Optional[str] = None,
-        state: Optional[str] = None,
-        site: Optional[str] = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
+        box: list[float] | None = None,
+        country: str | None = None,
+        state: str | None = None,
+        site: str | None = None,
         resample: bool = True,
         window: str = "h",
         download: bool = False,
         n_procs: int = 1,
         verbose: bool = False,
-        source: Optional[str] = None,
+        source: str | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,

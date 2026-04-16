@@ -1,7 +1,5 @@
 """TEMPO Reader"""
 
-from typing import Dict, List, Optional, Union
-
 import xarray as xr
 
 from .base import GriddedReader, register_reader
@@ -16,9 +14,9 @@ class TEMPOReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
-        group: Optional[Union[str, List[str]]] = None,
-        variable_dict: Optional[Dict] = None,
+        files: str | list[str],
+        group: str | list[str] | None = None,
+        variable_dict: dict | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -93,7 +91,7 @@ class TEMPOReader(GriddedReader):
         return ds
 
 
-def tempo_preprocess(ds: xr.Dataset, variable_dict: Optional[Dict] = None) -> xr.Dataset:
+def tempo_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.Dataset:
     """
     Preprocess TEMPO dataset: standardize coordinates, handle units,
     calculate pressure, and apply variable-specific transformations.

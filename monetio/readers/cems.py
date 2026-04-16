@@ -1,7 +1,7 @@
 """CEMS Reader"""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import pandas as pd
 import xarray as xr
@@ -28,9 +28,9 @@ class CEMSReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
-        states: Union[str, List[str]] = "md",
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
+        states: str | list[str] = "md",
         n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,

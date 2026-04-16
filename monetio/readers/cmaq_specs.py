@@ -1,7 +1,5 @@
 """CMAQ variable specifications and diagnostic definitions."""
 
-from typing import Dict
-
 from .base import DiagnosticSpec
 
 # Core species groups
@@ -87,7 +85,7 @@ NOY_GAS = [
 ]
 
 # Diagnostic definitions
-DIAGNOSTICS: Dict[str, DiagnosticSpec] = {
+DIAGNOSTICS: dict[str, DiagnosticSpec] = {
     "PM25": DiagnosticSpec(
         variables=AITKEN + ACCUMULATION + COARSE,
         weights=[1.0] * len(AITKEN + ACCUMULATION) + [0.2] * len(COARSE),

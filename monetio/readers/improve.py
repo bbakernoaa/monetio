@@ -1,7 +1,7 @@
 """IMPROVE Reader"""
 
 from functools import partial
-from typing import Any, List, Union
+from typing import Any, Union
 
 import pandas as pd
 import xarray as xr
@@ -25,7 +25,7 @@ class IMPROVEReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         add_meta: bool = False,
         delimiter: str = "\t",
         as_xarray: bool = True,

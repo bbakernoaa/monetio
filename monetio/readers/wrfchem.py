@@ -1,7 +1,7 @@
 """WRF-Chem Reader"""
 
 from functools import partial
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import numpy as np
 import xarray as xr
@@ -25,10 +25,10 @@ class WRFChemReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         convert_to_ppb: bool = True,
         mech: str = "racm_esrl_vcp",
-        var_list: Optional[List[str]] = None,
+        var_list: list[str] | None = None,
         surf_only: bool = False,
         surf_only_nc: bool = False,
         **kwargs: Any,
@@ -88,7 +88,7 @@ def wrfchem_preprocess(
     *,
     convert_to_ppb: bool = True,
     mech: str = "racm_esrl_vcp",
-    var_list: Optional[List[str]] = None,
+    var_list: list[str] | None = None,
     surf_only: bool = False,
     surf_only_nc: bool = False,
 ) -> xr.Dataset:

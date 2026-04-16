@@ -2,7 +2,7 @@
 
 import io
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -55,7 +55,7 @@ WIDTHS = [4, 3, 2, 2, 2, 2, 6, 6] + 5 * [7, 1] + 4 * [9]
 MADISON_WIDTHS = [4, 3, 2, 2, 2, 2, 6, 6] + 8 * [7, 1] + 7 * [9]
 
 
-def get_colspecs(widths: List[int]) -> List[tuple]:
+def get_colspecs(widths: list[int]) -> list[tuple]:
     """
     Generate colspecs for pd.read_fwf from widths.
 
@@ -189,9 +189,9 @@ class SOLRADReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[datetime, List[datetime], pd.DatetimeIndex]] = None,
-        sites: Optional[List[str]] = None,
+        files: str | list[str] | None = None,
+        dates: datetime | list[datetime] | pd.DatetimeIndex | None = None,
+        sites: list[str] | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs: dict,
@@ -280,9 +280,9 @@ class SOLRADReader(PointReader):
 
     def build_urls(
         self,
-        dates: Union[datetime, List[datetime], pd.DatetimeIndex],
-        sites: List[str],
-    ) -> List[str]:
+        dates: datetime | list[datetime] | pd.DatetimeIndex,
+        sites: list[str],
+    ) -> list[str]:
         """
         Discover available URLs for the given dates and sites.
 

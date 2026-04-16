@@ -4,7 +4,7 @@ import logging
 import warnings
 from datetime import datetime
 from functools import partial
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 class AQSReader(PointReader):
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
-        param: Optional[Union[str, List[str]]] = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
+        param: str | list[str] | None = None,
         daily: bool = False,
-        network: Optional[str] = None,
+        network: str | None = None,
         download: bool = False,
         local: bool = False,
         wide_fmt: bool = True,
@@ -196,7 +196,7 @@ class AQS:
             "date_of_last_change",
         ]
 
-    def _get_param_list(self, param: Optional[Union[str, List[str]]]) -> List[str]:
+    def _get_param_list(self, param: str | list[str] | None) -> list[str]:
         if param is None:
             return [
                 "SPEC",
@@ -216,7 +216,7 @@ class AQS:
             return [param]
         return param
 
-    def columns_rename(self, columns: List[str], verbose: bool = False) -> List[str]:
+    def columns_rename(self, columns: list[str], verbose: bool = False) -> list[str]:
         """Rename AQS columns to standard names."""
         rcolumn = []
         for ccc in columns:
@@ -232,7 +232,7 @@ class AQS:
             rcolumn.append(newc)
         return rcolumn
 
-    def load_aqs_file(self, url: str, network: Optional[str] = None) -> pd.DataFrame:
+    def load_aqs_file(self, url: str, network: str | None = None) -> pd.DataFrame:
         """
         Load a single AQS file.
 
@@ -343,7 +343,7 @@ class AQS:
         fname = f"{fname_prefix}{code}{year}.zip"
         return url, fname
 
-    def build_urls(self, params: List[str], dates, daily: bool = False) -> tuple:
+    def build_urls(self, params: list[str], dates, daily: bool = False) -> tuple:
         """Build multiple URLs for given parameters and dates in parallel."""
         import concurrent.futures
 

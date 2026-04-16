@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -102,17 +102,17 @@ class ISHLiteReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[pd.DatetimeIndex, List[datetime], datetime, str]] = None,
-        box: Optional[List[float]] = None,
-        country: Optional[str] = None,
-        state: Optional[str] = None,
-        site: Optional[str] = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
+        box: list[float] | None = None,
+        country: str | None = None,
+        state: str | None = None,
+        site: str | None = None,
         resample: bool = False,
         window: str = "h",
         n_procs: int = 1,
         verbose: bool = False,
-        source: Optional[str] = None,
+        source: str | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
@@ -308,16 +308,16 @@ class ISHLiteReader(PointReader):
 
 
 def add_data(
-    dates: Union[pd.DatetimeIndex, List[datetime], datetime, str],
-    box: Optional[List[float]] = None,
-    country: Optional[str] = None,
-    state: Optional[str] = None,
-    site: Optional[str] = None,
+    dates: pd.DatetimeIndex | list[datetime] | datetime | str,
+    box: list[float] | None = None,
+    country: str | None = None,
+    state: str | None = None,
+    site: str | None = None,
     resample: bool = False,
     window: str = "h",
     n_procs: int = 1,
     verbose: bool = False,
-    source: Optional[str] = None,
+    source: str | None = None,
     as_xarray: bool = True,
     lazy: bool = False,
     **kwargs,

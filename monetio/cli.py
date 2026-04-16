@@ -25,7 +25,7 @@ def parse_dates(dates):
 def handle_save(obj, output, as_pandas):
     """Handle saving the loaded data object."""
     if output:
-        if as_pandas or isinstance(obj, (pd.DataFrame, pd.Series)):
+        if as_pandas or isinstance(obj, pd.DataFrame | pd.Series):
             # Handle dask dataframe
             if hasattr(obj, "compute"):
                 obj = obj.compute()

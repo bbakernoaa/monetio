@@ -1,6 +1,6 @@
 """MODIS ORNL Reader"""
 
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -27,15 +27,15 @@ class MODISORNLReader(GriddedReader):
 
     def open_dataset(
         self,
-        date: Union[pd.Timestamp, str] = None,
+        date: pd.Timestamp | str = None,
         product: str = "MOD12A2H",
         band: str = "Lai_500m",
-        quality_control: Optional[Any] = None,
+        quality_control: Any | None = None,
         latitude: float = 0,
         longitude: float = 0,
         kmAboveBelow: int = 100,
         kmLeftRight: int = 100,
-        files: Union[str, List[str]] = None,
+        files: str | list[str] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -118,7 +118,7 @@ def _get_single_retrieval(
     date: pd.Timestamp,
     product: str,
     band: str,
-    quality_control: Optional[Any],
+    quality_control: Any | None,
     lat: float,
     lon: float,
     kmAboveBelow: int,

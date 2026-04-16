@@ -32,7 +32,7 @@ def combine_dataset(flist, taglist=None, renumber=False, verbose=False):
     usepid = False
 
     # check that taglist has same length as flist
-    if isinstance(taglist, (tuple, list, np.ndarray)):
+    if isinstance(taglist, tuple | list | np.ndarray):
         if len(taglist) == len(flist):
             usepid = True
         # if it doesn't set to None
@@ -43,7 +43,7 @@ def combine_dataset(flist, taglist=None, renumber=False, verbose=False):
 
     # if not renumbering then need to use a tag to differentiate trajectories in different files.
     if not renumber:
-        if not isinstance(taglist, (tuple, list, np.ndarray)):
+        if not isinstance(taglist, tuple | list | np.ndarray):
             taglist = np.arange(1, len(flist) + 2, 1)
             usepid = True
 

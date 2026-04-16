@@ -1,7 +1,5 @@
 """NASA MODIS Reader"""
 
-from typing import List, Union
-
 import pandas as pd
 import xarray as xr
 
@@ -15,7 +13,7 @@ class NASAMODISReader(GriddedReader):
     Reader for NASA MODIS HDF files.
     """
 
-    def open_dataset(self, files: Union[str, List[str]], **kwargs) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset:
         """
         Reads NASA MODIS swath data.
 

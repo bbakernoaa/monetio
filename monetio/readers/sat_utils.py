@@ -1,7 +1,8 @@
 """Satellite Reader Utilities"""
 
 import datetime
-from typing import TYPE_CHECKING, Callable, List, Optional, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 
@@ -52,7 +53,7 @@ def lazy_index_along_axis(data: xr.DataArray, index: xr.DataArray, dim: str) -> 
 
 
 def apply_lazy_conversion(
-    data: xr.DataArray, func: Callable, output_dtype: Union[str, np.dtype, type]
+    data: xr.DataArray, func: Callable, output_dtype: str | np.dtype | type
 ) -> xr.DataArray:
     """
     Apply a conversion function lazily to a DataArray backend-agnostic.
@@ -92,9 +93,9 @@ def standardize_satellite_coords(
     ds: xr.Dataset,
     lat_name: str = "Latitude",
     lon_name: str = "Longitude",
-    y_dim: Union[str, List[str]] = ["Rows", "scanline", "nlat", "lat", "nscan", "nTimes"],
-    x_dim: Union[str, List[str]] = ["Columns", "ground_pixel", "nlon", "lon", "nstep", "nIFOV"],
-    z_dim: Union[str, List[str]] = ["Levels", "layer", "level", "nLayer"],
+    y_dim: str | list[str] = ["Rows", "scanline", "nlat", "lat", "nscan", "nTimes"],
+    x_dim: str | list[str] = ["Columns", "ground_pixel", "nlon", "lon", "nstep", "nIFOV"],
+    z_dim: str | list[str] = ["Levels", "layer", "level", "nLayer"],
     time_name: str = "Time",
 ) -> xr.Dataset:
     """
@@ -293,8 +294,8 @@ def tai93_to_datetime(time_array: xr.DataArray) -> xr.DataArray:
 
 def add_time_coord(
     ds: xr.Dataset,
-    time_val: Optional[datetime.datetime] = None,
-    time_attr: Optional[str] = None,
+    time_val: datetime.datetime | None = None,
+    time_attr: str | None = None,
 ) -> xr.Dataset:
     """
     Add a time dimension and coordinate to the dataset.

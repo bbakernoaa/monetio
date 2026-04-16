@@ -2,7 +2,7 @@
 
 import io
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -176,9 +176,9 @@ class SURFRADReader(PointReader):
 
     def open_dataset(
         self,
-        files: Optional[Union[str, List[str]]] = None,
-        dates: Optional[Union[datetime, List[datetime], pd.DatetimeIndex]] = None,
-        sites: Optional[List[str]] = None,
+        files: str | list[str] | None = None,
+        dates: datetime | list[datetime] | pd.DatetimeIndex | None = None,
+        sites: list[str] | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs: dict,
@@ -267,9 +267,9 @@ class SURFRADReader(PointReader):
 
     def build_urls(
         self,
-        dates: Union[datetime, List[datetime], pd.DatetimeIndex],
-        sites: List[str],
-    ) -> List[str]:
+        dates: datetime | list[datetime] | pd.DatetimeIndex,
+        sites: list[str],
+    ) -> list[str]:
         """
         Discover available URLs for the given dates and sites.
 

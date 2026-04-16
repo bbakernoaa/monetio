@@ -1,5 +1,4 @@
 import datetime
-from typing import Union
 
 import numpy as np
 import xarray as xr
@@ -398,10 +397,10 @@ def get_giorgi_region_df(df):
 
 
 def calc_13_category_usda_soil_type(
-    clay: Union[xr.DataArray, np.ndarray],
-    sand: Union[xr.DataArray, np.ndarray],
-    silt: Union[xr.DataArray, np.ndarray],
-) -> Union[xr.DataArray, np.ndarray]:
+    clay: xr.DataArray | np.ndarray,
+    sand: xr.DataArray | np.ndarray,
+    silt: xr.DataArray | np.ndarray,
+) -> xr.DataArray | np.ndarray:
     """Calculate the 13 category USDA soil type from clay, sand, and silt percentages.
 
     The categories are:
@@ -562,7 +561,7 @@ def get_nc_values(nc_var):
         fill_value = attrs.get("_FillValue", attrs.get("missing_value"))
         if fill_value is not None:
             # Handle possible array-like fill_value
-            if hasattr(fill_value, "__iter__") and not isinstance(fill_value, (str, bytes)):
+            if hasattr(fill_value, "__iter__") and not isinstance(fill_value, str | bytes):
                 fill_value = fill_value[0]
             # Use masked_values for float precision tolerance
             values = np.ma.masked_values(values, fill_value, atol=1e-5, copy=False)

@@ -1,7 +1,5 @@
 """CAMx variable specifications and diagnostic definitions."""
 
-from typing import Dict
-
 from .base import DiagnosticSpec
 
 # Core species groups
@@ -42,7 +40,7 @@ NOY_GAS = [
 POC = ["SOA1", "SOA2", "SOA3", "SOA4"]
 
 # Diagnostic definitions
-DIAGNOSTICS: Dict[str, DiagnosticSpec] = {
+DIAGNOSTICS: dict[str, DiagnosticSpec] = {
     "PM25": DiagnosticSpec(
         variables=FINE,
         weights=None,

@@ -3,7 +3,7 @@
 import os
 from functools import partial
 from glob import glob
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import numpy as np
 import xarray as xr
@@ -21,9 +21,9 @@ class RAQMSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         convert_to_ppb: bool = True,
-        var_list: Optional[List[str]] = None,
+        var_list: list[str] | None = None,
         surf_only: bool = False,
         **kwargs: Any,
     ) -> xr.Dataset:
@@ -103,7 +103,7 @@ def raqms_preprocess(
     ds: xr.Dataset,
     *,
     convert_to_ppb: bool = True,
-    var_list: Optional[List[str]] = None,
+    var_list: list[str] | None = None,
     surf_only: bool = False,
 ) -> xr.Dataset:
     """

@@ -1,7 +1,6 @@
 """GOES Reader"""
 
 import datetime
-from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -20,8 +19,8 @@ class GOESReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
         satellite: str = "16",
         product: str = "ABI-L2-AODF",
         **kwargs,
@@ -67,10 +66,10 @@ class GOESReader(GriddedReader):
 
     def build_urls(
         self,
-        dates: Union[pd.DatetimeIndex, List[datetime.datetime], datetime.datetime, str],
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,
         satellite: str = "16",
         product: str = "ABI-L2-AODF",
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Build S3 URLs for GOES data based on dates.
 
@@ -92,7 +91,7 @@ class GOESReader(GriddedReader):
 
         s3fs = _import_required("s3fs")
 
-        if isinstance(dates, (str, datetime.datetime, pd.Timestamp)):
+        if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
         else:
             dates = pd.to_datetime(dates)
@@ -179,7 +178,7 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
 
     # Ensure all attributes are scalars
     for k, v in proj_dict.items():
-        if isinstance(v, (list, np.ndarray)):
+        if isinstance(v, list | np.ndarray):
             proj_dict[k] = v[0]
 
     crs = CRS.from_cf(proj_dict)
@@ -220,7 +219,7 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
             (latitude, longitude) as float32 NumPy arrays.
         """
         # Ensure p_srs is a string if it came as a Dask scalar/array
-        if isinstance(p_srs, (np.ndarray, np.generic)):
+        if isinstance(p_srs, np.ndarray | np.generic):
             p_srs = p_srs.item()
         if hasattr(p_srs, "decode"):
             p_srs = p_srs.decode()

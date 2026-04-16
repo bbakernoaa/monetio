@@ -4,7 +4,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
@@ -28,8 +28,8 @@ class OpenAQReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]] = None,
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
         n_procs: int = 1,
         wide_fmt: bool = True,
         as_xarray: bool = True,
@@ -66,11 +66,11 @@ class OpenAQReader(PointReader):
         if (
             files is not None
             and dates is None
-            and isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp, list, str))
+            and isinstance(files, pd.DatetimeIndex | datetime | pd.Timestamp | list | str)
         ):
             # If it's a string or list, it could be files.
             # But if it's a DatetimeIndex or a single datetime, it's definitely dates.
-            if isinstance(files, (pd.DatetimeIndex, datetime, pd.Timestamp)):
+            if isinstance(files, pd.DatetimeIndex | datetime | pd.Timestamp):
                 dates = files
                 files = None
             elif isinstance(files, list) and len(files) > 0 and isinstance(files[0], datetime):
@@ -83,7 +83,7 @@ class OpenAQReader(PointReader):
         # Use a more robust check for files
         has_files = files is not None
         if has_files:
-            if isinstance(files, (list, pd.Series, np.ndarray)):
+            if isinstance(files, list | pd.Series | np.ndarray):
                 has_files = len(files) > 0
             elif isinstance(files, str):
                 has_files = True
@@ -138,7 +138,7 @@ class OpenAQReader(PointReader):
     def _post_process(
         self,
         df: Union[pd.DataFrame, "dd.DataFrame"],
-        dates: Union[pd.DatetimeIndex, List[datetime], datetime, str] = None,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
         wide_fmt: bool = True,
         n_procs: int = 1,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
@@ -325,7 +325,7 @@ class OpenAQReader(PointReader):
         return ds
 
 
-def build_urls(dates: Union[pd.DatetimeIndex, List[datetime], datetime, str]) -> List[str]:
+def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> list[str]:
     """
     Construct OpenAQ S3 URLs for the given dates.
 

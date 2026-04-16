@@ -2,8 +2,6 @@
 E-PROFILE (European ALC network) Reader
 """
 
-from typing import List, Optional, Union
-
 import pandas as pd
 import xarray as xr
 
@@ -19,8 +17,8 @@ class EPROFILEReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
-        dates: Optional[Union[pd.DatetimeIndex, List, pd.Timestamp, str]] = None,
+        files: str | list[str],
+        dates: pd.DatetimeIndex | list | pd.Timestamp | str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """

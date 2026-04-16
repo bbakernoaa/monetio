@@ -1,7 +1,7 @@
 """PAMS Reader"""
 
 import json
-from typing import Any, List, Union
+from typing import Any, Union
 
 import pandas as pd
 import xarray as xr
@@ -25,7 +25,7 @@ class PAMSReader(PointReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs: Any,

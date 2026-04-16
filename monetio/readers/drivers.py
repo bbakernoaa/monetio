@@ -1,4 +1,5 @@
-from typing import List, Union
+from collections.abc import Callable
+from typing import Union
 
 import fsspec
 import pandas as pd
@@ -30,7 +31,7 @@ class FileUtility:
         return fsspec.filesystem("file")
 
     @staticmethod
-    def expand_paths(path_input: Union[str, List[str]], fs=None) -> List[str]:
+    def expand_paths(path_input: str | list[str], fs=None) -> list[str]:
         """
         Converts a string (with wildcards), a single path, or a list of paths
         into a guaranteed list of file paths/objects.
@@ -82,7 +83,7 @@ class XarrayDriver:
 
     def open(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         use_dask: bool = False,
         use_cubed: bool = False,
         use_virtualizarr: bool = False,
@@ -385,10 +386,10 @@ class PandasDriver:
 
     def open(
         self,
-        files: Union[str, List[str]],
-        read_method: Union[str, callable] = "read_csv",
+        files: str | list[str],
+        read_method: str | Callable = "read_csv",
         lazy: bool = False,
-        meta: Union[pd.DataFrame, pd.Series, dict, tuple, None] = None,
+        meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         file_list = FileUtility.expand_paths(files)

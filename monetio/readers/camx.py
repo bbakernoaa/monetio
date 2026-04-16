@@ -1,7 +1,7 @@
 """CAMx Reader"""
 
 from functools import partial
-from typing import Any, List, Union
+from typing import Any
 
 import numpy as np
 import xarray as xr
@@ -28,7 +28,7 @@ class CAMxReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: Union[str, List[str]],
+        files: str | list[str],
         earth_radius: float = 6370000,
         convert_to_ppb: bool = True,
         drop_duplicates: bool = False,
@@ -275,7 +275,7 @@ def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
             (longitude, latitude) arrays.
         """
         # Ensure p_srs is a string if it came as an array
-        if isinstance(p_srs, (np.ndarray, np.generic)):
+        if isinstance(p_srs, np.ndarray | np.generic):
             p_srs = p_srs.item()
         if hasattr(p_srs, "decode"):
             p_srs = p_srs.decode()
