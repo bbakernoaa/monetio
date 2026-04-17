@@ -474,23 +474,32 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     -------
     xarray.Dataset
         Dataset with 'latitude' and 'longitude' coordinates.
+
+    Examples
+    --------
+    >>> ds = _add_ioapi_latlon(ds, "+proj=lcc +lat_1=33 +lat_2=45 ...")
     """
     # 1. Generate 1D x and y values
     # NCOLS/NROWS might be attributes or dimensions
     ncols = ds.attrs.get("NCOLS", ds.sizes.get("x", ds.sizes.get("COL")))
     nrows = ds.attrs.get("NROWS", ds.sizes.get("y", ds.sizes.get("ROW")))
 
-    if ncols is None or nrows is None:
+    xorig = ds.attrs.get("XORIG")
+    yorig = ds.attrs.get("YORIG")
+    xcell = ds.attrs.get("XCELL")
+    ycell = ds.attrs.get("YCELL")
+
+    if any(v is None for v in [ncols, nrows, xorig, yorig, xcell, ycell]):
         return ds
 
     x = np.linspace(
-        ds.XORIG + ds.XCELL * 0.5,
-        ds.XORIG + (ncols - 0.5) * ds.XCELL,
+        xorig + xcell * 0.5,
+        xorig + (ncols - 0.5) * xcell,
         ncols,
     )
     y = np.linspace(
-        ds.YORIG + ds.YCELL * 0.5,
-        ds.YORIG + (nrows - 0.5) * ds.YCELL,
+        yorig + ycell * 0.5,
+        yorig + (nrows - 0.5) * ycell,
         nrows,
     )
 
@@ -514,7 +523,7 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     ) -> tuple[np.ndarray, np.ndarray]:
         from pyproj import Proj
 
-        if isinstance(p_srs, (np.ndarray, np.generic)):
+        if isinstance(p_srs, np.ndarray | np.generic):
             p_srs = p_srs.item()
         if hasattr(p_srs, "decode"):
             p_srs = p_srs.decode()
