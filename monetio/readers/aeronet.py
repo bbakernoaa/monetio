@@ -199,7 +199,7 @@ class AERONETReader(PointReader):
             try:
                 import dask.dataframe as dd
 
-                if isinstance(df, dd.DataFrame):
+                if isinstance(df, dd.DataFrame) and not isinstance(df, pd.DataFrame):
                     df = df.compute(num_workers=n_procs)
             except ImportError:
                 pass
@@ -737,13 +737,14 @@ def read_aeronet_csv(
     return df.copy()
 
 
-def _dust_detect(df: pd.DataFrame) -> pd.DataFrame:
+def _dust_detect(df: Union[pd.DataFrame, "dd.DataFrame"]) -> Union[pd.DataFrame, "dd.DataFrame"]:
     """Detect dust based on AOD and Angstrom exponent."""
     if "aod_1020nm" in df.columns and "440-870_angstrom_exponent" in df.columns:
         df["dust"] = (df["aod_1020nm"] > 0.3) & (df["440-870_angstrom_exponent"] < 0.6)
     elif "dust" not in df.columns:
         # Ensure 'dust' column exists for Dask metadata consistency
-        df["dust"] = np.array([False] * len(df), dtype=bool)
+        # We use a vectorized assignment that works for both Pandas and Dask
+        df["dust"] = False
 
     # Consistently use object or boolean dtype to support NaNs if needed,
     # but here we'll stick to bool/object consistency for Dask

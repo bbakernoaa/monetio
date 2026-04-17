@@ -97,12 +97,16 @@ class PAMSReader(PointReader):
 
             if "obs" in ds.data_vars and "units" not in ds["obs"].attrs:
                 # Fallback for non-pivoted or if mapping failed
-                if "units" in ds.variables and not hasattr(ds["units"].data, "dask"):
+                if "units" in ds.variables:
                     try:
                         # Extract units from the first element of 'units' coordinate/variable
                         # This works if 'units' is a string array/coordinate
-                        unit_val = str(ds["units"].values[0])
-                        ds["obs"].attrs["units"] = unit_val
+                        if hasattr(ds["units"].data, "dask"):
+                            # Use delayed or just skip if dask to avoid compute
+                            pass
+                        else:
+                            unit_val = str(ds["units"].to_numpy()[0])
+                            ds["obs"].attrs["units"] = unit_val
                     except (IndexError, AttributeError, KeyError):
                         pass
 

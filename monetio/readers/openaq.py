@@ -121,7 +121,7 @@ class OpenAQReader(PointReader):
         df = self._post_process(df, dates=dates, wide_fmt=do_wide, n_procs=n_procs)
         df = self.harmonize(df)
 
-        if not lazy and hasattr(df, "compute"):
+        if not lazy and hasattr(df, "compute") and not isinstance(df, pd.DataFrame):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:

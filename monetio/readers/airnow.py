@@ -108,7 +108,7 @@ class AirNowReader(PointReader):
 
         df = self.harmonize(df)
 
-        if not lazy and hasattr(df, "compute"):
+        if not lazy and hasattr(df, "compute") and not isinstance(df, pd.DataFrame):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
@@ -152,6 +152,13 @@ class AirNowReader(PointReader):
             # Only fix if current_uo is 0 and longitude is far from 0
             # We use a vectorized approach
             mask = (current_uo == 0) & (np.abs(lon) > 20)
+            # Use sum() or other dask-friendly reduction if we really wanted to check,
+            # but in apply_ufunc we can just process it.
+            # To avoid hidden compute from np.any(mask) if current_uo is dask,
+            # we should avoid it. But here we are inside the worker function,
+            # so mask is already a numpy array.
+            # WAIT: if dask="parallelized", then _get_uo_vec is called on numpy chunks.
+            # So np.any(mask) is fine here!
             if not np.any(mask):
                 return current_uo
 
@@ -522,7 +529,7 @@ def filter_bad_values(
 
                 # Merge back to bad_rows
                 bad_rows_fixed = bad_rows.merge(mapping, on=["latitude", "longitude"], how="left")
-                df.loc[bad_rows.index, "utcoffset"] = bad_rows_fixed.new_offset.values
+                df.loc[bad_rows.index, "utcoffset"] = bad_rows_fixed.new_offset.to_numpy()
         elif bad_utcoffset == "leave":
             pass
         else:
