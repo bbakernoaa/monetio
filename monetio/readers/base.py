@@ -457,3 +457,90 @@ def _format_units(ds: xr.Dataset) -> xr.Dataset:
     ds = update_history(ds, rf"Formatted units for {', '.join(to_format)} to $\mu g m^{{-3}}$.")
 
     return ds
+
+
+def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
+    """
+    Assigns latitude and longitude coordinates lazily for IOAPI-compliant grids.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset with IOAPI grid metadata (XORIG, YORIG, XCELL, YCELL, NCOLS, NROWS).
+    proj4_srs : str
+        The PROJ4 projection string.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with 'latitude' and 'longitude' coordinates.
+    """
+    # 1. Generate 1D x and y values
+    # NCOLS/NROWS might be attributes or dimensions
+    ncols = ds.attrs.get("NCOLS", ds.sizes.get("x", ds.sizes.get("COL")))
+    nrows = ds.attrs.get("NROWS", ds.sizes.get("y", ds.sizes.get("ROW")))
+
+    if ncols is None or nrows is None:
+        return ds
+
+    x = np.linspace(
+        ds.XORIG + ds.XCELL * 0.5,
+        ds.XORIG + (ncols - 0.5) * ds.XCELL,
+        ncols,
+    )
+    y = np.linspace(
+        ds.YORIG + ds.YCELL * 0.5,
+        ds.YORIG + (nrows - 0.5) * ds.YCELL,
+        nrows,
+    )
+
+    # 2. Broadcast to 2D
+    x_dim = "COL" if "COL" in ds.dims else "x"
+    y_dim = "ROW" if "ROW" in ds.dims else "y"
+
+    xda = xr.DataArray(x, dims=x_dim)
+    yda = xr.DataArray(y, dims=y_dim)
+
+    # Ensure coordinates are chunked if the dataset is chunked
+    if hasattr(ds, "chunks") and ds.chunks:
+        xda = xda.chunk({x_dim: ds.chunks.get(x_dim, "auto")})
+        yda = yda.chunk({y_dim: ds.chunks.get(y_dim, "auto")})
+
+    yv, xv = xr.broadcast(yda, xda)
+
+    # 3. Apply projection lazily
+    def _proj_inv(
+        x_val: np.ndarray, y_val: np.ndarray, p_srs: str | np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        from pyproj import Proj
+
+        if isinstance(p_srs, (np.ndarray, np.generic)):
+            p_srs = p_srs.item()
+        if hasattr(p_srs, "decode"):
+            p_srs = p_srs.decode()
+        p = Proj(p_srs)
+        return p(x_val, y_val, inverse=True)
+
+    lon, lat = xr.apply_ufunc(
+        _proj_inv,
+        xv,
+        yv,
+        proj4_srs,
+        dask="parallelized",
+        output_dtypes=[float, float],
+        output_core_dims=[(), ()],
+    )
+
+    ds = ds.assign_coords(
+        longitude=lon.assign_attrs(
+            {"long_name": "Longitude", "units": "degree_east", "standard_name": "longitude"}
+        ),
+        latitude=lat.assign_attrs(
+            {"long_name": "Latitude", "units": "degree_north", "standard_name": "latitude"}
+        ),
+    )
+
+    # Update history
+    ds = update_history(ds, "Generated Latitude/Longitude coordinates.")
+
+    return ds

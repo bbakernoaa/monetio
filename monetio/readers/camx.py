@@ -10,6 +10,7 @@ from monetio.grids import grid_from_dataset
 
 from .base import (
     GriddedReader,
+    _add_ioapi_latlon,
     _convert_to_ppb,
     _format_units,
     add_lazy_diagnostic,
@@ -125,7 +126,7 @@ def camx_preprocess(
     grid = grid_from_dataset(ds, earth_radius=earth_radius)
     if grid:
         ds = ds.assign_attrs({"proj4_srs": grid})
-        ds = _get_latlon(ds, grid)
+        ds = _add_ioapi_latlon(ds, grid)
 
         # Also assign proj4_srs to all data variables for compatibility
         for var in ds.data_vars:
@@ -210,100 +211,6 @@ def _get_times(ds: xr.Dataset) -> xr.Dataset:
 
     # Update history
     ds = update_history(ds, "Optimized time parsing.")
-
-    return ds
-
-
-def _get_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
-    """
-    Assigns latitude and longitude coordinates lazily.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset.
-    proj4_srs : str
-        The PROJ4 projection string.
-
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with 'latitude' and 'longitude' coordinates.
-    """
-    from pyproj import Proj
-
-    # 1. Generate 1D x and y values
-    x = np.linspace(
-        ds.XORIG + ds.XCELL * 0.5,
-        ds.XORIG + (ds.NCOLS - 0.5) * ds.XCELL,
-        ds.NCOLS,
-    )
-    y = np.linspace(
-        ds.YORIG + ds.YCELL * 0.5,
-        ds.YORIG + (ds.NROWS - 0.5) * ds.YCELL,
-        ds.NROWS,
-    )
-
-    # 2. Broadcast to 2D
-    xda = xr.DataArray(x, dims="COL")
-    yda = xr.DataArray(y, dims="ROW")
-
-    if hasattr(ds, "chunks") and ds.chunks:
-        # Use chunks from dataset if available
-        xda = xda.chunk({"COL": ds.chunks.get("COL", "auto")})
-        yda = yda.chunk({"ROW": ds.chunks.get("ROW", "auto")})
-
-    yv, xv = xr.broadcast(yda, xda)
-
-    # 3. Apply projection lazily
-    def _proj_inv(x_val: np.ndarray, y_val: np.ndarray, p_srs: str) -> tuple:
-        """
-        Vectorized inverse projection wrapper.
-
-        Parameters
-        ----------
-        x_val : np.ndarray
-            X coordinates in meters.
-        y_val : np.ndarray
-            Y coordinates in meters.
-        p_srs : str
-            PROJ4 projection string.
-
-        Returns
-        -------
-        tuple
-            (longitude, latitude) arrays.
-        """
-        # Ensure p_srs is a string if it came as an array
-        if isinstance(p_srs, np.ndarray | np.generic):
-            p_srs = p_srs.item()
-        if hasattr(p_srs, "decode"):
-            p_srs = p_srs.decode()
-
-        p = Proj(p_srs)
-        return p(x_val, y_val, inverse=True)
-
-    lon, lat = xr.apply_ufunc(
-        _proj_inv,
-        xv,
-        yv,
-        proj4_srs,
-        dask="parallelized",
-        output_dtypes=[float, float],
-        output_core_dims=[(), ()],
-    )
-
-    ds = ds.assign_coords(
-        longitude=lon.assign_attrs(
-            {"long_name": "Longitude", "units": "degree_east", "standard_name": "longitude"}
-        ),
-        latitude=lat.assign_attrs(
-            {"long_name": "Latitude", "units": "degree_north", "standard_name": "latitude"}
-        ),
-    )
-
-    # Update history
-    ds = update_history(ds, "Generated Latitude/Longitude coordinates.")
 
     return ds
 
