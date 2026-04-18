@@ -81,7 +81,7 @@ class NDBCReader(PointReader):
         df = self._post_process(df)
         df = self.harmonize(df)
 
-        if not lazy and hasattr(df, "compute"):
+        if not lazy and hasattr(df, "compute") and not isinstance(df, pd.DataFrame):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:

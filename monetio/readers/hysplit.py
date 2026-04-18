@@ -1,52 +1,79 @@
 """HYSPLIT Reader"""
 
 import datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import GriddedReader, register_reader, update_history
 from .drivers import FileUtility
-from .sat_utils import update_history
 
 
 @register_reader("hysplit")
 class HYSPLITReader(GriddedReader):
     def open_dataset(
         self,
-        files,
-        drange=None,
-        century=None,
-        verbose=False,
-        sample_time_stamp="start",
-        check_grid=True,
-        **kwargs,
-    ):
+        files: str | list[str],
+        drange: list[datetime.datetime] | None = None,
+        century: int | None = None,
+        verbose: bool = False,
+        sample_time_stamp: str = "start",
+        check_grid: bool = True,
+        lazy: bool = False,
+        **kwargs: Any,
+    ) -> xr.Dataset:
         """
         Reads HYSPLIT binary concentration (cdump) files.
-        """
-        file_list = FileUtility.expand_paths(files)
 
-        if len(file_list) == 1:
-            ds = open_dataset_hysplit(
-                file_list[0],
-                drange=drange,
-                century=century,
-                verbose=verbose,
-                sample_time_stamp=sample_time_stamp,
-                check_grid=check_grid,
-            )
-        else:
-            blist = [(f, f, "met") for f in file_list]
-            ds = combine_dataset(
-                blist,
-                drange=drange,
-                century=century,
-                verbose=verbose,
-                sample_time_stamp=sample_time_stamp,
-                check_grid=check_grid,
-            )
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path(s), URL(s), or glob pattern.
+        drange : List[datetime.datetime], optional
+            Date range to filter, by default None.
+        century : int, optional
+            Century to use for 2-digit years (e.g. 2000), by default None.
+        verbose : bool, optional
+            Whether to print verbose output, by default False.
+        sample_time_stamp : str, optional
+            Time stamp to use ('start' or 'end'), by default "start".
+        check_grid : bool, optional
+            Whether to fix grid continuity, by default True.
+        lazy : bool, optional
+            Whether to use Dask for lazy loading, by default False.
+        **kwargs : Any
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        xr.Dataset
+            The processed HYSPLIT dataset.
+        """
+        # Set up kwargs for read_method
+        read_kwargs = {
+            "drange": drange,
+            "century": century,
+            "verbose": verbose,
+            "sample_time_stamp": sample_time_stamp,
+            "check_grid": check_grid,
+        }
+
+        # If it is a single file, we can use open_dataset_hysplit directly
+        # If it is multiple files, we use combine_dataset which we'll modernize
+        # but better yet, let's use the XarrayDriver with our custom logic.
+
+        # We override the driver.open call to support our specific multi-file logic
+        # while still benefiting from FileUtility and potential future driver features.
+        ds = self.driver.open(
+            files,
+            read_method=open_dataset_hysplit,
+            lazy=lazy,
+            preprocess=None,  # HYSPLIT handles its own preprocessing
+            **read_kwargs,
+            **kwargs,
+        )
 
         ds = update_history(ds, "Read HYSPLIT data.")
         return ds
@@ -294,7 +321,10 @@ class ModelBin:
         concframe["levels"] = lev_name
         concframe["time"] = pdate1
 
-        names = concframe.columns.values
+        # Use list() to avoid .values compute if this were a Series/Index,
+        # but here it's a NumPy array from columns anyway.
+        # Still, let's make it cleaner.
+        names = list(concframe.columns)
         names = ["y" if x == "jndx" else x for x in names]
         names = ["x" if x == "indx" else x for x in names]
         names = ["z" if x == "levels" else x for x in names]

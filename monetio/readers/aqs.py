@@ -130,8 +130,9 @@ class AQSReader(PointReader):
         if is_dask:
             if df.npartitions == 0:
                 return df
-        elif len(df) == 0:
-            return df
+        else:
+            if df.empty:
+                return df
 
         # Filter dates
         if dates is not None:
@@ -146,7 +147,7 @@ class AQSReader(PointReader):
         df = self.harmonize(df)
 
         # Handle eager compute for Dask-backed objects if requested
-        if not lazy and is_dask:
+        if not lazy and is_dask and not isinstance(df, pd.DataFrame):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
