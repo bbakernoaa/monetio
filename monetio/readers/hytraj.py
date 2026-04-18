@@ -1,10 +1,16 @@
 """HYTRAJ Reader"""
 
+from __future__ import annotations
+
 import re
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
@@ -22,12 +28,12 @@ class HYTRAJReader(PointReader):
     def open_dataset(
         self,
         files: str | list[str],
-        taglist: list | None = None,
+        taglist: list[Any] | None = None,
         renumber: bool = False,
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs,
-    ) -> pd.DataFrame | xr.Dataset:
+        **kwargs: Any,
+    ) -> pd.DataFrame | xr.Dataset | dd.DataFrame:
         """
         Reads HYSPLIT trajectory (tdump) files.
 
@@ -35,7 +41,7 @@ class HYTRAJReader(PointReader):
         ----------
         files : Union[str, List[str]]
             File path(s) or glob pattern.
-        taglist : List, optional
+        taglist : list[Any], optional
             List of tags for each file, added as 'pid' column.
         renumber : bool, optional
             Whether to renumber trajectories across files, by default False.
@@ -43,45 +49,86 @@ class HYTRAJReader(PointReader):
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
             Whether to return a dask-backed object, by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the driver.
 
         Returns
         -------
         Union[pd.DataFrame, xr.Dataset]
             The loaded trajectory data.
+
+        Examples
+        --------
+        >>> ds = reader.open_dataset("tdump.*", taglist=["run1", "run2"], renumber=True)
         """
-        # Filter out taglist for driver
+        # Expand paths first to match tags and indices
+        file_list = FileUtility.expand_paths(files)
+
+        # Filter out reader-specific kwargs for driver
         driver_kwargs = {k: v for k, v in kwargs.items() if k not in ["taglist", "renumber"]}
 
-        df = self.driver.open(files, read_method=read_hytraj_file, lazy=lazy, **driver_kwargs)
+        if taglist is not None or renumber:
+            # If we need tagging or renumbering, we handle multi-file opening manually
+            # to pass specific arguments to each read_hytraj_file call.
+            from .drivers import PandasDriver
 
-        if taglist is not None:
-            # For dask, tagging should ideally happen inside read_hytraj_file
-            # but for now we implement the legacy eager logic.
-            if not lazy and len(taglist) == len(FileUtility.expand_paths(files)):
-                # This is tricky since driver.open returns a combined DF.
-                # We'll need to revisit this if taglist is a priority for Dask.
-                pass
+            if not isinstance(self.driver, PandasDriver):
+                raise TypeError("HYTRAJReader requires a PandasDriver.")
 
-        if renumber and not lazy:
-            # Increment traj_num to be unique across the whole dataset
-            if "traj_num" in df.columns:
-                # We can't easily do this lazily without triggering a compute on each partition.
-                pass
+            dsets = []
+            for i, f in enumerate(file_list):
+                tag = taglist[i] if taglist is not None and i < len(taglist) else None
+                renumber_index = i if renumber else None
+
+                # We use the driver.open for a single file to respect lazy settings
+                ds_single = self.driver.open(
+                    f,
+                    read_method=read_hytraj_file,
+                    lazy=lazy,
+                    tag=tag,
+                    renumber_index=renumber_index,
+                    **driver_kwargs,
+                )
+                dsets.append(ds_single)
+
+            if lazy:
+                import dask.dataframe as dd
+
+                df = dd.concat(dsets).reset_index(drop=True)
+            else:
+                df = pd.concat(dsets, ignore_index=True).reset_index(drop=True)
+
+            if taglist is not None:
+                df = update_history(df, f"Added tags from taglist: {taglist}")
+            if renumber:
+                df = update_history(df, "Renumbered trajectories for global uniqueness.")
+        else:
+            # Standard path
+            df = self.driver.open(files, read_method=read_hytraj_file, lazy=lazy, **driver_kwargs)
 
         df = self.harmonize(df)
 
         if as_xarray:
             # trajectories are moving locations, so fixed_location=False (default)
+            # PointReader.to_xarray handles both Pandas and Dask DataFrames
             ds = self.to_xarray(df, **kwargs)
+
+            # Set the intermediate time columns as coordinates
+            time_coords = [
+                c for c in ["year", "month", "day", "hour", "minute"] if c in ds.data_vars
+            ]
+            if time_coords:
+                ds = ds.set_coords(time_coords)
+
             ds = update_history(ds, "Read HYTRAJ data.")
             return ds
 
         return df
 
 
-def read_hytraj_file(filename: str, **kwargs) -> pd.DataFrame:
+def read_hytraj_file(
+    filename: str, tag: Any = None, renumber_index: int | None = None, **kwargs: Any
+) -> pd.DataFrame:
     """
     Read a single HYSPLIT trajectory (tdump) file.
 
@@ -89,11 +136,21 @@ def read_hytraj_file(filename: str, **kwargs) -> pd.DataFrame:
     ----------
     filename : str
         Path to the tdump file.
+    tag : Any, optional
+        Tag to add to the 'pid' column, by default None.
+    renumber_index : int, optional
+        Index to prepend to 'traj_num' for uniqueness across files, by default None.
+    **kwargs : Any
+        Additional arguments.
 
     Returns
     -------
     pd.DataFrame
         Trajectory data.
+
+    Examples
+    --------
+    >>> df = read_hytraj_file("tdump.txt", tag="run1")
     """
     fs = FileUtility.get_fs(filename)
     with fs.open(filename, "r") as f:
@@ -164,10 +221,14 @@ def read_hytraj_file(filename: str, **kwargs) -> pd.DataFrame:
         }
     )
 
-    # Drop intermediate columns
-    df = df.drop(columns=["year", "month", "day", "hour", "minute"])
+    if renumber_index is not None:
+        # Prepend index to ensure global uniqueness across files
+        df["traj_num"] = str(renumber_index) + "_" + df["traj_num"].astype(str)
 
     # Ensure consistent dtypes for merging
     df["siteid"] = df["traj_num"].astype(str)
+
+    if tag is not None:
+        df["pid"] = tag
 
     return df
