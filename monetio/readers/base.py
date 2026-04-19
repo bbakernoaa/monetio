@@ -459,6 +459,65 @@ def _format_units(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+def _convert_ugkg_to_ugm3(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Lazy conversion of ug/kg-dryair to ug/m3.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with converted units if density can be calculated.
+    """
+    to_convert = [
+        v
+        for v in ds.data_vars
+        if "units" in ds[v].attrs and "ug/kg" in ds[v].attrs["units"].lower()
+    ]
+
+    if not to_convert:
+        return ds
+
+    method = None
+    if "ALT" in ds.variables:
+        # Use inverse density (specific volume)
+        for v in to_convert:
+            ds[v] = ds[v] / ds["ALT"]
+            ds[v].attrs["units"] = r"$\mu g m^{-3}$"
+        method = "using ALT (specific volume)"
+    elif "pres_pa_mid" in ds.variables and "temperature_k" in ds.variables:
+        # Direct density rho = P / (R * T)
+        R = 287.05
+        rho = ds["pres_pa_mid"] / (ds["temperature_k"] * R)
+        for v in to_convert:
+            ds[v] = ds[v] * rho
+            ds[v].attrs["units"] = r"$\mu g m^{-3}$"
+        method = "using air density calculated from pres_pa_mid and temperature_k"
+    elif all(k in ds.variables for k in ["P", "PB", "T"]):
+        # WRF-Chem specific density calculation
+        R = 287.05
+        P_tot = ds["P"] + ds["PB"]
+        # Potential temperature to actual temperature conversion
+        T_actual = (ds["T"] + 300.0) * (P_tot / 100000.0) ** (287.05 / 1004.5)
+        rho = P_tot / (R * T_actual)
+
+        for v in to_convert:
+            ds[v] = ds[v] * rho
+            ds[v].attrs["units"] = r"$\mu g m^{-3}$"
+        method = "using air density calculated from P, PB, T"
+
+    if method:
+        ds = update_history(
+            ds, rf"Converted {', '.join(to_convert)} from $\mu g/kg$ to $\mu g/m^3$ {method}."
+        )
+
+    return ds
+
+
 def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     """
     Assigns latitude and longitude coordinates lazily for IOAPI-compliant grids.
