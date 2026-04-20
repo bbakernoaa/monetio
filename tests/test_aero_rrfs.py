@@ -1,6 +1,6 @@
 import numpy as np
-import pandas as pd
 import xarray as xr
+
 from monetio.readers.rrfs import RRFSReader, rrfs_preprocess
 
 
