@@ -3,7 +3,6 @@
 from functools import partial
 from typing import Any
 
-import numpy as np
 import xarray as xr
 
 from monetio.grids import grid_from_dataset
@@ -18,7 +17,6 @@ from .base import (
 )
 from .cmaq_specs import DIAGNOSTICS
 from .sat_utils import update_history
-from .time_utils import parse_ioapi_times
 
 
 @register_reader("cmaq")
@@ -178,5 +176,3 @@ def cmaq_preprocess(
     ds = update_history(ds, "Preprocessed CMAQ data.")
 
     return ds
-
-

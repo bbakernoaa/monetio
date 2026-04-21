@@ -3,7 +3,6 @@
 from functools import partial
 from typing import Any
 
-import numpy as np
 import xarray as xr
 
 from monetio.grids import grid_from_dataset
@@ -18,7 +17,6 @@ from .base import (
 )
 from .camx_specs import COARSE, DIAGNOSTICS, FINE, NOY_GAS, POC
 from .sat_utils import update_history
-from .time_utils import parse_ioapi_times
 
 
 @register_reader("camx")
@@ -167,8 +165,6 @@ def camx_preprocess(
     ds = update_history(ds, "Preprocessed CAMx data.")
 
     return ds
-
-
 
 
 def _predefined_mapping_tables(ds: xr.Dataset) -> xr.Dataset:
