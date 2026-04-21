@@ -462,6 +462,72 @@ def _format_units(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+def _convert_ugkg_to_ugm3(
+    ds: xr.Dataset,
+    *,
+    alt_name: str = "ALT",
+    pres_name: str = "pres_pa_mid",
+    temp_name: str = "temperature_k",
+    R: float = 287.05,
+) -> xr.Dataset:
+    """
+    Converts mass mixing ratio (ug/kg) to mass concentration (ug/m3) lazily.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+    alt_name : str, optional
+        Name of the specific volume variable, by default "ALT".
+    pres_name : str, optional
+        Name of the pressure variable (in Pa), by default "pres_pa_mid".
+    temp_name : str, optional
+        Name of the temperature variable (in K), by default "temperature_k".
+    R : float, optional
+        Gas constant for dry air in J/(kg·K), by default 287.05.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with converted units.
+    """
+    to_convert = [
+        v
+        for v in ds.data_vars
+        if "units" in ds[v].attrs and "ug/kg" in ds[v].attrs["units"].lower()
+    ]
+
+    if not to_convert:
+        return ds
+
+    method = None
+    if alt_name in ds.variables:
+        # rho = 1 / ALT
+        rho = 1.0 / ds[alt_name]
+        method = f"using {alt_name} (specific volume)"
+    elif pres_name in ds.variables and temp_name in ds.variables:
+        # rho = P / (R * T)
+        rho = ds[pres_name] / (R * ds[temp_name])
+        method = f"using air density calculated from {pres_name} and {temp_name}"
+    elif "P" in ds.variables and "PB" in ds.variables and "T" in ds.variables:
+        # WRF-specific fallback if not already handled by pres_name/temp_name
+        P_tot = ds["P"] + ds["PB"]
+        T_actual = (ds["T"] + 300.0) * (P_tot / 100000.0) ** (287.05 / 1004.5)
+        rho = P_tot / (R * T_actual)
+        method = "using air density calculated from P, PB, T"
+    else:
+        return ds
+
+    for v in to_convert:
+        ds[v] = ds[v] * rho
+        ds[v].attrs["units"] = r"$\mu g m^{-3}$"
+
+    # Update history
+    ds = update_history(ds, f"Converted {', '.join(to_convert)} from ug/kg to ug/m3 {method}.")
+
+    return ds
+
+
 def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     """
     Assigns latitude and longitude coordinates lazily for IOAPI-compliant grids.

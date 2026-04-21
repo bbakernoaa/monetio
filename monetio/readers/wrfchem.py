@@ -9,6 +9,7 @@ import xarray as xr
 from .base import (
     GriddedReader,
     _convert_to_ppb,
+    _convert_ugkg_to_ugm3,
     add_lazy_diagnostic,
     register_reader,
 )
@@ -233,58 +234,5 @@ def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
 
     # Update history
     ds = update_history(ds, "Optimized time parsing.")
-
-    return ds
-
-
-def _convert_ugkg_to_ugm3(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Lazy conversion of ug/kg-dryair to ug/m3.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset.
-
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with converted units if ALT or P/PB/T are available.
-    """
-    to_convert = [
-        v
-        for v in ds.data_vars
-        if "units" in ds[v].attrs and "ug/kg" in ds[v].attrs["units"].lower()
-    ]
-
-    if not to_convert:
-        return ds
-
-    method = None
-    if "ALT" in ds.variables:
-        # Use inverse density (specific volume)
-        for v in to_convert:
-            ds[v] = ds[v] / ds["ALT"]
-            ds[v].attrs["units"] = r"$\mu g m^{-3}$"
-        method = "using ALT (specific volume)"
-    elif all(k in ds.variables for k in ["P", "PB", "T"]):
-        # Standard WRF-Chem density calculation
-        # P_tot is total pressure (perturbation + base)
-        # T_actual is temperature in K
-        R = 287.05
-        P_tot = ds["P"] + ds["PB"]
-        # Potential temperature to actual temperature conversion
-        T_actual = (ds["T"] + 300.0) * (P_tot / 100000.0) ** (287.05 / 1004.5)
-        rho = P_tot / (R * T_actual)
-
-        for v in to_convert:
-            ds[v] = ds[v] * rho
-            ds[v].attrs["units"] = r"$\mu g m^{-3}$"
-        method = "using air density calculated from P, PB, T"
-
-    if method:
-        ds = update_history(
-            ds, rf"Converted {', '.join(to_convert)} from $\mu g/kg$ to $\mu g/m^3$ {method}."
-        )
 
     return ds
