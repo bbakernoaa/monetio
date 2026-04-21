@@ -632,3 +632,61 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     ds = update_history(ds, "Generated Latitude/Longitude coordinates.")
 
     return ds
+
+
+def _get_ioapi_times(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Extracts and assigns time coordinate from IOAPI TFLAG lazily.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset with TFLAG variable.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with 'time' coordinate.
+
+    Examples
+    --------
+    >>> ds = _get_ioapi_times(ds)
+    """
+    from .time_utils import parse_ioapi_times
+
+    tflag = ds.TFLAG
+    # TFLAG can be (TSTEP, DATE_TIME) or (TSTEP, VAR, DATE_TIME)
+    if tflag.ndim == 3:
+        tflag = tflag.isel(VAR=0, drop=True)
+
+    # Handle dimension names (COL is often used for DATE_TIME in pseudonetcdf)
+    dt_dims = [d for d in tflag.dims if "DATE" in str(d).upper() and "TIME" in str(d).upper()]
+    if not dt_dims:
+        dt_dim = tflag.dims[-1]
+    else:
+        dt_dim = dt_dims[0]
+
+    # Use apply_ufunc to construct dates lazily using vectorized parser
+    dates = xr.apply_ufunc(
+        parse_ioapi_times,
+        tflag.isel(**{dt_dim: 0}),
+        tflag.isel(**{dt_dim: 1}),
+        vectorize=False,
+        dask="parallelized",
+        output_dtypes=[np.dtype("datetime64[ns]")],
+    )
+
+    # If 'TSTEP' is the time dimension, we replace its values
+    if "TSTEP" in ds.dims:
+        ds = ds.assign_coords(TSTEP=dates)
+        ds = ds.rename({"TSTEP": "time"})
+    else:
+        # Fallback: assume first dimension is time
+        time_dim = tflag.dims[0]
+        ds = ds.assign_coords({time_dim: dates})
+        ds = ds.rename({time_dim: "time"})
+
+    # Update history
+    ds = update_history(ds, "Optimized IOAPI time parsing.")
+
+    return ds
