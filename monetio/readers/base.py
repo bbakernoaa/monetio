@@ -330,6 +330,9 @@ def add_lazy_diagnostic(
     default_aliases = {
         "PM25": ["PM25_TOT", "PM2_5", "PM2_5_DRY"],
         "PM10": ["PMC_TOT", "PM10", "PM_TOT", "PM10_DRY", "PM10_TOT"],
+        "NOx": ["NOX"],
+        "NOy": ["NOY"],
+        "O3": ["OZONE"],
     }
     if aliases is not None:
         # Merge user aliases with defaults
@@ -459,6 +462,72 @@ def _format_units(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+def _convert_ugkg_to_ugm3(
+    ds: xr.Dataset,
+    *,
+    alt_name: str = "ALT",
+    pres_name: str = "pres_pa_mid",
+    temp_name: str = "temperature_k",
+    R: float = 287.05,
+) -> xr.Dataset:
+    """
+    Converts mass mixing ratio (ug/kg) to mass concentration (ug/m3) lazily.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+    alt_name : str, optional
+        Name of the specific volume variable, by default "ALT".
+    pres_name : str, optional
+        Name of the pressure variable (in Pa), by default "pres_pa_mid".
+    temp_name : str, optional
+        Name of the temperature variable (in K), by default "temperature_k".
+    R : float, optional
+        Gas constant for dry air in J/(kg·K), by default 287.05.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with converted units.
+    """
+    to_convert = [
+        v
+        for v in ds.data_vars
+        if "units" in ds[v].attrs and "ug/kg" in ds[v].attrs["units"].lower()
+    ]
+
+    if not to_convert:
+        return ds
+
+    method = None
+    if alt_name in ds.variables:
+        # rho = 1 / ALT
+        rho = 1.0 / ds[alt_name]
+        method = f"using {alt_name} (specific volume)"
+    elif pres_name in ds.variables and temp_name in ds.variables:
+        # rho = P / (R * T)
+        rho = ds[pres_name] / (R * ds[temp_name])
+        method = f"using air density calculated from {pres_name} and {temp_name}"
+    elif "P" in ds.variables and "PB" in ds.variables and "T" in ds.variables:
+        # WRF-specific fallback if not already handled by pres_name/temp_name
+        P_tot = ds["P"] + ds["PB"]
+        T_actual = (ds["T"] + 300.0) * (P_tot / 100000.0) ** (287.05 / 1004.5)
+        rho = P_tot / (R * T_actual)
+        method = "using air density calculated from P, PB, T"
+    else:
+        return ds
+
+    for v in to_convert:
+        ds[v] = ds[v] * rho
+        ds[v].attrs["units"] = r"$\mu g m^{-3}$"
+
+    # Update history
+    ds = update_history(ds, f"Converted {', '.join(to_convert)} from ug/kg to ug/m3 {method}.")
+
+    return ds
+
+
 def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     """
     Assigns latitude and longitude coordinates lazily for IOAPI-compliant grids.
@@ -511,7 +580,17 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     yda = xr.DataArray(y, dims=y_dim)
 
     # Ensure coordinates are chunked if the dataset is chunked
+    is_dask = False
     if hasattr(ds, "chunks") and ds.chunks:
+        is_dask = True
+    else:
+        # Check if any data variables are dask-backed
+        for var in ds.data_vars:
+            if hasattr(ds[var].data, "dask"):
+                is_dask = True
+                break
+
+    if is_dask:
         xda = xda.chunk({x_dim: ds.chunks.get(x_dim, "auto")})
         yda = yda.chunk({y_dim: ds.chunks.get(y_dim, "auto")})
 
@@ -551,5 +630,63 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
 
     # Update history
     ds = update_history(ds, "Generated Latitude/Longitude coordinates.")
+
+    return ds
+
+
+def _get_ioapi_times(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Extracts and assigns time coordinate from IOAPI TFLAG lazily.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset with TFLAG variable.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with 'time' coordinate.
+
+    Examples
+    --------
+    >>> ds = _get_ioapi_times(ds)
+    """
+    from .time_utils import parse_ioapi_times
+
+    tflag = ds.TFLAG
+    # TFLAG can be (TSTEP, DATE_TIME) or (TSTEP, VAR, DATE_TIME)
+    if tflag.ndim == 3:
+        tflag = tflag.isel(VAR=0, drop=True)
+
+    # Handle dimension names (COL is often used for DATE_TIME in pseudonetcdf)
+    dt_dims = [d for d in tflag.dims if "DATE" in str(d).upper() and "TIME" in str(d).upper()]
+    if not dt_dims:
+        dt_dim = tflag.dims[-1]
+    else:
+        dt_dim = dt_dims[0]
+
+    # Use apply_ufunc to construct dates lazily using vectorized parser
+    dates = xr.apply_ufunc(
+        parse_ioapi_times,
+        tflag.isel(**{dt_dim: 0}),
+        tflag.isel(**{dt_dim: 1}),
+        vectorize=False,
+        dask="parallelized",
+        output_dtypes=[np.dtype("datetime64[ns]")],
+    )
+
+    # If 'TSTEP' is the time dimension, we replace its values
+    if "TSTEP" in ds.dims:
+        ds = ds.assign_coords(TSTEP=dates)
+        ds = ds.rename({"TSTEP": "time"})
+    else:
+        # Fallback: assume first dimension is time
+        time_dim = tflag.dims[0]
+        ds = ds.assign_coords({time_dim: dates})
+        ds = ds.rename({time_dim: "time"})
+
+    # Update history
+    ds = update_history(ds, "Optimized IOAPI time parsing.")
 
     return ds

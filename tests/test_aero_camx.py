@@ -29,6 +29,7 @@ def mock_camx_dataset():
         {
             "O3": (("TSTEP", "LAY", "ROW", "COL"), np.random.rand(ntime, nlay, nrow, ncol)),
             "NO": (("TSTEP", "LAY", "ROW", "COL"), np.random.rand(ntime, nlay, nrow, ncol)),
+            "NO2": (("TSTEP", "LAY", "ROW", "COL"), np.random.rand(ntime, nlay, nrow, ncol)),
             "TFLAG": tflag,
         }
     )
@@ -51,11 +52,24 @@ def mock_camx_dataset():
     # Add units
     ds.O3.attrs["units"] = "ppm"
     ds.NO.attrs["units"] = "ppm"
+    ds.NO2.attrs["units"] = "ppm"
 
     return ds
 
 
 def test_camx_eager_lazy(tmp_path):
+    """
+    Verify that CAMx data can be loaded both eagerly and lazily with consistent results.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Temporary path for test file creation.
+
+    Examples
+    --------
+    >>> test_camx_eager_lazy(tmp_path)
+    """
     ds_mock = mock_camx_dataset()
     fname = tmp_path / "test_camx.nc"
     ds_mock.to_netcdf(fname, engine="h5netcdf")
@@ -77,7 +91,8 @@ def test_camx_eager_lazy(tmp_path):
     assert isinstance(ds_lazy, xr.Dataset)
     assert hasattr(ds_lazy.O3.data, "dask")
 
-    # Verify values
+    # Verify values and coordinates consistency
+    # This ensures that both Eager (NumPy) and Lazy (Dask) paths produce identical results.
     xr.testing.assert_allclose(
         ds_eager.drop_vars("history", errors="ignore"),
         ds_lazy.compute().drop_vars("history", errors="ignore"),
@@ -85,10 +100,17 @@ def test_camx_eager_lazy(tmp_path):
 
     # Check diagnostics
     assert "NOx" in ds_eager.data_vars
-    # NOX = NO + NO2. In our mock we only have NO, so NOx should be NO.
-    # Actually add_lazy_diagnostic only adds if variables exist.
-    # In camx_specs.py, NOx is [NO, NOX]. If NOX is missing, it still adds NO?
-    # No, it checks available_vars. If only NO is available, NOx = NO.
+    # NOX = NO + NO2 (now that we added NO2 to the mock)
+    expected_nox = ds_eager.NO + ds_eager.NO2
+    xr.testing.assert_allclose(ds_eager.NOx, expected_nox)
+
+    # Verify history tracking
+    assert "Added lazy diagnostic: NOx" in ds_eager.attrs["history"]
+    assert "Generated Latitude/Longitude coordinates" in ds_eager.attrs["history"]
+
+    # Verify coordinate laziness/chunking (Step 3 fix)
+    assert hasattr(ds_lazy.latitude.data, "dask")
+    assert hasattr(ds_lazy.longitude.data, "dask")
 
 
 if __name__ == "__main__":

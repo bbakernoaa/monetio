@@ -70,7 +70,7 @@ DIAGNOSTICS: dict[str, DiagnosticSpec] = {
         name="NOy",
     ),
     "NOx": DiagnosticSpec(
-        variables=["NO", "NOX"],
+        variables=["NO", "NO2"],
         weights=None,
         units="ppbV",
         long_name="NOx",

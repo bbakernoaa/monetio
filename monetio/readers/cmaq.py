@@ -3,7 +3,6 @@
 from functools import partial
 from typing import Any
 
-import numpy as np
 import xarray as xr
 
 from monetio.grids import grid_from_dataset
@@ -18,7 +17,6 @@ from .base import (
 )
 from .cmaq_specs import DIAGNOSTICS
 from .sat_utils import update_history
-from .time_utils import parse_ioapi_times
 
 
 @register_reader("cmaq")
@@ -148,7 +146,9 @@ def cmaq_preprocess(
 
     # 3. Time
     if "TFLAG" in ds.variables:
-        ds = _get_times(ds)
+        from .base import _get_ioapi_times
+
+        ds = _get_ioapi_times(ds)
 
     # 4. Units and Formatting
     if convert_to_ppb:
@@ -174,57 +174,5 @@ def cmaq_preprocess(
 
     # Update history
     ds = update_history(ds, "Preprocessed CMAQ data.")
-
-    return ds
-
-
-def _get_times(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Extracts and assigns time coordinate from TFLAG lazily.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset.
-
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with 'time' coordinate.
-
-    Examples
-    --------
-    >>> ds = _get_times(ds)
-    """
-    # TFLAG format: [YYYYDDD, HHMMSS]
-    # We take the first variable's flags as they are typically identical for all.
-    tflag = ds.TFLAG
-    if tflag.ndim == 3:
-        # (TSTEP, VAR, DATE_TIME) -> (TSTEP, DATE_TIME)
-        tflag = tflag.isel(VAR=0, drop=True)
-
-    # Handle different possible names for DATE_TIME dimension (e.g. DATE_TIME or DATE-TIME)
-    dt_dims = [d for d in tflag.dims if "DATE" in str(d).upper() and "TIME" in str(d).upper()]
-    if not dt_dims:
-        # Fallback to last dimension if none matched
-        dt_dim = tflag.dims[-1]
-    else:
-        dt_dim = dt_dims[0]
-
-    # Use apply_ufunc to construct dates lazily using vectorized parser
-    dates = xr.apply_ufunc(
-        parse_ioapi_times,
-        tflag.isel(**{dt_dim: 0}),
-        tflag.isel(**{dt_dim: 1}),
-        vectorize=False,
-        dask="parallelized",
-        output_dtypes=[np.dtype("datetime64[ns]")],
-    )
-
-    ds = ds.assign_coords(TSTEP=dates)
-    ds = ds.rename({"TSTEP": "time"})
-
-    # Update history
-    ds = update_history(ds, "Optimized time parsing.")
 
     return ds

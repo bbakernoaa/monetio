@@ -3,7 +3,6 @@
 from functools import partial
 from typing import Any
 
-import numpy as np
 import xarray as xr
 
 from monetio.grids import grid_from_dataset
@@ -18,7 +17,6 @@ from .base import (
 )
 from .camx_specs import COARSE, DIAGNOSTICS, FINE, NOY_GAS, POC
 from .sat_utils import update_history
-from .time_utils import parse_ioapi_times
 
 
 @register_reader("camx")
@@ -134,7 +132,9 @@ def camx_preprocess(
 
     # 3. Time
     if "TFLAG" in ds.variables:
-        ds = _get_times(ds)
+        from .base import _get_ioapi_times
+
+        ds = _get_ioapi_times(ds)
 
     # 4. Units and Formatting
     if convert_to_ppb:
@@ -163,54 +163,6 @@ def camx_preprocess(
 
     # Update history
     ds = update_history(ds, "Preprocessed CAMx data.")
-
-    return ds
-
-
-def _get_times(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Extracts and assigns time coordinate from TFLAG lazily.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset.
-
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with 'time' coordinate.
-
-    Examples
-    --------
-    >>> ds = _get_times(ds)
-    """
-    tflag = ds.TFLAG
-    # CAMx TFLAG can be (TSTEP, DATE_TIME) or (TSTEP, VAR, DATE_TIME)
-    if tflag.ndim == 3:
-        tflag = tflag.isel(VAR=0, drop=True)
-
-    # Handle dimension names (COL is used for DATE_TIME in pseudonetcdf format)
-    # Actually it is usually TSTEP and something else.
-    # In _get_times from legacy: d["TFLAG"][:, 0]
-    # So the last dimension is the DATE_TIME one.
-    dt_dim = tflag.dims[-1]
-
-    # Use apply_ufunc to construct dates lazily using vectorized parser
-    dates = xr.apply_ufunc(
-        parse_ioapi_times,
-        tflag.isel(**{dt_dim: 0}),
-        tflag.isel(**{dt_dim: 1}),
-        vectorize=False,
-        dask="parallelized",
-        output_dtypes=[np.dtype("datetime64[ns]")],
-    )
-
-    ds = ds.assign_coords(TSTEP=dates)
-    ds = ds.rename({"TSTEP": "time"})
-
-    # Update history
-    ds = update_history(ds, "Optimized time parsing.")
 
     return ds
 
@@ -282,34 +234,3 @@ fine = FINE
 coarse = COARSE
 noy_gas = NOY_GAS
 poc = POC
-
-
-def add_lazy_pm25(ds):
-    return add_lazy_diagnostic(ds, "PM25", DIAGNOSTICS["PM25"])
-
-
-def add_lazy_pm10(ds):
-    return add_lazy_diagnostic(ds, "PM10", DIAGNOSTICS["PM10"])
-
-
-def add_lazy_pm_coarse(ds):
-    return add_lazy_diagnostic(ds, "PM_COARSE", DIAGNOSTICS["PM_COARSE"])
-
-
-def add_lazy_noy(ds):
-    return add_lazy_diagnostic(ds, "NOy", DIAGNOSTICS["NOy"])
-
-
-def add_lazy_nox(ds):
-    return add_lazy_diagnostic(ds, "NOx", DIAGNOSTICS["NOx"])
-
-
-def add_multiple_lazy(dset, variables, weights=None):
-    from numpy import ones
-
-    if weights is None:
-        weights = ones(len(variables))
-    new = dset[variables[0]] * weights[0]
-    for i in range(1, len(variables)):
-        new = new + dset[variables[i]] * weights[i]
-    return new

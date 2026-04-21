@@ -100,12 +100,12 @@ DIAGNOSTICS: dict[str, DiagnosticSpec] = {
         long_name="Particulate Matter < 10 microns",
         name="PM10",
     ),
-    "PM_COURSE": DiagnosticSpec(
+    "PM_COARSE": DiagnosticSpec(
         variables=COARSE,
         weights=None,
         units=r"$\mu g m^{-3}$",
-        long_name="Course Mode Particulate Matter",
-        name="PM_COURSE",
+        long_name="Coarse Mode Particulate Matter",
+        name="PM_COARSE",
     ),
     "CLf": DiagnosticSpec(
         variables=["ACLI", "ACLJ", "ACLK"],
