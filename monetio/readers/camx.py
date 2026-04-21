@@ -282,34 +282,3 @@ fine = FINE
 coarse = COARSE
 noy_gas = NOY_GAS
 poc = POC
-
-
-def add_lazy_pm25(ds):
-    return add_lazy_diagnostic(ds, "PM25", DIAGNOSTICS["PM25"])
-
-
-def add_lazy_pm10(ds):
-    return add_lazy_diagnostic(ds, "PM10", DIAGNOSTICS["PM10"])
-
-
-def add_lazy_pm_coarse(ds):
-    return add_lazy_diagnostic(ds, "PM_COARSE", DIAGNOSTICS["PM_COARSE"])
-
-
-def add_lazy_noy(ds):
-    return add_lazy_diagnostic(ds, "NOy", DIAGNOSTICS["NOy"])
-
-
-def add_lazy_nox(ds):
-    return add_lazy_diagnostic(ds, "NOx", DIAGNOSTICS["NOx"])
-
-
-def add_multiple_lazy(dset, variables, weights=None):
-    from numpy import ones
-
-    if weights is None:
-        weights = ones(len(variables))
-    new = dset[variables[0]] * weights[0]
-    for i in range(1, len(variables)):
-        new = new + dset[variables[i]] * weights[i]
-    return new

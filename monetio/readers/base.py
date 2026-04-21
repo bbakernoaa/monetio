@@ -330,6 +330,9 @@ def add_lazy_diagnostic(
     default_aliases = {
         "PM25": ["PM25_TOT", "PM2_5", "PM2_5_DRY"],
         "PM10": ["PMC_TOT", "PM10", "PM_TOT", "PM10_DRY", "PM10_TOT"],
+        "NOx": ["NOX"],
+        "NOy": ["NOY"],
+        "O3": ["OZONE"],
     }
     if aliases is not None:
         # Merge user aliases with defaults
@@ -511,7 +514,17 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     yda = xr.DataArray(y, dims=y_dim)
 
     # Ensure coordinates are chunked if the dataset is chunked
+    is_dask = False
     if hasattr(ds, "chunks") and ds.chunks:
+        is_dask = True
+    else:
+        # Check if any data variables are dask-backed
+        for var in ds.data_vars:
+            if hasattr(ds[var].data, "dask"):
+                is_dask = True
+                break
+
+    if is_dask:
         xda = xda.chunk({x_dim: ds.chunks.get(x_dim, "auto")})
         yda = yda.chunk({y_dim: ds.chunks.get(y_dim, "auto")})
 
