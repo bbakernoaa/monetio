@@ -9,6 +9,7 @@ from .base import (
     GriddedReader,
     _convert_to_ppb,
     _convert_ugkg_to_ugm3,
+    _scientific_hygiene,
     add_lazy_diagnostic,
     register_reader,
 )
@@ -169,10 +170,7 @@ class UFSReader(GriddedReader):
             ds = ds[available]
 
         # Scientific Hygiene
-        for var in ds.variables:
-            for attr, val in ds[var].attrs.items():
-                if isinstance(val, str):
-                    ds[var].attrs[attr] = val.strip()
+        ds = _scientific_hygiene(ds)
 
         # Update history
         ds = update_history(ds, "Read UFS-AQM data.")

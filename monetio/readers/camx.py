@@ -12,6 +12,7 @@ from .base import (
     _add_ioapi_latlon,
     _convert_to_ppb,
     _format_units,
+    _scientific_hygiene,
     add_lazy_diagnostic,
     register_reader,
 )
@@ -155,11 +156,8 @@ def camx_preprocess(
     # 6. Predefined mapping tables (backward compatibility)
     ds = _predefined_mapping_tables(ds)
 
-    # 7. Scientific Hygiene: Strip whitespace from all string attributes
-    for var in ds.variables:
-        for attr, val in ds[var].attrs.items():
-            if isinstance(val, str):
-                ds[var].attrs[attr] = val.strip()
+    # 7. Scientific Hygiene
+    ds = _scientific_hygiene(ds)
 
     # Update history
     ds = update_history(ds, "Preprocessed CAMx data.")

@@ -5,7 +5,7 @@ import datetime
 import pandas as pd
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import GriddedReader, _scientific_hygiene, register_reader
 from .nasa_utils import setup_netrc
 from .sat_utils import standardize_satellite_coords, update_history
 
@@ -237,6 +237,9 @@ def merra2_preprocess(ds: xr.Dataset, product: str | None = None) -> xr.Dataset:
 
     # 4. Calculate Pressure (Lazy)
     ds = _add_merra2_pressure(ds)
+
+    # 5. Scientific Hygiene
+    ds = _scientific_hygiene(ds)
 
     # Update history
     ds = update_history(ds, "Preprocessed MERRA-2 data via Aero Protocol.")
