@@ -10,6 +10,7 @@ from .base import (
     GriddedReader,
     _convert_to_ppb,
     _convert_ugkg_to_ugm3,
+    _scientific_hygiene,
     add_lazy_diagnostic,
     register_reader,
 )
@@ -169,15 +170,7 @@ def wrfchem_preprocess(
         ds = ds.isel(z=[0])
 
     # 7. Scientific Hygiene
-    ds = ds.reset_coords()
-    coords = [c for c in ["latitude", "longitude", "time"] if c in ds.variables]
-    ds = ds.set_coords(coords)
-
-    # Strip whitespace from string attributes
-    for var in ds.variables:
-        for attr, val in ds[var].attrs.items():
-            if isinstance(val, str):
-                ds[var].attrs[attr] = val.strip()
+    ds = _scientific_hygiene(ds)
 
     # Update history
     ds = update_history(ds, "Preprocessed WRF-Chem data.")
@@ -198,18 +191,23 @@ def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
     -------
     xarray.Dataset
         Dataset with 'time' coordinate.
+
+    Examples
+    --------
+    >>> ds = _parse_wrf_times(ds)
     """
     times_var = ds.Times
 
-    # Find the string dimension
-    string_dim = [d for d in times_var.dims if d != "time"]
-    if not string_dim:
+    # Find the string dimension (usually 'DateStrLen')
+    # We expect 'time' to be the other dimension if it's 2D
+    string_dims = [d for d in times_var.dims if d != "time"]
+    if not string_dims:
         if times_var.ndim == 1:
-            string_dim = [times_var.dims[0]]
+            string_dim = times_var.dims[0]
         else:
             return ds
-
-    string_dim = string_dim[-1]
+    else:
+        string_dim = string_dims[-1]
 
     # Use vectorized parser from time_utils
     parsed_times = xr.apply_ufunc(
@@ -222,13 +220,12 @@ def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
         output_dtypes=[np.dtype("datetime64[ns]")],
     )
 
-    # Force the name and dims of parsed_times to be 'time' if it was batch-dimensioned by it
-    if "time" in parsed_times.dims:
-        parsed_times = parsed_times.rename("time")
+    # Standardize name
+    parsed_times = parsed_times.rename("time")
 
-    # If 'time' dimension already exists, update it
+    # Assign coordinate
     if "time" in ds.dims:
-        ds.coords["time"] = parsed_times
+        ds = ds.assign_coords(time=parsed_times)
     else:
         ds["time"] = parsed_times
 

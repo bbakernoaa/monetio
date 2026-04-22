@@ -690,3 +690,48 @@ def _get_ioapi_times(ds: xr.Dataset) -> xr.Dataset:
     ds = update_history(ds, "Optimized IOAPI time parsing.")
 
     return ds
+
+
+def _scientific_hygiene(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Apply standard scientific hygiene to the dataset.
+
+    1. Identifies standard coordinates (latitude, longitude, time) and ensures they are set.
+    2. Strips whitespace from all string attributes.
+    3. Updates the history attribute.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+        Processed dataset.
+    """
+    # 1. Coordinate Handling - Ensure standard coordinates are set
+    # We do NOT use reset_coords() to avoid demoting non-standard coords.
+    coords = [
+        c for c in ["latitude", "longitude", "time"] if c in ds.variables and c not in ds.coords
+    ]
+    if coords:
+        ds = ds.set_coords(coords)
+
+    # 2. Attribute Cleaning - Strip whitespace from string attributes
+    for var in ds.variables:
+        for attr, val in ds[var].attrs.items():
+            if isinstance(val, str):
+                ds[var].attrs[attr] = val.strip()
+
+    # Also for global attributes
+    for attr, val in ds.attrs.items():
+        if isinstance(val, str):
+            ds.attrs[attr] = val.strip()
+
+    # 3. Provenance tracking
+    ds = update_history(
+        ds, "Applied scientific hygiene (standard coordinates and attribute cleaning)."
+    )
+
+    return ds
