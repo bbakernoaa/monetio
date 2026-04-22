@@ -5,7 +5,7 @@ from typing import Any
 
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import update_history
 
 
@@ -121,11 +121,8 @@ def chimere_preprocess(
     if dims:
         ds = ds.transpose(*dims)
 
-    # Scientific Hygiene: Strip whitespace from all string attributes
-    for var in ds.variables:
-        for attr, val in ds[var].attrs.items():
-            if isinstance(val, str):
-                ds[var].attrs[attr] = val.strip()
+    # Scientific Hygiene
+    ds = _scientific_hygiene(ds)
 
     # Update history
     ds = update_history(ds, "Preprocessed Chimere data.")

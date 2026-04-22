@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 import xarray as xr
 
-from .base import _format_units, register_reader
+from .base import _format_units, _scientific_hygiene, register_reader
 from .gfs import NCEPPDSReader
 from .sat_utils import update_history
 
@@ -184,11 +184,8 @@ def rrfs_preprocess(ds: xr.Dataset) -> xr.Dataset:
     # 1. Format Units
     ds = _format_units(ds)
 
-    # 2. Scientific Hygiene: Strip whitespace from all string attributes
-    for var in ds.variables:
-        for attr, val in ds[var].attrs.items():
-            if isinstance(val, str):
-                ds[var].attrs[attr] = val.strip()
+    # 2. Scientific Hygiene
+    ds = _scientific_hygiene(ds)
 
     # Update history
     ds = update_history(ds, "Preprocessed RRFS data.")
