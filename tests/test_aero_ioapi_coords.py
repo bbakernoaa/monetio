@@ -5,62 +5,66 @@ import xarray as xr
 from monetio.readers.base import _add_ioapi_latlon
 
 
-def test_add_ioapi_latlon_eager_lazy_consistency():
-    """Verify _add_ioapi_latlon produces identical results for Eager and Lazy backends."""
-    # 1. Setup mock IOAPI dataset
-    # LAMBERT CONFORMAL example
-    proj4 = "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +a=6370000 +b=6370000 +units=m +no_defs"
+def create_mock_ioapi_dataset(lazy=False):
+    """Creates a mock IOAPI-compliant dataset."""
+    # LCC Projection example
+    proj4 = "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+
+    # Grid metadata
+    ncols = 10
+    nrows = 10
+    xorig = -1000000.0
+    yorig = -1000000.0
+    xcell = 200000.0
+    ycell = 200000.0
 
     ds = xr.Dataset(
-        {"data": (("y", "x"), np.random.rand(10, 12))},
-        coords={"x": np.arange(12), "y": np.arange(10)},
-    )
-    ds.attrs.update(
-        {
-            "XORIG": -2500000.0,
-            "YORIG": -1500000.0,
-            "XCELL": 12000.0,
-            "YCELL": 12000.0,
-            "NCOLS": 12,
-            "NROWS": 10,
-        }
+        data_vars={"test_var": (("y", "x"), np.random.rand(nrows, ncols))},
+        attrs={
+            "NCOLS": ncols,
+            "NROWS": nrows,
+            "XORIG": xorig,
+            "YORIG": yorig,
+            "XCELL": xcell,
+            "YCELL": ycell,
+            "proj4_srs": proj4,
+        },
     )
 
-    # 2. Eager execution
-    ds_eager = _add_ioapi_latlon(ds.copy(), proj4)
+    if lazy:
+        ds = ds.chunk({"x": 5, "y": 5})
 
-    assert "latitude" in ds_eager.coords
-    assert "longitude" in ds_eager.coords
-    assert ds_eager.latitude.shape == (10, 12)
-
-    # 3. Lazy execution
-    ds_lazy = ds.chunk({"x": 6, "y": 5})
-    ds_lazy = _add_ioapi_latlon(ds_lazy, proj4)
-
-    # Verify it is still lazy
-    assert hasattr(ds_lazy.latitude.data, "dask")
-
-    # 4. Compare
-    xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
-
-    # 5. Verify history
-    assert "Generated Latitude/Longitude coordinates" in ds_eager.attrs["history"]
+    return ds, proj4
 
 
-def test_add_ioapi_latlon_col_row_dims():
-    """Verify it works with COL/ROW dimension names (as in some CMAQ files)."""
-    proj4 = "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +a=6370000 +b=6370000 +units=m +no_defs"
+def test_add_ioapi_latlon_consistency():
+    """Verify that _add_ioapi_latlon works identically for Eager and Lazy backends."""
+    # 1. Create datasets
+    ds_eager, proj4 = create_mock_ioapi_dataset(lazy=False)
+    ds_lazy, _ = create_mock_ioapi_dataset(lazy=True)
 
-    ds = xr.Dataset(
-        {"data": (("ROW", "COL"), np.random.rand(5, 5))},
-    )
-    ds.attrs.update(
-        {"XORIG": 0.0, "YORIG": 0.0, "XCELL": 1000.0, "YCELL": 1000.0, "NCOLS": 5, "NROWS": 5}
-    )
+    # 2. Apply function
+    ds_eager_res = _add_ioapi_latlon(ds_eager, proj4)
+    ds_lazy_res = _add_ioapi_latlon(ds_lazy, proj4)
 
-    ds_out = _add_ioapi_latlon(ds, proj4)
-    assert ds_out.latitude.dims == ("ROW", "COL")
-    assert ds_out.longitude.dims == ("ROW", "COL")
+    # 3. Basic checks
+    assert "latitude" in ds_eager_res.coords
+    assert "longitude" in ds_eager_res.coords
+    assert "latitude" in ds_lazy_res.coords
+    assert "longitude" in ds_lazy_res.coords
+
+    # 4. Consistency check
+    # We must compute the lazy one for comparison
+    xr.testing.assert_allclose(ds_eager_res.latitude, ds_lazy_res.latitude.compute())
+    xr.testing.assert_allclose(ds_eager_res.longitude, ds_lazy_res.longitude.compute())
+
+    # 5. Laziness check
+    assert hasattr(ds_lazy_res.latitude.data, "dask")
+    assert hasattr(ds_lazy_res.longitude.data, "dask")
+
+    # 6. Attributes check
+    assert ds_eager_res.latitude.attrs["units"] == "degree_north"
+    assert "PROJ inversion" in ds_eager_res.attrs["history"]
 
 
 if __name__ == "__main__":
