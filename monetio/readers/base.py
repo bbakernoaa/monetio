@@ -561,51 +561,60 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     if any(v is None for v in [ncols, nrows, xorig, yorig, xcell, ycell]):
         return ds
 
-    x = np.linspace(
-        xorig + xcell * 0.5,
-        xorig + (ncols - 0.5) * xcell,
-        ncols,
-    )
-    y = np.linspace(
-        yorig + ycell * 0.5,
-        yorig + (nrows - 0.5) * ycell,
-        nrows,
-    )
-
-    # 2. Broadcast to 2D
+    # 2. Coordinate and Dimension Names
     x_dim = "COL" if "COL" in ds.dims else "x"
     y_dim = "ROW" if "ROW" in ds.dims else "y"
+
+    # Generate 1D arrays
+    x = np.linspace(xorig + xcell * 0.5, xorig + (ncols - 0.5) * xcell, ncols)
+    y = np.linspace(yorig + ycell * 0.5, yorig + (nrows - 0.5) * ycell, nrows)
 
     xda = xr.DataArray(x, dims=x_dim)
     yda = xr.DataArray(y, dims=y_dim)
 
-    # Ensure coordinates are chunked if the dataset is chunked
-    is_dask = False
-    if hasattr(ds, "chunks") and ds.chunks:
-        is_dask = True
-    else:
-        # Check if any data variables are dask-backed
-        for var in ds.data_vars:
-            if hasattr(ds[var].data, "dask"):
-                is_dask = True
-                break
+    # 3. Backend-Agnostic Chunking
+    # Proactively check for Dask-backed data variables
+    is_dask = len(ds.chunks) > 0 or any(hasattr(ds[v].data, "dask") for v in ds.data_vars)
 
     if is_dask:
-        xda = xda.chunk({x_dim: ds.chunks.get(x_dim, "auto")})
-        yda = yda.chunk({y_dim: ds.chunks.get(y_dim, "auto")})
+        # Use existing chunks or default to 'auto'
+        x_chunks = ds.chunks.get(x_dim, "auto")
+        y_chunks = ds.chunks.get(y_dim, "auto")
+        xda = xda.chunk({x_dim: x_chunks})
+        yda = yda.chunk({y_dim: y_chunks})
 
+    # Broadcast to 2D
     yv, xv = xr.broadcast(yda, xda)
 
-    # 3. Apply projection lazily
+    # 4. Apply projection lazily
     def _proj_inv(
         x_val: np.ndarray, y_val: np.ndarray, p_srs: str | np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Kernel for lazy projection inversion.
+
+        Parameters
+        ----------
+        x_val : np.ndarray
+            X-coordinates in the projection.
+        y_val : np.ndarray
+            Y-coordinates in the projection.
+        p_srs : Union[str, np.ndarray]
+            PROJ projection string.
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            Longitude and latitude arrays.
+        """
         from pyproj import Proj
 
+        # Handle scalar/array inputs from apply_ufunc
         if isinstance(p_srs, np.ndarray | np.generic):
             p_srs = p_srs.item()
-        if hasattr(p_srs, "decode"):
+        if isinstance(p_srs, bytes):
             p_srs = p_srs.decode()
+
         p = Proj(p_srs)
         return p(x_val, y_val, inverse=True)
 
@@ -617,8 +626,10 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
         dask="parallelized",
         output_dtypes=[float, float],
         output_core_dims=[(), ()],
+        keep_attrs=True,
     )
 
+    # Assign coordinates and standard metadata
     ds = ds.assign_coords(
         longitude=lon.assign_attrs(
             {"long_name": "Longitude", "units": "degree_east", "standard_name": "longitude"}
@@ -629,7 +640,7 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     )
 
     # Update history
-    ds = update_history(ds, "Generated Latitude/Longitude coordinates.")
+    ds = update_history(ds, "Generated Latitude/Longitude coordinates via PROJ inversion.")
 
     return ds
 
