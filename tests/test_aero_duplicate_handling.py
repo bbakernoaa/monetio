@@ -79,8 +79,12 @@ def test_duplicate_handling_laziness(tmp_path, reader_class):
     # 1. Test Eager
     ds_eager = reader.open_dataset(f1, drop_duplicates=True, engine="h5netcdf")
     assert ds_eager.time.size == 3
+
+    # Support both case-sensitive and case-insensitive readers
+    o3_var = "O3" if "O3" in ds_eager.data_vars else "o3"
+
     # If the driver/engine defaults to dask, we compute it for the "Eager" check
-    o3_data = ds_eager.O3.data
+    o3_data = ds_eager[o3_var].data
     if hasattr(o3_data, "compute"):
         o3_data = o3_data.compute()
     assert isinstance(o3_data, np.ndarray)
@@ -91,7 +95,7 @@ def test_duplicate_handling_laziness(tmp_path, reader_class):
 
     # The coordinate 'time' will be computed for drop_duplicates (unavoidable)
     # but the data variables should remain dask-backed.
-    assert hasattr(ds_lazy.O3.data, "dask")
+    assert hasattr(ds_lazy[o3_var].data, "dask")
     assert ds_lazy.time.size == 3
 
     # 3. Verify results are identical
@@ -111,7 +115,10 @@ def test_no_duplicates_laziness(tmp_path, reader_class):
     # Note: We must ensure TFLAG itself is chunked so that _get_times remains lazy
     ds_lazy = reader.open_dataset(f1, drop_duplicates=False, chunks={"TSTEP": 1}, engine="h5netcdf")
 
+    # Support both case-sensitive and case-insensitive readers
+    o3_var = "O3" if "O3" in ds_lazy.data_vars else "o3"
+
     # In the new implementation, the O3 data variable must stay lazy.
     # Xarray may compute coordinates during alignment or concatenation,
     # but we have removed the explicit .compute() from our readers.
-    assert hasattr(ds_lazy.O3.data, "dask")
+    assert hasattr(ds_lazy[o3_var].data, "dask")

@@ -89,7 +89,7 @@ class CMAQReader(GriddedReader):
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """
-        Placeholder for future harmonization logic.
+        Standardize variable names and metadata.
 
         Parameters
         ----------
@@ -101,6 +101,22 @@ class CMAQReader(GriddedReader):
         xr.Dataset
             Harmonized dataset.
         """
+        # 1. Standardize variable names to lowercase
+        mapping = {v: v.lower() for v in ds.data_vars}
+        # Avoid collisions with existing coordinates
+        mapping = {k: v for k, v in mapping.items() if v not in ds.coords}
+        ds = ds.rename(mapping)
+
+        # 2. Specific mappings for common species if they exist
+        # Rename back to standard if they were changed to something else or keep as is
+        # Actually, many users expect lowercase.
+
+        # 3. Clean up attributes
+        ds = _scientific_hygiene(ds)
+
+        # Update history
+        ds = update_history(ds, "Harmonized CMAQ dataset (lowercased variables).")
+
         return ds
 
 
