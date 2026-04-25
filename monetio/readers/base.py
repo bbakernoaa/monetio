@@ -591,7 +591,7 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
         x_val: np.ndarray, y_val: np.ndarray, p_srs: str | np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Kernel for lazy projection inversion.
+        Kernel for lazy projection inversion using pyproj.Transformer.
 
         Parameters
         ----------
@@ -607,7 +607,7 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
         Tuple[np.ndarray, np.ndarray]
             Longitude and latitude arrays.
         """
-        from pyproj import Proj
+        from pyproj import Transformer
 
         # Handle scalar/array inputs from apply_ufunc
         if isinstance(p_srs, np.ndarray | np.generic):
@@ -615,8 +615,11 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
         if isinstance(p_srs, bytes):
             p_srs = p_srs.decode()
 
-        p = Proj(p_srs)
-        return p(x_val, y_val, inverse=True)
+        # Transformer is generally faster than Proj for repeated use
+        # and better handles modern PROJ versions.
+        # We use a transformer from the input SRS to WGS84 (EPSG:4326).
+        transformer = Transformer.from_crs(p_srs, "EPSG:4326", always_xy=True)
+        return transformer.transform(x_val, y_val)
 
     lon, lat = xr.apply_ufunc(
         _proj_inv,
