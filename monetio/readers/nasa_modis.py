@@ -3,7 +3,7 @@
 import pandas as pd
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
 
@@ -19,15 +19,21 @@ class NASAMODISReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
-            File path(s) or URL(s).
-        **kwargs : dict
-            Additional arguments passed to XarrayDriver.open.
+        files : str | list[str]
+            File path, list of paths, or glob pattern.
+        **kwargs : Any
+            Additional arguments passed to the Xarray driver.
 
         Returns
         -------
         xr.Dataset
-            The NASA MODIS dataset.
+            The processed NASA MODIS dataset.
+
+        Examples
+        --------
+        >>> from monetio.readers.nasa_modis import NASAMODISReader
+        >>> reader = NASAMODISReader()
+        >>> ds = reader.open_dataset("MOD43A4.A2023001.h10v05.006.2023010123456.hdf")
         """
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = nasa_modis_preprocess
@@ -42,7 +48,21 @@ class NASAMODISReader(GriddedReader):
 
 def nasa_modis_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """
-    Preprocess NASA MODIS dataset: standardize and assign coordinates.
+    Preprocess NASA MODIS dataset: standardize coordinates, handle time, and hygiene.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        The raw NASA MODIS dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        The preprocessed NASA MODIS dataset.
+
+    Examples
+    --------
+    >>> ds = nasa_modis_preprocess(ds)
     """
     from ..grids import get_modis_latlon_from_swath_hv, get_sinu_area_def
 
@@ -50,31 +70,33 @@ def nasa_modis_preprocess(ds: xr.Dataset) -> xr.Dataset:
     ds = standardize_satellite_coords(
         ds, y_dim=["YDim:MOD_Grid_BRDF", "y"], x_dim=["XDim:MOD_Grid_BRDF", "x"]
     )
+    ds = update_history(ds, "Standardized satellite coordinates.")
 
-    # Extract tile info from filename if possible
-    # We might need the original filename, but ds might not have it easily accessible here
-    # if it's already opened. However, often it's in attributes.
-    fname = ds.attrs.get("file_name", "")
-    if not fname and "history" in ds.attrs:
-        # Sometimes it's in history
-        pass
-
-    # If we don't have filename, we might be in trouble for h, v
-    # But usually NASA MODIS files have global attributes
+    # Extract tile info from attributes
     h = ds.attrs.get("HORIZONTALTILENUMBER")
     v = ds.attrs.get("VERTICALTILENUMBER")
 
     if h is not None and v is not None:
         ds = get_modis_latlon_from_swath_hv(h, v, ds)
         ds.attrs["area"] = get_sinu_area_def(ds)
+        ds = update_history(ds, f"Assigned coordinates for tile h{h}v{v}.")
 
     # Handle Time
     if "time" not in ds.coords:
-        # Try to get time from attributes or filename
+        # Try to get time from attributes
         range_start = ds.attrs.get("RANGEBEGINNINGDATE")
         time_start = ds.attrs.get("RANGEBEGINNINGTIME")
         if range_start and time_start:
-            ds["time"] = pd.to_datetime(f"{range_start} {time_start}")
-            ds = ds.expand_dims("time")
+            # We use xarray-native assignment to maintain laziness if possible,
+            # though these are usually scalar attributes.
+            dt = pd.to_datetime(f"{range_start} {time_start}")
+            ds = ds.assign_coords(time=dt).expand_dims("time")
+            ds = update_history(ds, f"Assigned time coordinate from attributes: {dt}.")
+
+    # Scientific Hygiene
+    ds = _scientific_hygiene(ds)
+
+    # Update history
+    ds = update_history(ds, "Preprocessed NASA MODIS data.")
 
     return ds
