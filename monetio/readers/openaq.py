@@ -4,18 +4,17 @@ import hashlib
 import json
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
+from .base import PointReader, register_reader
 from .sat_utils import update_history
 
 if TYPE_CHECKING:
     import dask.dataframe as dd
-
-from .base import PointReader, register_reader
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +29,10 @@ class OpenAQReader(PointReader):
         self,
         files: str | list[str] = None,
         dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
-        n_procs: int = 1,
         wide_fmt: bool = True,
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
         Retrieve and load OpenAQ data.
@@ -45,8 +43,6 @@ class OpenAQReader(PointReader):
             File path, list of paths, or glob pattern.
         dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
             Dates to retrieve if files are not provided.
-        n_procs : int, optional
-            Number of processors for dask compute (if not lazy), by default 1.
         wide_fmt : bool, optional
             Whether to return data in wide format, by default True.
         as_xarray : bool, optional
@@ -60,6 +56,12 @@ class OpenAQReader(PointReader):
         -------
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded OpenAQ data.
+
+        Examples
+        --------
+        >>> from monetio.readers.openaq import OpenAQReader
+        >>> reader = OpenAQReader()
+        >>> ds = reader.open_dataset(dates='2023-01-01', lazy=True)
         """
 
         # For backward compatibility, if the first argument looks like dates, swap them.
@@ -115,14 +117,9 @@ class OpenAQReader(PointReader):
             **kwargs,
         )
 
-        # Post-processing
-        # We only perform wide_fmt here if NOT lazy, to avoid the hidden compute in _post_process
-        do_wide = wide_fmt and not lazy
-        df = self._post_process(df, dates=dates, wide_fmt=do_wide, n_procs=n_procs)
+        # Post-processing (always long format to maintain laziness)
+        df = self._post_process(df, dates=dates)
         df = self.harmonize(df)
-
-        if not lazy and hasattr(df, "compute") and not isinstance(df, pd.DataFrame):
-            df = df.compute(num_workers=n_procs)
 
         if as_xarray:
             # Pop expand2d from kwargs if present to avoid multiple values error
@@ -133,17 +130,20 @@ class OpenAQReader(PointReader):
             ds = update_history(ds, "Read OpenAQ data.")
             return ds
 
+        if wide_fmt:
+            from ..util import long_to_wide
+
+            df = long_to_wide(df)
+
         return df
 
     def _post_process(
         self,
         df: Union[pd.DataFrame, "dd.DataFrame"],
         dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
-        wide_fmt: bool = True,
-        n_procs: int = 1,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         """
-        Internal post-processing logic.
+        Internal post-processing logic (backend-agnostic).
 
         Parameters
         ----------
@@ -151,10 +151,6 @@ class OpenAQReader(PointReader):
             Input dataframe.
         dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
             Requested dates for filtering.
-        wide_fmt : bool, optional
-            Whether to return data in wide format, by default True.
-        n_procs : int, optional
-            Number of processors for dask compute, by default 1.
 
         Returns
         -------
@@ -169,18 +165,20 @@ class OpenAQReader(PointReader):
         except ImportError:
             is_dask = False
 
-        if not is_dask and df.empty:
-            return df
+        # Use .empty for Pandas and .npartitions for Dask
+        if is_dask:
+            if df.npartitions == 0:
+                return df
+        else:
+            if df.empty:
+                return df
 
         if dates is not None:
             dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
-            if is_dask:
-                df = df.loc[(df.time >= dates.min()) & (df.time <= dates.max())]
-            else:
-                df = df.loc[(df.time >= dates.min()) & (df.time <= dates.max())]
+            df = df.loc[(df.time >= dates.min()) & (df.time <= dates.max())]
 
         # 1. SITE ID (Lazy friendly)
-        def _get_siteid(df_part):
+        def _get_siteid(df_part: pd.DataFrame) -> pd.DataFrame:
             if df_part.empty:
                 df_part["siteid"] = pd.Series(dtype=object)
                 return df_part
@@ -230,7 +228,7 @@ class OpenAQReader(PointReader):
         }
         ppm_to_ugm3["nox"] = ppm_to_ugm3["no2"]
 
-        def _convert_units(df_part):
+        def _convert_units(df_part: pd.DataFrame) -> pd.DataFrame:
             if df_part.empty:
                 return df_part
             for vn, f in ppm_to_ugm3.items():
@@ -256,71 +254,61 @@ class OpenAQReader(PointReader):
         subset = [c for c in subset if c in df.columns]
         df = df.drop_duplicates(subset=subset)
 
-        if wide_fmt:
-            # Note: pivot forces compute on Dask.
-            # We already avoid this in open_dataset by setting do_wide=False if lazy=True.
-            if is_dask:
-                df = df.compute(num_workers=n_procs)
-
-            index = [
-                "time",
-                "time_local",
-                "latitude",
-                "longitude",
-                "utcoffset",
-                "location",
-                "city",
-                "country",
-                "sourceName",
-                "sourceType",
-                "mobile",
-                "siteid",
-                "averagingPeriod",
-            ]
-            index = [c for c in index if c in df.columns]
-
-            df = df.pivot_table(values="obs", index=index, columns="variable").reset_index()
-
-            # Add units columns to match long_to_wide behavior
-            # (In long_to_wide, it's done by merging with units_map)
-            # For OpenAQ, we have specific renaming logic that we want to preserve
-            # but also keep it consistent with the lazy Xarray path if possible.
-
-            non_molec_params = ["pm1", "pm25", "pm4", "pm10", "bc"]
-            df = df.rename(columns={p: f"{p}_ugm3" for p in non_molec_params}, errors="ignore")
-            df = df.rename(columns={p: f"{p}_ppm" for p in ppm_to_ugm3}, errors="ignore")
+        # Update history if attributes exist
+        df = update_history(df, "Post-processed OpenAQ data (siteid, unit conversion).")
 
         return df
 
     def to_xarray(
-        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs
+        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs: Any
     ) -> xr.Dataset:
         """
-        Overridden to ensure consistent variable naming between eager and lazy paths.
+        Convert OpenAQ DataFrame to Xarray Dataset, ensuring consistent naming.
+
+        Parameters
+        ----------
+        df : Union[pd.DataFrame, dd.DataFrame]
+            Input dataframe.
+        expand2d : bool, optional
+            Whether to expand to 2D (time, node) structure, by default True.
+        **kwargs : dict
+            Additional arguments passed to super().to_xarray.
+
+        Returns
+        -------
+        xr.Dataset
+            The loaded dataset.
         """
         ds = super().to_xarray(df, expand2d=expand2d, **kwargs)
 
         if expand2d:
-            # If it was expanded via ds_to_2d, it will have O3, PM25 etc. as data vars
-            # and O3_unit, PM25_unit etc. as well.
-            # We want to rename them to O3_ppm, PM25_ugm3 to match eager _post_process.
+            # If it was expanded via ds_to_2d, it will have o3, pm25 etc. as data vars
+            # and o3_unit, pm25_unit etc. as well.
+            # We want to rename them to o3_ppm, pm25_ugm3 to match consistent MONETIO naming.
             ppm_vars = ["o3", "co", "no2", "no", "so2", "ch4", "co2", "nox"]
             ugm3_vars = ["pm1", "pm25", "pm4", "pm10", "bc"]
 
             rename_dict = {}
             for v in ppm_vars:
                 if v in ds.data_vars:
+                    ds[v].attrs["units"] = "ppm"
                     rename_dict[v] = f"{v}_ppm"
                     if f"{v}_unit" in ds.data_vars:
                         ds = ds.drop_vars(f"{v}_unit")
             for v in ugm3_vars:
                 if v in ds.data_vars:
+                    ds[v].attrs["units"] = "ug/m3"
                     rename_dict[v] = f"{v}_ugm3"
                     if f"{v}_unit" in ds.data_vars:
                         ds = ds.drop_vars(f"{v}_unit")
 
             if rename_dict:
                 ds = ds.rename(rename_dict)
+                # Format units to LaTeX if applicable
+                from .base import _format_units
+
+                ds = _format_units(ds)
+                ds = update_history(ds, f"Renamed variables: {list(rename_dict.values())}")
 
         return ds
 
@@ -374,7 +362,7 @@ def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> lis
     return urls
 
 
-def read_openaq_json(fn: str, storage_options: dict = None, **kwargs) -> pd.DataFrame:
+def read_openaq_json(fn: str, storage_options: dict = None, **kwargs: Any) -> pd.DataFrame:
     """
     Read an OpenAQ JSONL file.
 
@@ -384,6 +372,8 @@ def read_openaq_json(fn: str, storage_options: dict = None, **kwargs) -> pd.Data
         File path or URL.
     storage_options : dict, optional
         Storage options for fsspec, by default None.
+    **kwargs : Any
+        Additional arguments.
 
     Returns
     -------
@@ -488,12 +478,12 @@ def read_openaq_json(fn: str, storage_options: dict = None, **kwargs) -> pd.Data
 # -----------------------------------------------------------------------------
 
 
-def read_json(fp_or_url, **kwargs):
+def read_json(fp_or_url: str, **kwargs: Any) -> pd.DataFrame:
     """Legacy wrapper for read_openaq_json."""
     return read_openaq_json(fp_or_url, **kwargs)
 
 
-def read_json2(fp_or_url, **kwargs):
+def read_json2(fp_or_url: str, **kwargs: Any) -> pd.DataFrame:
     """Legacy wrapper for read_openaq_json."""
     # Note: original read_json2 used requests, but read_openaq_json is preferred.
     return read_openaq_json(fp_or_url, **kwargs)
@@ -514,14 +504,20 @@ class OPENAQ:
     }
     PPM_TO_UGM3["nox"] = PPM_TO_UGM3["no2"]
 
-    def __init__(self, engine="pandas"):
+    def __init__(self, engine: str = "pandas"):
         self.engine = engine
 
-    def build_urls(self, dates):
+    def build_urls(self, dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> list[str]:
         return build_urls(dates)
 
-    def add_data(self, dates, *, num_workers=1, wide_fmt=True, lazy=False):
+    def add_data(
+        self,
+        dates: pd.DatetimeIndex | list[datetime] | datetime | str,
+        *,
+        num_workers: int = 1,
+        wide_fmt: bool = True,
+        lazy: bool = False,
+    ) -> pd.DataFrame | xr.Dataset:
         reader = OpenAQReader()
-        return reader.open_dataset(
-            dates=dates, n_procs=num_workers, wide_fmt=wide_fmt, lazy=lazy, as_xarray=False
-        )
+        # num_workers is ignored in modern reader as it relies on dask config
+        return reader.open_dataset(dates=dates, wide_fmt=wide_fmt, lazy=lazy, as_xarray=False)
