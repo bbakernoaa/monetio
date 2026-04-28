@@ -1,11 +1,11 @@
+import json
+
 import numpy as np
-import pandas as pd
 import pytest
 import xarray as xr
-import json
-import os
 
 from monetio.readers.openaq import OpenAQReader
+
 
 @pytest.fixture
 def sample_openaq_jsonl(tmp_path):
@@ -20,7 +20,7 @@ def sample_openaq_jsonl(tmp_path):
             "unit": "µg/m³",
             "value": 19.9,
             "location": "Test Site",
-            "country": "US"
+            "country": "US",
         },
         {
             "date": {"utc": "2023-01-01T00:00:00Z", "local": "2023-01-01T01:00:00+01:00"},
@@ -30,7 +30,7 @@ def sample_openaq_jsonl(tmp_path):
             "unit": "µg/m³",
             "value": 10.0,
             "location": "Test Site",
-            "country": "US"
+            "country": "US",
         },
         {
             "date": {"utc": "2023-01-01T01:00:00Z", "local": "2023-01-01T02:00:00+01:00"},
@@ -40,13 +40,14 @@ def sample_openaq_jsonl(tmp_path):
             "unit": "µg/m³",
             "value": 25.0,
             "location": "Test Site",
-            "country": "US"
-        }
+            "country": "US",
+        },
     ]
     with open(fn, "w") as f:
         for entry in data:
             f.write(json.dumps(entry) + "\n")
     return str(fn)
+
 
 def test_openaq_eager_lazy_consistency(sample_openaq_jsonl):
     """Verify that Eager and Lazy modes return identical results for OpenAQ."""
@@ -64,6 +65,7 @@ def test_openaq_eager_lazy_consistency(sample_openaq_jsonl):
 
     # ds_lazy variables should be dask-backed
     import dask.array as da
+
     assert isinstance(ds_lazy.o3_ppm.data, da.Array)
 
     # 2. Check data values (after computing lazy)
@@ -75,7 +77,7 @@ def test_openaq_eager_lazy_consistency(sample_openaq_jsonl):
     assert "pm25_ugm3" in ds_eager.data_vars
     assert ds_eager.o3_ppm.attrs["units"] == "ppm"
     # Note: _format_units in base.py changes µg/m³ to LaTeX form
-    assert "$\mu g m^{-3}$" in ds_eager.pm25_ugm3.attrs["units"]
+    assert r"$\mu g m^{-3}$" in ds_eager.pm25_ugm3.attrs["units"]
 
     # 4. Check coordinates
     assert "time" in ds_eager.coords
@@ -83,14 +85,17 @@ def test_openaq_eager_lazy_consistency(sample_openaq_jsonl):
     assert "latitude" in ds_eager.coords
     assert "longitude" in ds_eager.coords
 
+
 def test_openaq_no_hidden_compute(sample_openaq_jsonl):
     """Ensure that lazy loading does not trigger immediate computes."""
     import dask
+
     reader = OpenAQReader()
 
     with dask.config.set(scheduler="single-threaded"):
         ds = reader.open_dataset(files=sample_openaq_jsonl, lazy=True, wide_fmt=True)
         assert hasattr(ds.o3_ppm.data, "dask")
+
 
 def test_openaq_unit_conversion(sample_openaq_jsonl):
     """Verify unit conversion logic for O3."""

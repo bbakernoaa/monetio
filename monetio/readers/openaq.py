@@ -517,9 +517,7 @@ class OPENAQ:
         num_workers: int = 1,
         wide_fmt: bool = True,
         lazy: bool = False,
-    ) -> Union[pd.DataFrame, xr.Dataset]:
+    ) -> pd.DataFrame | xr.Dataset:
         reader = OpenAQReader()
         # num_workers is ignored in modern reader as it relies on dask config
-        return reader.open_dataset(
-            dates=dates, wide_fmt=wide_fmt, lazy=lazy, as_xarray=False
-        )
+        return reader.open_dataset(dates=dates, wide_fmt=wide_fmt, lazy=lazy, as_xarray=False)
