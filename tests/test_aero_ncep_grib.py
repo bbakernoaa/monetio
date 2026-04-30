@@ -9,7 +9,6 @@ def mock_ncep_grib_dataset():
     """Create a mock NCEP GRIB dataset with 1D lat/lon."""
     nlat = 10
     nlon = 20
-    ntime = 1
 
     ds = xr.Dataset(
         {
@@ -47,7 +46,9 @@ def test_ncep_grib_eager_lazy(tmp_path):
     assert ds_eager.TMP_P0_L1_GLL0.attrs["units"] == "K"
 
     # 2. Lazy Mode
-    ds_lazy = reader.open_dataset(files=str(fname), chunks={"lat_0": 5, "lon_0": 10}, engine="h5netcdf")
+    ds_lazy = reader.open_dataset(
+        files=str(fname), chunks={"lat_0": 5, "lon_0": 10}, engine="h5netcdf"
+    )
 
     assert isinstance(ds_lazy, xr.Dataset)
     # Check if data is dask-backed

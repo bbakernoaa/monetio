@@ -107,7 +107,7 @@ def ncep_grib_preprocess(ds: xr.Dataset) -> xr.Dataset:
 
             # If the dataset is chunked but coordinates are not, wrap them in dask
             # to maintain laziness throughout the broadcast.
-            if hasattr(ds, "chunks") and ds.chunks:
+            if ds.chunks:
                 try:
                     import dask.array as da
 
