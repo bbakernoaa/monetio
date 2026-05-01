@@ -13,7 +13,7 @@ class NASAMODISReader(GriddedReader):
     Reader for NASA MODIS HDF files.
     """
 
-    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads NASA MODIS swath data.
 
@@ -38,7 +38,7 @@ class NASAMODISReader(GriddedReader):
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = nasa_modis_preprocess
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read NASA MODIS data.")

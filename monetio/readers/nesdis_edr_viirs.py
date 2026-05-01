@@ -21,15 +21,7 @@ class NESDISEDRVIIRSReader(GriddedReader):
     Available via FTP.
     """
 
-    def open_dataset(
-        self,
-        date: datetime.datetime | str | pd.Timestamp = None,
-        resolution: str = "high",
-        datapath: str = ".",
-        lazy: bool = False,
-        files: str | list[str] = None,
-        **kwargs,
-    ) -> xr.Dataset:
+    def open_dataset(self, date: datetime.datetime | str | pd.Timestamp = None, resolution: str = "high", datapath: str = ".", lazy: bool = False, files: str | list[str] = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads NESDIS EDR VIIRS data.
 

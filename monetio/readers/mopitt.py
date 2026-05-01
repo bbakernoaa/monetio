@@ -15,11 +15,7 @@ class MOPITTReader(GriddedReader):
     Reader for MOPITT (Measurements Of Pollution In The Troposphere) L3 data.
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str],
-        **kwargs,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads MOPITT data.
 
@@ -41,7 +37,7 @@ class MOPITTReader(GriddedReader):
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read MOPITT L3 data.")

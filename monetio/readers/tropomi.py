@@ -20,6 +20,10 @@ class TROPOMIReader(GriddedReader):
         group: str | list[str] | None = None,
         calculate_pressure: bool = True,
         qa_threshold: float | None = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -82,7 +86,14 @@ class TROPOMIReader(GriddedReader):
             g_kwargs["group"] = g
             try:
                 # We open without the TROPOMI preprocess at this stage
-                ds_g = super().open_dataset(files, **g_kwargs)
+                ds_g = super().open_dataset(
+                    files,
+                    use_virtualizarr=use_virtualizarr,
+                    virtualizarr_file=virtualizarr_file,
+                    use_icechunk=use_icechunk,
+                    icechunk_url=icechunk_url,
+                    **g_kwargs,
+                )
                 dsets.append(ds_g)
             except Exception as e:
                 warnings.warn(f"Could not open group {g}: {e}")

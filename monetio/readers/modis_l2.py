@@ -12,12 +12,7 @@ class MODISL2Reader(GriddedReader):
     Reader for MODIS L2 swath data.
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str],
-        variable_dict: dict = None,
-        **kwargs,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], variable_dict: dict = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads MODIS L2 swath data.
 
@@ -55,7 +50,7 @@ class MODISL2Reader(GriddedReader):
             # or the user can pass drop_variables.
             pass
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # Filter to requested variables if variable_dict is provided
         if variable_dict is not None:

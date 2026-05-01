@@ -109,6 +109,60 @@ def load(source: str, files=None, **kwargs):
     return reader.open_dataset(files=files, **kwargs)
 
 
+def virtualize(source: str, files=None, output: str = None, backend: str = "kerchunk", **kwargs):
+    """
+    Unified function to create virtual datasets (Kerchunk or Icechunk).
+
+    Parameters
+    ----------
+    source : str
+        MONETIO source name (e.g., 'cmaq', 'merra2', 'gfs').
+    files : Union[str, List[str]], optional
+        File path(s) or glob pattern. If None, will try to build URLs via reader.
+    output : str, optional
+        Path for the Kerchunk JSON reference file.
+    backend : str, optional
+        'kerchunk' or 'icechunk'. Default is 'kerchunk'.
+    **kwargs : dict
+        Additional arguments passed to the reader and driver.
+
+    Returns
+    -------
+    xr.Dataset
+        The virtualized dataset.
+    """
+    from .readers.base import READER_REGISTRY
+
+    if source not in READER_REGISTRY:
+        if source in _READER_MODULES:
+            import importlib
+
+            importlib.import_module(_READER_MODULES[source], package="monetio")
+        else:
+            raise ValueError(f"Unknown source '{source}'")
+
+    reader_cls = READER_REGISTRY[source]
+    reader = reader_cls()
+
+    # Determine files if not provided
+    if files is None:
+        if hasattr(reader, "build_urls"):
+            # Try to build URLs using common reader arguments
+            files = reader.build_urls(**kwargs)
+        else:
+            raise ValueError(f"Files must be provided for source '{source}'")
+
+    # Set driver virtualization options
+    if backend == "icechunk":
+        kwargs["use_icechunk"] = True
+        kwargs["icechunk_url"] = output
+    else:
+        kwargs["use_virtualizarr"] = True
+        kwargs["virtualizarr_file"] = output
+
+    return reader.open_dataset(files=files, **kwargs)
+
+
 from . import grids
 from .models import (
     camx,

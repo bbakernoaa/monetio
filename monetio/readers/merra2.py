@@ -24,6 +24,10 @@ class MERRA2Reader(GriddedReader):
         username: str | None = None,
         password: str | None = None,
         virtualizarr: str | None = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -67,10 +71,19 @@ class MERRA2Reader(GriddedReader):
 
             kwargs["preprocess"] = partial(merra2_preprocess, product=product)
 
+        # Harmonize virtualization parameters
         if virtualizarr is not None:
-            kwargs["virtualizarr_file"] = virtualizarr
+            use_virtualizarr = True
+            virtualizarr_file = virtualizarr
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         # Update history
         ds = update_history(ds, f"Read MERRA-2 {product} data.")

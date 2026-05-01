@@ -53,15 +53,7 @@ class VIIRSJRRReader(GriddedReader):
     Available on AWS Open Data.
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str] = None,
-        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
-        satellite: str = "snpp",
-        product: str = "AOD",
-        qa_threshold: float | None = None,
-        **kwargs,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str] = None, dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None, satellite: str = "snpp", product: str = "AOD", qa_threshold: float | None = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads NESDIS VIIRS JRR data.
 
@@ -106,7 +98,7 @@ class VIIRSJRRReader(GriddedReader):
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # Update history
         ds = update_history(ds, f"Read NESDIS VIIRS JRR {product} data from {satellite}.")

@@ -15,7 +15,7 @@ class NCEPGribReader(GriddedReader):
     Reader for NCEP GRIB files.
     """
 
-    def open_dataset(self, files: str | list[str], **kwargs: Any) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads NCEP GRIB files.
 
@@ -49,7 +49,7 @@ class NCEPGribReader(GriddedReader):
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = ncep_grib_preprocess
 
-        ds = self.driver.open(files, **kwargs)
+        ds = self.driver.open(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read NCEP GRIB data.")

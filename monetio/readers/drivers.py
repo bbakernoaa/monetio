@@ -88,6 +88,8 @@ class XarrayDriver:
         use_cubed: bool = False,
         use_virtualizarr: bool = False,
         virtualizarr_file: str = None,
+        use_icechunk: bool = False,
+        icechunk_url: str = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -108,6 +110,10 @@ class XarrayDriver:
             Path to save/load the VirtualiZarr reference JSON file. If provided and the file
             exists, the references will be loaded from it. If the file does not exist,
             the references will be computed and saved to this path.
+        use_icechunk : bool, optional
+            Whether to use Icechunk to create or load a virtual dataset, by default False.
+        icechunk_url : str, optional
+            URL for the Icechunk store.
         **kwargs : dict
             Additional arguments passed to xarray open functions.
 
@@ -145,135 +151,16 @@ class XarrayDriver:
         preprocess = xr_kwargs.pop("preprocess", None)
         read_method = xr_kwargs.pop("read_method", None)
 
-        if use_virtualizarr:
-            try:
-                import ujson  # noqa: F401
-                import zarr  # noqa: F401
-                from obspec_utils.registry import ObjectStoreRegistry
-                from obstore.store import HTTPStore, LocalStore, S3Store
-                from virtualizarr import open_virtual_mfdataset
-                from virtualizarr.parsers import HDFParser
-            except ImportError:
-                raise ImportError(
-                    "virtualizarr v2 requires 'virtualizarr', 'obstore', 'obspec_utils', 'ujson', and 'zarr'. "
-                    "Install with `pip install virtualizarr obstore obspec_utils ujson zarr`."
-                )
-
-            import os
-
-            refs = None
-            if virtualizarr_file is not None and os.path.exists(virtualizarr_file):
-                try:
-                    with open(virtualizarr_file) as f_ref:
-                        refs = ujson.load(f_ref)
-                except Exception as e:
-                    import warnings
-
-                    warnings.warn(f"Failed to load virtualizarr_file {virtualizarr_file}: {e}")
-                    refs = None
-
-            if refs is None:
-                registry = ObjectStoreRegistry()
-
-                if file_list[0].startswith("s3://"):
-                    remote_options = dict(xr_kwargs.get("storage_options", {}))
-                    bucket_name = file_list[0].replace("s3://", "").split("/")[0]
-                    s3_config = {}
-                    if remote_options.get("anon", True):
-                        s3_config["skip_signature"] = "true"
-                    if (
-                        "client_kwargs" in remote_options
-                        and "region_name" in remote_options["client_kwargs"]
-                    ):
-                        s3_config["region"] = remote_options["client_kwargs"]["region_name"]
-
-                    store = S3Store(bucket_name, config=s3_config)
-                    registry.register(f"s3://{bucket_name}", store)
-                elif file_list[0].startswith("http://") or file_list[0].startswith("https://"):
-                    store = HTTPStore()
-                    registry.register("http://", store)
-                    registry.register("https://", store)
-                else:
-                    store = LocalStore(prefix="/")
-                    registry.register("file:///", store)
-                    file_list = [
-                        f"file://{f}" if not f.startswith("file://") else f for f in file_list
-                    ]
-
-                concat_dim = xr_kwargs.get("concat_dim", "time")
-                try:
-                    vds = open_virtual_mfdataset(
-                        file_list,
-                        registry=registry,
-                        parser=HDFParser(),
-                        combine="nested",
-                        concat_dim=concat_dim,
-                    )
-                except ValueError:
-                    vds = open_virtual_mfdataset(
-                        file_list, registry=registry, parser=HDFParser(), combine="by_coords"
-                    )
-
-                refs = vds.vz.to_kerchunk()
-
-                if virtualizarr_file is not None:
-                    try:
-                        with open(virtualizarr_file, "w") as f_ref:
-                            ujson.dump(refs, f_ref)
-                    except Exception as e:
-                        import warnings
-
-                        warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
-
-            remote_protocol = "file"
-            remote_options = {}
-            if file_list[0].startswith("s3://"):
-                remote_protocol = "s3"
-                remote_options = dict(xr_kwargs.get("storage_options", {}))
-                if "anon" not in remote_options:
-                    remote_options["anon"] = True
-            elif file_list[0].startswith("http"):
-                remote_protocol = "http"
-                # file_list for fsspec mapper should not start with file:// if they are local
-            elif file_list[0].startswith("file://"):
-                pass
-
-            mapper = fsspec.get_mapper(
-                "reference://",
-                fo=refs,
-                remote_protocol=remote_protocol,
-                remote_options=remote_options,
-            )
-
-            # Clean up xr_kwargs for open_dataset
-            mfdataset_keys = [
-                "combine",
-                "concat_dim",
-                "parallel",
-                "compat",
-                "data_vars",
-                "coords",
-                "ids",
-                "infer_order",
-                "join",
-                "engine",
-                "storage_options",
-            ]
-            for k in mfdataset_keys:
-                xr_kwargs.pop(k, None)
-
-            ds = xr.open_dataset(
-                mapper,
-                engine="zarr",
-                backend_kwargs={"consolidated": False},
-                consolidated=False,
+        if use_virtualizarr or use_icechunk:
+            return self._open_virtual(
+                file_list,
+                use_virtualizarr=use_virtualizarr,
+                virtualizarr_file=virtualizarr_file,
+                use_icechunk=use_icechunk,
+                icechunk_url=icechunk_url,
+                preprocess=preprocess,
                 **xr_kwargs,
             )
-
-            if preprocess:
-                ds = preprocess(ds)
-
-            return ds
 
         try:
             # Case A: Single File (Optimized)
@@ -377,6 +264,188 @@ class XarrayDriver:
 
         except Exception as e:
             raise OSError(f"XarrayDriver failed to open files. Error: {e}")
+
+    def _open_virtual(
+        self,
+        file_list,
+        *,
+        use_virtualizarr=False,
+        virtualizarr_file=None,
+        use_icechunk=False,
+        icechunk_url=None,
+        preprocess=None,
+        **xr_kwargs,
+    ):
+        """Internal method to handle virtualization logic."""
+        try:
+            import os
+
+            import ujson  # noqa: F401
+            import zarr  # noqa: F401
+            from obspec_utils.registry import ObjectStoreRegistry
+            from obstore.store import HTTPStore, LocalStore, S3Store
+            from virtualizarr import open_virtual_mfdataset
+        except ImportError:
+            raise ImportError(
+                "Virtualization requires 'virtualizarr', 'obstore', 'obspec_utils', 'ujson', and 'zarr'. "
+                "Install with `pip install virtualizarr obstore obspec_utils ujson zarr`."
+            )
+
+        # Dynamic Parser Selection
+        engine = xr_kwargs.get("engine", "")
+        filename = file_list[0].lower()
+        if any(ext in filename for ext in [".grib", ".grib2", ".grb"]) or engine == "grib2io":
+            try:
+                from virtualizarr.parsers.kerchunk.translator import KerchunkTranslator
+
+                parser = KerchunkTranslator()
+            except ImportError:
+                from virtualizarr.parsers import HDFParser
+
+                parser = HDFParser()
+        else:
+            from virtualizarr.parsers import HDFParser
+
+            parser = HDFParser()
+
+        refs = None
+        # Try loading from Icechunk if requested
+        if use_icechunk and icechunk_url:
+            try:
+                import icechunk
+
+                repo = icechunk.Repository.open(icechunk_url)
+                session = repo.readonly_session()
+                ds = xr.open_dataset(session.store, engine="zarr", **xr_kwargs)
+                if preprocess:
+                    ds = preprocess(ds)
+                return ds
+            except Exception:
+                # If Icechunk fails or doesn't exist, proceed to creation
+                pass
+
+        if virtualizarr_file is not None and os.path.exists(virtualizarr_file):
+            try:
+                with open(virtualizarr_file) as f_ref:
+                    refs = ujson.load(f_ref)
+            except Exception as e:
+                import warnings
+
+                warnings.warn(f"Failed to load virtualizarr_file {virtualizarr_file}: {e}")
+                refs = None
+
+        if refs is None:
+            registry = ObjectStoreRegistry()
+
+            if file_list[0].startswith("s3://"):
+                remote_options = dict(xr_kwargs.get("storage_options", {}))
+                bucket_name = file_list[0].replace("s3://", "").split("/")[0]
+                s3_config = {}
+                if remote_options.get("anon", True):
+                    s3_config["skip_signature"] = "true"
+                if (
+                    "client_kwargs" in remote_options
+                    and "region_name" in remote_options["client_kwargs"]
+                ):
+                    s3_config["region"] = remote_options["client_kwargs"]["region_name"]
+
+                store = S3Store(bucket_name, config=s3_config)
+                registry.register(f"s3://{bucket_name}", store)
+            elif file_list[0].startswith("http://") or file_list[0].startswith("https://"):
+                store = HTTPStore()
+                registry.register("http://", store)
+                registry.register("https://", store)
+            else:
+                store = LocalStore(prefix="/")
+                registry.register("file:///", store)
+                file_list = [f"file://{f}" if not f.startswith("file://") else f for f in file_list]
+
+            concat_dim = xr_kwargs.get("concat_dim", "time")
+            try:
+                vds = open_virtual_mfdataset(
+                    file_list,
+                    registry=registry,
+                    parser=parser,
+                    combine="nested",
+                    concat_dim=concat_dim,
+                )
+            except ValueError:
+                vds = open_virtual_mfdataset(
+                    file_list, registry=registry, parser=parser, combine="by_coords"
+                )
+
+            if use_icechunk and icechunk_url:
+                try:
+                    import icechunk
+
+                    repo = icechunk.Repository.create(icechunk_url)
+                    session = repo.writable_session()
+                    vds.vz.to_icechunk(session.store)
+                    session.commit("Initial MONETIO virtualization")
+                except Exception as e:
+                    import warnings
+
+                    warnings.warn(f"Failed to export to Icechunk: {e}")
+
+            refs = vds.vz.to_kerchunk()
+
+            if virtualizarr_file is not None:
+                try:
+                    with open(virtualizarr_file, "w") as f_ref:
+                        ujson.dump(refs, f_ref)
+                except Exception as e:
+                    import warnings
+
+                    warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
+
+        remote_protocol = "file"
+        remote_options = {}
+        if file_list[0].startswith("s3://"):
+            remote_protocol = "s3"
+            remote_options = dict(xr_kwargs.get("storage_options", {}))
+            if "anon" not in remote_options:
+                remote_options["anon"] = True
+        elif file_list[0].startswith("http"):
+            remote_protocol = "http"
+        elif file_list[0].startswith("file://"):
+            pass
+
+        mapper = fsspec.get_mapper(
+            "reference://",
+            fo=refs,
+            remote_protocol=remote_protocol,
+            remote_options=remote_options,
+        )
+
+        # Clean up xr_kwargs for open_dataset
+        mfdataset_keys = [
+            "combine",
+            "concat_dim",
+            "parallel",
+            "compat",
+            "data_vars",
+            "coords",
+            "ids",
+            "infer_order",
+            "join",
+            "engine",
+            "storage_options",
+        ]
+        for k in mfdataset_keys:
+            xr_kwargs.pop(k, None)
+
+        ds = xr.open_dataset(
+            mapper,
+            engine="zarr",
+            backend_kwargs={"consolidated": False},
+            consolidated=False,
+            **xr_kwargs,
+        )
+
+        if preprocess:
+            ds = preprocess(ds)
+
+        return ds
 
 
 class PandasDriver:

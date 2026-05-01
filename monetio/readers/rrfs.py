@@ -76,16 +76,7 @@ class RRFSReader(NCEPPDSReader):
                 urls.append(url)
         return urls
 
-    def open_dataset(
-        self,
-        files: str | list[str] | None = None,
-        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
-        hour: int = 0,
-        lead_time: int | list[int] = 0,
-        product: str = "prslev.3km",
-        domain: str = "conus",
-        **kwargs: Any,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str] | None = None, dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None, hour: int = 0, lead_time: int | list[int] = 0, product: str = "prslev.3km", domain: str = "conus", use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads RRFS data.
 
@@ -130,7 +121,7 @@ class RRFSReader(NCEPPDSReader):
             kwargs["engine"] = "grib2io"
 
         # Use XarrayDriver (via GriddedReader/BaseReader)
-        ds = self.driver.open(files, **kwargs)
+        ds = self.driver.open(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # Apply RRFS-specific harmonization
         ds = self.harmonize(ds)

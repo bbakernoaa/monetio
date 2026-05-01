@@ -24,16 +24,7 @@ class PandoraReader(GEOMSReader):
     Pandora data follows the GEOMS (Generic Earth Observation Metadata Standard).
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str] | None = None,
-        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
-        siteid: str | None = None,
-        instrument: str | None = None,
-        product: str | None = "no2",
-        as_xarray: bool = True,
-        **kwargs: Any,
-    ) -> xr.Dataset | pd.DataFrame:
+    def open_dataset(self, files: str | list[str] | None = None, dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None, siteid: str | None = None, instrument: str | None = None, product: str | None = "no2", as_xarray: bool = True, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset | pd.DataFrame:
         """
         Retrieve and load Pandora data.
 
@@ -71,7 +62,7 @@ class PandoraReader(GEOMSReader):
                 return xr.Dataset()
             return pd.DataFrame()
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # Apply harmonization explicitly as GEOMSReader.open_dataset calls geoms_preprocess
         # but doesn't call a reader-specific harmonize method from the base class properly

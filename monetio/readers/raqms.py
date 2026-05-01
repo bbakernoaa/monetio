@@ -19,14 +19,7 @@ class RAQMSReader(GriddedReader):
     Reader for RAQMS (Real-time Air Quality Modeling System) model output files.
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str],
-        convert_to_ppb: bool = True,
-        var_list: list[str] | None = None,
-        surf_only: bool = False,
-        **kwargs: Any,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], convert_to_ppb: bool = True, var_list: list[str] | None = None, surf_only: bool = False, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads RAQMS netCDF files.
 
@@ -91,7 +84,7 @@ class RAQMSReader(GriddedReader):
 
         # 2. Open the dataset using standard xarray (via XarrayDriver)
         # Use fpaths instead of files to ensure consistent set of files
-        ds = self.driver.open(fpaths, **kwargs)
+        ds = self.driver.open(fpaths, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # Update history
         ds = update_history(ds, "Read RAQMS data.")

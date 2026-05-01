@@ -18,13 +18,7 @@ class GEOMSReader(GriddedReader):
     Reader for GEOMS format files (HDF4/HDF5).
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str],
-        rename_all: bool = True,
-        squeeze: bool = True,
-        **kwargs: Any,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], rename_all: bool = True, squeeze: bool = True, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads GEOMS format files.
 

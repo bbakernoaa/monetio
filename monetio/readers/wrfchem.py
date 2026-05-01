@@ -25,16 +25,7 @@ class WRFChemReader(GriddedReader):
     Reader for WRF-Chem and RAP-Chem model output files.
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str],
-        convert_to_ppb: bool = True,
-        mech: str = "racm_esrl_vcp",
-        var_list: list[str] | None = None,
-        surf_only: bool = False,
-        surf_only_nc: bool = False,
-        **kwargs: Any,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], convert_to_ppb: bool = True, mech: str = "racm_esrl_vcp", var_list: list[str] | None = None, surf_only: bool = False, surf_only_nc: bool = False, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads WRF-Chem netCDF files.
 
@@ -75,7 +66,7 @@ class WRFChemReader(GriddedReader):
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
 
-        ds = self.driver.open(files, **kwargs)
+        ds = self.driver.open(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         ds = self.harmonize(ds)
 

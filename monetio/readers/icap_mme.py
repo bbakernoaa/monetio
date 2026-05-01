@@ -28,15 +28,7 @@ class ICAPMMEReader(GriddedReader):
     Reader for ICAP-MME (International Cooperative for Aerosol Prediction - Multi Model Ensemble) data.
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str] | None = None,
-        dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
-        product: str = "MMC",
-        data_var: str = "dustaod550",
-        download: bool = False,
-        **kwargs: Any,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str] | None = None, dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None, product: str = "MMC", data_var: str = "dustaod550", download: bool = False, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Retrieve and load ICAP-MME data.
 
@@ -84,7 +76,7 @@ class ICAPMMEReader(GriddedReader):
             kwargs["combine"] = "nested"
 
         # Use XarrayDriver to open (Lazy by default)
-        ds = self.driver.open(files, **kwargs)
+        ds = self.driver.open(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         ds = self.harmonize(ds)
 

@@ -223,21 +223,67 @@ def openaq(dates, output, n_procs, lazy, as_pandas, wide_fmt):
     handle_save(obj, output, as_pandas)
 
 
-@cli.command(name="virtualizarr")
+@cli.command(name="virtualize")
 @click.argument("files", nargs=-1)
+@click.option("--output", "-o", required=True, help="Output file path (JSON or Icechunk URL).")
 @click.option(
-    "--output", "-o", required=True, help="Output JSON file path for the VirtualiZarr reference."
+    "--backend",
+    default="kerchunk",
+    type=click.Choice(["kerchunk", "icechunk"]),
+    help="Virtualization backend (default 'kerchunk').",
 )
+@click.option("--source", "-s", help="MONETIO source name (e.g., 'merra2', 'gfs').")
 @click.option(
     "--concat-dim", default="time", help="Dimension to concatenate along (default 'time')."
 )
-def virtualizarr(files, output, concat_dim):
+@click.option(
+    "--kwargs",
+    "-k",
+    multiple=True,
+    help="Additional keyword arguments for source URL building.",
+)
+def virtualize(files, output, backend, source, concat_dim, kwargs):
     """
-    Pre-process files into a single VirtualiZarr reference JSON map.
+    Create a virtual dataset (Kerchunk JSON or Icechunk store).
     Especially useful for large geospatial datasets (MERRA2, GFS, etc.).
     """
+    # Parse additional kwargs
+    extra_kwargs = {"concat_dim": concat_dim}
+    for kw in kwargs:
+        if "=" in kw:
+            key, val = kw.split("=", 1)
+            # Try to convert to bool or int if possible
+            if val.lower() == "true":
+                val = True
+            elif val.lower() == "false":
+                val = False
+            else:
+                try:
+                    val = int(val)
+                except ValueError:
+                    try:
+                        val = float(val)
+                    except ValueError:
+                        pass
+            extra_kwargs[key] = val
+
+    if source:
+        click.echo(f"Virtualizing {source} data using {backend} backend...")
+        try:
+            monetio.virtualize(
+                source,
+                files=list(files) if files else None,
+                output=output,
+                backend=backend,
+                **extra_kwargs,
+            )
+            click.echo(f"Successfully generated virtual dataset at {output}")
+        except Exception as e:
+            click.echo(f"Error: {e}")
+        return
+
     if not files:
-        click.echo("Error: No files provided.")
+        click.echo("Error: No files or source provided.")
         return
 
     # Expand any glob strings (e.g. s3://bucket/*.nc)
@@ -256,17 +302,34 @@ def virtualizarr(files, output, concat_dim):
 
     files = expanded_files
 
-    click.echo(f"Virtualizing {len(files)} file(s) into {output}...")
+    click.echo(f"Virtualizing {len(files)} file(s) into {output} using {backend}...")
     from monetio.readers.drivers import XarrayDriver
 
-    # We use XarrayDriver.open to handle the parsing natively and drop the dataset payload.
-    # It automatically saves the references to `virtualizarr_file`.
     xd = XarrayDriver()
     try:
-        xd.open(list(files), use_virtualizarr=True, virtualizarr_file=output, concat_dim=concat_dim)
+        use_virtualizarr = backend == "kerchunk"
+        use_icechunk = backend == "icechunk"
+        xd.open(
+            list(files),
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=output if use_virtualizarr else None,
+            use_icechunk=use_icechunk,
+            icechunk_url=output if use_icechunk else None,
+            **extra_kwargs,
+        )
         click.echo(f"Successfully generated {output}")
     except Exception as e:
-        click.echo(f"Error generating VirtualiZarr reference: {e}")
+        click.echo(f"Error generating virtual dataset: {e}")
+
+
+@cli.command(name="virtualizarr", hidden=True)
+@click.argument("files", nargs=-1)
+@click.option("--output", "-o", required=True)
+@click.option("--concat-dim", default="time")
+@click.pass_context
+def virtualizarr_legacy(ctx, files, output, concat_dim):
+    """Legacy alias for 'virtualize'."""
+    ctx.invoke(virtualize, files=files, output=output, concat_dim=concat_dim, backend="kerchunk")
 
 
 if __name__ == "__main__":
