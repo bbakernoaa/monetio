@@ -28,5 +28,9 @@ def open_dataset(fname, drange=None, century=2000, verbose=False):
     pandas.DataFrame
     """
     return PardumpReader().open_dataset(
-        files=fname, drange=drange, century=century, verbose=verbose, as_xarray=False,
+        files=fname,
+        drange=drange,
+        century=century,
+        verbose=verbose,
+        as_xarray=False,
     )

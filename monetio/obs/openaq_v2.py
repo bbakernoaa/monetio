@@ -84,7 +84,7 @@ def add_data(
 
 @deprecated_wrapper(
     "monetio.obs.openaq_v2.get_locations",
-    'from monetio.readers.openaq_v2 import get_locations',
+    "from monetio.readers.openaq_v2 import get_locations",
 )
 def get_locations(**kwargs):
     """Get available site info (including site IDs) from OpenAQ v2 API.
@@ -98,7 +98,7 @@ def get_locations(**kwargs):
 
 @deprecated_wrapper(
     "monetio.obs.openaq_v2.get_parameters",
-    'from monetio.readers.openaq_v2 import get_parameters',
+    "from monetio.readers.openaq_v2 import get_parameters",
 )
 def get_parameters(**kwargs):
     """Get supported parameter info from OpenAQ v2 API.
@@ -110,7 +110,7 @@ def get_parameters(**kwargs):
 
 @deprecated_wrapper(
     "monetio.obs.openaq_v2.get_latlonbox_sites",
-    'from monetio.readers.openaq_v2 import get_locations',
+    "from monetio.readers.openaq_v2 import get_locations",
 )
 def get_latlonbox_sites(latlonbox, **kwargs):
     """From all available sites, return those within a lat/lon box.

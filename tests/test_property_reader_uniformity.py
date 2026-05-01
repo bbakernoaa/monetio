@@ -100,9 +100,7 @@ class TestReaderStructureUniformity:
         mod = _import_reader_module(module_name)
         registered = _get_registered_classes(mod, module_name)
 
-        assert len(registered) >= 1, (
-            f"Module {module_name} has no @register_reader decorated class"
-        )
+        assert len(registered) >= 1, f"Module {module_name} has no @register_reader decorated class"
 
         if module_name not in MULTI_CLASS_MODULES:
             assert len(registered) == 1, (
@@ -116,7 +114,7 @@ class TestReaderStructureUniformity:
         registered = _get_registered_classes(mod, module_name)
 
         for cls in registered:
-            assert issubclass(cls, (GriddedReader, PointReader)), (
+            assert issubclass(cls, GriddedReader | PointReader), (
                 f"Class {cls.__name__} in {module_name} does not inherit from "
                 f"GriddedReader or PointReader. MRO: {[c.__name__ for c in cls.__mro__]}"
             )

@@ -35,7 +35,10 @@ def open_dataset(
     xarray.Dataset
     """
     return ICAPMMEReader().open_dataset(
-        dates=date, product=product, data_var=data_var, download=download,
+        dates=date,
+        product=product,
+        data_var=data_var,
+        download=download,
     )
 
 
@@ -70,7 +73,10 @@ def open_mfdataset(
     xarray.Dataset
     """
     return ICAPMMEReader().open_dataset(
-        dates=dates, product=product, data_var=data_var, download=download,
+        dates=dates,
+        product=product,
+        data_var=data_var,
+        download=download,
     )
 
 

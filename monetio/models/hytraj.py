@@ -27,7 +27,10 @@ def combine_dataset(flist, taglist=None, renumber=False, verbose=False):
     pandas.DataFrame
     """
     return HYTRAJReader().open_dataset(
-        files=flist, taglist=taglist, renumber=renumber, as_xarray=False,
+        files=flist,
+        taglist=taglist,
+        renumber=renumber,
+        as_xarray=False,
     )
 
 

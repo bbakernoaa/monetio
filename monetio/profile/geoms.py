@@ -26,6 +26,4 @@ def open_dataset(fp, *, rename_all=True, squeeze=True, **kwargs):
     -------
     xarray.Dataset
     """
-    return GEOMSReader().open_dataset(
-        files=fp, rename_all=rename_all, squeeze=squeeze, **kwargs
-    )
+    return GEOMSReader().open_dataset(files=fp, rename_all=rename_all, squeeze=squeeze, **kwargs)

@@ -24,6 +24,4 @@ def open_dataset(files, varnames, **kwargs):
     -------
     xarray.Dataset
     """
-    return MOPITTReader().open_dataset(
-        files=files, varnames=varnames, **kwargs
-    )
+    return MOPITTReader().open_dataset(files=files, varnames=varnames, **kwargs)

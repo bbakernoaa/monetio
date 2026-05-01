@@ -16,10 +16,7 @@ def _build_s3_config(storage_options: dict) -> dict:
     s3_config = {}
     if storage_options.get("anon", True):
         s3_config["skip_signature"] = "true"
-    if (
-        "client_kwargs" in storage_options
-        and "region_name" in storage_options["client_kwargs"]
-    ):
+    if "client_kwargs" in storage_options and "region_name" in storage_options["client_kwargs"]:
         s3_config["region"] = storage_options["client_kwargs"]["region_name"]
     return s3_config
 
@@ -82,8 +79,7 @@ def _open_via_icechunk(vds, icechunk_repo: str, virtualizarr_file: str | None) -
         import icechunk
     except ImportError:
         raise ImportError(
-            "Icechunk backend requires 'icechunk'. "
-            "Install with: pip install monetio[icechunk]"
+            "Icechunk backend requires 'icechunk'. Install with: pip install monetio[icechunk]"
         )
 
     repo = icechunk.Repository.open_or_create(icechunk_repo)
@@ -255,8 +251,8 @@ class XarrayDriver:
                 from virtualizarr.parsers import HDFParser
             except ImportError:
                 raise ImportError(
-                    "virtualizarr v2 requires 'virtualizarr', 'obstore', 'obspec_utils', 'ujson', and 'zarr'. "
-                    "Install with `pip install virtualizarr obstore obspec_utils ujson zarr`."
+                    "VirtualiZarr support requires additional packages. "
+                    "Install with: pip install monetio[virtualizarr]"
                 )
 
             import os

@@ -12,7 +12,6 @@ from monetio.readers.drivers import (
     _select_store,
 )
 
-
 # ---------------------------------------------------------------------------
 # Task 2.1: virtualizarr_backend / icechunk_repo parameters & validation
 # ---------------------------------------------------------------------------
@@ -83,12 +82,15 @@ class TestSelectStore:
         mock_obspec_registry = mock.MagicMock()
         mock_obspec_registry.ObjectStoreRegistry = self.MockRegistry
 
-        with mock.patch.dict("sys.modules", {
-            "obstore": mock_obstore,
-            "obstore.store": mock_obstore_store,
-            "obspec_utils": mock_obspec,
-            "obspec_utils.registry": mock_obspec_registry,
-        }):
+        with mock.patch.dict(
+            "sys.modules",
+            {
+                "obstore": mock_obstore,
+                "obstore.store": mock_obstore_store,
+                "obspec_utils": mock_obspec,
+                "obspec_utils.registry": mock_obspec_registry,
+            },
+        ):
             yield
 
     def test_s3_store_selected_for_s3_paths(self):
@@ -143,9 +145,7 @@ class TestBuildS3Config:
         assert "skip_signature" not in config
 
     def test_region_extracted_from_client_kwargs(self):
-        config = _build_s3_config(
-            {"anon": False, "client_kwargs": {"region_name": "us-west-2"}}
-        )
+        config = _build_s3_config({"anon": False, "client_kwargs": {"region_name": "us-west-2"}})
         assert config["region"] == "us-west-2"
 
     def test_empty_options_defaults_to_skip_signature(self):
@@ -178,8 +178,10 @@ class TestOpenViaIcechunk:
 
         expected_ds = xr.Dataset({"temp": [1, 2, 3]})
 
-        with mock.patch.dict("sys.modules", {"icechunk": mock_icechunk}), \
-             mock.patch("xarray.open_zarr", return_value=expected_ds) as mock_open_zarr:
+        with (
+            mock.patch.dict("sys.modules", {"icechunk": mock_icechunk}),
+            mock.patch("xarray.open_zarr", return_value=expected_ds) as mock_open_zarr,
+        ):
             result = _open_via_icechunk(vds, "/tmp/repo", None)
 
         # Verify workflow
@@ -188,9 +190,7 @@ class TestOpenViaIcechunk:
         vds.virtualize.to_icechunk.assert_called_once_with(mock_store)
         mock_session.commit.assert_called_once_with("VirtualiZarr references")
         mock_repo.readonly_session.assert_called_once()
-        mock_open_zarr.assert_called_once_with(
-            mock_readonly_session.store, consolidated=False
-        )
+        mock_open_zarr.assert_called_once_with(mock_readonly_session.store, consolidated=False)
         assert result is expected_ds
 
 
@@ -214,14 +214,21 @@ class TestIcechunkWiring:
         mock_virtualizarr.open_virtual_mfdataset.return_value = mock_vds
         mock_parsers = mock.MagicMock()
 
-        with mock.patch.dict("sys.modules", {
-                 "ujson": mock.MagicMock(),
-                 "zarr": mock.MagicMock(),
-                 "virtualizarr": mock_virtualizarr,
-                 "virtualizarr.parsers": mock_parsers,
-             }), \
-             mock.patch("monetio.readers.drivers._select_store") as mock_select, \
-             mock.patch("monetio.readers.drivers._open_via_icechunk", return_value=expected_ds) as mock_ice:
+        with (
+            mock.patch.dict(
+                "sys.modules",
+                {
+                    "ujson": mock.MagicMock(),
+                    "zarr": mock.MagicMock(),
+                    "virtualizarr": mock_virtualizarr,
+                    "virtualizarr.parsers": mock_parsers,
+                },
+            ),
+            mock.patch("monetio.readers.drivers._select_store") as mock_select,
+            mock.patch(
+                "monetio.readers.drivers._open_via_icechunk", return_value=expected_ds
+            ) as mock_ice,
+        ):
             mock_select.return_value = (mock.MagicMock(), [str(f)])
 
             result = driver.open(
@@ -247,16 +254,21 @@ class TestIcechunkWiring:
         mock_virtualizarr.open_virtual_mfdataset.return_value = mock_vds
         mock_parsers = mock.MagicMock()
 
-        with mock.patch.dict("sys.modules", {
-                 "ujson": mock.MagicMock(),
-                 "zarr": mock.MagicMock(),
-                 "virtualizarr": mock_virtualizarr,
-                 "virtualizarr.parsers": mock_parsers,
-             }), \
-             mock.patch("monetio.readers.drivers._select_store") as mock_select, \
-             mock.patch("monetio.readers.drivers._open_via_icechunk") as mock_ice, \
-             mock.patch("fsspec.get_mapper") as mock_mapper, \
-             mock.patch("xarray.open_dataset") as mock_open_ds:
+        with (
+            mock.patch.dict(
+                "sys.modules",
+                {
+                    "ujson": mock.MagicMock(),
+                    "zarr": mock.MagicMock(),
+                    "virtualizarr": mock_virtualizarr,
+                    "virtualizarr.parsers": mock_parsers,
+                },
+            ),
+            mock.patch("monetio.readers.drivers._select_store") as mock_select,
+            mock.patch("monetio.readers.drivers._open_via_icechunk") as mock_ice,
+            mock.patch("fsspec.get_mapper"),
+            mock.patch("xarray.open_dataset") as mock_open_ds,
+        ):
             mock_select.return_value = (mock.MagicMock(), [str(f)])
             mock_open_ds.return_value = xr.Dataset({"x": [1, 2, 3]})
 

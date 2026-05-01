@@ -58,13 +58,12 @@ def convert_ppmv_to_ppbv(ds: xr.Dataset, variables: list[str] | None = None) -> 
         Dataset with converted units.
     """
     if variables is None:
-        variables = [v for v in ds.data_vars
-                     if 'ppm' in ds[v].attrs.get('units', '').lower()]
+        variables = [v for v in ds.data_vars if "ppm" in ds[v].attrs.get("units", "").lower()]
     for var in variables:
         if var in ds.data_vars:
             ds[var] = ds[var] * 1000.0
-            if 'units' in ds[var].attrs:
-                ds[var].attrs['units'] = ds[var].attrs['units'].replace('ppm', 'ppb')
+            if "units" in ds[var].attrs:
+                ds[var].attrs["units"] = ds[var].attrs["units"].replace("ppm", "ppb")
     return ds
 
 

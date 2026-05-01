@@ -14,10 +14,8 @@ import tempfile
 import unittest.mock as mock
 
 import numpy as np
-import pytest
 import xarray as xr
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
 from monetio.readers.drivers import XarrayDriver
 
@@ -51,9 +49,7 @@ def _netcdf_file_set(draw):
 
     # Generate 1-3 variable names
     n_vars = draw(st.integers(min_value=1, max_value=3))
-    var_names = draw(
-        st.lists(_var_name, min_size=n_vars, max_size=n_vars, unique=True)
-    )
+    var_names = draw(st.lists(_var_name, min_size=n_vars, max_size=n_vars, unique=True))
 
     tmpdir = tempfile.mkdtemp()
     file_paths = []

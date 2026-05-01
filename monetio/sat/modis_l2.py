@@ -24,9 +24,7 @@ def read_dataset(fname, variable_dict, **kwargs):
     -------
     xarray.Dataset
     """
-    return MODISL2Reader().open_dataset(
-        files=fname, variable_dict=variable_dict, **kwargs
-    )
+    return MODISL2Reader().open_dataset(files=fname, variable_dict=variable_dict, **kwargs)
 
 
 @deprecated_wrapper(

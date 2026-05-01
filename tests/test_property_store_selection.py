@@ -10,8 +10,7 @@ files, prefix them with file://.
 
 import unittest.mock as mock
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
 from monetio.readers.drivers import _select_store
 
@@ -88,12 +87,15 @@ def _mock_obstore_context():
     mock_obspec_registry = mock.MagicMock()
     mock_obspec_registry.ObjectStoreRegistry = MockRegistry
 
-    ctx = mock.patch.dict("sys.modules", {
-        "obstore": mock.MagicMock(),
-        "obstore.store": mock_obstore_store,
-        "obspec_utils": mock.MagicMock(),
-        "obspec_utils.registry": mock_obspec_registry,
-    })
+    ctx = mock.patch.dict(
+        "sys.modules",
+        {
+            "obstore": mock.MagicMock(),
+            "obstore.store": mock_obstore_store,
+            "obspec_utils": mock.MagicMock(),
+            "obspec_utils.registry": mock_obspec_registry,
+        },
+    )
 
     return ctx, MockS3Store, MockHTTPStore, MockLocalStore, MockRegistry
 

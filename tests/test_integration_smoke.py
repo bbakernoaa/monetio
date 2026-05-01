@@ -140,15 +140,9 @@ def test_cdump2netcdf_has_no_deprecation():
     mod = importlib.import_module("monetio.models.cdump2netcdf")
     source = inspect.getsource(mod)
 
-    assert "deprecated_wrapper" not in source, (
-        "cdump2netcdf.py should not use deprecated_wrapper"
-    )
-    assert "_deprecation" not in source, (
-        "cdump2netcdf.py should not import from _deprecation"
-    )
-    assert "DeprecationWarning" not in source, (
-        "cdump2netcdf.py should not emit DeprecationWarning"
-    )
+    assert "deprecated_wrapper" not in source, "cdump2netcdf.py should not use deprecated_wrapper"
+    assert "_deprecation" not in source, "cdump2netcdf.py should not import from _deprecation"
+    assert "DeprecationWarning" not in source, "cdump2netcdf.py should not emit DeprecationWarning"
 
 
 # ---------------------------------------------------------------------------
@@ -161,15 +155,9 @@ def test_epa_util_has_no_deprecation():
     mod = importlib.import_module("monetio.obs.epa_util")
     source = inspect.getsource(mod)
 
-    assert "deprecated_wrapper" not in source, (
-        "epa_util.py should not use deprecated_wrapper"
-    )
-    assert "_deprecation" not in source, (
-        "epa_util.py should not import from _deprecation"
-    )
-    assert "DeprecationWarning" not in source, (
-        "epa_util.py should not emit DeprecationWarning"
-    )
+    assert "deprecated_wrapper" not in source, "epa_util.py should not use deprecated_wrapper"
+    assert "_deprecation" not in source, "epa_util.py should not import from _deprecation"
+    assert "DeprecationWarning" not in source, "epa_util.py should not emit DeprecationWarning"
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +175,4 @@ def test_reader_registry_has_all_sources():
             importlib.import_module(module_path, package="monetio")
 
     missing = set(monetio._READER_MODULES.keys()) - set(READER_REGISTRY.keys())
-    assert not missing, (
-        f"READER_REGISTRY is missing sources: {missing}"
-    )
+    assert not missing, f"READER_REGISTRY is missing sources: {missing}"

@@ -27,110 +27,155 @@ import pytest
 _DEPRECATED_FUNCTIONS = [
     # --- Models ---
     pytest.param(
-        "monetio.models.cmaq", "open_dataset",
-        "monetio.readers.cmaq", "CMAQReader",
-        "monetio.models.cmaq.open_dataset", 'monetio.load("cmaq"',
+        "monetio.models.cmaq",
+        "open_dataset",
+        "monetio.readers.cmaq",
+        "CMAQReader",
+        "monetio.models.cmaq.open_dataset",
+        'monetio.load("cmaq"',
         {"fname": "/tmp/dummy.nc"},
         id="models-cmaq-open_dataset",
     ),
     pytest.param(
-        "monetio.models.cmaq", "open_mfdataset",
-        "monetio.readers.cmaq", "CMAQReader",
-        "monetio.models.cmaq.open_mfdataset", 'monetio.load("cmaq"',
+        "monetio.models.cmaq",
+        "open_mfdataset",
+        "monetio.readers.cmaq",
+        "CMAQReader",
+        "monetio.models.cmaq.open_mfdataset",
+        'monetio.load("cmaq"',
         {"fname": "/tmp/dummy.nc"},
         id="models-cmaq-open_mfdataset",
     ),
     pytest.param(
-        "monetio.models.raqms", "open_dataset",
-        "monetio.readers.raqms", "RAQMSReader",
-        "monetio.models.raqms.open_dataset", 'monetio.load("raqms"',
+        "monetio.models.raqms",
+        "open_dataset",
+        "monetio.readers.raqms",
+        "RAQMSReader",
+        "monetio.models.raqms.open_dataset",
+        'monetio.load("raqms"',
         {"fname": "/tmp/dummy.nc"},
         id="models-raqms-open_dataset",
     ),
     pytest.param(
-        "monetio.models.chimere", "open_mfdataset",
-        "monetio.readers.chimere", "ChimereReader",
-        "monetio.models.chimere.open_mfdataset", 'monetio.load("chimere"',
+        "monetio.models.chimere",
+        "open_mfdataset",
+        "monetio.readers.chimere",
+        "ChimereReader",
+        "monetio.models.chimere.open_mfdataset",
+        'monetio.load("chimere"',
         {"files": ["/tmp/dummy.nc"]},
         id="models-chimere-open_mfdataset",
     ),
     pytest.param(
-        "monetio.models.hysplit", "open_dataset",
-        "monetio.readers.hysplit", "HYSPLITReader",
-        "monetio.models.hysplit.open_dataset", 'monetio.load("hysplit"',
+        "monetio.models.hysplit",
+        "open_dataset",
+        "monetio.readers.hysplit",
+        "HYSPLITReader",
+        "monetio.models.hysplit.open_dataset",
+        'monetio.load("hysplit"',
         {"fname": "/tmp/dummy.nc"},
         id="models-hysplit-open_dataset",
     ),
     pytest.param(
-        "monetio.models.pardump", "open_dataset",
-        "monetio.readers.pardump", "PardumpReader",
-        "monetio.models.pardump.open_dataset", 'monetio.load("pardump"',
+        "monetio.models.pardump",
+        "open_dataset",
+        "monetio.readers.pardump",
+        "PardumpReader",
+        "monetio.models.pardump.open_dataset",
+        'monetio.load("pardump"',
         {"fname": "/tmp/dummy.txt"},
         id="models-pardump-open_dataset",
     ),
     pytest.param(
-        "monetio.models.camx", "open_dataset",
-        "monetio.readers.camx", "CAMxReader",
-        "monetio.models.camx.open_dataset", 'monetio.load("camx"',
+        "monetio.models.camx",
+        "open_dataset",
+        "monetio.readers.camx",
+        "CAMxReader",
+        "monetio.models.camx.open_dataset",
+        'monetio.load("camx"',
         {"fname": "/tmp/dummy.nc"},
         id="models-camx-open_dataset",
     ),
     # --- Obs ---
     pytest.param(
-        "monetio.obs.airnow", "add_data",
-        "monetio.readers.airnow", "AirNowReader",
-        "monetio.obs.airnow.add_data", 'monetio.load("airnow"',
+        "monetio.obs.airnow",
+        "add_data",
+        "monetio.readers.airnow",
+        "AirNowReader",
+        "monetio.obs.airnow.add_data",
+        'monetio.load("airnow"',
         {"dates": ["2023-01-01"]},
         id="obs-airnow-add_data",
     ),
     pytest.param(
-        "monetio.obs.aqs", "add_data",
-        "monetio.readers.aqs", "AQSReader",
-        "monetio.obs.aqs.add_data", 'monetio.load("aqs"',
+        "monetio.obs.aqs",
+        "add_data",
+        "monetio.readers.aqs",
+        "AQSReader",
+        "monetio.obs.aqs.add_data",
+        'monetio.load("aqs"',
         {"dates": ["2023-01-01"]},
         id="obs-aqs-add_data",
     ),
     pytest.param(
-        "monetio.obs.cems", "add_data",
-        "monetio.readers.cems", "CEMSReader",
-        "monetio.obs.cems.add_data", 'monetio.load("cems"',
+        "monetio.obs.cems",
+        "add_data",
+        "monetio.readers.cems",
+        "CEMSReader",
+        "monetio.obs.cems.add_data",
+        'monetio.load("cems"',
         {},
         id="obs-cems-add_data",
     ),
     # --- Profile ---
     pytest.param(
-        "monetio.profile.tolnet", "open_dataset",
-        "monetio.readers.tolnet", "TOLNetReader",
-        "monetio.profile.tolnet.open_dataset", 'monetio.load("tolnet"',
+        "monetio.profile.tolnet",
+        "open_dataset",
+        "monetio.readers.tolnet",
+        "TOLNetReader",
+        "monetio.profile.tolnet.open_dataset",
+        'monetio.load("tolnet"',
         {"fname": "/tmp/dummy.h5"},
         id="profile-tolnet-open_dataset",
     ),
     pytest.param(
-        "monetio.profile.geoms", "open_dataset",
-        "monetio.readers.geoms", "GEOMSReader",
-        "monetio.profile.geoms.open_dataset", 'monetio.load("geoms"',
+        "monetio.profile.geoms",
+        "open_dataset",
+        "monetio.readers.geoms",
+        "GEOMSReader",
+        "monetio.profile.geoms.open_dataset",
+        'monetio.load("geoms"',
         {"fp": "/tmp/dummy.hdf"},
         id="profile-geoms-open_dataset",
     ),
     # --- Sat ---
     pytest.param(
-        "monetio.sat.goes", "open_dataset",
-        "monetio.readers.goes", "GOESReader",
-        "monetio.sat.goes.open_dataset", 'monetio.load("goes"',
+        "monetio.sat.goes",
+        "open_dataset",
+        "monetio.readers.goes",
+        "GOESReader",
+        "monetio.sat.goes.open_dataset",
+        'monetio.load("goes"',
         {"filename": "/tmp/dummy.nc"},
         id="sat-goes-open_dataset",
     ),
     pytest.param(
-        "monetio.sat.modis_l2", "read_dataset",
-        "monetio.readers.modis_l2", "MODISL2Reader",
-        "monetio.sat.modis_l2.read_dataset", 'monetio.load("modis_l2"',
+        "monetio.sat.modis_l2",
+        "read_dataset",
+        "monetio.readers.modis_l2",
+        "MODISL2Reader",
+        "monetio.sat.modis_l2.read_dataset",
+        'monetio.load("modis_l2"',
         {"fname": "/tmp/dummy.hdf", "variable_dict": {}},
         id="sat-modis_l2-read_dataset",
     ),
     pytest.param(
-        "monetio.sat.nesdis_edr_viirs", "open_dataset",
-        "monetio.readers.nesdis_edr_viirs", "NESDISEDRVIIRSReader",
-        "monetio.sat.nesdis_edr_viirs.open_dataset", 'monetio.load("nesdis_edr_viirs"',
+        "monetio.sat.nesdis_edr_viirs",
+        "open_dataset",
+        "monetio.readers.nesdis_edr_viirs",
+        "NESDISEDRVIIRSReader",
+        "monetio.sat.nesdis_edr_viirs.open_dataset",
+        'monetio.load("nesdis_edr_viirs"',
         {"date": "2023-01-01"},
         id="sat-nesdis_edr_viirs-open_dataset",
     ),
@@ -168,9 +213,7 @@ def test_deprecation_warning_content(
         warnings.simplefilter("always")
 
         # Mock the reader's open_dataset to prevent real I/O
-        with mock.patch.object(
-            reader_cls, "open_dataset", return_value=mock.MagicMock()
-        ):
+        with mock.patch.object(reader_cls, "open_dataset", return_value=mock.MagicMock()):
             try:
                 wrapper_fn(**call_kwargs)
             except Exception:
@@ -181,8 +224,7 @@ def test_deprecation_warning_content(
     dep_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
 
     assert len(dep_warnings) >= 1, (
-        f"Expected DeprecationWarning from {wrapper_module}.{func_name}, "
-        f"got {len(dep_warnings)}"
+        f"Expected DeprecationWarning from {wrapper_module}.{func_name}, got {len(dep_warnings)}"
     )
 
     msg = str(dep_warnings[0].message)
@@ -198,9 +240,7 @@ def test_deprecation_warning_content(
     )
 
     # Requirement 9.1: Contains removal version
-    assert "0.4.0" in msg, (
-        f"Warning should contain removal version '0.4.0', got: {msg}"
-    )
+    assert "0.4.0" in msg, f"Warning should contain removal version '0.4.0', got: {msg}"
 
     # Requirement 9.3: Uses DeprecationWarning category
     assert dep_warnings[0].category is DeprecationWarning

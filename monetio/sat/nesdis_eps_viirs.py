@@ -24,9 +24,7 @@ def open_dataset(date, datapath=".", **kwargs):
     -------
     xarray.DataArray
     """
-    return NESDISEPSVIIRSReader().open_dataset(
-        dates=date, datapath=datapath, **kwargs
-    )
+    return NESDISEPSVIIRSReader().open_dataset(dates=date, datapath=datapath, **kwargs)
 
 
 @deprecated_wrapper(
@@ -49,6 +47,4 @@ def open_mfdataset(dates, datapath=".", **kwargs):
     -------
     xarray.Dataset
     """
-    return NESDISEPSVIIRSReader().open_dataset(
-        dates=dates, datapath=datapath, **kwargs
-    )
+    return NESDISEPSVIIRSReader().open_dataset(dates=dates, datapath=datapath, **kwargs)

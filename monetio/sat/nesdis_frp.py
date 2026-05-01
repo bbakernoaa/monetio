@@ -20,6 +20,4 @@ def download_data(date, ftype="meanFRP", **kwargs):
     **kwargs : dict
         Additional arguments forwarded to ``NESDISFRPReader.open_dataset``.
     """
-    return NESDISFRPReader().open_dataset(
-        dates=date, ftype=ftype, **kwargs
-    )
+    return NESDISFRPReader().open_dataset(dates=date, ftype=ftype, **kwargs)
