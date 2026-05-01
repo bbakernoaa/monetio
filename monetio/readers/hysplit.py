@@ -1,7 +1,6 @@
 """HYSPLIT Reader"""
 
 import datetime
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -13,7 +12,21 @@ from .drivers import FileUtility
 
 @register_reader("hysplit")
 class HYSPLITReader(GriddedReader):
-    def open_dataset(self, files: str | list[str], drange: list[datetime.datetime] | None = None, century: int | None = None, verbose: bool = False, sample_time_stamp: str = "start", check_grid: bool = True, lazy: bool = False, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        drange: list[datetime.datetime] | None = None,
+        century: int | None = None,
+        verbose: bool = False,
+        sample_time_stamp: str = "start",
+        check_grid: bool = True,
+        lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads HYSPLIT binary concentration (cdump) files.
 
@@ -56,8 +69,18 @@ class HYSPLITReader(GriddedReader):
 
         # We override the driver.open call to support our specific multi-file logic
         # while still benefiting from FileUtility and potential future driver features.
-        ds = self.driver.open(files, read_method=open_dataset_hysplit, lazy=lazy, preprocess=None, # HYSPLIT handles its own preprocessing
-            **read_kwargs, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = self.driver.open(
+            files,
+            read_method=open_dataset_hysplit,
+            lazy=lazy,
+            preprocess=None,  # HYSPLIT handles its own preprocessing
+            **read_kwargs,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         ds = update_history(ds, "Read HYSPLIT data.")
         return ds

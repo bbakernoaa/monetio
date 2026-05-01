@@ -25,7 +25,23 @@ class MODISORNLReader(GriddedReader):
     Reader for MODIS data from ORNL web service.
     """
 
-    def open_dataset(self, date: pd.Timestamp | str = None, product: str = "MOD12A2H", band: str = "Lai_500m", quality_control: Any | None = None, latitude: float = 0, longitude: float = 0, kmAboveBelow: int = 100, kmLeftRight: int = 100, files: str | list[str] = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        date: pd.Timestamp | str = None,
+        product: str = "MOD12A2H",
+        band: str = "Lai_500m",
+        quality_control: Any | None = None,
+        latitude: float = 0,
+        longitude: float = 0,
+        kmAboveBelow: int = 100,
+        kmLeftRight: int = 100,
+        files: str | list[str] = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads MODIS data from ORNL.
 

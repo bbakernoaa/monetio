@@ -14,7 +14,16 @@ class OMPSReader(GriddedReader):
     Supports Level 2 (Nadir Mapper) and Level 3 daily products.
     """
 
-    def open_dataset(self, files: str | list[str], product: str = "nmto3_l2", use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        product: str = "nmto3_l2",
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads OMPS data.
 
@@ -42,7 +51,14 @@ class OMPSReader(GriddedReader):
 
         # L2 data often has different cross-track dimensions if not carefully selected,
         # but standard products should be consistent.
-        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         # Update history
         ds = update_history(ds, f"Read OMPS {product} data.")

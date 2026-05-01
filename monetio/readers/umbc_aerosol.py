@@ -16,7 +16,15 @@ class UMBCAerosolReader(GriddedReader):
     Reader for UMBC Aerosol (CL51 Ceilometer) data.
     """
 
-    def open_dataset(self, files: str | list[str], use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads UMBC Aerosol HDF5 files.
 
@@ -52,7 +60,14 @@ class UMBCAerosolReader(GriddedReader):
             g_kwargs["group"] = g
             try:
                 # We open without the UMBC preprocess at this stage
-                ds_g = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **g_kwargs)
+                ds_g = super().open_dataset(
+                    files,
+                    use_virtualizarr=use_virtualizarr,
+                    virtualizarr_file=virtualizarr_file,
+                    use_icechunk=use_icechunk,
+                    icechunk_url=icechunk_url,
+                    **g_kwargs,
+                )
                 dsets.append(ds_g)
                 # Manually collect attributes from groups
                 all_attrs.update(ds_g.attrs)

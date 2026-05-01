@@ -1,7 +1,5 @@
 """UFS-AQM Reader"""
 
-from typing import Any
-
 import numpy as np
 import xarray as xr
 
@@ -23,7 +21,20 @@ class UFSReader(GriddedReader):
     Reader for UFS-AQM model output files.
     """
 
-    def open_dataset(self, files: str | list[str], convert_to_ppb: bool = True, mech: str = "cb6r3_ae6_aq", var_list: list[str] | None = None, fname_pm25: str | list[str] | None = None, surf_only: bool = False, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        convert_to_ppb: bool = True,
+        mech: str = "cb6r3_ae6_aq",
+        var_list: list[str] | None = None,
+        fname_pm25: str | list[str] | None = None,
+        surf_only: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads UFS-AQM netCDF files.
 
@@ -61,11 +72,25 @@ class UFSReader(GriddedReader):
             kwargs["combine"] = "nested"
 
         # Open dataset
-        ds = self.driver.open(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = self.driver.open(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         # Merge PM25 file if present
         if fname_pm25 is not None:
-            ds_pm25 = self.driver.open(fname_pm25, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+            ds_pm25 = self.driver.open(
+                fname_pm25,
+                use_virtualizarr=use_virtualizarr,
+                virtualizarr_file=virtualizarr_file,
+                use_icechunk=use_icechunk,
+                icechunk_url=icechunk_url,
+                **kwargs,
+            )
             ds_pm25 = ds_pm25.drop_vars(["lat", "lon", "pfull"], errors="ignore")
             ds_pm25.attrs = {}
             from monetio.util import _try_merge_exact

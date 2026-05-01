@@ -13,7 +13,15 @@ class TOLNetReader(GriddedReader):
     Reader for TOLNet (Tropospheric Ocean Laboratory Network) lidar data.
     """
 
-    def open_dataset(self, files: str | list[str], use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Retrieve and load TOLNet data.
 
@@ -48,7 +56,14 @@ class TOLNetReader(GriddedReader):
         # Update kwargs to use our lazy reader as the primary method
         kwargs["read_method"] = _read_single_tolnet
 
-        ds = self.driver.open(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = self.driver.open(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         if user_preprocess:
             ds = user_preprocess(ds)

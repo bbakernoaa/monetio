@@ -14,7 +14,19 @@ class NCEPPDSReader(GriddedReader):
     Base reader for NCEP products on AWS Public Dataset (PDS).
     """
 
-    def open_dataset(self, files: str | list[str] = None, dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None, hour: int = 0, lead_time: int | list[int] = 0, product: str = "pgrb2.0p25", use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
+        hour: int = 0,
+        lead_time: int | list[int] = 0,
+        product: str = "pgrb2.0p25",
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads NCEP GRIB2 data from AWS S3.
 
@@ -48,7 +60,14 @@ class NCEPPDSReader(GriddedReader):
 
         # grib2io engine generally requires local files or file-like objects.
         # XarrayDriver handles S3 URLs by opening them via fsspec.
-        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         # Apply Aero Protocol harmonization
         ds = self.harmonize(ds)

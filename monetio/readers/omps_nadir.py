@@ -22,7 +22,19 @@ class OMPSNadirReader(GriddedReader):
     Available on AWS Open Data.
     """
 
-    def open_dataset(self, files: str | list[str] = None, dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None, satellite: str = "snpp", product: str = "v8toz", group: str | list[str] = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
+        satellite: str = "snpp",
+        product: str = "v8toz",
+        group: str | list[str] = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads OMPS Nadir data.
 
@@ -111,7 +123,14 @@ class OMPSNadirReader(GriddedReader):
 
             try:
                 # Open without the preprocessor at this stage
-                ds_g = super().open_dataset(g_files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **g_kwargs)
+                ds_g = super().open_dataset(
+                    g_files,
+                    use_virtualizarr=use_virtualizarr,
+                    virtualizarr_file=virtualizarr_file,
+                    use_icechunk=use_icechunk,
+                    icechunk_url=icechunk_url,
+                    **g_kwargs,
+                )
                 dsets.append(ds_g)
             except (OSError, RuntimeError, ValueError):
                 # Not all groups may be present in all files

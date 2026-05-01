@@ -20,7 +20,19 @@ class NESDISFRPReader(GriddedReader):
     Reader for NESDIS Fire Radiative Power (FRP) data on FV3 C384 grid.
     """
 
-    def open_dataset(self, date: datetime.datetime | str | pd.Timestamp = None, ftype: str = "meanFRP", datapath: str = ".", lazy: bool = False, files: str | list[str] = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        date: datetime.datetime | str | pd.Timestamp = None,
+        ftype: str = "meanFRP",
+        datapath: str = ".",
+        lazy: bool = False,
+        files: str | list[str] = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads NESDIS FRP data.
 

@@ -16,7 +16,20 @@ class MERRA2Reader(GriddedReader):
     Reader for MERRA-2 (Modern-Era Retrospective analysis for Research and Applications, Version 2) data.
     """
 
-    def open_dataset(self, files: str | list[str] | None = None, dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None, product: str = "inst1_2d_asm_Nx", username: str | None = None, password: str | None = None, virtualizarr: str | None = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
+        product: str = "inst1_2d_asm_Nx",
+        username: str | None = None,
+        password: str | None = None,
+        virtualizarr: str | None = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads MERRA-2 data.
 
@@ -63,7 +76,14 @@ class MERRA2Reader(GriddedReader):
             use_virtualizarr = True
             virtualizarr_file = virtualizarr
 
-        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         # Update history
         ds = update_history(ds, f"Read MERRA-2 {product} data.")

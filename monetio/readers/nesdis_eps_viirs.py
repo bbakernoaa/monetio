@@ -17,7 +17,16 @@ class NESDISEPSVIIRSReader(GriddedReader):
     Available on NOAA STAR FTP.
     """
 
-    def open_dataset(self, files: str | list[str] = None, dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str] = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads NESDIS EPS VIIRS data.
 
@@ -46,7 +55,14 @@ class NESDISEPSVIIRSReader(GriddedReader):
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
 
-        ds = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         # Update history
         ds = update_history(ds, "Read NESDIS EPS VIIRS data.")

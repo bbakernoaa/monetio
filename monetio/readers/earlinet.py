@@ -12,7 +12,15 @@ class EARLINETReader(GriddedReader):
     Reader for EARLINET (European Aerosol Research Lidar Network) NetCDF data.
     """
 
-    def open_dataset(self, files: str | list[str], use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Retrieve and load EARLINET data.
 
@@ -32,7 +40,15 @@ class EARLINETReader(GriddedReader):
         kwargs.setdefault("combine", "by_coords")
 
         # Use XarrayDriver (via GriddedReader) to open
-        ds = super().open_dataset(files, preprocess=earlinet_preprocess, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = super().open_dataset(
+            files,
+            preprocess=earlinet_preprocess,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         return ds
 

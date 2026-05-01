@@ -1,7 +1,6 @@
 """Chimere Reader"""
 
 from functools import partial
-from typing import Any
 
 import xarray as xr
 
@@ -15,7 +14,17 @@ class ChimereReader(GriddedReader):
     Reader for Chimere model output files.
     """
 
-    def open_dataset(self, files: str | list[str], var_list: list[str] = None, surf_only: bool = False, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        var_list: list[str] = None,
+        surf_only: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Reads Chimere netCDF files.
 
@@ -47,7 +56,14 @@ class ChimereReader(GriddedReader):
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
 
-        ds = self.driver.open(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = self.driver.open(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         ds = self.harmonize(ds)
 

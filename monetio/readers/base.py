@@ -46,7 +46,15 @@ class BaseReader(abc.ABC):
     """
 
     @abc.abstractmethod
-    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset | pd.DataFrame:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset | pd.DataFrame:
         """
         Main entry point to read data.
 
@@ -116,6 +124,10 @@ class PointReader(BaseReader):
         as_xarray: bool = True,
         lazy: bool = False,
         meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -141,7 +153,17 @@ class PointReader(BaseReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded dataset.
         """
-        df = self.driver.open(files, read_method=read_method, lazy=lazy, meta=meta, **kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_method,
+            lazy=lazy,
+            meta=meta,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         df = self.harmonize(df)
 

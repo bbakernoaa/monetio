@@ -15,7 +15,16 @@ class EPROFILEReader(GriddedReader):
     Reader for E-PROFILE (European ALC network) NetCDF data.
     """
 
-    def open_dataset(self, files: str | list[str], dates: pd.DatetimeIndex | list | pd.Timestamp | str | None = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        dates: pd.DatetimeIndex | list | pd.Timestamp | str | None = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Retrieve and load E-PROFILE data.
 
@@ -42,7 +51,15 @@ class EPROFILEReader(GriddedReader):
         kwargs.setdefault("combine", "by_coords")
 
         # Use XarrayDriver (via GriddedReader) to open
-        ds = super().open_dataset(files, preprocess=eprofile_preprocess, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+        ds = super().open_dataset(
+            files,
+            preprocess=eprofile_preprocess,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         return ds
 

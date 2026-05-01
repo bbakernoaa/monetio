@@ -94,12 +94,12 @@ monetio openaq -d 2023-01-01 -o openaq_global.csv --as-pandas
 ```
 
 
-## Pre-processing Large Datasets (VirtualiZarr)
+## Virtualization (Kerchunk & Icechunk)
 
 For very large gridded datasets (e.g., MERRA2, GFS, RRFS), `xarray.open_mfdataset` can be slow to build the initial coordinate map. MONETIO provides a command to pre-process these files into a single VirtualiZarr reference JSON file. This allows instant loading of the virtual Zarr dataset later.
 
 ```bash
-monetio virtualizarr "s3://noaa-rrfs-pds/rrfs_a/20230101/00/control/rrfs.t00z.prslev.f*.nc" -o rrfs_cache.json
+monetio virtualize "s3://noaa-rrfs-pds/rrfs_a/20230101/00/control/rrfs.t00z.prslev.f*.nc" -o rrfs_cache.json
 ```
 
 Options:
