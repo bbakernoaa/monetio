@@ -438,6 +438,12 @@ def read_airnow_csv(
         "source",
     ]
 
+    # Provide dtype hints for known numeric columns to avoid pandas type
+    # inference overhead.  The column indices map to the pipe-delimited
+    # AirNow format: 0=date, 1=time, 2=siteid, 3=site, 4=utcoffset,
+    # 5=variable, 6=units, 7=obs, 8=source (hourly) or similar for daily.
+    _dtype_hints = {4: "float32", 7: "float32"}
+
     try:
         dft = pd.read_csv(
             fn,
@@ -445,6 +451,7 @@ def read_airnow_csv(
             header=None,
             encoding="ISO-8859-1",
             on_bad_lines="warn",
+            dtype=_dtype_hints,
             storage_options=storage_options,
         )
     except Exception:

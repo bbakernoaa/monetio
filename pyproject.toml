@@ -87,6 +87,19 @@ test = [
     "filelock"
 ]
 
+virtualizarr = [
+    "virtualizarr>=1.0",
+    "obstore",
+    "obspec_utils",
+    "ujson",
+    "zarr>=2.18",
+]
+
+icechunk = [
+    "icechunk>=0.1",
+    "monetio[virtualizarr]",
+]
+
 
 [tool.setuptools]
 packages = ["monetio", "monetio.models", "monetio.obs", "monetio.profile", "monetio.readers", "monetio.sat"]

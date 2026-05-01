@@ -1,10 +1,13 @@
-"""
-ISH Reader Redirection
-"""
+"""ISH Reader. Deprecated wrapper — use monetio.load('ish', ...) instead."""
 
+from ..readers._deprecation import deprecated_wrapper
 from ..readers.ish import ISH, ISHReader, read_ish_file  # noqa: F401
 
 
+@deprecated_wrapper(
+    "monetio.obs.ish.add_data",
+    'monetio.load("ish", dates=...)',
+)
 def add_data(
     dates,
     *,

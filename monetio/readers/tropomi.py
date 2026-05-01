@@ -5,7 +5,12 @@ import warnings
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .sat_utils import lazy_index_along_axis, standardize_satellite_coords, update_history
+from .sat_utils import (
+    apply_qa_mask,
+    lazy_index_along_axis,
+    standardize_satellite_coords,
+    update_history,
+)
 
 
 @register_reader("tropomi")
@@ -173,15 +178,8 @@ def tropomi_preprocess(
                 ds[var] = ds[var].rename({"y": "time"})
 
     # 6. Quality Flagging (Lazy & Vectorized)
-    if qa_threshold is not None and "qa_value" in ds.data_vars:
-        # Mask all data variables where qa_value < threshold
-        # We preserve the qa_value itself and coordinates
-        qa = ds["qa_value"]
-        mask = qa >= qa_threshold
-        # Dataset-level where is vectorized and lazy-safe
-        ds = ds.where(mask)
-        # Restore the original qa_value (unmasked)
-        ds["qa_value"] = qa
+    if qa_threshold is not None:
+        ds = apply_qa_mask(ds, qa_var="qa_value", threshold=qa_threshold)
 
     # Update history
     ds = update_history(

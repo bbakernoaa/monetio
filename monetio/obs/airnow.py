@@ -1,10 +1,13 @@
-"""
-AirNow Reader. Redirection to monetio.readers.airnow
-"""
+"""AirNow Reader. Deprecated wrapper — use monetio.load('airnow', ...) instead."""
 
+from ..readers._deprecation import deprecated_wrapper
 from ..readers.airnow import AirNowReader, build_urls, get_utcoffset, retrieve  # noqa: F401
 
 
+@deprecated_wrapper(
+    "monetio.obs.airnow.add_data",
+    'monetio.load("airnow", dates=...)',
+)
 def add_data(
     dates,
     *,
@@ -27,6 +30,10 @@ def add_data(
     )
 
 
+@deprecated_wrapper(
+    "monetio.obs.airnow.aggregate_files",
+    'monetio.load("airnow", dates=...)',
+)
 def aggregate_files(dates, *, download=False, n_procs=1, daily=False, bad_utcoffset="drop"):
     """Aggregate AirNow files."""
     return AirNowReader().open_dataset(

@@ -1,114 +1,74 @@
-import logging
-import sys
-from collections import OrderedDict
-from datetime import UTC, datetime
-from glob import glob
+"""MODIS L2 Reader. Deprecated wrapper — use monetio.load('modis_l2', ...) instead."""
 
-import numpy as np
-import xarray as xr
+from ..readers._deprecation import deprecated_wrapper
+from ..readers.modis_l2 import MODISL2Reader  # noqa: F401
 
 
-def read_dataset(fname, variable_dict):
-    """
+@deprecated_wrapper(
+    "monetio.sat.modis_l2.read_dataset",
+    'monetio.load("modis_l2", files=...)',
+)
+def read_dataset(fname, variable_dict, **kwargs):
+    """Read a single MODIS L2 HDF file.
+
     Parameters
     ----------
     fname : str
         Input file path.
+    variable_dict : dict
+        Variable configuration dictionary.
+    **kwargs : dict
+        Additional arguments forwarded to ``MODISL2Reader.open_dataset``.
 
     Returns
     -------
     xarray.Dataset
     """
-    from monetio.sat.hdfio import hdf_close, hdf_list, hdf_open, hdf_read
-
-    epoch_1993 = int(datetime(1993, 1, 1, tzinfo=UTC).timestamp())
-
-    print("reading " + fname)
-
-    ds = xr.Dataset()
-
-    f = hdf_open(fname)
-    hdf_list(f)
-    # Geolocation and Time Parameters
-    latitude = hdf_read(f, "Latitude")
-    longitude = hdf_read(f, "Longitude")
-    # convert seconds since 1993 to since 1970
-    start_time = hdf_read(f, "Scan_Start_Time") + epoch_1993
-    for varname in variable_dict:
-        print(varname)
-        values = hdf_read(f, varname)
-        print("min, max: ", values.min(), " ", values.max())
-        if "scale" in variable_dict[varname]:
-            values = variable_dict[varname]["scale"] * values
-        if "minimum" in variable_dict[varname]:
-            minimum = variable_dict[varname]["minimum"]
-            values[values < minimum] = np.nan
-        if "maximum" in variable_dict[varname]:
-            maximum = variable_dict[varname]["maximum"]
-            values[values > maximum] = np.nan
-        ds[varname] = xr.DataArray(values)
-        if "quality_flag" in variable_dict[varname]:
-            ds.attrs["quality_flag"] = varname
-            ds.attrs["quality_thresh"] = variable_dict[varname]["quality_flag"]
-    hdf_close(f)
-
-    ds = ds.assign_coords(
-        {
-            "lon": (["dim_0", "dim_1"], longitude),
-            "lat": (["dim_0", "dim_1"], latitude),
-            "time": (["dim_0", "dim_1"], start_time),
-        }
+    return MODISL2Reader().open_dataset(
+        files=fname, variable_dict=variable_dict, **kwargs
     )
-    ds = ds.rename_dims({"dim_0": "Cell_Along_Swath", "dim_1": "Cell_Across_Swath"})
-
-    return ds
 
 
-def apply_quality_flag(ds):
-    """
-    Parameters
-    ----------
-    ds : xarray.Dataset
-    """
-    if "quality_flag" in ds.attrs:
-        quality_flag = ds[ds.attrs["quality_flag"]]
-        quality_thresh = ds.attrs["quality_thresh"]
-        for varname in ds:
-            if varname != ds.attrs["quality_flag"]:
-                logging.debug(varname)
-                values = ds[varname].values
-                values[quality_flag >= quality_thresh] = np.nan
-                ds[varname].values = values
+@deprecated_wrapper(
+    "monetio.sat.modis_l2.read_mfdataset",
+    'monetio.load("modis_l2", files=...)',
+)
+def read_mfdataset(fnames, variable_dict, debug=False, **kwargs):
+    """Read multiple MODIS L2 HDF files.
 
-
-def read_mfdataset(fnames, variable_dict, debug=False):
-    """
     Parameters
     ----------
     fnames : str
         Regular expression for input file paths.
+    variable_dict : dict
+        Variable configuration dictionary.
+    debug : bool
+        Enable debug logging.
+    **kwargs : dict
+        Additional arguments forwarded to ``MODISL2Reader.open_dataset``.
 
     Returns
     -------
-    xarray.Dataset
+    dict
+        Ordered dict of granules keyed by datetime string.
     """
-    if debug:
-        logging_level = logging.DEBUG
-        logging.basicConfig(stream=sys.stdout, level=logging_level)
+    return MODISL2Reader().open_dataset(
+        files=fnames, variable_dict=variable_dict, debug=debug, **kwargs
+    )
 
-    if isinstance(fnames, str):
-        files = sorted(glob(fnames))
-    else:
-        files = fnames
 
-    granules = OrderedDict()
+@deprecated_wrapper(
+    "monetio.sat.modis_l2.apply_quality_flag",
+    'monetio.load("modis_l2", files=...)',
+)
+def apply_quality_flag(ds, **kwargs):
+    """Apply quality flag to a MODIS L2 dataset.
 
-    for file in files:
-        granule = read_dataset(file, variable_dict)
-        apply_quality_flag(granule)
-        granule_str = file.split("/")[-1]
-        granule_info = granule_str.split(".")
-        datetime_str = granule_info[1][1:] + granule_info[2]
-        granules[datetime_str] = granule
-
-    return granules
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset with quality_flag attribute.
+    **kwargs : dict
+        Additional arguments.
+    """
+    return MODISL2Reader().apply_quality_flag(ds, **kwargs)

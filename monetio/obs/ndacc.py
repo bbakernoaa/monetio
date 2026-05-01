@@ -1,10 +1,13 @@
-"""
-NDACC Reader Redirection
-"""
+"""NDACC Reader. Deprecated wrapper — use monetio.load('ndacc', ...) instead."""
 
-from ..readers.ndacc import NDACCReader
+from ..readers._deprecation import deprecated_wrapper
+from ..readers.ndacc import NDACCReader  # noqa: F401
 
 
+@deprecated_wrapper(
+    "monetio.obs.ndacc.add_data",
+    'monetio.load("ndacc", dates=...)',
+)
 def add_data(
     dates=None,
     siteid=None,
@@ -22,6 +25,10 @@ def add_data(
     )
 
 
+@deprecated_wrapper(
+    "monetio.obs.ndacc.add_local",
+    'monetio.load("ndacc", files=...)',
+)
 def add_local(
     fname,
     as_xarray=True,

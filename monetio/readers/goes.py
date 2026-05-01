@@ -64,6 +64,26 @@ class GOESReader(GriddedReader):
 
         return ds
 
+    def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
+        """
+        Apply GOES-specific naming conventions and metadata standardization.
+
+        The heavy lifting is done in ``goes_preprocess`` which is passed as
+        the ``preprocess`` callback to the driver.  This method applies any
+        final dataset-level harmonization after files have been merged.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            Input dataset (already preprocessed per-file).
+
+        Returns
+        -------
+        xr.Dataset
+            Harmonized dataset.
+        """
+        return super().harmonize(ds)
+
     def build_urls(
         self,
         dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,

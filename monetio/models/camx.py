@@ -1,7 +1,6 @@
-"""
-CAMx Reader. Redirection to monetio.readers.camx
-"""
+"""CAMx Reader. Deprecated wrapper — use monetio.load('camx', ...) instead."""
 
+from ..readers._deprecation import deprecated_wrapper
 from ..readers.camx import (  # noqa: F401
     CAMxReader,
     camx_preprocess,
@@ -12,6 +11,10 @@ from ..readers.camx import (  # noqa: F401
 )
 
 
+@deprecated_wrapper(
+    "monetio.models.camx.open_dataset",
+    'monetio.load("camx", files=...)',
+)
 def open_dataset(fname, **kwargs):
     """Method to open CAMx files using pseudonetcdf.
 

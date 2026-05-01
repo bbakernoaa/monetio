@@ -1,10 +1,13 @@
-"""
-E-PROFILE Reader Redirection
-"""
+"""E-PROFILE Reader. Deprecated wrapper — use monetio.load('eprofile', ...) instead."""
 
-from ..readers.eprofile import EPROFILEReader
+from ..readers._deprecation import deprecated_wrapper
+from ..readers.eprofile import EPROFILEReader  # noqa: F401
 
 
+@deprecated_wrapper(
+    "monetio.obs.eprofile.add_data",
+    'monetio.load("eprofile", files=...)',
+)
 def add_data(
     files=None,
     dates=None,
