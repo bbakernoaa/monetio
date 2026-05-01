@@ -60,6 +60,7 @@ dev = [
     "pytest-print",
     "pytest-xdist",
     "filelock",
+    "hypothesis",
     "ruff",
     "mkdocs-material",
     "mkdocstrings[python]",
@@ -84,7 +85,8 @@ test = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
-    "filelock"
+    "filelock",
+    "hypothesis",
 ]
 
 virtualizarr = [

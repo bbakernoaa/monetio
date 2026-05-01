@@ -1,7 +1,7 @@
 """GEOMS Profile Reader. Deprecated wrapper — use monetio.load('geoms', ...) instead."""
 
 from ..readers._deprecation import deprecated_wrapper
-from ..readers.geoms import GEOMSReader  # noqa: F401
+from ..readers.geoms import GEOMSReader, _dti_from_mjd2000  # noqa: F401
 
 
 @deprecated_wrapper(

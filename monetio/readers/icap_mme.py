@@ -69,6 +69,16 @@ class ICAPMMEReader(GriddedReader):
             if dates is None:
                 raise ValueError("Either 'files' or 'dates' must be provided.")
 
+            # Validate parameters before building URLs
+            if product.upper() not in VALID_FILETYPES:
+                raise ValueError(
+                    f"Invalid input for 'product': '{product}'. Must be one of {VALID_FILETYPES}."
+                )
+            if data_var.lower() not in VALID_DATA_VARS:
+                raise ValueError(
+                    f"Invalid input for 'data_var': '{data_var}'. Must be one of {VALID_DATA_VARS}."
+                )
+
             urls, fnames = build_urls(dates, filetype=product, data_var=data_var)
             if download:
                 files = []
