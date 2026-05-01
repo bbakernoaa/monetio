@@ -111,7 +111,7 @@ class OMPSNadirReader(GriddedReader):
 
             try:
                 # Open without the preprocessor at this stage
-                ds_g = super().open_dataset(g_files, **g_kwargs, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+                ds_g = super().open_dataset(g_files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **g_kwargs)
                 dsets.append(ds_g)
             except (OSError, RuntimeError, ValueError):
                 # Not all groups may be present in all files

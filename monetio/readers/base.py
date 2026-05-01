@@ -75,12 +75,27 @@ class GriddedReader(BaseReader):
     def __init__(self):
         self.driver = XarrayDriver()
 
-    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        **kwargs,
+    ) -> xr.Dataset:
         """
         Uses XarrayDriver to open files.
         Readers can override this to add pre/post processing.
         """
-        ds = self.driver.open(files, **kwargs)
+        ds = self.driver.open(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
         return self.harmonize(ds)
 
 

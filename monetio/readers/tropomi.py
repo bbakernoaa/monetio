@@ -14,18 +14,7 @@ class TROPOMIReader(GriddedReader):
     Reader for TROPOMI L2 (Sentinel-5P) data.
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str],
-        group: str | list[str] | None = None,
-        calculate_pressure: bool = True,
-        qa_threshold: float | None = None,
-        use_virtualizarr: bool = False,
-        virtualizarr_file: str | None = None,
-        use_icechunk: bool = False,
-        icechunk_url: str | None = None,
-        **kwargs,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], group: str | list[str] | None = None, calculate_pressure: bool = True, qa_threshold: float | None = None, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads TROPOMI data.
 
@@ -86,14 +75,7 @@ class TROPOMIReader(GriddedReader):
             g_kwargs["group"] = g
             try:
                 # We open without the TROPOMI preprocess at this stage
-                ds_g = super().open_dataset(
-                    files,
-                    use_virtualizarr=use_virtualizarr,
-                    virtualizarr_file=virtualizarr_file,
-                    use_icechunk=use_icechunk,
-                    icechunk_url=icechunk_url,
-                    **g_kwargs,
-                )
+                ds_g = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **g_kwargs)
                 dsets.append(ds_g)
             except Exception as e:
                 warnings.warn(f"Could not open group {g}: {e}")

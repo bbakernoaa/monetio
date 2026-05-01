@@ -52,7 +52,7 @@ class UMBCAerosolReader(GriddedReader):
             g_kwargs["group"] = g
             try:
                 # We open without the UMBC preprocess at this stage
-                ds_g = super().open_dataset(files, **g_kwargs, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+                ds_g = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **g_kwargs)
                 dsets.append(ds_g)
                 # Manually collect attributes from groups
                 all_attrs.update(ds_g.attrs)

@@ -61,7 +61,7 @@ class TEMPOReader(GriddedReader):
             g_kwargs["group"] = g
             try:
                 # Open without the preprocessor at this stage
-                ds_g = super().open_dataset(files, **g_kwargs, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
+                ds_g = super().open_dataset(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **g_kwargs)
                 dsets.append(ds_g)
             except Exception:
                 # Not all groups may be present in all files

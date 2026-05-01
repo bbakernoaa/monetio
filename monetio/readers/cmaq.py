@@ -25,18 +25,7 @@ class CMAQReader(GriddedReader):
     Reader for CMAQ (Community Multiscale Air Quality) model output files.
     """
 
-    def open_dataset(
-        self,
-        files: str | list[str],
-        earth_radius: float = 6370000,
-        convert_to_ppb: bool = True,
-        drop_duplicates: bool = False,
-        use_virtualizarr: bool = False,
-        virtualizarr_file: str | None = None,
-        use_icechunk: bool = False,
-        icechunk_url: str | None = None,
-        **kwargs,
-    ) -> xr.Dataset:
+    def open_dataset(self, files: str | list[str], earth_radius: float = 6370000, convert_to_ppb: bool = True, drop_duplicates: bool = False, use_virtualizarr: bool = False, virtualizarr_file: str | None = None, use_icechunk: bool = False, icechunk_url: str | None = None, **kwargs) -> xr.Dataset:
         """
         Reads CMAQ netCDF files.
 
@@ -76,14 +65,7 @@ class CMAQReader(GriddedReader):
             # Actually, preprocess runs BEFORE concatenation.
             kwargs["concat_dim"] = "time"
 
-        ds = self.driver.open(
-            files,
-            use_virtualizarr=use_virtualizarr,
-            virtualizarr_file=virtualizarr_file,
-            use_icechunk=use_icechunk,
-            icechunk_url=icechunk_url,
-            **kwargs,
-        )
+        ds = self.driver.open(files, use_virtualizarr=use_virtualizarr, virtualizarr_file=virtualizarr_file, use_icechunk=use_icechunk, icechunk_url=icechunk_url, **kwargs)
 
         # 3. Finalize
         if drop_duplicates:
