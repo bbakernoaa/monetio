@@ -1,13 +1,12 @@
-"""
-HYSPLIT Reader. Redirection to monetio.readers.hysplit
-"""
+"""HYSPLIT Reader. Deprecated wrapper — use monetio.load('hysplit', ...) instead."""
 
-from ..readers.hysplit import (  # noqa: F401  # noqa: F401
+from ..readers._deprecation import deprecated_wrapper
+from ..readers.hysplit import (  # noqa: F401
     HYSPLITReader,
     add_species,
     check_drange,
     check_grid_continuity,
-    combine_dataset as combine_dataset_reader,  # noqa: F401
+    combine_dataset as combine_dataset_reader,
     fix_grid_continuity,
     get_latlongrid,
     getlatlon,
@@ -16,6 +15,10 @@ from ..readers.hysplit import (  # noqa: F401  # noqa: F401
 )
 
 
+@deprecated_wrapper(
+    "monetio.models.hysplit.open_dataset",
+    'monetio.load("hysplit", files=...)',
+)
 def open_dataset(fname, **kwargs):
     """Method to open HYSPLIT netcdf files.
 
@@ -33,6 +36,10 @@ def open_dataset(fname, **kwargs):
     return HYSPLITReader().open_dataset(files=fname, **kwargs)
 
 
+@deprecated_wrapper(
+    "monetio.models.hysplit.combine_dataset",
+    'monetio.load("hysplit", files=...)',
+)
 def combine_dataset(
     blist,
     drange=None,

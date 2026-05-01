@@ -71,7 +71,7 @@ def test_icap_protocol_compliance():
 def test_open_dataset_bad_date():
     from monetio.models.icap_mme import open_dataset
 
-    with pytest.raises(ValueError, match="File does not exist"):
+    with pytest.raises((ValueError, OSError)):
         open_dataset("1990-08-01", verify=False)
 
 

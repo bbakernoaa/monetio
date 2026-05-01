@@ -1,10 +1,13 @@
-"""
-CRN Reader. Redirection to monetio.readers.crn
-"""
+"""CRN Reader. Deprecated wrapper — use monetio.load('crn', ...) instead."""
 
+from ..readers._deprecation import deprecated_wrapper
 from ..readers.crn import CRNReader  # noqa: F401
 
 
+@deprecated_wrapper(
+    "monetio.obs.crn.add_data",
+    'monetio.load("crn", dates=...)',
+)
 def add_data(
     dates,
     param=None,

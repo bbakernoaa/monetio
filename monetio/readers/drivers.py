@@ -11,6 +11,89 @@ except ImportError:
     dd = None
 
 
+def _build_s3_config(storage_options: dict) -> dict:
+    """Build an S3Store config dict from fsspec-style storage_options."""
+    s3_config = {}
+    if storage_options.get("anon", True):
+        s3_config["skip_signature"] = "true"
+    if "client_kwargs" in storage_options and "region_name" in storage_options["client_kwargs"]:
+        s3_config["region"] = storage_options["client_kwargs"]["region_name"]
+    return s3_config
+
+
+def _select_store(file_list: list[str], storage_options: dict) -> tuple:
+    """Select the appropriate object store based on file protocol.
+
+    Parameters
+    ----------
+    file_list : list[str]
+        List of file paths (all assumed to share the same protocol).
+    storage_options : dict
+        fsspec-style storage options (e.g. ``{"anon": True}``).
+
+    Returns
+    -------
+    tuple[ObjectStoreRegistry, list[str]]
+        The configured registry and (possibly updated) file list.
+    """
+    from obspec_utils.registry import ObjectStoreRegistry
+    from obstore.store import HTTPStore, LocalStore, S3Store
+
+    registry = ObjectStoreRegistry()
+
+    if file_list[0].startswith("s3://"):
+        bucket = file_list[0].replace("s3://", "").split("/")[0]
+        config = _build_s3_config(storage_options)
+        store = S3Store(bucket, config=config)
+        registry.register(f"s3://{bucket}", store)
+    elif file_list[0].startswith("http://") or file_list[0].startswith("https://"):
+        store = HTTPStore()
+        registry.register("http://", store)
+        registry.register("https://", store)
+    else:
+        store = LocalStore(prefix="/")
+        registry.register("file:///", store)
+        file_list = [f"file://{f}" if not f.startswith("file://") else f for f in file_list]
+
+    return registry, file_list
+
+
+def _open_via_icechunk(vds, icechunk_repo: str, virtualizarr_file: str | None) -> xr.Dataset:
+    """Store virtual references in Icechunk and return the dataset.
+
+    Parameters
+    ----------
+    vds : virtualizarr.VirtualDataset
+        The virtual dataset to persist.
+    icechunk_repo : str
+        Path (local or remote) to the Icechunk repository.
+    virtualizarr_file : str | None
+        Unused for Icechunk but accepted for interface consistency.
+
+    Returns
+    -------
+    xr.Dataset
+        The dataset opened from the Icechunk store.
+    """
+    try:
+        import icechunk
+    except ImportError:
+        raise ImportError(
+            "Icechunk backend requires 'icechunk'. Install with: pip install monetio[icechunk]"
+        )
+
+    repo = icechunk.Repository.open_or_create(icechunk_repo)
+    session = repo.writable_session("main")
+    store = session.store
+
+    vds.virtualize.to_icechunk(store)
+    session.commit("VirtualiZarr references")
+
+    # Re-open for reading
+    session = repo.readonly_session()
+    return xr.open_zarr(session.store, consolidated=False)
+
+
 class FileUtility:
     """
     Helper class to manage file path expansion (Local + S3 + HTTP).
@@ -87,7 +170,9 @@ class XarrayDriver:
         use_dask: bool = False,
         use_cubed: bool = False,
         use_virtualizarr: bool = False,
-        virtualizarr_file: str = None,
+        virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -108,6 +193,13 @@ class XarrayDriver:
             Path to save/load the VirtualiZarr reference JSON file. If provided and the file
             exists, the references will be loaded from it. If the file does not exist,
             the references will be computed and saved to this path.
+        virtualizarr_backend : str, optional
+            Backend for VirtualiZarr references. Must be ``"kerchunk"`` (default) or
+            ``"icechunk"``. When ``"icechunk"`` is selected, references are stored in
+            an Icechunk repository instead of a kerchunk JSON file.
+        icechunk_repo : str, optional
+            Path to the Icechunk repository. Required when
+            ``virtualizarr_backend="icechunk"``.
         **kwargs : dict
             Additional arguments passed to xarray open functions.
 
@@ -116,6 +208,12 @@ class XarrayDriver:
         xr.Dataset
             The loaded dataset.
         """
+        # Validate virtualizarr_backend parameter
+        if virtualizarr_backend not in ("kerchunk", "icechunk"):
+            raise ValueError(
+                f"Invalid virtualizarr_backend '{virtualizarr_backend}'. "
+                "Must be 'kerchunk' or 'icechunk'."
+            )
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
 
@@ -149,20 +247,23 @@ class XarrayDriver:
             try:
                 import ujson  # noqa: F401
                 import zarr  # noqa: F401
-                from obspec_utils.registry import ObjectStoreRegistry
-                from obstore.store import HTTPStore, LocalStore, S3Store
                 from virtualizarr import open_virtual_mfdataset
                 from virtualizarr.parsers import HDFParser
             except ImportError:
                 raise ImportError(
-                    "virtualizarr v2 requires 'virtualizarr', 'obstore', 'obspec_utils', 'ujson', and 'zarr'. "
-                    "Install with `pip install virtualizarr obstore obspec_utils ujson zarr`."
+                    "VirtualiZarr support requires additional packages. "
+                    "Install with: pip install monetio[virtualizarr]"
                 )
 
             import os
 
+            # --- Kerchunk cache: load existing refs if available ---
             refs = None
-            if virtualizarr_file is not None and os.path.exists(virtualizarr_file):
+            if (
+                virtualizarr_backend == "kerchunk"
+                and virtualizarr_file is not None
+                and os.path.exists(virtualizarr_file)
+            ):
                 try:
                     with open(virtualizarr_file) as f_ref:
                         refs = ujson.load(f_ref)
@@ -173,32 +274,8 @@ class XarrayDriver:
                     refs = None
 
             if refs is None:
-                registry = ObjectStoreRegistry()
-
-                if file_list[0].startswith("s3://"):
-                    remote_options = dict(xr_kwargs.get("storage_options", {}))
-                    bucket_name = file_list[0].replace("s3://", "").split("/")[0]
-                    s3_config = {}
-                    if remote_options.get("anon", True):
-                        s3_config["skip_signature"] = "true"
-                    if (
-                        "client_kwargs" in remote_options
-                        and "region_name" in remote_options["client_kwargs"]
-                    ):
-                        s3_config["region"] = remote_options["client_kwargs"]["region_name"]
-
-                    store = S3Store(bucket_name, config=s3_config)
-                    registry.register(f"s3://{bucket_name}", store)
-                elif file_list[0].startswith("http://") or file_list[0].startswith("https://"):
-                    store = HTTPStore()
-                    registry.register("http://", store)
-                    registry.register("https://", store)
-                else:
-                    store = LocalStore(prefix="/")
-                    registry.register("file:///", store)
-                    file_list = [
-                        f"file://{f}" if not f.startswith("file://") else f for f in file_list
-                    ]
+                storage_options = dict(xr_kwargs.get("storage_options", {}))
+                registry, file_list = _select_store(file_list, storage_options)
 
                 concat_dim = xr_kwargs.get("concat_dim", "time")
                 try:
@@ -214,6 +291,14 @@ class XarrayDriver:
                         file_list, registry=registry, parser=HDFParser(), combine="by_coords"
                     )
 
+                # --- Branch on backend ---
+                if virtualizarr_backend == "icechunk":
+                    ds = _open_via_icechunk(vds, icechunk_repo, virtualizarr_file)
+                    if preprocess:
+                        ds = preprocess(ds)
+                    return ds
+
+                # Kerchunk path: export refs and optionally cache them
                 refs = vds.vz.to_kerchunk()
 
                 if virtualizarr_file is not None:
@@ -376,7 +461,7 @@ class XarrayDriver:
                     return xr.open_mfdataset(file_list, **xr_kwargs)
 
         except Exception as e:
-            raise OSError(f"XarrayDriver failed to open files. Error: {e}")
+            raise OSError(f"XarrayDriver failed to open files. Error: {e}") from e
 
 
 class PandasDriver:
@@ -452,4 +537,4 @@ class PandasDriver:
         except (RuntimeError, ValueError):
             raise
         except Exception as e:
-            raise OSError(f"PandasDriver failed to open files. Error: {e}")
+            raise OSError(f"PandasDriver failed to open files. Error: {e}") from e

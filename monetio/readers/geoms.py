@@ -432,16 +432,29 @@ def _rename_var(vn: str, *, under: str = "_", dot: str = "_") -> str:
 
 def _dti_from_mjd2000(x: Any) -> pd.DatetimeIndex:
     """
-    Legacy helper for backward compatibility.
+    Convert MJD2000 values to DatetimeIndex.
+
+    The input must have a ``VAR_UNITS`` attribute containing ``"MJD2K"``
+    (case-insensitive), otherwise an ``AttributeError`` is raised.
 
     Parameters
     ----------
     x : Any
-        MJD2000 data.
+        DataArray or array-like with MJD2000 values.
 
     Returns
     -------
     pd.DatetimeIndex
         DatetimeIndex.
+
+    Raises
+    ------
+    AttributeError
+        If ``x`` does not have a ``VAR_UNITS`` attribute containing ``"MJD2K"``.
     """
+    units = getattr(x, "attrs", {}).get("VAR_UNITS")
+    if units is None:
+        raise AttributeError("VAR_UNITS attribute not found")
+    if "MJD2K" not in units.upper():
+        raise AttributeError(f"VAR_UNITS='{units}' does not contain 'MJD2K'")
     return pd.to_datetime(np.asarray(x) + 2451544.5, unit="D", origin="julian")

@@ -1,10 +1,13 @@
-"""
-AERONET Reader Redirection
-"""
+"""AERONET Reader. Deprecated wrapper — use monetio.load('aeronet', ...) instead."""
 
+from ..readers._deprecation import deprecated_wrapper
 from ..readers.aeronet import AERONET, AERONETReader, get_valid_sites  # noqa: F401
 
 
+@deprecated_wrapper(
+    "monetio.obs.aeronet.add_data",
+    'monetio.load("aeronet", dates=...)',
+)
 def add_data(
     dates=None,
     product="AOD15",
@@ -40,6 +43,10 @@ def add_data(
     )
 
 
+@deprecated_wrapper(
+    "monetio.obs.aeronet.add_local",
+    'monetio.load("aeronet", files=...)',
+)
 def add_local(
     fname,
     *,

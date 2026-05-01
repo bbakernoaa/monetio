@@ -1,10 +1,13 @@
-"""
-SKYNET Reader Redirection
-"""
+"""SKYNET Reader. Deprecated wrapper — use monetio.load('skynet', ...) instead."""
 
-from ..readers.skynet import SKYNETReader
+from ..readers._deprecation import deprecated_wrapper
+from ..readers.skynet import SKYNETReader  # noqa: F401
 
 
+@deprecated_wrapper(
+    "monetio.obs.skynet.add_data",
+    'monetio.load("skynet", dates=...)',
+)
 def add_data(
     dates=None,
     siteid=None,
@@ -22,6 +25,10 @@ def add_data(
     )
 
 
+@deprecated_wrapper(
+    "monetio.obs.skynet.add_local",
+    'monetio.load("skynet", files=...)',
+)
 def add_local(
     fname,
     as_xarray=False,

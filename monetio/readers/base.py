@@ -75,12 +75,50 @@ class GriddedReader(BaseReader):
     def __init__(self):
         self.driver = XarrayDriver()
 
-    def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset:
+    def open_dataset(
+        self,
+        files: str | list[str],
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
+        use_dask: bool = False,
+        **kwargs,
+    ) -> xr.Dataset:
         """
-        Uses XarrayDriver to open files.
-        Readers can override this to add pre/post processing.
+        Uses XarrayDriver to open files. VirtualiZarr options are forwarded to the driver.
+
+        Parameters
+        ----------
+        files : str or list[str]
+            File path(s), URL(s), or glob pattern.
+        use_virtualizarr : bool, optional
+            Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
+        virtualizarr_file : str or None, optional
+            Path to save/load the VirtualiZarr reference JSON file, by default None.
+        virtualizarr_backend : str, optional
+            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
+        icechunk_repo : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_dask : bool, optional
+            Whether to use Dask for lazy loading, by default False.
+        **kwargs : dict
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        xr.Dataset
+            The loaded dataset.
         """
-        ds = self.driver.open(files, **kwargs)
+        ds = self.driver.open(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            virtualizarr_backend=virtualizarr_backend,
+            icechunk_repo=icechunk_repo,
+            use_dask=use_dask,
+            **kwargs,
+        )
         return self.harmonize(ds)
 
 
@@ -97,6 +135,12 @@ class PointReader(BaseReader):
     def open_dataset(
         self,
         files: str | list[str],
+        # VirtualiZarr kwargs accepted but silently ignored for PointReaders
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
+        # Standard PointReader kwargs
         read_method: str = "read_csv",
         as_xarray: bool = True,
         lazy: bool = False,
@@ -110,6 +154,14 @@ class PointReader(BaseReader):
         ----------
         files : Union[str, List[str]]
             File path, list of paths, or glob pattern.
+        use_virtualizarr : bool, optional
+            Accepted but ignored for PointReaders (VirtualiZarr only applies to gridded data).
+        virtualizarr_file : str or None, optional
+            Accepted but ignored for PointReaders.
+        virtualizarr_backend : str, optional
+            Accepted but ignored for PointReaders.
+        icechunk_repo : str or None, optional
+            Accepted but ignored for PointReaders.
         read_method : str, optional
             The pandas/dask reading method to use, by default "read_csv".
         as_xarray : bool, optional
@@ -126,6 +178,9 @@ class PointReader(BaseReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded dataset.
         """
+        # VirtualiZarr kwargs (use_virtualizarr, virtualizarr_file,
+        # virtualizarr_backend, icechunk_repo) are silently discarded here
+        # and NOT forwarded to PandasDriver.
         df = self.driver.open(files, read_method=read_method, lazy=lazy, meta=meta, **kwargs)
 
         df = self.harmonize(df)
@@ -275,13 +330,15 @@ class PointReader(BaseReader):
                 if "node" in ds[var].dims:
                     ds[var].attrs.update({"mesh": "mesh", "location": "node"})
 
-        # Copy attributes from DataFrame if they exist (e.g. history)
-        if hasattr(df, "attrs"):
-            for k, v in df.attrs.items():
-                if k not in ds.attrs:
-                    ds.attrs[k] = v
-                elif k == "history":
-                    ds.attrs[k] = f"{v}\n{ds.attrs[k]}"
+        # Copy attributes from DataFrame if they exist (e.g. history).
+        # Dask DataFrames don't support .attrs the same way as pandas, so
+        # we guard with getattr to avoid AttributeError.
+        df_attrs = getattr(df, "attrs", {}) or {}
+        for k, v in df_attrs.items():
+            if k not in ds.attrs:
+                ds.attrs[k] = v
+            elif k == "history":
+                ds.attrs[k] = f"{v}\n{ds.attrs[k]}"
 
         # Add Global Attributes
         if "Conventions" not in ds.attrs:

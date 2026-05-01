@@ -25,10 +25,18 @@ dependencies:
   - requests
   - timezonefinder
   #
+  # virtualizarr
+  - virtualizarr>=1.0
+  - obstore
+  - ujson
+  - zarr>=3.1,<3.2
+  #
   # test
+  - hypothesis
   - pytest
   - pytest-xdist
   #
   - pip>=21.1
   - pip:
+      - obspec_utils
       - "-e .[dev]"

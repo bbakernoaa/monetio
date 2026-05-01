@@ -58,8 +58,28 @@ class TOLNetReader(GriddedReader):
 
         return ds
 
+    def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
+        """
+        Apply TOLNet-specific naming conventions and metadata standardization.
 
-def read_tolnet(fname: str, **kwargs) -> xr.Dataset:
+        The heavy lifting is done in ``tolnet_preprocess`` which is called
+        per-file during ``read_tolnet``.  This method applies any final
+        dataset-level harmonization after files have been merged.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            Input dataset (already preprocessed per-file).
+
+        Returns
+        -------
+        xr.Dataset
+            Harmonized dataset.
+        """
+        return super().harmonize(ds)
+
+
+def read_tolnet(fname: str, chunks=None, **kwargs) -> xr.Dataset:
     """
     Read a single TOLNet HDF5 file lazily.
 
@@ -67,6 +87,10 @@ def read_tolnet(fname: str, **kwargs) -> xr.Dataset:
     ----------
     fname : str
         File path or URL.
+    chunks : dict, optional
+        Chunk sizes for dask-backed lazy loading. Pass ``{}`` for automatic
+        chunking or a mapping like ``{"time": 100}`` for explicit sizes.
+        When *None* (default) the dataset is loaded eagerly.
     **kwargs : dict
         Additional arguments passed to xr.open_dataset.
 
@@ -86,12 +110,14 @@ def read_tolnet(fname: str, **kwargs) -> xr.Dataset:
     ]
     xr_kwargs = {k: v for k, v in kwargs.items() if k in xr_keys}
 
+    # Forward the explicit chunks parameter (overrides any chunks in kwargs)
+    if chunks is not None:
+        xr_kwargs["chunks"] = chunks
+
     engine = kwargs.get("engine", "h5netcdf")
 
     # 1. Open DATA group
     try:
-        # If chunks is empty dict, it's lazy but not specifically chunked.
-        # But for h5netcdf, we might need to be careful.
         ds_data = xr.open_dataset(
             fname, group="DATA", engine=engine, phony_dims="sort", **xr_kwargs
         )

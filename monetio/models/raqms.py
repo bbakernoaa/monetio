@@ -1,10 +1,13 @@
-"""
-Reader for RAQMS real-time files. Redirection to monetio.readers.raqms
-"""
+"""RAQMS Reader. Deprecated wrapper — use monetio.load('raqms', ...) instead."""
 
+from ..readers._deprecation import deprecated_wrapper
 from ..readers.raqms import RAQMSReader  # noqa: F401
 
 
+@deprecated_wrapper(
+    "monetio.models.raqms.open_dataset",
+    'monetio.load("raqms", files=...)',
+)
 def open_dataset(fname, **kwargs):
     """Open a single dataset from RAQMS output. Currently expects netCDF file format.
 
@@ -22,6 +25,10 @@ def open_dataset(fname, **kwargs):
     return RAQMSReader().open_dataset(files=fname, **kwargs)
 
 
+@deprecated_wrapper(
+    "monetio.models.raqms.open_mfdataset",
+    'monetio.load("raqms", files=...)',
+)
 def open_mfdataset(fname, **kwargs):
     """Open a multiple file dataset from RAQMS output.
 
@@ -37,31 +44,3 @@ def open_mfdataset(fname, **kwargs):
     xarray.Dataset
     """
     return RAQMSReader().open_dataset(files=fname, **kwargs)
-
-
-def _ensure_mfdataset_filenames(fname):
-    """Checks if RAQMS netcdf dataset
-
-    Parameters
-    ----------
-    fname : str or list of str
-
-    Returns
-    -------
-    list of str
-        The file paths.
-    bool
-        Whether all of files are the expected uwhyb netCDF format.
-    """
-    from glob import glob
-    from os.path import basename
-
-    if isinstance(fname, str):
-        fpaths = sorted(glob(fname))
-    else:
-        fpaths = sorted(fname)
-
-    # Check file name is of the expected format
-    good = len(fpaths) > 0 and all(fp.endswith(".nc") and "uwhyb" in basename(fp) for fp in fpaths)
-
-    return fpaths, good

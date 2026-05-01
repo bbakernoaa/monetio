@@ -21,6 +21,95 @@ from .sat_utils import update_history
 
 logger = logging.getLogger(__name__)
 
+#: Mapping from AQS numeric parameter codes to short variable names used
+#: throughout monetio (e.g. ``88101 -> "PM2.5"``, ``44201 -> "OZONE"``).
+#: Extracted as a module-level constant so it is built once rather than
+#: recreated on every call to :meth:`AQS.get_species`.
+AQS_PARAMETER_CODES: dict[int, str] = {
+    88101: "PM2.5",
+    88502: "PM2.5",
+    44201: "OZONE",
+    81102: "PM10",
+    42401: "SO2",
+    42602: "NO2",
+    42101: "CO",
+    62101: "TEMP",
+    88305: "OC",
+    88306: "NO3f",
+    88307: "ECf",
+    88316: "ECf_optical",
+    88403: "SO4f",
+    88312: "TCf",
+    88104: "Alf",
+    88107: "Baf",
+    88313: "BCf",
+    88109: "Brf",
+    88110: "Cdf",
+    88111: "Caf",
+    88117: "Cef",
+    88118: "Csf",
+    88203: "Cl-f",
+    88115: "Clf",
+    88112: "Crf",
+    88113: "Cof",
+    88114: "Cuf",
+    88121: "Euf",
+    88143: "Auf",
+    88127: "Hff",
+    88131: "Inf",
+    88126: "Fef",
+    88146: "Laf",
+    88128: "Pbf",
+    88140: "Mgf",
+    88132: "Mnf",
+    88142: "Hgf",
+    88134: "Mof",
+    88136: "Nif",
+    88147: "Nbf",
+    88310: "NO3f",
+    88152: "Pf",
+    88303: "K+f",
+    88176: "Rbf",
+    88162: "Smf",
+    88163: "Scf",
+    88154: "Sef",
+    88165: "Sif",
+    88166: "Agf",
+    88302: "Na+f",
+    88184: "Naf",
+    88168: "Srf",
+    88169: "Sf",
+    88170: "Taf",
+    88172: "Tbf",
+    88160: "Snf",
+    88161: "Tif",
+    88186: "Wf",
+    88314: "C_370nmf",
+    88179: "Uf",
+    88164: "Vf",
+    88183: "Yf",
+    88167: "Znf",
+    88185: "Zrf",
+    88103: "Asf",
+    88105: "Bef",
+    88124: "Gaf",
+    88180: "Kf",
+    88301: "NH4+f",
+    42600: "NOY",
+    42601: "NO",
+    42603: "NOX",
+    61103: "WS",
+    61101: "WS",
+    61104: "WD",
+    61102: "WD",
+    62201: "RH",
+    62103: "DP",
+}
+
+#: String-keyed version of :data:`AQS_PARAMETER_CODES`, used for mapping
+#: against ``parameter_code`` columns that have been cast to ``str``.
+_AQS_PARAMETER_CODES_STR: dict[str, str] = {str(k): v for k, v in AQS_PARAMETER_CODES.items()}
+
 
 @register_reader("aqs")
 class AQSReader(PointReader):
@@ -411,100 +500,21 @@ class AQS:
     def get_species(
         self, df: Union[pd.DataFrame, "dd.DataFrame"], voc: bool = False
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
-        """Map parameter codes to short variable names."""
+        """Map parameter codes to short variable names.
+
+        Uses the module-level :data:`AQS_PARAMETER_CODES` mapping (and its
+        string-keyed counterpart :data:`_AQS_PARAMETER_CODES_STR`) so the
+        lookup table is built once at import time rather than on every call.
+        """
         if voc:
             df["variable"] = df.parameter_name.str.upper()
             return df
-
-        mapping = {
-            88101: "PM2.5",
-            88502: "PM2.5",
-            44201: "OZONE",
-            81102: "PM10",
-            42401: "SO2",
-            42602: "NO2",
-            42101: "CO",
-            62101: "TEMP",
-            88305: "OC",
-            88306: "NO3f",
-            88307: "ECf",
-            88316: "ECf_optical",
-            88403: "SO4f",
-            88312: "TCf",
-            88104: "Alf",
-            88107: "Baf",
-            88313: "BCf",
-            88109: "Brf",
-            88110: "Cdf",
-            88111: "Caf",
-            88117: "Cef",
-            88118: "Csf",
-            88203: "Cl-f",
-            88115: "Clf",
-            88112: "Crf",
-            88113: "Cof",
-            88114: "Cuf",
-            88121: "Euf",
-            88143: "Auf",
-            88127: "Hff",
-            88131: "Inf",
-            88126: "Fef",
-            88146: "Laf",
-            88128: "Pbf",
-            88140: "Mgf",
-            88132: "Mnf",
-            88142: "Hgf",
-            88134: "Mof",
-            88136: "Nif",
-            88147: "Nbf",
-            88310: "NO3f",
-            88152: "Pf",
-            88303: "K+f",
-            88176: "Rbf",
-            88162: "Smf",
-            88163: "Scf",
-            88154: "Sef",
-            88165: "Sif",
-            88166: "Agf",
-            88302: "Na+f",
-            88184: "Naf",
-            88168: "Srf",
-            88169: "Sf",
-            88170: "Taf",
-            88172: "Tbf",
-            88160: "Snf",
-            88161: "Tif",
-            88186: "Wf",
-            88314: "C_370nmf",
-            88179: "Uf",
-            88164: "Vf",
-            88183: "Yf",
-            88167: "Znf",
-            88185: "Zrf",
-            88103: "Asf",
-            88105: "Bef",
-            88124: "Gaf",
-            88180: "Kf",
-            88301: "NH4+f",
-            42600: "NOY",
-            42601: "NO",
-            42603: "NOX",
-            61103: "WS",
-            61101: "WS",
-            61104: "WD",
-            61102: "WD",
-            62201: "RH",
-            62103: "DP",
-        }
-
-        # Convert keys to string for matching
-        mapping_str = {str(k): v for k, v in mapping.items()}
 
         if "variable" not in df.columns:
             df["variable"] = ""
 
         pcode_as_str = df["parameter_code"].astype(str)
-        df["variable"] = pcode_as_str.map(mapping_str)
+        df["variable"] = pcode_as_str.map(_AQS_PARAMETER_CODES_STR)
 
         # Handle missing mappings
         if "variable" in df.columns:

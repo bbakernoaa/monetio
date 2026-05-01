@@ -12,6 +12,61 @@ import pandas as pd
 import xarray as xr
 
 
+def apply_qa_mask(ds: xr.Dataset, qa_var: str = "qa_value", threshold: float = 0.5) -> xr.Dataset:
+    """Apply quality flag masking to a dataset.
+
+    Masks all data variables where the QA variable is below the threshold,
+    while preserving the QA variable itself and all coordinates.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset containing a QA variable.
+    qa_var : str
+        Name of the quality flag variable.
+    threshold : float
+        Minimum acceptable quality value.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with low-quality values masked as NaN.
+    """
+    if qa_var not in ds.data_vars:
+        return ds
+    qa = ds[qa_var]
+    mask = qa >= threshold
+    ds = ds.where(mask)
+    ds[qa_var] = qa  # Restore unmasked QA values
+    return ds
+
+
+def convert_ppmv_to_ppbv(ds: xr.Dataset, variables: list[str] | None = None) -> xr.Dataset:
+    """Convert gas-phase variables from ppmV to ppbV (multiply by 1000).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    variables : list of str, optional
+        Variables to convert. If None, converts all variables with
+        units containing 'ppm'.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with converted units.
+    """
+    if variables is None:
+        variables = [v for v in ds.data_vars if "ppm" in ds[v].attrs.get("units", "").lower()]
+    for var in variables:
+        if var in ds.data_vars:
+            ds[var] = ds[var] * 1000.0
+            if "units" in ds[var].attrs:
+                ds[var].attrs["units"] = ds[var].attrs["units"].replace("ppm", "ppb")
+    return ds
+
+
 def lazy_index_along_axis(data: xr.DataArray, index: xr.DataArray, dim: str) -> xr.DataArray:
     """
     Index a dimension using another DataArray lazily, handling both Eager and Dask.

@@ -1,192 +1,50 @@
-import os
+"""NESDIS EPS VIIRS Reader. Deprecated wrapper — use monetio.load('nesdis_eps_viirs', ...) instead."""
 
-import xarray as xr
-
-server = "ftp.star.nesdis.noaa.gov"
-base_dir = "/pub/smcd/VIIRS_Aerosol/npp.viirs.aerosol.data/epsaot550/"
+from ..readers._deprecation import deprecated_wrapper
+from ..readers.nesdis_eps_viirs import NESDISEPSVIIRSReader  # noqa: F401
 
 
-def open_dataset(date, datapath="."):
-    """Short summary.
-
-    Parameters
-    ----------
-    date : type
-        Description of parameter `date`.
-    datapath : type
-        Description of parameter `datapath`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    current = change_dir(datapath)
-    nlat = 720
-    nlon = 1440
-    lon, lat = _get_latlons(nlat, nlon)
-    if isinstance(date, str):
-        fname, date = download_data(date)
-    else:
-        fname, date = download_data(date)
-    print(fname)
-    data = read_data(fname, lat, lon, date)
-    change_dir(current)
-    return data.where(data > 0)
-
-
-def open_mfdataset(dates, datapath="."):
-    """Short summary.
+@deprecated_wrapper(
+    "monetio.sat.nesdis_eps_viirs.open_dataset",
+    'monetio.load("nesdis_eps_viirs", files=...)',
+)
+def open_dataset(date, datapath=".", **kwargs):
+    """Open NESDIS EPS VIIRS AOT data.
 
     Parameters
     ----------
-    dates : type
-        Description of parameter `dates`.
-    datapath : type
-        Description of parameter `datapath`.
+    date : str or datetime-like
+        Date to retrieve.
+    datapath : str
+        Path to download/read data.
+    **kwargs : dict
+        Additional arguments forwarded to ``NESDISEPSVIIRSReader.open_dataset``.
 
     Returns
     -------
-    type
-        Description of returned object.
-
+    xarray.DataArray
     """
-    from xarray import concat
-
-    das = []
-    for i in dates:
-        print(i)
-        das.append(open_dataset(i, datapath=datapath))
-    ds = concat(das, dim="time")
-    return ds
+    return NESDISEPSVIIRSReader().open_dataset(dates=date, datapath=datapath, **kwargs)
 
 
-def read_data(fname, lat, lon, date):
-    """Short summary.
+@deprecated_wrapper(
+    "monetio.sat.nesdis_eps_viirs.open_mfdataset",
+    'monetio.load("nesdis_eps_viirs", files=...)',
+)
+def open_mfdataset(dates, datapath=".", **kwargs):
+    """Open multiple NESDIS EPS VIIRS AOT files.
 
     Parameters
     ----------
-    fname : type
-        Description of parameter `fname`.
-    lat : type
-        Description of parameter `lat`.
-    lon : type
-        Description of parameter `lon`.
-    date : type
-        Description of parameter `date`.
+    dates : sequence of datetime-like
+        Dates to retrieve.
+    datapath : str
+        Path to download/read data.
+    **kwargs : dict
+        Additional arguments forwarded to ``NESDISEPSVIIRSReader.open_dataset``.
 
     Returns
     -------
-    type
-        Description of returned object.
-
+    xarray.Dataset
     """
-    from pandas import to_datetime
-
-    f = xr.open_dataset(fname)
-    datearr = to_datetime([date])
-    da = f["aot_ip_out"]
-    da = da.rename({"nlat": "y", "nlon": "x"})
-    da["latitude"] = (("y", "x"), lat)
-    da["longitude"] = (("y", "x"), lon)
-    da = da.expand_dims("time")
-    da["time"] = datearr
-    da.attrs["units"] = ""
-    da.name = "VIIRS EPS AOT"
-    da.attrs["long_name"] = "Aerosol Optical Thickness"
-    da.attrs["source"] = (
-        "ftp://ftp.star.nesdis.noaa.gov/pub/smcd/VIIRS_Aerosol/npp.viirs.aerosol.data/epsaot550"
-    )
-    return da
-
-
-def change_dir(to_path):
-    """Short summary.
-
-    Parameters
-    ----------
-    to_path : type
-        Description of parameter `to_path`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    current = os.getcwd()
-    os.chdir(to_path)
-    return current
-
-
-def download_data(date, resolution="high"):
-    """Short summary.
-
-    Parameters
-    ----------
-    date : type
-        Description of parameter `date`.
-    resolution : type
-        Description of parameter `resolution`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    import ftplib
-    from datetime import datetime
-
-    from pandas import DatetimeIndex
-
-    if isinstance(date, datetime) or isinstance(date, DatetimeIndex):
-        year = date.strftime("%Y")
-        yyyymmdd = date.strftime("%Y%m%d")
-    else:
-        from pandas import Timestamp
-
-        date = Timestamp(date)
-        year = date.strftime("%Y")
-        yyyymmdd = date.strftime("%Y%m%d")
-        # npp_eaot_ip_gridded_0.25_20181222.high.nc
-    # print(year, yyyymmdd)
-    file = f"npp_eaot_ip_gridded_0.25_{yyyymmdd}.high.nc"
-    exists = os.path.isfile(file)
-    if ~exists:
-        ftp = ftplib.FTP(server)
-        ftp.login()
-        ftp.cwd(base_dir + year)
-        ftp.retrbinary("RETR " + file, open(file, "wb").write)
-    else:
-        print(f"File Already Exists! Reading: {file}")
-    return file, date
-
-
-def _get_latlons(nlat, nlon):
-    """Short summary.
-
-    Parameters
-    ----------
-    nlat : type
-        Description of parameter `nlat`.
-    nlon : type
-        Description of parameter `nlon`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    from numpy import linspace, meshgrid
-
-    lon_min = -179.875
-    lon_max = -1 * lon_min
-    lat_min = -89.875
-    lat_max = -1.0 * lat_min
-    lons = linspace(lon_min, lon_max, nlon)
-    lats = linspace(lat_max, lat_min, nlat)
-    lon, lat = meshgrid(lons, lats)
-    return lon, lat
+    return NESDISEPSVIIRSReader().open_dataset(dates=dates, datapath=datapath, **kwargs)
