@@ -74,11 +74,11 @@ class HYSPLITReader(GriddedReader):
             read_method=open_dataset_hysplit,
             lazy=lazy,
             preprocess=None,  # HYSPLIT handles its own preprocessing
-            **read_kwargs,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
             use_icechunk=use_icechunk,
             icechunk_url=icechunk_url,
+            **read_kwargs,
             **kwargs,
         )
 

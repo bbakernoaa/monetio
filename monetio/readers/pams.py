@@ -27,6 +27,10 @@ class PAMSReader(PointReader):
         self,
         files: str | list[str],
         as_xarray: bool = True,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs: Any,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -60,7 +64,15 @@ class PAMSReader(PointReader):
         }
 
         # Use PandasDriver to open files
-        df = self.driver.open(files, read_method=read_pams, **reader_kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_pams,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **reader_kwargs,
+        )
 
         df = self.harmonize(df)
 

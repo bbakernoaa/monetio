@@ -26,6 +26,10 @@ class NDBCReader(PointReader):
         n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -74,6 +78,10 @@ class NDBCReader(PointReader):
             read_method=read_func,
             as_xarray=False,
             lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
             **kwargs,
         )
 

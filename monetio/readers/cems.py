@@ -34,6 +34,10 @@ class CEMSReader(PointReader):
         n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs: dict,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -90,7 +94,16 @@ class CEMSReader(PointReader):
             k: v for k, v in kwargs.items() if k not in ["expand2d", "pivot", "wide_fmt"]
         }
 
-        df = self.driver.open(files, read_method=read_cems, lazy=lazy, **reader_kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_cems,
+            lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **reader_kwargs,
+        )
 
         df = self.harmonize(df)
 

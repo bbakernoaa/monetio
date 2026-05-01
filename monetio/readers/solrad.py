@@ -194,6 +194,10 @@ class SOLRADReader(PointReader):
         sites: list[str] | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs: dict,
     ) -> Union[xr.Dataset, pd.DataFrame, "dd.DataFrame"]:
         """
@@ -238,7 +242,16 @@ class SOLRADReader(PointReader):
         }
 
         # We use read_solrad as the custom read_method
-        df = self.driver.open(files, read_method=read_solrad, lazy=lazy, **driver_kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_solrad,
+            lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **driver_kwargs,
+        )
 
         # Post-processing: Harmonize column names
         df = self._postprocess(df)

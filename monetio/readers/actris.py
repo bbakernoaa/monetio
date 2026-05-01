@@ -214,6 +214,10 @@ class ACTRISReader(PointReader):
         siteid: str | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
@@ -287,7 +291,16 @@ class ACTRISReader(PointReader):
         kwargs.setdefault("read_method", read_actris)
 
         # Use base class to open
-        df = super().open_dataset(files, as_xarray=False, lazy=lazy, **kwargs)
+        df = super().open_dataset(
+            files,
+            as_xarray=False,
+            lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         df = self.harmonize(df)
 

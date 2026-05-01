@@ -459,6 +459,10 @@ class PandasDriver:
         read_method: str | Callable = "read_csv",
         lazy: bool = False,
         meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         file_list = FileUtility.expand_paths(files)

@@ -352,6 +352,10 @@ class IGRA2Reader(PointReader):
         add_metadata: bool = True,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -363,7 +367,16 @@ class IGRA2Reader(PointReader):
             files = self.build_urls(sites=site, derived=derived)
 
         read_method = read_igra2_derived if derived else read_igra2
-        df = self.driver.open(files, read_method=read_method, lazy=lazy, **kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_method,
+            lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         if add_metadata:
             stations = self.read_station_list()

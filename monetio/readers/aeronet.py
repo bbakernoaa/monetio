@@ -45,6 +45,10 @@ class AERONETReader(PointReader):
         retries: int = 5,
         backoff_factor: float = 2.0,
         n_chunks: int | None = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs: dict,
     ) -> pd.DataFrame | xr.Dataset:
         """
@@ -192,6 +196,10 @@ class AERONETReader(PointReader):
             as_xarray=False,
             lazy=use_dask,
             meta=meta,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
             **kwargs,
         )
 

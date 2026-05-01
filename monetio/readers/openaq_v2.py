@@ -26,6 +26,10 @@ class OpenAQV2Reader(PointReader):
         sites: list[str] = None,
         wide_fmt: bool = True,
         files: str | list[str] = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, "xr.Dataset"]:
         """

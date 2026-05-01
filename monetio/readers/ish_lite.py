@@ -115,6 +115,10 @@ class ISHLiteReader(PointReader):
         source: str | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -193,7 +197,16 @@ class ISHLiteReader(PointReader):
             raise ValueError("Must provide either 'files' or 'dates'.")
 
         # Use driver directly
-        df = self.driver.open(files, read_method=read_ish_lite_file, lazy=lazy, **kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_ish_lite_file,
+            lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         # Filtering by date if requested
         if dates is not None:

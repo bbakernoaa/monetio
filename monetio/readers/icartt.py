@@ -146,6 +146,10 @@ class ICARTTReader(PointReader):
         files: str | list[str],
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs: Any,
     ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
@@ -180,7 +184,16 @@ class ICARTTReader(PointReader):
         header = parse_icartt_header(file_list[0])
 
         # Open data
-        df = self.driver.open(files, read_method=read_icartt, lazy=lazy, **kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_icartt,
+            lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         if lazy:
             # For Dask, we apply scaling and missing values via map_partitions

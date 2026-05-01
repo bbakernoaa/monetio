@@ -193,6 +193,10 @@ class CRNReader(PointReader):
         latlonbox: list[float] | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> xr.Dataset | pd.DataFrame:
         """
@@ -235,7 +239,16 @@ class CRNReader(PointReader):
             files = self.retrieve(files)
 
         # We use read_crn as the custom read_method
-        df = self.driver.open(files, read_method=read_crn, lazy=lazy, **kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_crn,
+            lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         # Post-processing: Merge with monitor info and fix columns
         df = self._postprocess(df, latlonbox=latlonbox)

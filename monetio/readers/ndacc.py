@@ -31,6 +31,10 @@ class NDACCReader(GEOMSReader):
         siteid: str | None = None,
         instrument: str | None = None,
         as_xarray: bool = True,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs: Any,
     ) -> xr.Dataset | pd.DataFrame:
         """
@@ -66,7 +70,14 @@ class NDACCReader(GEOMSReader):
                 return xr.Dataset()
             return pd.DataFrame()
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **kwargs,
+        )
 
         if not as_xarray:
             return ds.to_dataframe().reset_index()

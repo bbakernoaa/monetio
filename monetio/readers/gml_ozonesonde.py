@@ -31,6 +31,10 @@ class GMLOzonesondeReader(PointReader):
         errors: str = "raise",
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -90,7 +94,16 @@ class GMLOzonesondeReader(PointReader):
 
         # Use PandasDriver to open files
         # We pass read_100m as the read_method
-        df = self.driver.open(files, read_method=read_100m, lazy=lazy, **reader_kwargs)
+        df = self.driver.open(
+            files,
+            read_method=read_100m,
+            lazy=lazy,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            **reader_kwargs,
+        )
 
         df = self.harmonize(df)
 

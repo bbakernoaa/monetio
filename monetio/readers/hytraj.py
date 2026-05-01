@@ -32,6 +32,10 @@ class HYTRAJReader(PointReader):
         renumber: bool = False,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs: Any,
     ) -> pd.DataFrame | xr.Dataset | dd.DataFrame:
         """
@@ -87,6 +91,10 @@ class HYTRAJReader(PointReader):
                     lazy=lazy,
                     tag=tag,
                     renumber_index=renumber_index,
+                    use_virtualizarr=use_virtualizarr,
+                    virtualizarr_file=virtualizarr_file,
+                    use_icechunk=use_icechunk,
+                    icechunk_url=icechunk_url,
                     **driver_kwargs,
                 )
                 dsets.append(ds_single)
@@ -104,7 +112,16 @@ class HYTRAJReader(PointReader):
                 df = update_history(df, "Renumbered trajectories for global uniqueness.")
         else:
             # Standard path
-            df = self.driver.open(files, read_method=read_hytraj_file, lazy=lazy, **driver_kwargs)
+            df = self.driver.open(
+                files,
+                read_method=read_hytraj_file,
+                lazy=lazy,
+                use_virtualizarr=use_virtualizarr,
+                virtualizarr_file=virtualizarr_file,
+                use_icechunk=use_icechunk,
+                icechunk_url=icechunk_url,
+                **driver_kwargs,
+            )
 
         df = self.harmonize(df)
 

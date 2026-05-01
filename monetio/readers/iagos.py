@@ -31,6 +31,10 @@ class IAGOSReader(PointReader):
         dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
         as_xarray: bool = True,
         lazy: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
