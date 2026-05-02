@@ -2,13 +2,13 @@
 
 import datetime
 import os
+from functools import partial
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
-from .drivers import FileUtility
 from .sat_utils import update_history
 
 BASE_URL = "https://gsce-dtn.sdstate.edu/index.php/s/e8wPYPOL1bGXk5z/download?path=%2F"
@@ -22,11 +22,9 @@ class NESDISFRPReader(GriddedReader):
 
     def open_dataset(
         self,
+        files: str | list[str] = None,
         date: datetime.datetime | str | pd.Timestamp = None,
         ftype: str = "meanFRP",
-        datapath: str = ".",
-        lazy: bool = False,
-        files: str | list[str] = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -34,16 +32,14 @@ class NESDISFRPReader(GriddedReader):
 
         Parameters
         ----------
-        date : datetime.datetime, str, or pd.Timestamp
-            Date to retrieve.
+        files : str or list[str], optional
+            File path(s) or URL(s).
+        date : datetime.datetime, str, or pd.Timestamp, optional
+            Date to retrieve. If files is None, this is used to build URLs.
         ftype : str, optional
             Type of FRP data (e.g., 'meanFRP'). Default is 'meanFRP'.
-        datapath : str, optional
-            Local path to store downloaded files. Default is '.'.
-        lazy : bool, optional
-            Whether to read data lazily using Dask, by default False.
         **kwargs : dict
-            Additional arguments.
+            Additional arguments passed to XarrayDriver.open.
 
         Returns
         -------
@@ -53,118 +49,196 @@ class NESDISFRPReader(GriddedReader):
         Examples
         --------
         >>> reader = NESDISFRPReader()
-        >>> ds = reader.open_dataset("2023-01-01", ftype="meanFRP")
+        >>> ds = reader.open_dataset(date="2023-01-01", ftype="meanFRP")
         """
-        date = pd.Timestamp(date)
+        if files is None:
+            if date is None:
+                raise ValueError("Either 'files' or 'date' must be provided.")
+            files = self.build_urls(date, ftype=ftype)
 
-        if not os.path.exists(datapath):
-            os.makedirs(datapath, exist_ok=True)
+        if "preprocess" not in kwargs:
+            kwargs["preprocess"] = partial(nesdis_frp_preprocess, ftype=ftype)
 
-        # Download tiles (1-6)
-        files = self.download_data(date, ftype=ftype, datapath=datapath)
+        if "read_method" not in kwargs:
+            kwargs["read_method"] = read_nesdis_frp_binary
 
-        das = []
-        for i, fname in enumerate(files):
-            tile_num = i + 1
-            da = self.read_tile(fname, tile=tile_num, lazy=lazy)
-            das.append(da)
+        # Forward ftype to read_method
+        kwargs["ftype"] = ftype
 
-        ds = xr.concat(das, dim="tile")
-        ds = ds.assign_coords(tile=np.arange(1, 7), time=date).expand_dims("time")
-        ds = ds.to_dataset(name=ftype)
+        # We concatenate tiles in the reading step if possible, or use XarrayDriver's concat
+        # Actually, each file is a tile.
+        if "concat_dim" not in kwargs:
+            kwargs["concat_dim"] = "tile"
+        if "combine" not in kwargs:
+            kwargs["combine"] = "nested"
 
-        # Scientific Hygiene: Coordinate standardization
-        if "longitude" in ds.coords:
-            ds["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
-        if "latitude" in ds.coords:
-            ds["latitude"].attrs.update({"units": "degrees_north", "standard_name": "latitude"})
+        ds = super().open_dataset(files, **kwargs)
 
         # Update history
-        ds = update_history(ds, f"Read NESDIS {ftype} data from {len(files)} tiles.")
+        ds = update_history(ds, f"Read NESDIS {ftype} data.")
 
         return ds
 
-    def download_data(
-        self, date: pd.Timestamp, ftype: str = "meanFRP", datapath: str = "."
+    def build_urls(
+        self, date: datetime.datetime | str | pd.Timestamp, ftype: str = "meanFRP"
     ) -> list[str]:
         """
-        Download NESDIS FRP data from the GSCE server.
+        Build URLs for NESDIS FRP data based on date.
 
         Parameters
         ----------
-        date : pd.Timestamp
-            Date to download.
+        date : datetime.datetime, str, or pd.Timestamp
+            Date to retrieve.
         ftype : str, optional
             File type (e.g., 'meanFRP'), by default "meanFRP".
-        datapath : str, optional
-            Local directory to save files, by default ".".
 
         Returns
         -------
-        List[str]
-            List of paths to the downloaded files.
+        list[str]
+            List of URLs.
+
+        Examples
+        --------
+        >>> reader = NESDISFRPReader()
+        >>> urls = reader.build_urls("2023-01-01")
         """
+        date = pd.Timestamp(date)
         yyyymmdd = date.strftime("%Y%m%d")
         url_ftype = f"&files={ftype}."
 
-        files = []
+        urls = []
         for i in range(1, 7):
             tile = f".FV3C384Grid.tile{i}.bin"
             url = f"{BASE_URL}{yyyymmdd}{url_ftype}{yyyymmdd}{tile}"
-            filename = f"{ftype}.{yyyymmdd}.FV3.C384Grid.tile{i}.bin"
-            filepath = os.path.join(datapath, filename)
+            urls.append(url)
 
-            if not os.path.isfile(filepath):
-                fs = FileUtility.get_fs(url)
-                fs.get(url, filepath)
+        return urls
 
-            files.append(filepath)
 
-        return files
+def read_nesdis_frp_binary(fname: str, **kwargs) -> xr.Dataset:
+    """
+    Read a single NESDIS FRP tile from a binary file.
+    Supports streaming from fsspec-compatible files.
 
-    def read_tile(
-        self,
-        fname: str,
-        tile: int = 1,
-        res: str = "C384",
-        dtype: str = "f4",
-        lazy: bool = False,
-    ) -> xr.DataArray:
-        """
-        Read a single NESDIS FRP tile from a binary file.
+    Parameters
+    ----------
+    fname : str
+        Path or URL to the binary file.
+    **kwargs : dict
+        Additional arguments (res, dtype, lazy).
 
-        Parameters
-        ----------
-        fname : str
-            Path to the binary file.
-        tile : int, optional
-            Tile number (1-6), by default 1.
-        res : str, optional
-            Grid resolution, by default "C384".
-        dtype : str, optional
-            Data type in the binary file, by default "f4".
-        lazy : bool, optional
-            Whether to use Dask for lazy loading, by default False.
+    Returns
+    -------
+    xr.Dataset
+        The tile data as a Dataset.
 
-        Returns
-        -------
-        xr.DataArray
-            The tile data with coordinates if fv3grid is available.
-        """
-        r = int(res[1:])
-        shape = (r, r)
+    Examples
+    --------
+    >>> ds = read_nesdis_frp_binary("meanFRP.20230101.FV3.C384Grid.tile1.bin")
+    """
+    res = kwargs.get("res", "C384")
+    dtype = kwargs.get("dtype", "f4")
+    lazy = kwargs.get("lazy", "chunks" in kwargs)
 
-        if lazy:
-            import dask.array as da
-            from dask import delayed
+    r = int(res[1:])
+    shape = (r, r)
 
-            # Define delayed reader
-            load_tile = delayed(_read_binary_tile)(fname, res, dtype)
-            data = da.from_delayed(load_tile, shape=shape, dtype=np.dtype(dtype))
-        else:
-            data = _read_binary_tile(fname, res, dtype)
+    def _read_core(filename):
+        from scipy.io import FortranFile
 
-        # Handle Grid and Coordinates
+        from .drivers import FileUtility
+
+        fs = FileUtility.get_fs(filename)
+        with fs.open(filename, "rb") as f:
+            # We need to wrap it in a seekable stream for FortranFile if it's remote
+            # But FortranFile might not like fsspec file objects if they aren't fully seekable/buffered
+            # Alternatively, read it all and use BytesIO
+            import io
+
+            # Ensure we are at the start and the stream is seekable for FortranFile
+            buffer = io.BytesIO(f.read())
+            w = FortranFile(buffer)
+            try:
+                a = w.read_reals(dtype=dtype)
+            except Exception:
+                # Fallback: maybe it's not a reals record but a simple binary dump
+                # FortranFile expects header/footer. If missing, it fails.
+                buffer.seek(0)
+                a = np.frombuffer(buffer.read(), dtype=dtype)
+        return a.reshape((r, r), order="F").copy()
+
+    if lazy:
+        import dask.array as da
+        from dask import delayed
+
+        load_tile = delayed(_read_core)(fname)
+        data = da.from_delayed(load_tile, shape=shape, dtype=np.dtype(dtype))
+    else:
+        data = _read_core(fname)
+
+    # Extract tile and date from filename if possible
+    # Example: meanFRP.20230101.FV3.C384Grid.tile1.bin
+    tile = 1
+    date = None
+    basename = os.path.basename(fname)
+    try:
+        import re
+
+        tile_match = re.search(r"tile(\d+)", basename)
+        if tile_match:
+            tile = int(tile_match.group(1))
+
+        date_match = re.search(r"(\d{8})", basename)
+        if date_match:
+            date = pd.to_datetime(date_match.group(1))
+    except (ValueError, TypeError):
+        pass
+
+    ds = xr.Dataset(data_vars={"frp": (("x", "y"), data)}, coords={"tile": tile})
+
+    if date:
+        ds = ds.assign_coords(time=date).expand_dims("time")
+
+    return ds
+
+
+def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
+    """
+    Preprocess NESDIS FRP dataset: assign coordinates and metadata.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset.
+    ftype : str, optional
+        File type, by default "meanFRP".
+
+    Returns
+    -------
+    xr.Dataset
+        Processed dataset.
+
+    Examples
+    --------
+    >>> ds = nesdis_frp_preprocess(ds, ftype="meanFRP")
+    """
+    # 1. Rename to ftype if it was generic
+    if "frp" in ds.data_vars and ftype != "frp":
+        ds = ds.rename({"frp": ftype})
+
+    # 2. Handle Grid and Coordinates
+    # We assume C384 for now as per legacy reader
+    res = "C384"
+    # ds.tile is usually a scalar coordinate if it's from a single file (tile)
+    # but could be an array if concatenated.
+    try:
+        tile = int(ds.tile.values) if not hasattr(ds.tile.data, "dask") else None
+    except (TypeError, ValueError):
+        tile = None
+
+    # If tile is dask-backed, we might need to be careful.
+    # But tile should be a coordinate, usually small and eager.
+    if tile is not None:
         try:
             import fv3grid as fg
 
@@ -172,44 +246,27 @@ class NESDISFRPReader(GriddedReader):
             # Wrap longitudes to [-180, 180]
             lon = (grid.longitude + 180) % 360 - 180
             lat = grid.latitude
-            coords = {"latitude": (("x", "y"), lat), "longitude": (("x", "y"), lon)}
+
+            ds = ds.assign_coords(
+                latitude=(("x", "y"), lat),
+                longitude=(("x", "y"), lon),
+            )
+
+            ds.latitude.attrs.update({"units": "degrees_north", "standard_name": "latitude"})
+            ds.longitude.attrs.update({"units": "degrees_east", "standard_name": "longitude"})
         except ImportError:
-            coords = None
+            pass
 
-        if coords:
-            da = xr.DataArray(data, dims=("x", "y"), coords=coords)
-        else:
-            da = xr.DataArray(data, dims=("x", "y"))
+    # 3. Scientific Hygiene: Metadata
+    if ftype in ds.data_vars:
+        ds[ftype].attrs.update(
+            {
+                "long_name": f"NESDIS {ftype} Fire Radiative Power",
+                "units": "MW",  # Assuming MW for FRP
+            }
+        )
 
-        # Update history on the DataArray if possible
-        da = update_history(da, f"Read tile {tile} from {fname} (lazy={lazy}).")
+    # Provenance
+    ds = update_history(ds, f"Preprocessed NESDIS {ftype} data via Aero Protocol.")
 
-        return da
-
-
-def _read_binary_tile(fname: str, res: str, dtype: str) -> np.ndarray:
-    """
-    Core binary reading logic for a single tile.
-
-    Parameters
-    ----------
-    fname : str
-        File path.
-    res : str
-        Grid resolution (e.g., 'C384').
-    dtype : str
-        Numpy dtype string.
-
-    Returns
-    -------
-    np.ndarray
-        Reshaped data array.
-    """
-    from scipy.io import FortranFile
-
-    r = int(res[1:])
-    with open(fname, "rb") as f:
-        w = FortranFile(f)
-        a = w.read_reals(dtype=dtype)
-
-    return a.reshape((r, r), order="F")
+    return ds
