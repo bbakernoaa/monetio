@@ -1,8 +1,11 @@
 import gzip
+
 import numpy as np
 import pytest
 import xarray as xr
+
 from monetio.readers.nesdis_edr_viirs import NESDISEDRVIIRSReader
+
 
 @pytest.fixture
 def mock_edr_binary(tmp_path):
@@ -19,6 +22,7 @@ def mock_edr_binary(tmp_path):
         f.write(data.tobytes())
 
     return str(fname), data[0, :, :]
+
 
 def test_nesdis_edr_viirs_eager(mock_edr_binary):
     fname, expected_data = mock_edr_binary
@@ -43,6 +47,7 @@ def test_nesdis_edr_viirs_eager(mock_edr_binary):
     assert "time" in ds.coords
     assert ds.time.values[0] == np.datetime64("2023-01-01")
 
+
 def test_nesdis_edr_viirs_lazy(mock_edr_binary):
     fname, expected_data = mock_edr_binary
     reader = NESDISEDRVIIRSReader()
@@ -62,6 +67,7 @@ def test_nesdis_edr_viirs_lazy(mock_edr_binary):
     mask = ~np.isnan(ds_computed.aod_550.values[0])
     np.testing.assert_allclose(ds_computed.aod_550.values[0][mask], expected_data[mask])
 
+
 def test_nesdis_edr_viirs_consistency(mock_edr_binary):
     fname, _ = mock_edr_binary
     reader = NESDISEDRVIIRSReader()
@@ -70,6 +76,7 @@ def test_nesdis_edr_viirs_consistency(mock_edr_binary):
     ds_lazy = reader.open_dataset(files=fname, lazy=True).compute()
 
     xr.testing.assert_allclose(ds_eager, ds_lazy)
+
 
 def test_build_urls():
     reader = NESDISEDRVIIRSReader()
