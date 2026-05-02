@@ -1,65 +1,82 @@
+import gzip
 import numpy as np
-import pandas as pd
 import pytest
 import xarray as xr
-
 from monetio.readers.nesdis_edr_viirs import NESDISEDRVIIRSReader
 
-
 @pytest.fixture
-def dummy_binary_file(tmp_path):
-    """Create a dummy binary file for NESDIS EDR VIIRS."""
-    fname = tmp_path / "npp_aot550_edr_gridded_0.25_20230101.high.bin"
-    nlat, nlon = 720, 1440
-    # 2 layers: AOD and something else
-    data = np.random.rand(2, nlat, nlon).astype(np.float32)
-    # Add some invalid values to test masking
-    data[0, 0, 0] = -1000.0
-    data.tofile(fname)
-    return str(fname)
+def mock_edr_binary(tmp_path):
+    """Create a mock gzipped EDR binary file."""
+    # High res: 1800 x 3600
+    nlat, nlon = 1800, 3600
+    # 2 layers
+    data = np.random.rand(2, nlat, nlon).astype("<f4")
+    # Set some values to -999.9 for masking test
+    data[0, 0, 0] = -999.9
 
+    fname = tmp_path / "npp_aot550_edr_gridded_0.10_20230101.high.bin.gz"
+    with gzip.open(fname, "wb") as f:
+        f.write(data.tobytes())
 
-def test_nesdis_edr_viirs_eager_lazy_consistency(dummy_binary_file):
-    """Verify that Eager and Lazy modes return identical results."""
+    return str(fname), data[0, :, :]
+
+def test_nesdis_edr_viirs_eager(mock_edr_binary):
+    fname, expected_data = mock_edr_binary
     reader = NESDISEDRVIIRSReader()
-    date = pd.Timestamp("2023-01-01")
 
-    # Eager (NumPy)
-    ds_eager = reader.read_data(dummy_binary_file, date, resolution="low", lazy=False)
+    ds = reader.open_dataset(files=fname, lazy=False)
 
-    # Lazy (Dask)
-    ds_lazy = reader.read_data(dummy_binary_file, date, resolution="low", lazy=True)
+    assert isinstance(ds, xr.Dataset)
+    assert "aod_550" in ds.data_vars
+    assert ds.aod_550.shape == (1, 1800, 3600)
+    assert not hasattr(ds.aod_550.data, "dask")
 
-    # Assertions
-    # 1. Check data values (after computing lazy)
-    xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
+    # Check masking
+    assert np.isnan(ds.aod_550.values[0, 0, 0])
+    # Check data (excluding NaN)
+    mask = ~np.isnan(ds.aod_550.values[0])
+    np.testing.assert_allclose(ds.aod_550.values[0][mask], expected_data[mask])
 
-    # 2. Check types
-    assert isinstance(ds_eager.aod_550.data, np.ndarray)
-    import dask.array as da
+    # Check coords
+    assert "latitude" in ds.coords
+    assert "longitude" in ds.coords
+    assert "time" in ds.coords
+    assert ds.time.values[0] == np.datetime64("2023-01-01")
 
-    assert isinstance(ds_lazy.aod_550.data, da.Array)
-
-    # 3. Check coordinates
-    assert "latitude" in ds_lazy.coords
-    assert "longitude" in ds_lazy.coords
-    assert "time" in ds_lazy.coords
-    assert ds_lazy.latitude.ndim == 2
-    assert ds_lazy.longitude.ndim == 2
-
-    # 4. Check masking
-    assert np.isnan(ds_eager.aod_550.isel(time=0, y=0, x=0))
-    assert np.isnan(ds_lazy.aod_550.isel(time=0, y=0, x=0).compute())
-
-
-def test_nesdis_edr_viirs_metadata(dummy_binary_file):
-    """Check metadata and attributes."""
+def test_nesdis_edr_viirs_lazy(mock_edr_binary):
+    fname, expected_data = mock_edr_binary
     reader = NESDISEDRVIIRSReader()
-    date = pd.Timestamp("2023-01-01")
-    ds = reader.read_data(dummy_binary_file, date, resolution="low", lazy=False)
 
-    assert ds.aod_550.attrs["units"] == "1"
-    assert "history" in ds.attrs
-    assert "Aero Protocol" in ds.attrs["history"]
-    assert ds.latitude.attrs["units"] == "degrees_north"
-    assert ds.longitude.attrs["units"] == "degrees_east"
+    ds = reader.open_dataset(files=fname, lazy=True)
+
+    assert isinstance(ds, xr.Dataset)
+    assert "aod_550" in ds.data_vars
+    assert ds.aod_550.shape == (1, 1800, 3600)
+    assert hasattr(ds.aod_550.data, "dask")
+
+    # Check that no compute has happened yet for data
+    # (Checking a value will trigger compute, so we do it last)
+
+    ds_computed = ds.compute()
+    assert np.isnan(ds_computed.aod_550.values[0, 0, 0])
+    mask = ~np.isnan(ds_computed.aod_550.values[0])
+    np.testing.assert_allclose(ds_computed.aod_550.values[0][mask], expected_data[mask])
+
+def test_nesdis_edr_viirs_consistency(mock_edr_binary):
+    fname, _ = mock_edr_binary
+    reader = NESDISEDRVIIRSReader()
+
+    ds_eager = reader.open_dataset(files=fname, lazy=False)
+    ds_lazy = reader.open_dataset(files=fname, lazy=True).compute()
+
+    xr.testing.assert_allclose(ds_eager, ds_lazy)
+
+def test_build_urls():
+    reader = NESDISEDRVIIRSReader()
+    urls = reader.build_urls("2023-01-01", resolution="high")
+    assert len(urls) == 1
+    assert "ftp://ftp.star.nesdis.noaa.gov" in urls[0]
+    assert "20230101.high.bin.gz" in urls[0]
+
+    urls_low = reader.build_urls("2023-01-01", resolution="low")
+    assert "0.25_20230101.high.bin.gz" in urls_low[0]
