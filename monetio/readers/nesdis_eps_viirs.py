@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import add_time_coord, standardize_satellite_coords, update_history
 
 
@@ -19,8 +19,8 @@ class NESDISEPSVIIRSReader(GriddedReader):
 
     def open_dataset(
         self,
-        files: str | list[str] = None,
-        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
+        files: str | list[str] | None = None,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -28,9 +28,9 @@ class NESDISEPSVIIRSReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]], optional
+        files : str | list[str] | None, optional
             File path(s) or URL(s).
-        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
+        dates : pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None, optional
             Dates to retrieve. If files is None, this is used to build URLs.
         **kwargs : dict
             Additional arguments passed to XarrayDriver.open.
@@ -39,6 +39,11 @@ class NESDISEPSVIIRSReader(GriddedReader):
         -------
         xr.Dataset
             The NESDIS EPS VIIRS dataset.
+
+        Examples
+        --------
+        >>> reader = NESDISEPSVIIRSReader()
+        >>> ds = reader.open_dataset(dates="2023-01-01")
         """
         if files is None:
             if dates is None:
@@ -66,13 +71,18 @@ class NESDISEPSVIIRSReader(GriddedReader):
 
         Parameters
         ----------
-        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+        dates : pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str
             Dates to retrieve.
 
         Returns
         -------
-        List[str]
+        list[str]
             List of FTP URLs.
+
+        Examples
+        --------
+        >>> reader = NESDISEPSVIIRSReader()
+        >>> urls = reader.build_urls("2023-01-01")
         """
         if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
@@ -105,6 +115,10 @@ def nesdis_eps_viirs_preprocess(ds: xr.Dataset) -> xr.Dataset:
     -------
     xr.Dataset
         Processed dataset.
+
+    Examples
+    --------
+    >>> ds = nesdis_eps_viirs_preprocess(ds)
     """
     # 1. Standardize dimensions and coordinates
     ds = standardize_satellite_coords(ds)
@@ -119,13 +133,19 @@ def nesdis_eps_viirs_preprocess(ds: xr.Dataset) -> xr.Dataset:
         lon_max = -1.0 * lon_min
         lat_min = -89.875
         lat_max = -1.0 * lat_min
-        lons = np.linspace(lon_min, lon_max, nlon)
+        lons = np.linspace(lon_min, lon_max, nlon).astype(np.float32)
         # EPS uses descending latitudes (lat_max to lat_min)
-        lats = np.linspace(lat_max, lat_min, nlat)
+        lats = np.linspace(lat_max, lat_min, nlat).astype(np.float32)
 
         # Lazy coordinate generation using xr.broadcast
         lon1d = xr.DataArray(lons, dims=("x",), name="longitude")
         lat1d = xr.DataArray(lats, dims=("y",), name="latitude")
+
+        # Handle Dask if the dataset is chunked
+        if hasattr(ds, "chunks") and ds.chunks:
+            lon1d = lon1d.chunk({"x": ds.chunks.get("x", "auto")})
+            lat1d = lat1d.chunk({"y": ds.chunks.get("y", "auto")})
+
         lat2d, lon2d = xr.broadcast(lat1d, lon1d)
 
         ds = ds.assign_coords(
@@ -151,5 +171,11 @@ def nesdis_eps_viirs_preprocess(ds: xr.Dataset) -> xr.Dataset:
                 "standard_name": "atmosphere_optical_thickness_due_to_ambient_aerosol",
             }
         )
+
+    # 5. Scientific Hygiene
+    ds = _scientific_hygiene(ds)
+
+    # 6. Update history
+    ds = update_history(ds, "Preprocessed NESDIS EPS VIIRS data.")
 
     return ds
