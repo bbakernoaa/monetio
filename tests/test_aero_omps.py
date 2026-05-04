@@ -22,14 +22,24 @@ def test_omps_l2_consistency(lazy):
         {
             "ColumnAmountO3": (
                 ("scanline", "ground_pixel"),
-                np.array([[300.0, 400.0, 50.0, 750.0], [300.0, 300.0, 300.0, 300.0], [0.0, 0.0, 0.0, 0.0]], dtype=np.float32),
+                np.array(
+                    [
+                        [300.0, 400.0, 50.0, 750.0],
+                        [300.0, 300.0, 300.0, 300.0],
+                        [0.0, 0.0, 0.0, 0.0],
+                    ],
+                    dtype=np.float32,
+                ),
                 {"units": " DU ", "long_name": " Total Ozone "},
             ),
             "Time": (("scanline",), time_raw),
             "Latitude": (("scanline", "ground_pixel"), np.zeros((n_scan, n_pixel))),
             "Longitude": (("scanline", "ground_pixel"), np.zeros((n_scan, n_pixel))),
             "RadiativeCloudFraction": (("scanline", "ground_pixel"), np.zeros((n_scan, n_pixel))),
-            "QualityFlags": (("scanline", "ground_pixel"), np.zeros((n_scan, n_pixel), dtype=np.int32)),
+            "QualityFlags": (
+                ("scanline", "ground_pixel"),
+                np.zeros((n_scan, n_pixel), dtype=np.int32),
+            ),
         }
     )
 

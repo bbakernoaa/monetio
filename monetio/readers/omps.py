@@ -1,6 +1,5 @@
 """OMPS Reader"""
 
-import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, _scientific_hygiene, register_reader
