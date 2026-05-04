@@ -72,7 +72,7 @@ class NDACCReader(GEOMSReader):
             return ds.to_dataframe().reset_index()
 
         # Update history
-        ds = update_history(ds, "Read NDACC data via Aero Protocol.")
+        ds = update_history(ds, "Read NDACC data using standardized preprocessing.")
 
         return ds
 

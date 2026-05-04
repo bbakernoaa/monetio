@@ -49,7 +49,7 @@ def test_tolnet_reader_eager(mock_tolnet_file):
     assert np.isnan(ds.ozone_mixing_ratio.isel(z=0, time=0).values)
 
     # Check history
-    assert "Read TOLNet data via Aero Protocol." in ds.attrs["history"]
+    assert "Read TOLNet data using standardized preprocessing." in ds.attrs["history"]
 
 
 def test_tolnet_reader_lazy(mock_tolnet_file):

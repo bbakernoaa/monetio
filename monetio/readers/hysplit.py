@@ -856,7 +856,7 @@ def mass_loading(
 
     # 4. Provenance and scientific hygiene
     if isinstance(ml, xr.Dataset):
-        ml = update_history(ml, "Calculated mass loading via Aero Protocol.")
+        ml = update_history(ml, "Calculated mass loading using standardized preprocessing.")
     elif isinstance(ml, xr.DataArray):
         # Ensure name is reasonable
         if hasattr(xrash, "name"):
@@ -865,7 +865,7 @@ def mass_loading(
         if hasattr(ml, "attrs"):
             if "history" in xrash.attrs:
                 ml.attrs["history"] = xrash.attrs["history"]
-            ml = update_history(ml, "Calculated mass loading via Aero Protocol.")
+            ml = update_history(ml, "Calculated mass loading using standardized preprocessing.")
 
     return ml
 

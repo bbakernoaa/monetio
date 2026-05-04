@@ -603,7 +603,7 @@ def force_object_strings(df):
     except ImportError:
         is_dask = False
 
-    # Preserve attributes (Aero Protocol: Scientific Hygiene)
+    # Preserve attributes (scientific hygiene)
     attrs = getattr(df, "attrs", {}).copy()
 
     if is_dask:
@@ -761,7 +761,7 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
                         except Exception:
                             pass
 
-        # Copy attributes from original dataset (Aero Protocol: Scientific Hygiene)
+        # Copy attributes from original dataset (scientific hygiene)
         for k, v in ds.attrs.items():
             if k not in ds2d.attrs:
                 ds2d.attrs[k] = v

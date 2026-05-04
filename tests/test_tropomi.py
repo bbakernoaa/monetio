@@ -245,7 +245,7 @@ def test_tropomi_multi_group(monkeypatch):
 
 def test_tropomi_eager_lazy_consistency():
     """
-    Strict Aero Protocol Check: Verify Eager (NumPy) and Lazy (Dask)
+    Strict consistency check: Verify Eager (NumPy) and Lazy (Dask)
     produce identical results for TROPOMI preprocessing.
     """
     # Create a base dataset

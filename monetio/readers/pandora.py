@@ -82,7 +82,7 @@ class PandoraReader(GEOMSReader):
             return ds.to_dataframe().reset_index()
 
         # Update history
-        ds = update_history(ds, "Read Pandora data via Aero Protocol.")
+        ds = update_history(ds, "Read Pandora data using standardized preprocessing.")
 
         return ds
 

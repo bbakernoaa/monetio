@@ -136,7 +136,7 @@ def read_icartt(filename: str, **kwargs: Any) -> pd.DataFrame:
 @register_reader("icartt")
 class ICARTTReader(PointReader):
     """
-    ICARTT Data Reader following the Aero Protocol.
+    ICARTT Data Reader following standard conventions.
     """
 
     fixed_location = False
@@ -184,7 +184,7 @@ class ICARTTReader(PointReader):
 
         if lazy:
             # For Dask, we apply scaling and missing values via map_partitions
-            # or we do it after converting to Xarray (preferable for Aero Protocol)
+            # or we do it after converting to Xarray (preferable for backend-agnostic lazy processing)
             pass
 
         df = self.harmonize(df)
@@ -209,7 +209,7 @@ class ICARTTReader(PointReader):
                 }
             )
 
-            ds = update_history(ds, "Read ICARTT data via Aero Protocol.")
+            ds = update_history(ds, "Read ICARTT data using standardized preprocessing.")
             return ds
 
         return df

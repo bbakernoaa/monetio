@@ -59,7 +59,10 @@ def test_goes_opt_eager_vs_lazy():
     xr.testing.assert_allclose(ds_eager.longitude, ds_lazy_computed.longitude)
 
     # Check history
-    assert "Optimized GOES coordinate generation via Aero Protocol." in ds_eager.attrs["history"]
+    assert (
+        "Optimized GOES coordinate generation using standardized preprocessing."
+        in ds_eager.attrs["history"]
+    )
     assert "Preprocessed GOES data." in ds_eager.attrs["history"]
 
 

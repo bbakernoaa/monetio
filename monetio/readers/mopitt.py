@@ -137,7 +137,7 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
         ds = _combine_mopitt_apriori(ds)
 
     # Update history
-    ds = update_history(ds, "Preprocessed MOPITT L3 data via Aero Protocol.")
+    ds = update_history(ds, "Preprocessed MOPITT L3 data using standardized preprocessing.")
 
     return ds
 

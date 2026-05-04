@@ -137,6 +137,6 @@ def modis_l2_preprocess(ds: xr.Dataset, variable_dict: dict = None) -> xr.Datase
                 # Mask all data variables by the combined quality flag
                 ds[varname] = ds[varname].where(combined_mask)
 
-    ds = update_history(ds, "Preprocessed MODIS L2 data via Aero Protocol.")
+    ds = update_history(ds, "Preprocessed MODIS L2 data using standardized preprocessing.")
 
     return ds

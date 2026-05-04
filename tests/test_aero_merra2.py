@@ -97,7 +97,7 @@ def test_merra2_lazy_loading(mock_merra2_dataset, tmp_path):
 
     assert ds.pres_pa_mid.chunks is not None
     assert "history" in ds.attrs
-    assert "Preprocessed MERRA-2 data via Aero Protocol." in ds.attrs["history"]
+    assert "Preprocessed MERRA-2 data using standardized preprocessing." in ds.attrs["history"]
 
 
 def test_merra2_build_urls():

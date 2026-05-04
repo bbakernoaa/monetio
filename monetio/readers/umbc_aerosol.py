@@ -157,6 +157,6 @@ def umbc_aerosol_preprocess(ds: xr.Dataset) -> xr.Dataset:
     ds.coords["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
 
     # Update history
-    ds = update_history(ds, "Preprocessed UMBC Aerosol data via Aero Protocol.")
+    ds = update_history(ds, "Preprocessed UMBC Aerosol data using standardized preprocessing.")
 
     return ds

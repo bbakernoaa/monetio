@@ -231,7 +231,7 @@ class XarrayDriver:
         # Expand wildcards (supports S3 globbing now)
         file_list = FileUtility.expand_paths(files)
 
-        # Handle 'lazy' keyword: Eager by default per Aero Protocol.
+        # Handle 'lazy' keyword: Eager by default.
         if "lazy" in xr_kwargs:
             use_dask = xr_kwargs.pop("lazy")
 

@@ -37,7 +37,7 @@ def test_hysplit_mass_loading_eager_vs_lazy():
     xr.testing.assert_allclose(ml_eager, ml_lazy_computed)
 
     # Check history
-    assert "Calculated mass loading via Aero Protocol." in ml_eager.attrs["history"]
+    assert "Calculated mass loading using standardized preprocessing." in ml_eager.attrs["history"]
 
 
 def test_get_thickness():
