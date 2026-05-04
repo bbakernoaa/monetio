@@ -268,6 +268,8 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     )
 
     # Update history
-    ds = update_history(ds, "Optimized GOES coordinate generation using standardized preprocessing.")
+    ds = update_history(
+        ds, "Optimized GOES coordinate generation using standardized preprocessing."
+    )
 
     return ds

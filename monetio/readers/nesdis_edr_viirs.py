@@ -248,6 +248,8 @@ def nesdis_edr_viirs_preprocess(ds: xr.Dataset, resolution: str = "high") -> xr.
         ds = ds.transpose("time", "y", "x")
 
     # Provenance
-    ds = update_history(ds, "Preprocessed NESDIS EDR VIIRS binary data using standardized preprocessing.")
+    ds = update_history(
+        ds, "Preprocessed NESDIS EDR VIIRS binary data using standardized preprocessing."
+    )
 
     return ds

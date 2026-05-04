@@ -82,8 +82,12 @@ def test_modis_l2_preprocess_eager_lazy_consistency():
     xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
 
     # Ensure history was updated
-    assert "Preprocessed MODIS L2 data using standardized preprocessing." in ds_eager.attrs["history"]
-    assert "Preprocessed MODIS L2 data using standardized preprocessing." in ds_lazy.attrs["history"]
+    assert (
+        "Preprocessed MODIS L2 data using standardized preprocessing." in ds_eager.attrs["history"]
+    )
+    assert (
+        "Preprocessed MODIS L2 data using standardized preprocessing." in ds_lazy.attrs["history"]
+    )
 
 
 def test_modis_l2_multiple_quality_flags():
