@@ -3,8 +3,13 @@
 import pandas as pd
 import xarray as xr
 
-from .base import GriddedReader, register_reader
-from .sat_utils import standardize_satellite_coords, tai93_to_datetime, update_history
+from .base import GriddedReader, _scientific_hygiene, register_reader
+from .sat_utils import (
+    add_time_coord,
+    standardize_satellite_coords,
+    tai93_to_datetime,
+    update_history,
+)
 
 
 @register_reader("omps")
@@ -18,6 +23,11 @@ class OMPSReader(GriddedReader):
         self,
         files: str | list[str],
         product: str = "nmto3_l2",
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
+        use_dask: bool = False,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -29,6 +39,16 @@ class OMPSReader(GriddedReader):
             File path(s) or URL(s).
         product : str, optional
             OMPS product: 'nmto3_l2' (default) or 'nmto3_l3'.
+        use_virtualizarr : bool, optional
+            Whether to use VirtualiZarr, by default False.
+        virtualizarr_file : str or None, optional
+            Path to the VirtualiZarr file, by default None.
+        virtualizarr_backend : str, optional
+            VirtualiZarr backend, by default "kerchunk".
+        icechunk_repo : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_dask : bool, optional
+            Whether to use Dask for lazy loading, by default False.
         **kwargs : dict
             Additional arguments passed to XarrayDriver.open.
 
@@ -47,7 +67,15 @@ class OMPSReader(GriddedReader):
 
         # L2 data often has different cross-track dimensions if not carefully selected,
         # but standard products should be consistent.
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            virtualizarr_backend=virtualizarr_backend,
+            icechunk_repo=icechunk_repo,
+            use_dask=use_dask,
+            **kwargs,
+        )
 
         # Update history
         ds = update_history(ds, f"Read OMPS {product} data.")
@@ -73,8 +101,10 @@ def omps_preprocess(ds: xr.Dataset, product: str = "nmto3_l2") -> xr.Dataset:
 
     Examples
     --------
-    >>> ds = reader.open_dataset(files, product='nmto3_l2')
-    >>> ds = omps_preprocess(ds, product='nmto3_l2')
+    >>> import xarray as xr
+    >>> from monetio.readers.omps import omps_preprocess
+    >>> ds = xr.Dataset({"ColumnAmountO3": (("scanline", "ground_pixel"), [[250, 260]])})
+    >>> ds = omps_preprocess(ds, product="nmto3_l2")
     """
     if product == "nmto3_l2":
         ds = _preprocess_nmto3_l2(ds)
@@ -83,6 +113,9 @@ def omps_preprocess(ds: xr.Dataset, product: str = "nmto3_l2") -> xr.Dataset:
 
     # Standardize coordinates
     ds = standardize_satellite_coords(ds)
+
+    # Scientific Hygiene
+    ds = _scientific_hygiene(ds)
 
     return ds
 
@@ -100,20 +133,11 @@ def _preprocess_nmto3_l2(ds: xr.Dataset) -> xr.Dataset:
     -------
     xr.Dataset
         Processed dataset with standard names and lazily converted time.
+
+    Examples
+    --------
+    >>> ds = _preprocess_nmto3_l2(ds)
     """
-    # Group names might be present if opened with xarray directly without group specification,
-    # but typically we expect them to be at root or in specific groups.
-    # If using h5netcdf, we might need to handle groups.
-
-    # Check if we have GeolocationData group
-    if (
-        "GeolocationData" in ds.data_vars or "GeolocationData" in ds.groups
-        if hasattr(ds, "groups")
-        else False
-    ):
-        # This means it might have been opened without group selection
-        pass
-
     # Basic mapping of variables if they are in groups
     mapping = {
         "GeolocationData/Latitude": "latitude",
@@ -192,6 +216,10 @@ def _preprocess_nmto3_l3(ds: xr.Dataset) -> xr.Dataset:
     -------
     xr.Dataset
         Processed dataset with standard names and 2D coordinates.
+
+    Examples
+    --------
+    >>> ds = _preprocess_nmto3_l3(ds)
     """
     root_mapping = {
         "Latitude": "lat",
@@ -210,22 +238,13 @@ def _preprocess_nmto3_l3(ds: xr.Dataset) -> xr.Dataset:
         # Generate 2D meshgrid lazily
         lon2d, lat2d = xr.broadcast(ds.lon, ds.lat)
         ds = ds.assign_coords(
-            latitude=(("lat", "lon"), lat2d, {"units": "degrees_north"}),
-            longitude=(("lat", "lon"), lon2d, {"units": "degrees_east"}),
+            latitude=lat2d.assign_attrs({"units": "degrees_north"}),
+            longitude=lon2d.assign_attrs({"units": "degrees_east"}),
         )
 
     # Handle Time from attributes if available
     if "time" not in ds.coords:
-        # L3 attribute 'Date'
-        date_attr = ds.attrs.get("Date")
-        if date_attr:
-            if isinstance(date_attr, bytes):
-                date_attr = date_attr.decode("UTF-8")
-            try:
-                ds["time"] = [pd.to_datetime(date_attr)]
-                ds = ds.expand_dims("time")
-            except Exception:
-                pass
+        ds = add_time_coord(ds, time_attr="Date")
 
     # Masking
     if "ozone_column" in ds.data_vars:
