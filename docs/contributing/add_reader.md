@@ -11,6 +11,29 @@ All readers are located in the `monetio/readers/` directory and inherit from `Ba
 - **`PointReader`**: A base class for point/tabular data (Observations) that utilizes the `PandasDriver`.
 - **`READER_REGISTRY`**: A global dictionary where all readers must register themselves using the `@register_reader("name")` decorator.
 
+## Design Principles
+
+Architecting scientific pipelines in MONETIO requires balancing flexibility, maintainability, and provenance. All new readers should adhere to these principles:
+
+### 1. Backend Agnostic (Optional Dask)
+Code must run **Eagerly (NumPy) by default** and **Lazily (Dask) optionally**.
+- **Generic Inputs**: Write functions that accept generic `xr.DataArray` or `xr.Dataset` inputs. Do not assume a specific backend.
+- **No Hidden Computes**: Never call `.compute()`, `.load()`, or `.values` inside a processing function. This breaks laziness for Dask users.
+- **No Forced Chunking**: Do not hardcode `.chunk()` inside functions. Chunking is the user's responsibility at the I/O stage.
+- **Vectorization**: Use `xarray.apply_ufunc` with `dask='parallelized'` to support both backends simultaneously.
+
+### 2. Maintainability and Documentation
+- **NumPy Docstrings**: Every function must have a docstring following the [NumPy format](https://numpydoc.readthedocs.io/en/latest/format.html) (Parameters, Returns, Examples).
+- **Type Hinting**: Use `xarray.DataArray` or `xarray.Dataset` types. Avoid backend-specific types like `dask.array.Array`.
+
+### 3. Provenance (Scientific Hygiene)
+- **History Tracking**: Automatically track data lineage by updating `ds.attrs['history']` whenever data is transformed.
+- **Coordinate Integrity**: Never drop coordinates (like vertical levels) unless explicitly requested.
+
+### 4. Quality and Validation
+- **Dual-Backend Testing**: Every reader or processing logic should be verified with a unit test that runs twice: once with Eager (NumPy) data and once with Lazy (Dask) data.
+- **Pre-Commit**: Use `pre-commit run --all-files` to ensure code style and linting standards are met.
+
 ## Steps to Add a New Reader
 
 ### 1. Create the Reader Module

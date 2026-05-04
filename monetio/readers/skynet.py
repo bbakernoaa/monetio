@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 class SKYNETReader(PointReader):
     """
     Reader for SKYNET sun photometer data.
+
+    This reader supports retrieving and loading SKYNET data from local or remote files,
+    standardizing it into a common format, and optionally converting it to an
+    xarray Dataset.
     """
 
     def open_dataset(
@@ -58,6 +62,11 @@ class SKYNETReader(PointReader):
         -------
         Union[pd.DataFrame, xr.Dataset]
             The loaded SKYNET data.
+
+        Examples
+        --------
+        >>> reader = SKYNETReader()
+        >>> ds = reader.open_dataset(siteid="POC", dates="2023-01-01")
         """
         if files is None:
             if dates is None:
@@ -92,6 +101,16 @@ class SKYNETReader(PointReader):
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
         """
         Standardize column names and types.
+
+        Parameters
+        ----------
+        df : Union[pd.DataFrame, dd.DataFrame]
+            Input dataframe.
+
+        Returns
+        -------
+        Union[pd.DataFrame, dd.DataFrame]
+            Harmonized dataframe.
         """
         df = super().harmonize(df)
 
@@ -108,7 +127,26 @@ class SKYNETReader(PointReader):
     ) -> list[str]:
         """
         Construct SKYNET URLs.
-        Note: The actual ISDC URL structure may vary. This is a placeholder.
+
+        Parameters
+        ----------
+        dates : Union[pd.DatetimeIndex, List[datetime], datetime, str]
+            Dates to retrieve.
+        siteid : str, optional
+            SKYNET site ID.
+        product : str, optional
+            SKYNET product, by default "AOT".
+        **kwargs : dict
+            Additional arguments.
+
+        Returns
+        -------
+        List[str]
+            List of constructed URLs.
+
+        Examples
+        --------
+        >>> urls = reader.build_urls("2023-01-01", siteid="POC")
         """
         dates = pd.DatetimeIndex(np.atleast_1d(pd.to_datetime(dates)))
         if dates.empty or siteid is None:
@@ -129,6 +167,22 @@ class SKYNETReader(PointReader):
 def read_skynet_csv(fn: str, **kwargs: dict) -> pd.DataFrame:
     """
     Read a single SKYNET ASCII file.
+
+    Parameters
+    ----------
+    fn : str
+        Path to the SKYNET file.
+    **kwargs : dict
+        Additional arguments.
+
+    Returns
+    -------
+    pd.DataFrame
+        Data from the SKYNET file.
+
+    Examples
+    --------
+    >>> df = read_skynet_csv("site_20230101.AOT")
     """
     fs = FileUtility.get_fs(fn)
     try:

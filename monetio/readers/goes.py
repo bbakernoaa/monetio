@@ -179,7 +179,7 @@ def goes_preprocess(ds: xr.Dataset) -> xr.Dataset:
 
 def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     """
-    Calculate latitude and longitude for GOES data lazily using the Aero Protocol.
+    Calculate latitude and longitude for GOES data lazily using standardized routines.
 
     Parameters
     ----------
@@ -268,6 +268,6 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     )
 
     # Update history
-    ds = update_history(ds, "Optimized GOES coordinate generation via Aero Protocol.")
+    ds = update_history(ds, "Optimized GOES coordinate generation using standardized preprocessing.")
 
     return ds

@@ -54,7 +54,7 @@ class TOLNetReader(GriddedReader):
             ds = user_preprocess(ds)
 
         # Update history
-        ds = update_history(ds, "Read TOLNet data via Aero Protocol.")
+        ds = update_history(ds, "Read TOLNet data using standardized preprocessing.")
 
         return ds
 

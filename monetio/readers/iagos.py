@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 @register_reader("iagos")
 class IAGOSReader(PointReader):
     """
-    IAGOS Data Reader following the Aero Protocol.
+    IAGOS Data Reader following standard conventions.
     Supports both local files and retrieval via IAGOS API (placeholder).
     """
 
@@ -73,7 +73,7 @@ class IAGOSReader(PointReader):
         if not as_xarray:
             return ds.to_dataframe().reset_index()
 
-        ds = update_history(ds, "Read IAGOS data via Aero Protocol.")
+        ds = update_history(ds, "Read IAGOS data using standardized preprocessing.")
         return ds
 
     def build_urls(

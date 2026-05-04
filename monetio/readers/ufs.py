@@ -135,7 +135,7 @@ class UFSReader(GriddedReader):
         # Time fix (Avoid eager .indexes)
         if "time" in ds.coords:
             # Check for cftime lazily if possible, or use .indexes only if necessary
-            # For now, following Aero Protocol to avoid eager indexes if we can
+            # For now, following standard conventions to avoid eager indexes if we can
             if ds.indexes["time"].__class__.__name__ == "CFTimeIndex":
                 ds["time"] = ds.indexes["time"].to_datetimeindex()
 

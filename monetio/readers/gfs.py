@@ -58,7 +58,7 @@ class NCEPPDSReader(GriddedReader):
         # XarrayDriver handles S3 URLs by opening them via fsspec.
         ds = super().open_dataset(files, **kwargs)
 
-        # Apply Aero Protocol harmonization
+        # Apply standard harmonization
         ds = self.harmonize(ds)
 
         # Update history
@@ -91,7 +91,7 @@ class NCEPPDSReader(GriddedReader):
         if actual_rename:
             ds = ds.rename(actual_rename)
 
-        # Variable Mapping (Aero Protocol)
+        # Variable Mapping
         var_mapping = {
             "O3MR": "ozone",
             "TMP": "temperature",

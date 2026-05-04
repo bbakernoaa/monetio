@@ -204,7 +204,7 @@ def read_actris(filename: str, **kwargs) -> pd.DataFrame:
 @register_reader("actris")
 class ACTRISReader(PointReader):
     """
-    ACTRIS/EBAS Data Reader following the Aero Protocol.
+    ACTRIS/EBAS Data Reader following standard conventions.
     """
 
     def open_dataset(
@@ -310,7 +310,7 @@ class ACTRISReader(PointReader):
                 }
             )
 
-            ds = update_history(ds, "Read ACTRIS/EBAS data via Aero Protocol.")
+            ds = update_history(ds, "Read ACTRIS/EBAS data using standardized preprocessing.")
             return ds
 
         return df

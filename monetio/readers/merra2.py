@@ -242,7 +242,7 @@ def merra2_preprocess(ds: xr.Dataset, product: str | None = None) -> xr.Dataset:
     ds = _scientific_hygiene(ds)
 
     # Update history
-    ds = update_history(ds, "Preprocessed MERRA-2 data via Aero Protocol.")
+    ds = update_history(ds, "Preprocessed MERRA-2 data using standardized preprocessing.")
 
     return ds
 

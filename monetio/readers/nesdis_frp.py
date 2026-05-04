@@ -267,6 +267,6 @@ def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
         )
 
     # Provenance
-    ds = update_history(ds, f"Preprocessed NESDIS {ftype} data via Aero Protocol.")
+    ds = update_history(ds, f"Preprocessed NESDIS {ftype} data using standardized preprocessing.")
 
     return ds
