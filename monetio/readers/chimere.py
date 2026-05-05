@@ -18,8 +18,13 @@ class ChimereReader(GriddedReader):
     def open_dataset(
         self,
         files: str | list[str],
-        var_list: list[str] = None,
+        var_list: list[str] | None = None,
         surf_only: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
+        use_dask: bool = False,
         **kwargs: Any,
     ) -> xr.Dataset:
         """
@@ -27,19 +32,35 @@ class ChimereReader(GriddedReader):
 
         Parameters
         ----------
-        files : Union[str, List[str]]
+        files : str or list of str
             File path, list of paths, or glob pattern.
         var_list : list of str, optional
             List of variable names meant to be kept for the analysis, by default None.
         surf_only : bool, optional
             Whether to only keep surface data (layer 0), by default False.
+        use_virtualizarr : bool, optional
+            Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
+        virtualizarr_file : str or None, optional
+            Path to save/load the VirtualiZarr reference JSON file, by default None.
+        virtualizarr_backend : str, optional
+            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
+        icechunk_repo : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_dask : bool, optional
+            Whether to use Dask for lazy loading, by default False.
         **kwargs : Any
             Additional arguments passed to the driver.
 
         Returns
         -------
-        xarray.Dataset
+        xr.Dataset
             The processed Chimere dataset.
+
+        Examples
+        --------
+        >>> reader = ChimereReader()
+        >>> ds = reader.open_dataset("chimere_output.nc")
+        >>> ds_lazy = reader.open_dataset("chimere_output.nc", use_dask=True)
         """
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = partial(
@@ -53,7 +74,15 @@ class ChimereReader(GriddedReader):
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
 
-        ds = self.driver.open(files, **kwargs)
+        ds = self.driver.open(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            virtualizarr_backend=virtualizarr_backend,
+            icechunk_repo=icechunk_repo,
+            use_dask=use_dask,
+            **kwargs,
+        )
 
         ds = self.harmonize(ds)
 
@@ -64,14 +93,14 @@ class ChimereReader(GriddedReader):
 
 
 def chimere_preprocess(
-    ds: xr.Dataset, *, var_list: list[str] = None, surf_only: bool = False
+    ds: xr.Dataset, *, var_list: list[str] | None = None, surf_only: bool = False
 ) -> xr.Dataset:
     """
     Preprocess function for a single Chimere file.
 
     Parameters
     ----------
-    ds : xarray.Dataset
+    ds : xr.Dataset
         Input Chimere dataset.
     var_list : list of str, optional
         List of variables to keep, by default None.
@@ -80,8 +109,14 @@ def chimere_preprocess(
 
     Returns
     -------
-    xarray.Dataset
+    xr.Dataset
         Processed dataset.
+
+    Examples
+    --------
+    >>> import xarray as xr
+    >>> ds = xr.Dataset({"O3": (("time_counter", "y", "x"), [[1, 2]])})
+    >>> ds_clean = chimere_preprocess(ds, var_list=["O3"])
     """
     if var_list is not None:
         drop_vars = set(ds.data_vars) - set(var_list)
@@ -93,38 +128,31 @@ def chimere_preprocess(
         "time_counter": "time",
         "bottom_top": "z",
     }
-    # Only rename if they exist
+    # Only rename if they exist in variables or dims
     rename_dict = {k: v for k, v in rename_dict.items() if k in ds.variables or k in ds.dims}
 
     if rename_dict:
         ds = ds.rename(rename_dict)
-        # Update history
-        ds = update_history(ds, f"Renamed coordinates/dimensions: {rename_dict}.")
 
     if surf_only and "z" in ds.dims:
         ds = ds.isel(z=[0])
-        # Update history
-        ds = update_history(ds, "Subsetted to surface layer (z=0).")
 
-    ds = ds.reset_coords()
-    coords = [c for c in ["latitude", "longitude", "time"] if c in ds.variables]
-    ds = ds.set_coords(coords)
-
-    # Ensure lat/lon have standard attributes
-    if "latitude" in ds.coords:
+    # Ensure lat/lon have standard attributes if they exist
+    if "latitude" in ds.variables:
         ds["latitude"].attrs.update({"units": "degrees_north", "standard_name": "latitude"})
-    if "longitude" in ds.coords:
+    if "longitude" in ds.variables:
         ds["longitude"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
+
+    # Scientific Hygiene handles coordinate assignment (latitude, longitude, time)
+    # and attribute cleaning while preserving history.
+    ds = _scientific_hygiene(ds)
 
     # Transpose to standard order if dims exist
     dims = [d for d in ["time", "z", "y", "x"] if d in ds.dims]
     if dims:
         ds = ds.transpose(*dims)
 
-    # Scientific Hygiene
-    ds = _scientific_hygiene(ds)
-
-    # Update history
-    ds = update_history(ds, "Preprocessed Chimere data.")
+    # Consolidate history update
+    ds = update_history(ds, "Preprocessed Chimere data (renaming, subsetting, and hygiene).")
 
     return ds
