@@ -1,3 +1,33 @@
+[tool.semantic_release]
+# Version is stored in monetio/__init__.py as __version__ = "x.y.z"
+version_variables = ["monetio/__init__.py:__version__"]
+tag_format = "v{version}"
+# Commit message used when bumping the version
+commit_message = "chore(release): v{version} [skip ci]"
+# Conventional Commit types that trigger a release
+major_on_zero = false
+allow_zero_version = true
+
+[tool.semantic_release.branches.stable]
+match = "stable"
+prerelease = false
+
+[tool.semantic_release.branches.develop]
+match = "develop"
+prerelease = true
+prerelease_token = "beta"
+
+[tool.semantic_release.changelog]
+changelog_file = "CHANGELOG.md"
+exclude_commit_patterns = [
+    "^chore\\(release\\):",
+    "^Merge ",
+]
+
+[tool.semantic_release.publish]
+dist_glob_patterns = ["dist/*"]
+upload_to_vcs_release = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
