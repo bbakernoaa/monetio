@@ -10,7 +10,7 @@ The primary way to load data in MONETIO is the `load` function.
 
 ## Virtualization
 
-::: monetio.virtualize
+Virtualization is supported via `monetio.load` with `use_virtualizarr=True`.
 
 ## Utility Functions
 
