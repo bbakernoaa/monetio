@@ -83,6 +83,30 @@ Global hourly and synoptic surface observations.
 
 - **Source ID**: `ish` or `ish_lite`
 
+### PAMS
+
+Photochemical Assessment Monitoring Stations.
+
+- **Source ID**: `pams`
+
+### NDBC
+
+National Data Buoy Center (buoy meteorological data).
+
+- **Source ID**: `ndbc`
+
+### SURFRAD
+
+Surface Radiation Budget Network.
+
+- **Source ID**: `surfrad`
+
+### SOLRAD
+
+NOAA Solar Radiation Network.
+
+- **Source ID**: `solrad`
+
 ### Other Networks
 
 - **HYTRAJ**: HYSPLIT Trajectories (`hytraj`)

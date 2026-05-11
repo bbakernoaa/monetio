@@ -25,6 +25,8 @@ nav:
       - Command Line Interface: cli.md
       - Observations: observations.md
       - Models: models.md
+      - Satellites: satellites.md
+      - Profiles: profiles.md
       - Tutorial:
           - Overview: tutorial.md
           - Loading Data: tutorial/loading.md
@@ -34,6 +36,7 @@ nav:
           - NESDIS VIIRS AOD: tutorial/NESDIS_VIIRS_AOD.md
       - WCOSS: wcoss.md
   - Contributing:
+      - Developer's Guide: contributing/developers_guide.md
       - Adding a Reader: contributing/add_reader.md
   - Help & Reference:
       - Architecture: architecture.md
