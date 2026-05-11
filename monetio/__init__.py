@@ -109,6 +109,39 @@ def load(source: str, files=None, **kwargs):
     return reader.open_dataset(files=files, **kwargs)
 
 
+def virtualize(source: str, files=None, output: str = None, backend: str = "kerchunk", **kwargs):
+    """
+    Pre-process files into a virtual reference (e.g., Kerchunk JSON or Icechunk repo).
+
+    Usage:
+        monetio.virtualize("merra2", files="data/*.nc4", output="merra2_ref.json")
+
+    Parameters
+    ----------
+    source : str
+        The reader source ID (e.g., "merra2", "gfs").
+    files : str or list of str, optional
+        File path(s) or glob pattern(s).
+    output : str, optional
+        Path to save the output reference (required for 'kerchunk' backend).
+    backend : str, optional
+        The virtualization backend. Must be "kerchunk" (default) or "icechunk".
+    **kwargs : dict
+        Additional arguments passed to the reader and driver.
+    """
+    if backend == "kerchunk" and output is None:
+        raise ValueError("The 'output' parameter is required for the 'kerchunk' backend.")
+
+    return load(
+        source,
+        files=files,
+        use_virtualizarr=True,
+        virtualizarr_file=output,
+        virtualizarr_backend=backend,
+        **kwargs,
+    )
+
+
 from . import grids
 from .models import (
     camx,
@@ -141,6 +174,7 @@ from .sat import goes
 __all__ = [
     "__version__",
     "load",
+    "virtualize",
     #
     # utility functions
     "rename_latlon",

@@ -31,7 +31,10 @@ Moderate Resolution Imaging Spectroradiometer.
 
 National Environmental Satellite, Data, and Information Service (NESDIS) Visible Infrared Imaging Radiometer Suite (VIIRS).
 
-- **Source ID**: `nesdis_edr_viirs`, `nesdis_eps_viirs`, `nesdis_viirs_jrr` (or `viirs_jrr`), `nesdis_frp`
+- **Source ID**: `nesdis_edr_viirs`: Enterprise Data Record (EDR).
+- **Source ID**: `nesdis_eps_viirs`: Enterprise Processing System (EPS).
+- **Source ID**: `nesdis_viirs_jrr` (or `viirs_jrr`): Joint Polar Satellite System (JPSS) Risk Reduction (JRR).
+- **Source ID**: `nesdis_frp`: Fire Radiative Power (FRP).
 
 ### OMPS
 

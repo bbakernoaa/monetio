@@ -21,17 +21,17 @@ In-service Aircraft for a Global Observing System.
 
 - **Source ID**: `iagos`
 
-### GML Ozonesonde
-
-Global Monitoring Laboratory (GML) Ozonesondes.
-
-- **Source ID**: `gml_ozonesonde`
-
 ### ACTRIS/EBAS
 
 European Research Infrastructure for the observation of Aerosol, Clouds and Trace Gases.
 
 - **Source ID**: `actris`
+
+### GML Ozonesonde
+
+Global Monitoring Laboratory (GML) Ozonesondes.
+
+- **Source ID**: `gml_ozonesonde`
 
 ### EARLINET
 
