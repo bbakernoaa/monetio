@@ -43,6 +43,24 @@ Unified Forecast System with Chemistry.
 
 - **Source ID**: `ufs`
 
+### NCEP GRIB
+
+National Centers for Environmental Prediction (NCEP) GRIB2 model outputs.
+
+- **Source ID**: `ncep_grib`, `gfs`, `gefs`, `gdas`, `rrfs`, `grib2`
+
+### ICAP-MME
+
+International Cooperative for Aerosol Prediction Multi-Model Ensemble.
+
+- **Source ID**: `icap_mme`
+
+### PARDUMP
+
+HYSPLIT Particle Dump files.
+
+- **Source ID**: `pardump`
+
 ### Other Models
 
 - **CAMx**: Comprehensive Air Quality Model with extensions (`camx`)

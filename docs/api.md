@@ -1,100 +1,37 @@
-# API
+# API Reference
 
-```.. module:: monetio
+This page provides a high-level overview of the most commonly used MONETIO functions. For a complete reference, see the [Code Reference](reference/monetio/index.md).
 
-```
+## Core API
 
-```.. py:currentmodule:: None
+The primary way to load data in MONETIO is the `load` function.
 
-```
+::: monetio.load
 
-```{contents}
-:depth: 3
-:local: true
-```
+## Virtualization
 
-## Data sources
+::: monetio.virtualize
 
-### Point observations
+## Utility Functions
 
-In general, these modules provide an `add_data` function for retrieving data,
-for example, `monetio.aeronet.add_data`.
+::: monetio.rename_latlon
 
-#### AERONET
+::: monetio.rename_to_monet_latlon
 
-See `observations:AERONET` for more information.
+::: monetio.dataset_to_monet
 
-```.. autosummary::
+::: monetio.coards_to_netcdf
 
-   monetio.aeronet.add_data
-   monetio.aeronet.add_local
-   monetio.aeronet.get_valid_sites
-```
+## Readers Base Classes
 
-```.. autofunction:: monetio.aeronet.add_data
+::: monetio.readers.base.BaseReader
+    options:
+      show_bases: false
 
-```
+::: monetio.readers.base.GriddedReader
+    options:
+      show_bases: false
 
-```.. autofunction:: monetio.aeronet.add_local
-
-```
-
-```.. autofunction:: monetio.aeronet.get_valid_sites
-
-```
-
-#### AirNow
-
-See `observations:AirNow` for more information.
-
-```.. autosummary::
-
-   monetio.airnow.add_data
-```
-
-```.. autofunction:: monetio.airnow.add_data
-
-```
-
-### Profile observations
-
-```.. automodule:: monetio.geoms
-
-```
-
-```.. py:currentmodule:: None
-
-```
-
-```.. autosummary::
-
-   monetio.geoms.open_dataset
-```
-
-```.. autofunction:: monetio.geoms.open_dataset
-
-```
-
-## Utility functions
-
-There are a few top-level utility functions.
-
-```.. autosummary::
-
-   monetio.rename_latlon
-   monetio.rename_to_monet_latlon
-   monetio.dataset_to_monet
-   monetio.coards_to_netcdf
-```
-
-### Grid tools
-
-```.. autosummary::
-
-   monetio.grids
-
-
-```
-
-- `genindex`
-- `modindex`
+::: monetio.readers.base.PointReader
+    options:
+      show_bases: false
