@@ -102,6 +102,8 @@ For very large gridded datasets (e.g., MERRA2, GFS, RRFS), `xarray.open_mfdatase
 monetio virtualizarr "s3://noaa-rrfs-pds/rrfs_a/20230101/00/control/rrfs.t00z.prslev.f*.nc" -o rrfs_cache.json
 ```
 
+The `virtualizarr` command is a specialized entry point that leverages `monetio.virtualize` internally.
+
 Options:
 - `-o, --output PATH`: (Required) Path to save the output JSON reference file.
 - `--concat-dim TEXT`: Dimension to concatenate the files along (default: `time`).

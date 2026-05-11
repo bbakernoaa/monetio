@@ -10,7 +10,9 @@ The primary way to load data in MONETIO is the `load` function.
 
 ## Virtualization
 
-Virtualization is supported via `monetio.load` with `use_virtualizarr=True`.
+Virtualization is supported via `monetio.load` with `use_virtualizarr=True` or via the `virtualize` function.
+
+::: monetio.virtualize
 
 ## Utility Functions
 
@@ -35,3 +37,5 @@ Virtualization is supported via `monetio.load` with `use_virtualizarr=True`.
 ::: monetio.readers.base.PointReader
     options:
       show_bases: false
+
+::: monetio.readers.drivers.FileUtility

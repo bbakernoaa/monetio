@@ -47,7 +47,12 @@ Unified Forecast System with Chemistry.
 
 National Centers for Environmental Prediction (NCEP) GRIB2 model outputs.
 
-- **Source ID**: `ncep_grib`, `gfs`, `gefs`, `gdas`, `rrfs`, `grib2`
+- **Source ID**: `ncep_grib`: Generic NCEP GRIB2 reader.
+- **Source ID**: `gfs`: Global Forecast System.
+- **Source ID**: `gefs`: Global Ensemble Forecast System.
+- **Source ID**: `gdas`: Global Data Assimilation System.
+- **Source ID**: `rrfs`: Rapid Refresh Forecast System.
+- **Source ID**: `grib2`: Standard GRIB2 files.
 
 ### ICAP-MME
 

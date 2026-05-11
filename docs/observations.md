@@ -52,7 +52,9 @@ European Research Infrastructure for the observation of Aerosol, Clouds and Trac
 
 Global air quality data platform.
 
-- **Source ID**: `openaq`
+- **Source ID**: `openaq` (Legacy/Version 1)
+- **Source ID**: `openaq_v2` (Modern REST API)
+- **Source ID**: `openaq_aws` (S3-based public dataset)
 
 ### IAGOS
 
