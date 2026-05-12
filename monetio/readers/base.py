@@ -763,6 +763,72 @@ def _get_ioapi_times(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+def _harmonize_ioapi_dims(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Standardize IOAPI dimension names (COL, ROW, LAY) to (x, y, z) lazily.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with standardized dimensions.
+    """
+    rename_dict = {}
+    if "COL" in ds.dims:
+        rename_dict["COL"] = "x"
+    if "ROW" in ds.dims:
+        rename_dict["ROW"] = "y"
+    if "LAY" in ds.dims:
+        rename_dict["LAY"] = "z"
+
+    if rename_dict:
+        ds = ds.rename(rename_dict)
+        ds = update_history(ds, f"Renamed dimensions: {rename_dict}")
+
+    return ds
+
+
+def _harmonize_ioapi_vars(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Standardize IOAPI variable names and remove redundant data variables.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with standardized variables.
+    """
+    # 1. Standardize variable names to lowercase
+    mapping = {v: v.lower() for v in ds.data_vars}
+    # Avoid collisions with existing coordinates
+    mapping = {k: v for k, v in mapping.items() if v not in ds.coords}
+    ds = ds.rename(mapping)
+
+    # 2. Drop redundant variables that are now coordinates
+    # This prevents cluttering the data_vars when they have been promoted
+    to_drop = [v for v in ds.data_vars if v in ds.coords]
+
+    # Specific common ones in IOAPI that might be present but promoted/renamed
+    # e.g. 'lat', 'lon', 'tflag'
+    for redundant in ["lat", "lon", "tflag"]:
+        if redundant in ds.data_vars:
+            to_drop.append(redundant)
+
+    if to_drop:
+        ds = ds.drop_vars(list(set(to_drop)))
+        ds = update_history(ds, f"Dropped redundant data variables: {list(set(to_drop))}")
+
+    return ds
+
+
 def _scientific_hygiene(ds: xr.Dataset) -> xr.Dataset:
     """
     Apply standard scientific hygiene to the dataset.
