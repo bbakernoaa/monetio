@@ -12,6 +12,8 @@ from .base import (
     _add_ioapi_latlon,
     _convert_to_ppb,
     _format_units,
+    _harmonize_ioapi_dims,
+    _harmonize_ioapi_vars,
     _scientific_hygiene,
     add_lazy_diagnostic,
     register_reader,
@@ -101,21 +103,14 @@ class CMAQReader(GriddedReader):
         xr.Dataset
             Harmonized dataset.
         """
-        # 1. Standardize variable names to lowercase
-        mapping = {v: v.lower() for v in ds.data_vars}
-        # Avoid collisions with existing coordinates
-        mapping = {k: v for k, v in mapping.items() if v not in ds.coords}
-        ds = ds.rename(mapping)
+        # 1. Standardize variable names and drop redundant ones
+        ds = _harmonize_ioapi_vars(ds)
 
-        # 2. Specific mappings for common species if they exist
-        # Rename back to standard if they were changed to something else or keep as is
-        # Actually, many users expect lowercase.
-
-        # 3. Clean up attributes
+        # 2. Clean up attributes
         ds = _scientific_hygiene(ds)
 
         # Update history
-        ds = update_history(ds, "Harmonized CMAQ dataset (lowercased variables).")
+        ds = update_history(ds, "Harmonized CMAQ dataset.")
 
         return ds
 
@@ -173,17 +168,12 @@ def cmaq_preprocess(
     ds = _format_units(ds)
 
     # 5. Rename dimensions
-    rename_dict = {}
-    if "COL" in ds.dims:
-        rename_dict["COL"] = "x"
-    if "ROW" in ds.dims:
-        rename_dict["ROW"] = "y"
-    if "LAY" in ds.dims:
-        rename_dict["LAY"] = "z"
-    if rename_dict:
-        ds = ds.rename(rename_dict)
+    ds = _harmonize_ioapi_dims(ds)
 
-    # 6. Scientific Hygiene
+    # 6. Harmonize variables (lowercase and drop redundant)
+    ds = _harmonize_ioapi_vars(ds)
+
+    # 7. Scientific Hygiene
     ds = _scientific_hygiene(ds)
 
     # Update history

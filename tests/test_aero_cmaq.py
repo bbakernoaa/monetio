@@ -87,11 +87,11 @@ def test_cmaq_preprocess_consistency():
 
     # 4. Consistency check
     # Check units conversion (ppmV -> ppbV)
-    assert ds_eager_res.O3.attrs["units"] == "ppbV"
-    xr.testing.assert_allclose(ds_eager_res.O3, ds_lazy_res.O3.compute())
+    assert ds_eager_res.o3.attrs["units"] == "ppbV"
+    xr.testing.assert_allclose(ds_eager_res.o3, ds_lazy_res.o3.compute())
 
     # 5. Laziness check
-    assert hasattr(ds_lazy_res.O3.data, "dask")
+    assert hasattr(ds_lazy_res.o3.data, "dask")
     assert hasattr(ds_lazy_res.latitude.data, "dask")
 
 
@@ -128,9 +128,9 @@ def test_cmaq_diagnostics():
 
     ds_res = cmaq_preprocess(ds)
 
-    assert "NOx" in ds_res.data_vars
-    assert hasattr(ds_res.NOx.data, "dask")
-    assert ds_res.NOx.attrs["units"] == "ppbV"  # Should be synced to ppbV
+    assert "nox" in ds_res.data_vars
+    assert hasattr(ds_res.nox.data, "dask")
+    assert ds_res.nox.attrs["units"] == "ppbV"  # Should be synced to ppbV
 
 
 if __name__ == "__main__":
