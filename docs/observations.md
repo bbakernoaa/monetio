@@ -52,7 +52,9 @@ European Research Infrastructure for the observation of Aerosol, Clouds and Trac
 
 Global air quality data platform.
 
-- **Source ID**: `openaq`
+- **Source ID**: `openaq` (Legacy/Version 1)
+- **Source ID**: `openaq_v2` (Modern REST API)
+- **Source ID**: `openaq_aws` (S3-based public dataset)
 
 ### IAGOS
 
@@ -82,6 +84,30 @@ Pandonia Global Network (ground-based remote sensing).
 Global hourly and synoptic surface observations.
 
 - **Source ID**: `ish` or `ish_lite`
+
+### PAMS
+
+Photochemical Assessment Monitoring Stations.
+
+- **Source ID**: `pams`
+
+### NDBC
+
+National Data Buoy Center (buoy meteorological data).
+
+- **Source ID**: `ndbc`
+
+### SURFRAD
+
+Surface Radiation Budget Network.
+
+- **Source ID**: `surfrad`
+
+### SOLRAD
+
+NOAA Solar Radiation Network.
+
+- **Source ID**: `solrad`
 
 ### Other Networks
 

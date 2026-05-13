@@ -82,14 +82,14 @@ def test_camx_eager_lazy(tmp_path):
     assert "time" in ds_eager.coords
     assert "latitude" in ds_eager.coords
     assert "longitude" in ds_eager.coords
-    assert "O3" in ds_eager.data_vars
-    assert ds_eager.O3.attrs["units"] == "ppbV"  # Converted from ppm
+    assert "o3" in ds_eager.data_vars
+    assert ds_eager.o3.attrs["units"] == "ppbV"  # Converted from ppm
 
     # Lazy Mode
     # Note: Using chunks={} in open_dataset kwargs triggers dask
     ds_lazy = reader.open_dataset(files=str(fname), chunks={"time": 1}, engine="h5netcdf")
     assert isinstance(ds_lazy, xr.Dataset)
-    assert hasattr(ds_lazy.O3.data, "dask")
+    assert hasattr(ds_lazy.o3.data, "dask")
 
     # Verify values and coordinates consistency
     # This ensures that both Eager (NumPy) and Lazy (Dask) paths produce identical results.
@@ -99,10 +99,10 @@ def test_camx_eager_lazy(tmp_path):
     )
 
     # Check diagnostics
-    assert "NOx" in ds_eager.data_vars
+    assert "nox" in ds_eager.data_vars
     # NOX = NO + NO2 (now that we added NO2 to the mock)
-    expected_nox = ds_eager.NO + ds_eager.NO2
-    xr.testing.assert_allclose(ds_eager.NOx, expected_nox)
+    expected_nox = ds_eager.no + ds_eager.no2
+    xr.testing.assert_allclose(ds_eager.nox, expected_nox)
 
     # Verify history tracking
     assert "Added lazy diagnostic: NOx" in ds_eager.attrs["history"]

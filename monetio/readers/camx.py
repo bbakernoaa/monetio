@@ -12,6 +12,8 @@ from .base import (
     _add_ioapi_latlon,
     _convert_to_ppb,
     _format_units,
+    _harmonize_ioapi_dims,
+    _harmonize_ioapi_vars,
     _scientific_hygiene,
     add_lazy_diagnostic,
     register_reader,
@@ -89,6 +91,31 @@ class CAMxReader(GriddedReader):
 
         return ds
 
+    def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
+        """
+        Standardize variable names and metadata.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            CAMx dataset.
+
+        Returns
+        -------
+        xr.Dataset
+            Harmonized dataset.
+        """
+        # 1. Standardize variable names and drop redundant ones
+        ds = _harmonize_ioapi_vars(ds)
+
+        # 2. Clean up attributes
+        ds = _scientific_hygiene(ds)
+
+        # Update history
+        ds = update_history(ds, "Harmonized CAMx dataset.")
+
+        return ds
+
 
 def camx_preprocess(
     ds: xr.Dataset,
@@ -143,20 +170,15 @@ def camx_preprocess(
     ds = _format_units(ds)
 
     # 5. Rename dimensions
-    rename_dict = {}
-    if "COL" in ds.dims:
-        rename_dict["COL"] = "x"
-    if "ROW" in ds.dims:
-        rename_dict["ROW"] = "y"
-    if "LAY" in ds.dims:
-        rename_dict["LAY"] = "z"
-    if rename_dict:
-        ds = ds.rename(rename_dict)
+    ds = _harmonize_ioapi_dims(ds)
 
     # 6. Predefined mapping tables (backward compatibility)
     ds = _predefined_mapping_tables(ds)
 
-    # 7. Scientific Hygiene
+    # 7. Harmonize variables (lowercase and drop redundant)
+    ds = _harmonize_ioapi_vars(ds)
+
+    # 8. Scientific Hygiene
     ds = _scientific_hygiene(ds)
 
     # Update history
