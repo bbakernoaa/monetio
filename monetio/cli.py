@@ -226,14 +226,24 @@ def openaq(dates, output, n_procs, lazy, as_pandas, wide_fmt):
 @cli.command(name="virtualizarr")
 @click.argument("files", nargs=-1)
 @click.option(
-    "--output", "-o", required=True, help="Output JSON file path for the VirtualiZarr reference."
+    "--output",
+    "-o",
+    required=True,
+    help="Output reference path. For 'kerchunk', this is a JSON file; for 'icechunk', a repository URL.",
+)
+@click.option(
+    "--backend",
+    "-b",
+    type=click.Choice(["kerchunk", "icechunk"]),
+    default="kerchunk",
+    help="Virtualization backend (default 'kerchunk').",
 )
 @click.option(
     "--concat-dim", default="time", help="Dimension to concatenate along (default 'time')."
 )
-def virtualizarr(files, output, concat_dim):
+def virtualizarr(files, output, backend, concat_dim):
     """
-    Pre-process files into a single VirtualiZarr reference JSON map.
+    Pre-process files into a single VirtualiZarr reference (Kerchunk or Icechunk).
     Especially useful for large geospatial datasets (MERRA2, GFS, etc.).
     """
     if not files:
@@ -260,11 +270,19 @@ def virtualizarr(files, output, concat_dim):
     from monetio.readers.drivers import XarrayDriver
 
     # We use XarrayDriver.open to handle the parsing natively and drop the dataset payload.
-    # It automatically saves the references to `virtualizarr_file`.
+    # It automatically saves the references to the specified output.
     xd = XarrayDriver()
+    use_icechunk = backend == "icechunk"
     try:
-        xd.open(list(files), use_virtualizarr=True, virtualizarr_file=output, concat_dim=concat_dim)
-        click.echo(f"Successfully generated {output}")
+        xd.open(
+            list(files),
+            use_virtualizarr=True,
+            virtualizarr_file=None if use_icechunk else output,
+            use_icechunk=use_icechunk,
+            icechunk_url=output if use_icechunk else None,
+            concat_dim=concat_dim,
+        )
+        click.echo(f"Successfully generated reference at {output} (backend: {backend})")
     except Exception as e:
         click.echo(f"Error generating VirtualiZarr reference: {e}")
 

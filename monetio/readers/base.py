@@ -80,8 +80,8 @@ class GriddedReader(BaseReader):
         files: str | list[str],
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
-        virtualizarr_backend: str = "kerchunk",
-        icechunk_repo: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         use_dask: bool = False,
         **kwargs,
     ) -> xr.Dataset:
@@ -96,9 +96,9 @@ class GriddedReader(BaseReader):
             Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
         virtualizarr_file : str or None, optional
             Path to save/load the VirtualiZarr reference JSON file, by default None.
-        virtualizarr_backend : str, optional
-            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
-        icechunk_repo : str or None, optional
+        use_icechunk : bool, optional
+            Whether to use Icechunk for VirtualiZarr references, by default False.
+        icechunk_url : str or None, optional
             Path to the Icechunk repository, by default None.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
@@ -114,8 +114,8 @@ class GriddedReader(BaseReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_backend=virtualizarr_backend,
-            icechunk_repo=icechunk_repo,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
             use_dask=use_dask,
             **kwargs,
         )
@@ -138,12 +138,13 @@ class PointReader(BaseReader):
         # VirtualiZarr kwargs accepted but silently ignored for PointReaders
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
-        virtualizarr_backend: str = "kerchunk",
-        icechunk_repo: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         # Standard PointReader kwargs
         read_method: str = "read_csv",
         as_xarray: bool = True,
         lazy: bool = False,
+        use_dask: bool = False,
         meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
@@ -158,9 +159,9 @@ class PointReader(BaseReader):
             Accepted but ignored for PointReaders (VirtualiZarr only applies to gridded data).
         virtualizarr_file : str or None, optional
             Accepted but ignored for PointReaders.
-        virtualizarr_backend : str, optional
+        use_icechunk : bool, optional
             Accepted but ignored for PointReaders.
-        icechunk_repo : str or None, optional
+        icechunk_url : str or None, optional
             Accepted but ignored for PointReaders.
         read_method : str, optional
             The pandas/dask reading method to use, by default "read_csv".
@@ -168,6 +169,8 @@ class PointReader(BaseReader):
             If True, return an xarray.Dataset, by default True.
         lazy : bool, optional
             If True, return a dask-backed object, by default False.
+        use_dask : bool, optional
+            Alias for `lazy`, by default False.
         meta : pd.DataFrame, pd.Series, dict, or tuple, optional
             Dask metadata to use for lazy loading, by default None.
         **kwargs : dict
@@ -178,8 +181,12 @@ class PointReader(BaseReader):
         Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
             The loaded dataset.
         """
+        # Handle 'use_dask' as an alias for 'lazy'
+        if use_dask:
+            lazy = True
+
         # VirtualiZarr kwargs (use_virtualizarr, virtualizarr_file,
-        # virtualizarr_backend, icechunk_repo) are silently discarded here
+        # use_icechunk, icechunk_url) are silently discarded here
         # and NOT forwarded to PandasDriver.
         df = self.driver.open(files, read_method=read_method, lazy=lazy, meta=meta, **kwargs)
 
