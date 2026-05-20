@@ -80,6 +80,8 @@ class GriddedReader(BaseReader):
         files: str | list[str],
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         use_dask: bool = False,
@@ -96,6 +98,10 @@ class GriddedReader(BaseReader):
             Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
         virtualizarr_file : str or None, optional
             Path to save/load the VirtualiZarr reference JSON file, by default None.
+        virtualizarr_backend : str, optional
+            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
+        icechunk_repo : str or None, optional
+            Path to the Icechunk repository, by default None.
         use_icechunk : bool, optional
             Whether to use Icechunk for VirtualiZarr references, by default False.
         icechunk_url : str or None, optional
@@ -114,6 +120,8 @@ class GriddedReader(BaseReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
+            virtualizarr_backend=virtualizarr_backend,
+            icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
             icechunk_url=icechunk_url,
             use_dask=use_dask,
@@ -138,6 +146,8 @@ class PointReader(BaseReader):
         # VirtualiZarr kwargs accepted but silently ignored for PointReaders
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         # Standard PointReader kwargs
@@ -158,6 +168,10 @@ class PointReader(BaseReader):
         use_virtualizarr : bool, optional
             Accepted but ignored for PointReaders (VirtualiZarr only applies to gridded data).
         virtualizarr_file : str or None, optional
+            Accepted but ignored for PointReaders.
+        virtualizarr_backend : str, optional
+            Accepted but ignored for PointReaders.
+        icechunk_repo : str or None, optional
             Accepted but ignored for PointReaders.
         use_icechunk : bool, optional
             Accepted but ignored for PointReaders.
@@ -186,8 +200,8 @@ class PointReader(BaseReader):
             lazy = True
 
         # VirtualiZarr kwargs (use_virtualizarr, virtualizarr_file,
-        # use_icechunk, icechunk_url) are silently discarded here
-        # and NOT forwarded to PandasDriver.
+        # virtualizarr_backend, icechunk_repo, use_icechunk, icechunk_url)
+        # are silently discarded here and NOT forwarded to PandasDriver.
         df = self.driver.open(files, read_method=read_method, lazy=lazy, meta=meta, **kwargs)
 
         df = self.harmonize(df)

@@ -172,6 +172,8 @@ class XarrayDriver:
         use_cubed: bool = False,
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         **kwargs,
@@ -194,6 +196,12 @@ class XarrayDriver:
             Path to save/load the VirtualiZarr reference JSON file. If provided and the file
             exists, the references will be loaded from it. If the file does not exist,
             the references will be computed and saved to this path.
+        virtualizarr_backend : str, optional
+            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
+            Note: This parameter is deprecated in favor of `use_icechunk`.
+        icechunk_repo : str, optional
+            Path to the Icechunk repository. Required when ``virtualizarr_backend="icechunk"``.
+            Note: This parameter is deprecated in favor of `icechunk_url`.
         use_icechunk : bool, optional
             Whether to use Icechunk as the storage backend for VirtualiZarr references,
             by default False. If True, references are stored in an Icechunk repository.
@@ -208,23 +216,28 @@ class XarrayDriver:
         xr.Dataset
             The loaded dataset.
         """
-        # Deprecation fallbacks for renamed parameters
-        if "virtualizarr_backend" in kwargs:
+        # Handle deprecated parameters
+        if virtualizarr_backend == "icechunk":
             warnings.warn(
-                "The 'virtualizarr_backend' parameter is deprecated. Use 'use_icechunk' instead.",
+                "The 'virtualizarr_backend' parameter is deprecated. Use 'use_icechunk=True' instead.",
                 FutureWarning,
                 stacklevel=2,
             )
-            vb = kwargs.pop("virtualizarr_backend")
-            if vb == "icechunk":
-                use_icechunk = True
-        if "icechunk_repo" in kwargs:
+            use_icechunk = True
+        if icechunk_repo is not None:
             warnings.warn(
                 "The 'icechunk_repo' parameter is deprecated. Use 'icechunk_url' instead.",
                 FutureWarning,
                 stacklevel=2,
             )
-            icechunk_url = kwargs.pop("icechunk_repo")
+            icechunk_url = icechunk_repo
+
+        # Validate backend selection
+        if not use_icechunk and virtualizarr_backend not in ("kerchunk", "icechunk"):
+            raise ValueError(
+                f"Invalid virtualizarr_backend '{virtualizarr_backend}'. "
+                "Must be 'kerchunk' or 'icechunk'."
+            )
 
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
