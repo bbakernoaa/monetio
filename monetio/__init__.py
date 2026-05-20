@@ -123,21 +123,25 @@ def virtualize(source: str, files=None, output: str = None, backend: str = "kerc
     files : str or list of str, optional
         File path(s) or glob pattern(s).
     output : str, optional
-        Path to save the output reference (required for 'kerchunk' backend).
+        Path to save the output reference. For 'kerchunk' backend, this is the JSON file path.
+        For 'icechunk' backend, this is the Icechunk repository URL/path.
     backend : str, optional
         The virtualization backend. Must be "kerchunk" (default) or "icechunk".
     **kwargs : dict
         Additional arguments passed to the reader and driver.
     """
-    if backend == "kerchunk" and output is None:
-        raise ValueError("The 'output' parameter is required for the 'kerchunk' backend.")
+    if output is None:
+        raise ValueError("The 'output' parameter is required for virtualization.")
+
+    use_icechunk = backend == "icechunk"
 
     return load(
         source,
         files=files,
         use_virtualizarr=True,
-        virtualizarr_file=output,
-        virtualizarr_backend=backend,
+        virtualizarr_file=None if use_icechunk else output,
+        use_icechunk=use_icechunk,
+        icechunk_url=output if use_icechunk else None,
         **kwargs,
     )
 

@@ -31,6 +31,13 @@ class UFSReader(GriddedReader):
         var_list: list[str] | None = None,
         fname_pm25: str | list[str] | None = None,
         surf_only: bool = False,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        use_dask: bool = False,
         **kwargs: Any,
     ) -> xr.Dataset:
         """
@@ -50,6 +57,20 @@ class UFSReader(GriddedReader):
             Optional separate PM2.5 files to merge, by default None.
         surf_only : bool, optional
             Whether to only keep surface data, by default False.
+        use_virtualizarr : bool, optional
+            Whether to use VirtualiZarr, by default False.
+        virtualizarr_file : str or None, optional
+            Path to the VirtualiZarr file, by default None.
+        virtualizarr_backend : str, optional
+            VirtualiZarr backend, by default "kerchunk".
+        icechunk_repo : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_icechunk : bool, optional
+            Whether to use Icechunk, by default False.
+        icechunk_url : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_dask : bool, optional
+            Whether to use Dask for lazy loading, by default False.
         **kwargs : Any
             Additional arguments passed to the driver.
 
@@ -70,7 +91,17 @@ class UFSReader(GriddedReader):
             kwargs["combine"] = "nested"
 
         # Open dataset
-        ds = self.driver.open(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            virtualizarr_backend=virtualizarr_backend,
+            icechunk_repo=icechunk_repo,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            use_dask=use_dask,
+            **kwargs,
+        )
 
         # Merge PM25 file if present
         if fname_pm25 is not None:

@@ -24,6 +24,8 @@ class ChimereReader(GriddedReader):
         virtualizarr_file: str | None = None,
         virtualizarr_backend: str = "kerchunk",
         icechunk_repo: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         use_dask: bool = False,
         **kwargs: Any,
     ) -> xr.Dataset:
@@ -43,8 +45,12 @@ class ChimereReader(GriddedReader):
         virtualizarr_file : str or None, optional
             Path to save/load the VirtualiZarr reference JSON file, by default None.
         virtualizarr_backend : str, optional
-            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
+            VirtualiZarr backend, by default "kerchunk".
         icechunk_repo : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_icechunk : bool, optional
+            Whether to use Icechunk, by default False.
+        icechunk_url : str or None, optional
             Path to the Icechunk repository, by default None.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
@@ -80,6 +86,8 @@ class ChimereReader(GriddedReader):
             virtualizarr_file=virtualizarr_file,
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
             use_dask=use_dask,
             **kwargs,
         )

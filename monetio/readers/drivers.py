@@ -1,8 +1,4 @@
-import os
-import tempfile
-import hashlib
 import warnings
-
 from collections.abc import Callable
 from typing import Union
 
@@ -63,14 +59,14 @@ def _select_store(file_list: list[str], storage_options: dict) -> tuple:
     return registry, file_list
 
 
-def _open_via_icechunk(vds, icechunk_repo: str, virtualizarr_file: str | None) -> xr.Dataset:
+def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) -> xr.Dataset:
     """Store virtual references in Icechunk and return the dataset.
 
     Parameters
     ----------
     vds : virtualizarr.VirtualDataset
         The virtual dataset to persist.
-    icechunk_repo : str
+    icechunk_url : str
         Path (local or remote) to the Icechunk repository.
     virtualizarr_file : str | None
         Unused for Icechunk but accepted for interface consistency.
@@ -87,7 +83,7 @@ def _open_via_icechunk(vds, icechunk_repo: str, virtualizarr_file: str | None) -
             "Icechunk backend requires 'icechunk'. Install with: pip install monetio[icechunk]"
         )
 
-    repo = icechunk.Repository.open_or_create(icechunk_repo)
+    repo = icechunk.Repository.open_or_create(icechunk_url)
     session = repo.writable_session("main")
     store = session.store
 
@@ -178,6 +174,8 @@ class XarrayDriver:
         virtualizarr_file: str | None = None,
         virtualizarr_backend: str = "kerchunk",
         icechunk_repo: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -199,12 +197,17 @@ class XarrayDriver:
             exists, the references will be loaded from it. If the file does not exist,
             the references will be computed and saved to this path.
         virtualizarr_backend : str, optional
-            Backend for VirtualiZarr references. Must be ``"kerchunk"`` (default) or
-            ``"icechunk"``. When ``"icechunk"`` is selected, references are stored in
-            an Icechunk repository instead of a kerchunk JSON file.
+            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
+            Note: This parameter is deprecated in favor of `use_icechunk`.
         icechunk_repo : str, optional
-            Path to the Icechunk repository. Required when
-            ``virtualizarr_backend="icechunk"``.
+            Path to the Icechunk repository. Required when ``virtualizarr_backend="icechunk"``.
+            Note: This parameter is deprecated in favor of `icechunk_url`.
+        use_icechunk : bool, optional
+            Whether to use Icechunk as the storage backend for VirtualiZarr references,
+            by default False. If True, references are stored in an Icechunk repository.
+            If False, the default Kerchunk JSON format is used.
+        icechunk_url : str, optional
+            Path or URL to the Icechunk repository. Required when ``use_icechunk=True``.
         **kwargs : dict
             Additional arguments passed to xarray open functions.
 
@@ -213,12 +216,29 @@ class XarrayDriver:
         xr.Dataset
             The loaded dataset.
         """
-        # Validate virtualizarr_backend parameter
-        if virtualizarr_backend not in ("kerchunk", "icechunk"):
+        # Handle deprecated parameters
+        if virtualizarr_backend == "icechunk":
+            warnings.warn(
+                "The 'virtualizarr_backend' parameter is deprecated. Use 'use_icechunk=True' instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            use_icechunk = True
+        if icechunk_repo is not None:
+            warnings.warn(
+                "The 'icechunk_repo' parameter is deprecated. Use 'icechunk_url' instead.",
+                FutureWarning,
+                stacklevel=2,
+            )
+            icechunk_url = icechunk_repo
+
+        # Validate backend selection
+        if not use_icechunk and virtualizarr_backend not in ("kerchunk", "icechunk"):
             raise ValueError(
                 f"Invalid virtualizarr_backend '{virtualizarr_backend}'. "
                 "Must be 'kerchunk' or 'icechunk'."
             )
+
         # Prepare kwargs for xarray
         xr_kwargs = kwargs.copy()
 
@@ -265,7 +285,7 @@ class XarrayDriver:
             # --- Kerchunk cache: load existing refs if available ---
             refs = None
             if (
-                virtualizarr_backend == "kerchunk"
+                not use_icechunk
                 and virtualizarr_file is not None
                 and os.path.exists(virtualizarr_file)
             ):
@@ -273,8 +293,6 @@ class XarrayDriver:
                     with open(virtualizarr_file) as f_ref:
                         refs = ujson.load(f_ref)
                 except Exception as e:
-                    import warnings
-
                     warnings.warn(f"Failed to load virtualizarr_file {virtualizarr_file}: {e}")
                     refs = None
 
@@ -297,8 +315,8 @@ class XarrayDriver:
                     )
 
                 # --- Branch on backend ---
-                if virtualizarr_backend == "icechunk":
-                    ds = _open_via_icechunk(vds, icechunk_repo, virtualizarr_file)
+                if use_icechunk:
+                    ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file)
                     if preprocess:
                         ds = preprocess(ds)
                     return ds
@@ -311,8 +329,6 @@ class XarrayDriver:
                         with open(virtualizarr_file, "w") as f_ref:
                             ujson.dump(refs, f_ref)
                     except Exception as e:
-                        import warnings
-
                         warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
 
             remote_protocol = "file"
