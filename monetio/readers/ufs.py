@@ -127,9 +127,18 @@ class UFSReader(GriddedReader):
             "delz": "dz_m",
         }
         # Only rename what exists
+        # To avoid warnings, we use a single rename call for all variables and dimensions.
         actual_rename = {k: v for k, v in rename_dict.items() if k in ds.variables or k in ds.dims}
         if actual_rename:
-            ds = ds.rename(actual_rename)
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*does not create an index anymore.*")
+                ds = ds.rename(actual_rename)
+
+            # Ensure renamed dimensions that were coordinates maintain their index
+            for old, new in actual_rename.items():
+                if new in ds.dims and new in ds.coords and new not in ds.indexes:
+                    ds = ds.set_index({new: new})
 
         # Calculations
         if "surfpres_pa" in ds and "ak" in ds and "bk" in ds:
