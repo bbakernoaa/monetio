@@ -75,6 +75,72 @@ class GriddedReader(BaseReader):
     def __init__(self):
         self.driver = XarrayDriver()
 
+    def to_kerchunk(
+        self,
+        files: str | list[str],
+        virtualizarr_file: str | None = None,
+        virtualizarr_parser: str = "hdf",
+        **kwargs,
+    ) -> dict:
+        """
+        Generate Kerchunk references for the given files.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path(s), URL(s), or glob pattern.
+        virtualizarr_file : str, optional
+            Path to save the generated Kerchunk reference JSON file.
+        virtualizarr_parser : str, optional
+            The parser to use for VirtualiZarr, by default "hdf".
+        **kwargs : dict
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        dict
+            The generated Kerchunk references.
+        """
+        return self.driver.to_kerchunk(
+            files,
+            virtualizarr_file=virtualizarr_file,
+            virtualizarr_parser=virtualizarr_parser,
+            **kwargs,
+        )
+
+    def to_icechunk(
+        self,
+        files: str | list[str],
+        icechunk_url: str,
+        virtualizarr_parser: str = "hdf",
+        **kwargs,
+    ) -> xr.Dataset:
+        """
+        Generate and store VirtualiZarr references in an Icechunk repository.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path(s), URL(s), or glob pattern.
+        icechunk_url : str
+            Path or URL to the Icechunk repository.
+        virtualizarr_parser : str, optional
+            The parser to use for VirtualiZarr, by default "hdf".
+        **kwargs : dict
+            Additional arguments passed to the driver.
+
+        Returns
+        -------
+        xr.Dataset
+            The dataset opened from the Icechunk store.
+        """
+        return self.driver.to_icechunk(
+            files,
+            icechunk_url=icechunk_url,
+            virtualizarr_parser=virtualizarr_parser,
+            **kwargs,
+        )
+
     def open_dataset(
         self,
         files: str | list[str],
@@ -84,6 +150,7 @@ class GriddedReader(BaseReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
+        virtualizarr_parser: str = "hdf",
         use_dask: bool = False,
         **kwargs,
     ) -> xr.Dataset:
@@ -106,6 +173,8 @@ class GriddedReader(BaseReader):
             Whether to use Icechunk for VirtualiZarr references, by default False.
         icechunk_url : str or None, optional
             Path to the Icechunk repository, by default None.
+        virtualizarr_parser : str, optional
+            The parser to use for VirtualiZarr, by default "hdf".
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
         **kwargs : dict
@@ -124,6 +193,7 @@ class GriddedReader(BaseReader):
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
             icechunk_url=icechunk_url,
+            virtualizarr_parser=virtualizarr_parser,
             use_dask=use_dask,
             **kwargs,
         )
@@ -150,6 +220,7 @@ class PointReader(BaseReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
+        virtualizarr_parser: str = "hdf",
         # Standard PointReader kwargs
         read_method: str = "read_csv",
         as_xarray: bool = True,
@@ -176,6 +247,8 @@ class PointReader(BaseReader):
         use_icechunk : bool, optional
             Accepted but ignored for PointReaders.
         icechunk_url : str or None, optional
+            Accepted but ignored for PointReaders.
+        virtualizarr_parser : str, optional
             Accepted but ignored for PointReaders.
         read_method : str, optional
             The pandas/dask reading method to use, by default "read_csv".

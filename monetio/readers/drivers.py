@@ -176,6 +176,7 @@ class XarrayDriver:
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
+        virtualizarr_parser: str = "hdf",
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -208,6 +209,9 @@ class XarrayDriver:
             If False, the default Kerchunk JSON format is used.
         icechunk_url : str, optional
             Path or URL to the Icechunk repository. Required when ``use_icechunk=True``.
+        virtualizarr_parser : str, optional
+            The parser to use for VirtualiZarr. Options include "hdf" (default),
+            "netcdf3", "zarr", "fits", "dmrpp".
         **kwargs : dict
             Additional arguments passed to xarray open functions.
 
@@ -273,7 +277,7 @@ class XarrayDriver:
                 import ujson  # noqa: F401
                 import zarr  # noqa: F401
                 from virtualizarr import open_virtual_mfdataset
-                from virtualizarr.parsers import HDFParser
+                from virtualizarr import parsers as vzp
             except ImportError:
                 raise ImportError(
                     "VirtualiZarr support requires additional packages. "
@@ -300,18 +304,29 @@ class XarrayDriver:
                 storage_options = dict(xr_kwargs.get("storage_options", {}))
                 registry, file_list = _select_store(file_list, storage_options)
 
+                # Select parser
+                parser_map = {
+                    "hdf": vzp.HDFParser,
+                    "netcdf3": vzp.NetCDF3Parser,
+                    "zarr": vzp.ZarrParser,
+                    "fits": vzp.FITSParser,
+                    "dmrpp": vzp.DMRPPParser,
+                }
+                parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+                parser = parser_cls()
+
                 concat_dim = xr_kwargs.get("concat_dim", "time")
                 try:
                     vds = open_virtual_mfdataset(
                         file_list,
                         registry=registry,
-                        parser=HDFParser(),
+                        parser=parser,
                         combine="nested",
                         concat_dim=concat_dim,
                     )
                 except ValueError:
                     vds = open_virtual_mfdataset(
-                        file_list, registry=registry, parser=HDFParser(), combine="by_coords"
+                        file_list, registry=registry, parser=parser, combine="by_coords"
                     )
 
                 # --- Branch on backend ---
@@ -489,6 +504,143 @@ class PandasDriver:
     """
     The unified driver for opening tabular/point data.
     """
+
+    def to_kerchunk(
+        self,
+        files: str | list[str],
+        virtualizarr_file: str | None = None,
+        virtualizarr_parser: str = "hdf",
+        **kwargs,
+    ) -> dict:
+        """
+        Generate Kerchunk references for the given files.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path(s), URL(s), or glob pattern.
+        virtualizarr_file : str, optional
+            Path to save the generated Kerchunk reference JSON file.
+        virtualizarr_parser : str, optional
+            The parser to use for VirtualiZarr, by default "hdf".
+        **kwargs : dict
+            Additional arguments passed to the driver and VirtualiZarr.
+
+        Returns
+        -------
+        dict
+            The generated Kerchunk references.
+        """
+        try:
+            import ujson
+            from virtualizarr import open_virtual_mfdataset
+            from virtualizarr import parsers as vzp
+        except ImportError:
+            raise ImportError(
+                "VirtualiZarr support requires additional packages. "
+                "Install with: pip install monetio[virtualizarr]"
+            )
+
+        file_list = FileUtility.expand_paths(files)
+        storage_options = dict(kwargs.get("storage_options", {}))
+        registry, file_list = _select_store(file_list, storage_options)
+
+        parser_map = {
+            "hdf": vzp.HDFParser,
+            "netcdf3": vzp.NetCDF3Parser,
+            "zarr": vzp.ZarrParser,
+            "fits": vzp.FITSParser,
+            "dmrpp": vzp.DMRPPParser,
+        }
+        parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+        parser = parser_cls()
+
+        concat_dim = kwargs.get("concat_dim", "time")
+        try:
+            vds = open_virtual_mfdataset(
+                file_list,
+                registry=registry,
+                parser=parser,
+                combine="nested",
+                concat_dim=concat_dim,
+            )
+        except ValueError:
+            vds = open_virtual_mfdataset(
+                file_list, registry=registry, parser=parser, combine="by_coords"
+            )
+
+        refs = vds.vz.to_kerchunk()
+
+        if virtualizarr_file is not None:
+            with open(virtualizarr_file, "w") as f:
+                ujson.dump(refs, f)
+
+        return refs
+
+    def to_icechunk(
+        self,
+        files: str | list[str],
+        icechunk_url: str,
+        virtualizarr_parser: str = "hdf",
+        **kwargs,
+    ) -> xr.Dataset:
+        """
+        Generate and store VirtualiZarr references in an Icechunk repository.
+
+        Parameters
+        ----------
+        files : Union[str, List[str]]
+            File path(s), URL(s), or glob pattern.
+        icechunk_url : str
+            Path or URL to the Icechunk repository.
+        virtualizarr_parser : str, optional
+            The parser to use for VirtualiZarr, by default "hdf".
+        **kwargs : dict
+            Additional arguments passed to the driver and VirtualiZarr.
+
+        Returns
+        -------
+        xr.Dataset
+            The dataset opened from the Icechunk store.
+        """
+        try:
+            from virtualizarr import open_virtual_mfdataset
+            from virtualizarr import parsers as vzp
+        except ImportError:
+            raise ImportError(
+                "VirtualiZarr support requires additional packages. "
+                "Install with: pip install monetio[virtualizarr]"
+            )
+
+        file_list = FileUtility.expand_paths(files)
+        storage_options = dict(kwargs.get("storage_options", {}))
+        registry, file_list = _select_store(file_list, storage_options)
+
+        parser_map = {
+            "hdf": vzp.HDFParser,
+            "netcdf3": vzp.NetCDF3Parser,
+            "zarr": vzp.ZarrParser,
+            "fits": vzp.FITSParser,
+            "dmrpp": vzp.DMRPPParser,
+        }
+        parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+        parser = parser_cls()
+
+        concat_dim = kwargs.get("concat_dim", "time")
+        try:
+            vds = open_virtual_mfdataset(
+                file_list,
+                registry=registry,
+                parser=parser,
+                combine="nested",
+                concat_dim=concat_dim,
+            )
+        except ValueError:
+            vds = open_virtual_mfdataset(
+                file_list, registry=registry, parser=parser, combine="by_coords"
+            )
+
+        return _open_via_icechunk(vds, icechunk_url, None)
 
     def open(
         self,

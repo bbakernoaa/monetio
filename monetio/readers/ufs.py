@@ -38,7 +38,7 @@ class UFSReader(GriddedReader):
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         use_dask: bool = False,
-        **kwargs: Any,
+        virtualizarr_parser: str = "hdf", **kwargs: Any,
     ) -> xr.Dataset:
         """
         Reads UFS-AQM netCDF files.
@@ -100,12 +100,12 @@ class UFSReader(GriddedReader):
             use_icechunk=use_icechunk,
             icechunk_url=icechunk_url,
             use_dask=use_dask,
-            **kwargs,
+            virtualizarr_parser=virtualizarr_parser, **kwargs,
         )
 
         # Merge PM25 file if present
         if fname_pm25 is not None:
-            ds_pm25 = self.driver.open(fname_pm25, **kwargs)
+            ds_pm25 = self.driver.open(fname_pm25, virtualizarr_parser=virtualizarr_parser, **kwargs)
             ds_pm25 = ds_pm25.drop_vars(["lat", "lon", "pfull"], errors="ignore")
             ds_pm25.attrs = {}
             from monetio.util import _try_merge_exact
