@@ -68,8 +68,32 @@ Geostationary Operational Environmental Satellite.
 
 - **Source ID**: `goes`
 
+### GEMS
+
+Geostationary Environment Monitoring Spectrometer (South Korea).
+
+- **Source ID**: `gems`
+
+### Sentinel-4
+
+ESA Geostationary air quality constellation component (Europe).
+
+- **Source ID**: `sentinel4`
+
 ### MOPITT
 
 Measurements Of Pollution In The Troposphere.
 
 - **Source ID**: `mopitt`
+
+### CALIPSO / CALIOP
+
+Cloud-Aerosol Lidar and Infrared Pathfinder Satellite Observations.
+
+- **Source ID**: `calipso`
+
+### EarthCARE
+
+ESA/JAXA Earth Cloud, Aerosol and Radiation Explorer.
+
+- **Source ID**: `earthcare`
