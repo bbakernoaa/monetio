@@ -115,7 +115,7 @@ class GPMIMERGReader(GriddedReader):
                 end_min = min_start + 29
                 end_time = f"E{d.hour:02d}{end_min:02d}59"
                 # The .0000. might also change depending on the product stream
-                url = f"{base_url}/{d.strftime('%Y/%m')}/3B-HHR.MS.MRG.3IMERG.{date_str}-{start_time}-{end_time}.{d.hour*60+min_start:04d}.V{version}B.HDF5"
+                url = f"{base_url}/{d.strftime('%Y/%m')}/3B-HHR.MS.MRG.3IMERG.{date_str}-{start_time}-{end_time}.{d.hour * 60 + min_start:04d}.V{version}B.HDF5"
             else:
                 # Daily: 3B-DAY.MS.MRG.3IMERG.20240101-S000000-E235959.V07B.nc4
                 date_str = d.strftime("%Y%m%d")

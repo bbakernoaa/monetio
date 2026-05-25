@@ -31,6 +31,7 @@ class AMDARReader(PointReader):
         """
         if isinstance(files, str):
             import glob
+
             files = sorted(glob.glob(files)) if "*" in files else [files]
 
         datasets = []
@@ -80,7 +81,9 @@ class AMDARReader(PointReader):
         }
 
         rename_dict = {
-            old: new for old, new in mapping.items() if old in ds.variables and new not in ds.variables
+            old: new
+            for old, new in mapping.items()
+            if old in ds.variables and new not in ds.variables
         }
         if rename_dict:
             ds = ds.rename(rename_dict)
