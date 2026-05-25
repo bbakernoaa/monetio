@@ -134,7 +134,9 @@ class IODAReader(BaseReader):
                     if ds_group[tv].dtype == object or ds_group[tv].dtype.kind in ["S", "U"]:
                         try:
                             # Try ISO format first
-                            new_time = pd.to_datetime(ds_group[tv].values.astype(str), errors="coerce")
+                            new_time = pd.to_datetime(
+                                ds_group[tv].values.astype(str), errors="coerce"
+                            )
                             if hasattr(new_time, "tz"):
                                 if new_time.tz is not None:
                                     new_time = new_time.tz_localize(None)
@@ -177,14 +179,6 @@ def export_to_ioda(ds_monet, variable_mapping, output_path):
         if curr_dim != "Location" and curr_dim != "nlocs":
             ds = ds.rename({curr_dim: "Location"})
 
-    # Ensure a core dimension exists
-    if "Location" in ds.dims:
-        core_dim = "Location"
-    elif "nlocs" in ds.dims:
-        core_dim = "nlocs"
-    else:
-        core_dim = "Location"
-
     # 2. Build groups based on mapping
     groups = {}
     for monet_var, (ioda_group, ioda_var) in variable_mapping.items():
@@ -198,7 +192,12 @@ def export_to_ioda(ds_monet, variable_mapping, output_path):
         da = ds[monet_var].drop_vars(ds.coords, errors="ignore")
 
         # Handle time conversion in MetaData to ISO 8601 strings
-        if ioda_group == "MetaData" and ioda_var in ["datetime", "dateTime", "dateTimeString", "time"]:
+        if ioda_group == "MetaData" and ioda_var in [
+            "datetime",
+            "dateTime",
+            "dateTimeString",
+            "time",
+        ]:
             if np.issubdtype(da.dtype, np.datetime64) or da.dtype.kind == "M":
                 # Ensure UTC 'Z' suffix
                 times = pd.to_datetime(da.values).strftime("%Y-%m-%dT%H:%M:%SZ")

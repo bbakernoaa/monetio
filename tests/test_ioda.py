@@ -1,11 +1,14 @@
 import os
+
+import netCDF4
 import numpy as np
 import pandas as pd
-import xarray as xr
 import pytest
-import netCDF4
+import xarray as xr
+
 import monetio
 from monetio.readers.ioda import export_to_ioda
+
 
 @pytest.fixture
 def mock_ioda_file(tmp_path):
@@ -47,6 +50,7 @@ def mock_ioda_file(tmp_path):
 
     return str(fn)
 
+
 def test_ioda_read(mock_ioda_file):
     ds = monetio.load("ioda", files=mock_ioda_file)
 
@@ -70,6 +74,7 @@ def test_ioda_read(mock_ioda_file):
     assert np.issubdtype(ds.time.dtype, np.datetime64)
     assert ds.time.values[0] == pd.Timestamp("2023-01-01T00:00:00")
 
+
 def test_ioda_export(tmp_path):
     # Create a dummy monet-like dataset (multi-dimensional)
     times = pd.date_range("2023-01-01", periods=2, freq="h")
@@ -85,7 +90,7 @@ def test_ioda_export(tmp_path):
             "site": sites,
             "latitude": (("site",), [34.0, 35.0]),
             "longitude": (("site",), [-118.0, -117.0]),
-        }
+        },
     )
 
     output_path = str(tmp_path / "exported_ioda.nc")
@@ -111,7 +116,7 @@ def test_ioda_export(tmp_path):
     assert "ozone_conc_error" in ds_back.variables
     assert "latitude" in ds_back.variables
     assert "time" in ds_back.variables
-    assert "ozone_conc_qc" in ds_back.variables # Auto-populated
+    assert "ozone_conc_qc" in ds_back.variables  # Auto-populated
 
     # Check a value
     # Stacking (time, site) -> (0,0), (0,1), (1,0), (1,1)
@@ -119,6 +124,7 @@ def test_ioda_export(tmp_path):
 
     # Check MetaData dateTime was converted back to strings in file but read as datetime
     assert np.issubdtype(ds_back.time.dtype, np.datetime64)
+
 
 def test_ioda_read_multiple(tmp_path, mock_ioda_file):
     # Create a second file

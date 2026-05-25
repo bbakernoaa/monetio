@@ -165,6 +165,7 @@ from .obs import (
     cems,
     crn,
     improve,
+    ioda,
     ish,
     ish_lite,
     nadp,
@@ -172,7 +173,6 @@ from .obs import (
     openaq_v2,
     openaq_v3,
     pams,
-    ioda,
 )
 from .profile import geoms, gml_ozonesonde, icartt, tolnet
 from .sat import goes
