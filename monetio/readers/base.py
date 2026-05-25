@@ -246,6 +246,8 @@ class PointReader(BaseReader):
             Accepted but ignored for PointReaders.
         icechunk_url : str or None, optional
             Accepted but ignored for PointReaders.
+        virtualizarr_parser : str, optional
+            Accepted but ignored for PointReaders.
         read_method : str, optional
             The pandas/dask reading method to use, by default "read_csv".
         as_xarray : bool, optional

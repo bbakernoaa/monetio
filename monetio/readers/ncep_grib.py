@@ -37,9 +37,10 @@ class NCEPGribReader(GriddedReader):
         >>> reader = NCEPGribReader()
         >>> ds = reader.open_dataset("gfs.*.grib2", engine="pynio")
         """
-        # Ensure we have engine='grib2io' if not specified
+        # Ensure we have engine='pynio' if not specified
+        # Note: pynio is often used for these files but might be hard to install.
         if "engine" not in kwargs:
-            kwargs["engine"] = "grib2io"
+            kwargs["engine"] = "pynio"
 
         # Also supports open_mfdataset logic
         if "concat_dim" not in kwargs:

@@ -209,9 +209,6 @@ class XarrayDriver:
             If False, the default Kerchunk JSON format is used.
         icechunk_url : str, optional
             Path or URL to the Icechunk repository. Required when ``use_icechunk=True``.
-        virtualizarr_parser : str, optional
-            The parser to use for VirtualiZarr. Options include "hdf" (default),
-            "netcdf3", "zarr", "fits", "dmrpp", "grib2".
         **kwargs : dict
             Additional arguments passed to xarray open functions.
 
