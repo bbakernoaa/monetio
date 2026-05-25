@@ -1,10 +1,13 @@
 """
 Test Sentinel-4 Reader
 """
+
 import numpy as np
 import pytest
 import xarray as xr
+
 from monetio.readers.sentinel4 import Sentinel4Reader
+
 
 def create_mock_sentinel4_dataset(is_dask=False):
     """Create a mock Sentinel-4 L2 dataset."""
@@ -13,10 +16,22 @@ def create_mock_sentinel4_dataset(is_dask=False):
 
     ds = xr.Dataset(
         data_vars={
-            "qa_value": (("scanline", "ground_pixel"), np.linspace(0, 1, scanline * ground_pixel).reshape(scanline, ground_pixel)),
-            "nitrogendioxide_tropospheric_column": (("scanline", "ground_pixel"), np.random.rand(scanline, ground_pixel)),
-            "latitude": (("scanline", "ground_pixel"), np.linspace(40, 50, scanline)[:, None] * np.ones((1, ground_pixel))),
-            "longitude": (("scanline", "ground_pixel"), np.ones((scanline, 1)) * np.linspace(-10, 10, ground_pixel)[None, :]),
+            "qa_value": (
+                ("scanline", "ground_pixel"),
+                np.linspace(0, 1, scanline * ground_pixel).reshape(scanline, ground_pixel),
+            ),
+            "nitrogendioxide_tropospheric_column": (
+                ("scanline", "ground_pixel"),
+                np.random.rand(scanline, ground_pixel),
+            ),
+            "latitude": (
+                ("scanline", "ground_pixel"),
+                np.linspace(40, 50, scanline)[:, None] * np.ones((1, ground_pixel)),
+            ),
+            "longitude": (
+                ("scanline", "ground_pixel"),
+                np.ones((scanline, 1)) * np.linspace(-10, 10, ground_pixel)[None, :],
+            ),
         }
     )
 
@@ -24,6 +39,7 @@ def create_mock_sentinel4_dataset(is_dask=False):
         ds = ds.chunk({"scanline": 5, "ground_pixel": 10})
 
     return ds
+
 
 @pytest.mark.parametrize("lazy", [False, True])
 def test_sentinel4_reader_logic(lazy, monkeypatch):

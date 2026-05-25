@@ -1,10 +1,13 @@
 """
 Test EarthCARE Reader
 """
+
 import numpy as np
 import pytest
 import xarray as xr
+
 from monetio.readers.earthcare import EarthCAREReader
+
 
 def create_mock_earthcare_dataset(is_dask=False):
     """Create a mock EarthCARE L2 aerosol profile dataset."""
@@ -24,6 +27,7 @@ def create_mock_earthcare_dataset(is_dask=False):
         ds = ds.chunk({"profile": 5, "n_range": 15})
 
     return ds
+
 
 @pytest.mark.parametrize("lazy", [False, True])
 def test_earthcare_reader_logic(lazy, monkeypatch):

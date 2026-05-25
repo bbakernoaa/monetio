@@ -1,9 +1,11 @@
 """
 Test AmeriFlux Reader
 """
+
 import pandas as pd
-import pytest
+
 from monetio.readers.ameriflux import AmeriFluxReader
+
 
 def create_mock_ameriflux_df():
     """Create a mock AmeriFlux BASE dataframe."""
@@ -13,6 +15,7 @@ def create_mock_ameriflux_df():
         "FC": [1.2, 1.3, 1.1],
     }
     return pd.DataFrame(data)
+
 
 def test_ameriflux_reader_logic(monkeypatch):
     """Test AmeriFlux reader preprocessing logic."""

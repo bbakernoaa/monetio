@@ -1,11 +1,13 @@
 """
 Test TCCON Reader
 """
+
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
+
 from monetio.readers.tccon import TCCONReader
+
 
 def create_mock_tccon_dataset():
     """Create a mock TCCON GGG2020 dataset."""
@@ -22,9 +24,10 @@ def create_mock_tccon_dataset():
         },
         attrs={
             "site_name": "pasadena01",
-        }
+        },
     )
     return ds
+
 
 def test_tccon_reader_logic(monkeypatch):
     """Test TCCON reader preprocessing logic."""

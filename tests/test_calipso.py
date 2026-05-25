@@ -1,10 +1,13 @@
 """
 Test CALIPSO Reader
 """
+
 import numpy as np
 import pytest
 import xarray as xr
+
 from monetio.readers.calipso import CALIPSOReader
+
 
 def create_mock_calipso_dataset(is_dask=False):
     """Create a mock CALIOP L2 aerosol profile dataset."""
@@ -24,6 +27,7 @@ def create_mock_calipso_dataset(is_dask=False):
         ds = ds.chunk({"nray": 5, "nbin": 15})
 
     return ds
+
 
 @pytest.mark.parametrize("lazy", [False, True])
 def test_calipso_reader_logic(lazy, monkeypatch):
