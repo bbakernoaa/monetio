@@ -70,6 +70,12 @@ _READER_MODULES = {
     "merra2": ".readers.merra2",
     "nesdis_viirs_jrr": ".readers.nesdis_viirs_jrr",
     "viirs_jrr": ".readers.nesdis_viirs_jrr",
+    "gems": ".readers.gems",
+    "sentinel4": ".readers.sentinel4",
+    "calipso": ".readers.calipso",
+    "earthcare": ".readers.earthcare",
+    "tccon": ".readers.tccon",
+    "ameriflux": ".readers.ameriflux",
 }
 
 
@@ -83,9 +89,9 @@ def load(source: str, files=None, **kwargs):
 
     Available sources:
         Models: cmaq, camx, chimere, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, ufs, wrfchem, grib2, gfs, gefs, gdas, rrfs
-        Obs: airnow, aeronet, aqs, cems, crn, eprofile, improve, ish, ish_lite, nadp, ndacc, ndbc, openaq, openaq_v2, openaq_aws, pams, pandora, skynet, solrad, surfrad
+        Obs: airnow, aeronet, aqs, ameriflux, cems, crn, improve, eprofile, ish, ish_lite, nadp, openaq, openaq_v2, openaq_aws, pams, ndbc, surfrad, solrad, ndacc, pandora, skynet, tccon
         Profile: actris, earlinet, geoms, gml_ozonesonde, iagos, icartt, igra2, mplnet, tolnet, umbc_aerosol
-        Sat: goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, tempo, tropomi, viirs_jrr
+        Sat: calipso, earthcare, gems, goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, sentinel4, tempo, tropomi, viirs_jrr
     """
     from .readers.base import READER_REGISTRY
 
