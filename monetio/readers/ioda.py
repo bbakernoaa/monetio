@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .base import BaseReader, register_reader
+from .base import BaseReader, _scientific_hygiene, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
 
@@ -51,7 +51,62 @@ class IODAReader(BaseReader):
 
             ds = xr.concat(dsets, dim=concat_dim)
 
+        ds = self.harmonize(ds)
         ds = update_history(ds, "Read IODA data.")
+        return ds
+
+    def harmonize(self, ds):
+        """
+        Standardize to UGRID convention and apply scientific hygiene.
+        """
+        # 1. Rename core dimension to 'node'
+        core_dims = ["nlocs", "Location"]
+        for cd in core_dims:
+            if cd in ds.dims:
+                ds = ds.rename_dims({cd: "node"})
+                if cd in ds.coords:
+                    ds = ds.rename_vars({cd: "node"})
+                break
+
+        # 2. Add UGRID metadata
+        if "node" in ds.dims:
+            node_coords = []
+            for c in ["longitude", "latitude", "elevation"]:
+                if c in ds.coords or c in ds.data_vars:
+                    node_coords.append(c)
+
+            if node_coords:
+                ds["mesh"] = xr.DataArray(
+                    data=np.int32(0),
+                    attrs={
+                        "cf_role": "mesh_topology",
+                        "topology_dimension": 0,
+                        "node_coordinates": " ".join(node_coords),
+                    },
+                )
+
+            if "latitude" in ds.variables:
+                ds.latitude.attrs.update({"units": "degrees_north", "standard_name": "latitude"})
+            if "longitude" in ds.variables:
+                ds.longitude.attrs.update({"units": "degrees_east", "standard_name": "longitude"})
+            if "elevation" in ds.variables:
+                ds.elevation.attrs.update(
+                    {"units": "m", "standard_name": "height_above_mean_sea_level"}
+                )
+
+            for var in ds.data_vars:
+                if "node" in ds[var].dims:
+                    ds[var].attrs.update({"mesh": "mesh", "location": "node"})
+
+        # 3. Standard attribute cleaning
+        ds = _scientific_hygiene(ds)
+
+        # 4. Conventions
+        if "Conventions" not in ds.attrs:
+            ds.attrs["Conventions"] = "CF-1.8 UGRID-1.0"
+        elif "UGRID-1.0" not in ds.attrs["Conventions"]:
+            ds.attrs["Conventions"] += " UGRID-1.0"
+
         return ds
 
     def _read_single_file(self, filepath, **kwargs):

@@ -55,8 +55,10 @@ def test_ioda_read(mock_ioda_file):
     ds = monetio.load("ioda", files=mock_ioda_file)
 
     assert isinstance(ds, xr.Dataset)
-    assert "nlocs" in ds.dims
-    assert ds.sizes["nlocs"] == 5
+    assert "node" in ds.dims
+    assert ds.sizes["node"] == 5
+    assert "mesh" in ds.variables
+    assert ds.mesh.attrs["cf_role"] == "mesh_topology"
 
     # Check variables
     assert "latitude" in ds.variables
@@ -109,8 +111,8 @@ def test_ioda_export(tmp_path):
     # Verify by reading it back with our reader
     ds_back = monetio.load("ioda", files=output_path)
 
-    assert "Location" in ds_back.dims
-    assert ds_back.sizes["Location"] == 4  # 2 times * 2 sites
+    assert "node" in ds_back.dims
+    assert ds_back.sizes["node"] == 4  # 2 times * 2 sites
 
     assert "ozone_conc" in ds_back.variables
     assert "ozone_conc_error" in ds_back.variables
@@ -143,5 +145,5 @@ def test_ioda_read_multiple(tmp_path, mock_ioda_file):
         o3[:] = [60.0]
 
     ds = monetio.load("ioda", files=[mock_ioda_file, str(fn2)])
-    assert ds.sizes["nlocs"] == 6
+    assert ds.sizes["node"] == 6
     assert ds.latitude.values[-1] == 60.0
