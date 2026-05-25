@@ -1,8 +1,9 @@
-import numpy as np
-import pytest
-import xarray as xr
 import dask.array as da
+import numpy as np
+import xarray as xr
+
 from monetio.readers.nesdis_eps_viirs import NESDISEPSVIIRSReader, nesdis_eps_viirs_preprocess
+
 
 def test_nesdis_eps_viirs_preprocess():
     # Create dummy dataset
@@ -35,6 +36,7 @@ def test_nesdis_eps_viirs_preprocess():
     # Check standard attributes
     assert ds_out.aod_550.attrs["units"] == "1"
 
+
 def test_nesdis_eps_viirs_eager_lazy_consistency():
     # Create dummy dataset
     data = np.random.rand(10, 10).astype("f4")
@@ -56,6 +58,7 @@ def test_nesdis_eps_viirs_eager_lazy_consistency():
     # Check consistency
     xr.testing.assert_allclose(out_eager, out_lazy.compute())
     assert isinstance(out_lazy.aod_550.data, da.Array)
+
 
 def test_nesdis_eps_viirs_build_urls():
     reader = NESDISEPSVIIRSReader()

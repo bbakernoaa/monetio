@@ -1,8 +1,9 @@
-import numpy as np
-import pytest
-import xarray as xr
 import dask.array as da
+import numpy as np
+import xarray as xr
+
 from monetio.readers.ncep_grib import NCEPGribReader, ncep_grib_preprocess
+
 
 def test_ncep_grib_preprocess():
     # Create dummy dataset with 1D coordinates
@@ -14,7 +15,7 @@ def test_ncep_grib_preprocess():
         coords={
             "lat_0": np.linspace(-90, 90, ny),
             "lon_0": np.linspace(-180, 180, nx),
-        }
+        },
     )
 
     ds_out = ncep_grib_preprocess(ds)
@@ -27,6 +28,7 @@ def test_ncep_grib_preprocess():
     assert ds_out.y.size == ny
     assert ds_out.x.size == nx
 
+
 def test_ncep_grib_eager_lazy_consistency():
     ny, nx = 10, 12
     data = np.random.rand(ny, nx).astype("f4")
@@ -37,7 +39,7 @@ def test_ncep_grib_eager_lazy_consistency():
         coords={
             "lat_0": np.linspace(-90, 90, ny),
             "lon_0": np.linspace(-180, 180, nx),
-        }
+        },
     )
 
     ds_lazy = ds_eager.chunk({"lat_0": 5, "lon_0": 6})
@@ -47,6 +49,7 @@ def test_ncep_grib_eager_lazy_consistency():
 
     xr.testing.assert_allclose(out_eager, out_lazy.compute())
     assert isinstance(out_lazy.latitude.data, da.Array)
+
 
 def test_ncep_grib_reader_open(monkeypatch):
     class MockDriver:

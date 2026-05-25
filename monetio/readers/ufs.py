@@ -131,6 +131,7 @@ class UFSReader(GriddedReader):
         actual_rename = {k: v for k, v in rename_dict.items() if k in ds.variables or k in ds.dims}
         if actual_rename:
             import warnings
+
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*does not create an index anymore.*")
                 ds = ds.rename(actual_rename)
