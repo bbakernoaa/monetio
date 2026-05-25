@@ -1,19 +1,28 @@
+"""JCSDA IODA NetCDF4 Reader and Writer."""
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .base import BaseReader, _scientific_hygiene, register_reader
+from .base import PointReader, _scientific_hygiene, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
 
 
 @register_reader("ioda")
-class IODAReader(BaseReader):
+class IODAReader(PointReader):
     """
     Reader for JCSDA IODA NetCDF4 files.
     """
 
-    def open_dataset(self, files, **kwargs):
+    def open_dataset(
+        self,
+        files,
+        as_xarray: bool = True,
+        lazy: bool = False,
+        use_dask: bool = False,
+        **kwargs,
+    ):
         """
         Reads IODA format files and merges groups into a flat dataset.
 
@@ -21,22 +30,38 @@ class IODAReader(BaseReader):
         ----------
         files : str or list[str]
             File path, list of paths, or glob pattern.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
+        use_dask : bool, optional
+            Alias for `lazy`, by default False.
         **kwargs : dict
             Additional arguments passed to xr.open_dataset.
 
         Returns
         -------
-        xr.Dataset
+        xr.Dataset | pd.DataFrame
             Flattened IODA dataset.
         """
+        if use_dask:
+            lazy = True
+
         file_list = FileUtility.expand_paths(files)
+
+        # Merge xr.open_dataset kwargs
+        xr_kwargs = kwargs.copy()
+        if lazy:
+            xr_kwargs.setdefault("chunks", "auto")
 
         dsets = []
         for f in file_list:
-            dsets.append(self._read_single_file(f, **kwargs))
+            dsets.append(self._read_single_file(f, **xr_kwargs))
 
         if not dsets:
-            return xr.Dataset()
+            if as_xarray:
+                return xr.Dataset()
+            return pd.DataFrame()
 
         if len(dsets) == 1:
             ds = dsets[0]
@@ -52,6 +77,11 @@ class IODAReader(BaseReader):
             ds = xr.concat(dsets, dim=concat_dim)
 
         ds = self.harmonize(ds)
+
+        if not as_xarray:
+            # PointReader expects a DataFrame if as_xarray=False
+            return ds.to_dataframe().reset_index()
+
         ds = update_history(ds, "Read IODA data.")
         return ds
 
