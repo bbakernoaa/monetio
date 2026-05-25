@@ -144,7 +144,7 @@ def build_urls(
     fnames = []
     if verbose:
         print("Building ICAP-MME URLs...")
-    base_url = "https://usgodae.org/ftp/outgoing/nrl/ICAP-MME/"
+    base_url = "https://nrlgodae1.nrlmry.navy.mil/ftp/outgoing/nrl/ICAP-MME/"
 
     for dt in dates:
         fname = "icap_{}_{}_{}.nc".format(
