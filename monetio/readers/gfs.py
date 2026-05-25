@@ -45,7 +45,9 @@ class GFSReader(NCEPPDSReader):
                 lt_str = f"{lt:03d}"
                 if source.lower() == "aws":
                     bucket = "noaa-gfs-bdp-pds"
-                    url = f"s3://{bucket}/gfs.{d_str}/{h_str}/atmos/gfs.t{h_str}z.{product}.f{lt_str}"
+                    url = (
+                        f"s3://{bucket}/gfs.{d_str}/{h_str}/atmos/gfs.t{h_str}z.{product}.f{lt_str}"
+                    )
                 else:
                     # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20250325/00/atmos/gfs.t00z.pgrb2.0p25.f000
                     url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.{d_str}/{h_str}/atmos/gfs.t{h_str}z.{product}.f{lt_str}"

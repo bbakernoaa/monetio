@@ -118,7 +118,9 @@ class RRFSReader(NCEPPDSReader):
         if "domain" not in kwargs:
             kwargs["domain"] = "conus"
 
-        return super().open_dataset(files=files, dates=dates, hour=hour, lead_time=lead_time, **kwargs)
+        return super().open_dataset(
+            files=files, dates=dates, hour=hour, lead_time=lead_time, **kwargs
+        )
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """
