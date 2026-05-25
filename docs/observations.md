@@ -65,6 +65,13 @@ import monetio as mio
 df = mio.load("openaq_v3", dates='2024-01-01', parameters=['pm25', 'o3'])
 ```
 
+### IODA
+
+JCSDA Interface for Observation Data Access format.
+
+- **Source ID**: `ioda`
+- **Formats**: NetCDF4 (with groups)
+
 ### IAGOS
 
 In-service Aircraft for a Global Observing System (global airborne in-situ measurements).
