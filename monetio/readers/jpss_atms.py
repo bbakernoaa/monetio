@@ -1,4 +1,4 @@
-"""JPSS Sounding Readers (CrIS and ATMS)"""
+"""JPSS ATMS (Advanced Technology Microwave Sounder) Reader"""
 
 import xarray as xr
 
@@ -6,17 +6,16 @@ from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
 
-@register_reader("jpss_met")
-class JPSSMetReader(GriddedReader):
+@register_reader("jpss_atms")
+class JPSSATMSReader(GriddedReader):
     """
-    Reader for JPSS (Suomi-NPP, NOAA-20, NOAA-21) thermodynamic profiles
-    from CrIS (Cross-track Infrared Sounder) and ATMS (Advanced Technology
-    Microwave Sounder).
+    Reader for JPSS (Suomi-NPP, NOAA-20, NOAA-21) ATMS (Advanced Technology
+    Microwave Sounder) thermodynamic profiles.
     """
 
     def open_dataset(self, files: str | list[str], **kwargs) -> xr.Dataset:
         """
-        Reads JPSS CrIS or ATMS NetCDF/HDF5 files.
+        Reads JPSS ATMS NetCDF/HDF5 files.
 
         Parameters
         ----------
@@ -28,10 +27,10 @@ class JPSSMetReader(GriddedReader):
         Returns
         -------
         xr.Dataset
-            The JPSS meteorological profiles dataset.
+            The JPSS ATMS meteorological profiles dataset.
         """
         if "preprocess" not in kwargs:
-            kwargs["preprocess"] = jpss_met_preprocess
+            kwargs["preprocess"] = jpss_atms_preprocess
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
@@ -39,14 +38,14 @@ class JPSSMetReader(GriddedReader):
         ds = super().open_dataset(files, **kwargs)
 
         # Update history
-        ds = update_history(ds, "Read JPSS meteorological profile data.")
+        ds = update_history(ds, "Read JPSS ATMS meteorological profile data.")
 
         return ds
 
 
-def jpss_met_preprocess(ds: xr.Dataset) -> xr.Dataset:
+def jpss_atms_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """
-    Preprocess JPSS CrIS/ATMS dataset.
+    Preprocess JPSS ATMS dataset.
 
     Parameters
     ----------
@@ -59,7 +58,6 @@ def jpss_met_preprocess(ds: xr.Dataset) -> xr.Dataset:
         Processed dataset.
     """
     # 1. Standardize coordinates
-    # JPSS data usually has 'nscan', 'npress', 'nlat', 'nlon' etc.
     ds = standardize_satellite_coords(
         ds,
         lat_name="latitude",
@@ -69,7 +67,7 @@ def jpss_met_preprocess(ds: xr.Dataset) -> xr.Dataset:
         z_dim=["npress", "lev", "level", "z"],
     )
 
-    # 2. Variable renaming (standard names for thermodynamic variables)
+    # 2. Variable renaming
     mapping = {
         "temperature": "temperature",
         "water_vapor": "specific_humidity",
@@ -87,6 +85,6 @@ def jpss_met_preprocess(ds: xr.Dataset) -> xr.Dataset:
     ds = _scientific_hygiene(ds)
 
     # Update history
-    ds = update_history(ds, "Preprocessed JPSS CrIS/ATMS data.")
+    ds = update_history(ds, "Preprocessed JPSS ATMS data.")
 
     return ds
