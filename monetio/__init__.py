@@ -88,8 +88,8 @@ def load(source: str, files=None, **kwargs):
         df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
 
     Available sources:
-        Models: cmaq, camx, chimere, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, ufs, wrfchem, grib2, gfs, gefs, gdas, rrfs
-        Obs: airnow, aeronet, aqs, ameriflux, cems, crn, improve, eprofile, ish, ish_lite, nadp, openaq, openaq_v2, openaq_aws, pams, ndbc, surfrad, solrad, ndacc, pandora, skynet, tccon
+        Models: camx, chimere, cmaq, gefs, gdas, gfs, grib2, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, rrfs, ufs, wrfchem
+        Obs: aeronet, airnow, ameriflux, aqs, cems, crn, eprofile, improve, ish, ish_lite, nadp, ndacc, ndbc, openaq, openaq_aws, openaq_v2, pams, pandora, skynet, solrad, surfrad, tccon
         Profile: actris, earlinet, geoms, gml_ozonesonde, iagos, icartt, igra2, mplnet, tolnet, umbc_aerosol
         Sat: calipso, earthcare, gems, goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, sentinel4, tempo, tropomi, viirs_jrr
     """
