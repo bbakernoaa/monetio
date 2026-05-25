@@ -100,10 +100,10 @@ def load(source: str, files=None, **kwargs):
         df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
 
     Available sources:
-        Models: camx, chimere, cmaq, gdas, gefs, gfs, grib2, hrrr, hysplit, hytraj, icap_mme, nam, ncep_grib, pardump, rap, raqms, rrfs, ufs, wrfchem
-        Obs: aeronet, airnow, ameriflux, aqs, cems, crn, eprofile, improve, ish, ish_lite, nadp, ndacc, ndbc, openaq, openaq_aws, openaq_v2, pams, pandora, skynet, solrad, surfrad, tccon
-        Profile: actris, earlinet, geoms, gml_ozonesonde, iagos, icartt, igra2, mplnet, tolnet, umbc_aerosol
-        Sat: calipso, earthcare, gems, goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, sentinel4, tempo, tropomi, viirs_jrr
+        Models: camx, chimere, cmaq, era5, gdas, gefs, gfs, grib2, hrrr, hysplit, hytraj, icap_mme, merra2, nam, ncep_grib, ncep_reanalysis, pardump, rap, raqms, rrfs, ufs, wrfchem
+        Obs: aeronet, airnow, ameriflux, aqs, cems, crn, eprofile, improve, ish, ish_lite, madis, nadp, ndacc, ndbc, openaq, openaq_aws, openaq_v2, pams, pandora, skynet, solrad, surfrad, tccon
+        Profile: actris, amdar, earlinet, geoms, gml_ozonesonde, iagos, icartt, igra2, mplnet, tolnet, umbc_aerosol
+        Sat: calipso, earthcare, gems, goes, gpm_imerg, jpss_atms, jpss_cris, modis_l2, modis_ornl, mopitt, mrms, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, sentinel4, smap, tempo, tropomi, viirs_jrr
     """
     from .readers.base import READER_REGISTRY
 
@@ -211,9 +211,9 @@ __all__ = [
     "airnow",
     "aeronet",
     "aqs",
-    "cems",  # TODO: module with add_data
+    "cems",
     "crn",
-    "improve",  # TODO: module with add_data
+    "improve",
     "ish",
     "ish_lite",
     "nadp",
@@ -320,9 +320,12 @@ def dataset_to_monet(ds, *, lat_name="lat", lon_name="lon", latlon2d=None):
         ndim_lat = ds[lat_name].ndim
         assert ndim_lat <= 2
         latlon2d = ndim_lat == 2
-    # TODO: apply rename_to_monet_latlon ?
+
     if latlon2d is False:
         ds = coards_to_netcdf(ds, lat_name=lat_name, lon_name=lon_name)
+
+    ds = rename_to_monet_latlon(ds)
+
     return ds
 
 
