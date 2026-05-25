@@ -209,9 +209,6 @@ class XarrayDriver:
             If False, the default Kerchunk JSON format is used.
         icechunk_url : str, optional
             Path or URL to the Icechunk repository. Required when ``use_icechunk=True``.
-        virtualizarr_parser : str, optional
-            The parser to use for VirtualiZarr. Options include "hdf" (default),
-            "netcdf3", "zarr", "fits", "dmrpp".
         **kwargs : dict
             Additional arguments passed to xarray open functions.
 
@@ -276,8 +273,7 @@ class XarrayDriver:
             try:
                 import ujson  # noqa: F401
                 import zarr  # noqa: F401
-                from virtualizarr import open_virtual_mfdataset
-                from virtualizarr import parsers as vzp
+                from virtualizarr import open_virtual_mfdataset, parsers as vzp
             except ImportError:
                 raise ImportError(
                     "VirtualiZarr support requires additional packages. "
@@ -533,8 +529,7 @@ class PandasDriver:
         """
         try:
             import ujson
-            from virtualizarr import open_virtual_mfdataset
-            from virtualizarr import parsers as vzp
+            from virtualizarr import open_virtual_mfdataset, parsers as vzp
         except ImportError:
             raise ImportError(
                 "VirtualiZarr support requires additional packages. "
@@ -604,8 +599,7 @@ class PandasDriver:
             The dataset opened from the Icechunk store.
         """
         try:
-            from virtualizarr import open_virtual_mfdataset
-            from virtualizarr import parsers as vzp
+            from virtualizarr import open_virtual_mfdataset, parsers as vzp
         except ImportError:
             raise ImportError(
                 "VirtualiZarr support requires additional packages. "

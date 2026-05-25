@@ -25,7 +25,7 @@ class MOPITTReader(GriddedReader):
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         use_dask: bool = False,
-        virtualizarr_parser: str = "hdf", **kwargs,
+        **kwargs,
     ) -> xr.Dataset:
         """
         Reads MOPITT data.
@@ -71,7 +71,7 @@ class MOPITTReader(GriddedReader):
             use_icechunk=use_icechunk,
             icechunk_url=icechunk_url,
             use_dask=use_dask,
-            virtualizarr_parser=virtualizarr_parser, **kwargs,
+            **kwargs,
         )
 
         # Update history

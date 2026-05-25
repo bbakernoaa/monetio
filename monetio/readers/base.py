@@ -173,8 +173,6 @@ class GriddedReader(BaseReader):
             Whether to use Icechunk for VirtualiZarr references, by default False.
         icechunk_url : str or None, optional
             Path to the Icechunk repository, by default None.
-        virtualizarr_parser : str, optional
-            The parser to use for VirtualiZarr, by default "hdf".
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
         **kwargs : dict
@@ -247,8 +245,6 @@ class PointReader(BaseReader):
         use_icechunk : bool, optional
             Accepted but ignored for PointReaders.
         icechunk_url : str or None, optional
-            Accepted but ignored for PointReaders.
-        virtualizarr_parser : str, optional
             Accepted but ignored for PointReaders.
         read_method : str, optional
             The pandas/dask reading method to use, by default "read_csv".
