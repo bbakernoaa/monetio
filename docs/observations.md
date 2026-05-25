@@ -54,7 +54,16 @@ Global air quality data platform.
 
 - **Source ID**: `openaq` (Legacy/Version 1)
 - **Source ID**: `openaq_v2` (Modern REST API)
+- **Source ID**: `openaq_v3` (Latest REST API)
 - **Source ID**: `openaq_aws` (S3-based public dataset)
+
+### OpenAQ v3 Usage
+
+```python
+import monetio as mio
+# Set environment variable OPENAQ_API_KEY
+df = mio.load("openaq_v3", dates='2024-01-01', parameters=['pm25', 'o3'])
+```
 
 ### IAGOS
 
