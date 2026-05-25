@@ -43,6 +43,7 @@ _READER_MODULES = {
     "ndacc": ".readers.ndacc",
     "pandora": ".readers.pandora",
     "skynet": ".readers.skynet",
+    "ioda": ".readers.ioda",
     # Profile
     "icartt": ".readers.icartt",
     "tolnet": ".readers.tolnet",
@@ -83,7 +84,7 @@ def load(source: str, files=None, **kwargs):
 
     Available sources:
         Models: cmaq, camx, chimere, hysplit, hytraj, icap_mme, ncep_grib, pardump, raqms, ufs, wrfchem, grib2, gfs, gefs, gdas, rrfs
-        Obs: airnow, aeronet, aqs, cems, crn, eprofile, improve, ish, ish_lite, nadp, ndacc, ndbc, openaq, openaq_v2, openaq_aws, pams, pandora, skynet, solrad, surfrad
+        Obs: airnow, aeronet, aqs, cems, crn, eprofile, improve, ioda, ish, ish_lite, nadp, ndacc, ndbc, openaq, openaq_v2, openaq_aws, pams, pandora, skynet, solrad, surfrad
         Profile: actris, earlinet, geoms, gml_ozonesonde, iagos, icartt, igra2, mplnet, tolnet, umbc_aerosol
         Sat: goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, tempo, tropomi, viirs_jrr
     """
@@ -171,6 +172,7 @@ from .obs import (
     openaq_v2,
     openaq_v3,
     pams,
+    ioda,
 )
 from .profile import geoms, gml_ozonesonde, icartt, tolnet
 from .sat import goes
@@ -203,6 +205,7 @@ __all__ = [
     "openaq_v2",
     "openaq_v3",
     "pams",
+    "ioda",
     #
     # profile obs
     "geoms",
