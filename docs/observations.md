@@ -65,6 +65,13 @@ import monetio as mio
 df = mio.load("openaq_v3", dates='2024-01-01', parameters=['pm25', 'o3'])
 ```
 
+### IODA
+
+JCSDA Interface for Observation Data Access format.
+
+- **Source ID**: `ioda`
+- **Formats**: NetCDF4 (with groups)
+
 ### IAGOS
 
 In-service Aircraft for a Global Observing System (global airborne in-situ measurements).
@@ -117,19 +124,6 @@ Surface Radiation Budget Network.
 NOAA Solar Radiation Network.
 
 - **Source ID**: `solrad`
-
-### TCCON
-
-Total Carbon Column Observing Network (ground-based FTIR).
-
-- **Source ID**: `tccon`
-- **Variables**: `xco2`, `xch4`, `xn2o`, `xco`, etc.
-
-### AmeriFlux
-
-Eddy covariance tower network for carbon, water vapor, and energy fluxes.
-
-- **Source ID**: `ameriflux`
 
 ### Other Networks
 
