@@ -47,7 +47,6 @@ _READER_MODULES = {
     "ndacc": ".readers.ndacc",
     "pandora": ".readers.pandora",
     "skynet": ".readers.skynet",
-    "ioda": ".readers.ioda",
     # Profile
     "icartt": ".readers.icartt",
     "tolnet": ".readers.tolnet",
@@ -83,6 +82,12 @@ _READER_MODULES = {
     "mrms": ".readers.mrms",
     "nesdis_viirs_jrr": ".readers.nesdis_viirs_jrr",
     "viirs_jrr": ".readers.nesdis_viirs_jrr",
+    "gems": ".readers.gems",
+    "sentinel4": ".readers.sentinel4",
+    "calipso": ".readers.calipso",
+    "earthcare": ".readers.earthcare",
+    "tccon": ".readers.tccon",
+    "ameriflux": ".readers.ameriflux",
 }
 
 
@@ -96,9 +101,9 @@ def load(source: str, files=None, **kwargs):
 
     Available sources:
         Models: camx, chimere, cmaq, gdas, gefs, gfs, grib2, hrrr, hysplit, hytraj, icap_mme, nam, ncep_grib, pardump, rap, raqms, rrfs, ufs, wrfchem
-        Obs: aeronet, airnow, ameriflux, aqs, cems, crn, eprofile, improve, ioda, ish, ish_lite, nadp, ndacc, ndbc, openaq, openaq_aws, openaq_v2, pams, pandora, skynet, solrad, surfrad, tccon
+        Obs: aeronet, airnow, ameriflux, aqs, cems, crn, eprofile, improve, ish, ish_lite, nadp, ndacc, ndbc, openaq, openaq_aws, openaq_v2, pams, pandora, skynet, solrad, surfrad, tccon
         Profile: actris, earlinet, geoms, gml_ozonesonde, iagos, icartt, igra2, mplnet, tolnet, umbc_aerosol
-        Sat: goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, tempo, tropomi, viirs_jrr
+        Sat: calipso, earthcare, gems, goes, merra2, modis_l2, modis_ornl, mopitt, nasa_modis, nesdis_edr_viirs, nesdis_eps_viirs, nesdis_frp, nesdis_viirs_jrr, omps, omps_nadir, sentinel4, tempo, tropomi, viirs_jrr
     """
     from .readers.base import READER_REGISTRY
 
@@ -177,7 +182,6 @@ from .obs import (
     cems,
     crn,
     improve,
-    ioda,
     ish,
     ish_lite,
     nadp,
@@ -217,7 +221,6 @@ __all__ = [
     "openaq_v2",
     "openaq_v3",
     "pams",
-    "ioda",
     #
     # profile obs
     "geoms",
