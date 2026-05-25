@@ -209,6 +209,9 @@ class XarrayDriver:
             If False, the default Kerchunk JSON format is used.
         icechunk_url : str, optional
             Path or URL to the Icechunk repository. Required when ``use_icechunk=True``.
+        virtualizarr_parser : str, optional
+            The parser to use for VirtualiZarr. Options include "hdf" (default),
+            "netcdf3", "zarr", "fits", "dmrpp", "grib2".
         **kwargs : dict
             Additional arguments passed to xarray open functions.
 
@@ -301,14 +304,24 @@ class XarrayDriver:
                 registry, file_list = _select_store(file_list, storage_options)
 
                 # Select parser
-                parser_map = {
-                    "hdf": vzp.HDFParser,
-                    "netcdf3": vzp.NetCDF3Parser,
-                    "zarr": vzp.ZarrParser,
-                    "fits": vzp.FITSParser,
-                    "dmrpp": vzp.DMRPPParser,
-                }
-                parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+                if virtualizarr_parser.lower() == "grib2":
+                    try:
+                        from grib2io.xarray_backend import Grib2ioParser as parser_cls
+                    except ImportError:
+                        raise ImportError(
+                            "GRIB2 virtualization requires 'grib2io'. "
+                            "Install with: pip install monetio[grib2io]"
+                        )
+                else:
+                    parser_map = {
+                        "hdf": vzp.HDFParser,
+                        "netcdf3": vzp.NetCDF3Parser,
+                        "zarr": vzp.ZarrParser,
+                        "fits": vzp.FITSParser,
+                        "dmrpp": vzp.DMRPPParser,
+                    }
+                    parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+
                 parser = parser_cls()
 
                 concat_dim = xr_kwargs.get("concat_dim", "time")
@@ -540,14 +553,24 @@ class PandasDriver:
         storage_options = dict(kwargs.get("storage_options", {}))
         registry, file_list = _select_store(file_list, storage_options)
 
-        parser_map = {
-            "hdf": vzp.HDFParser,
-            "netcdf3": vzp.NetCDF3Parser,
-            "zarr": vzp.ZarrParser,
-            "fits": vzp.FITSParser,
-            "dmrpp": vzp.DMRPPParser,
-        }
-        parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+        if virtualizarr_parser.lower() == "grib2":
+            try:
+                from grib2io.xarray_backend import Grib2ioParser as parser_cls
+            except ImportError:
+                raise ImportError(
+                    "GRIB2 virtualization requires 'grib2io'. "
+                    "Install with: pip install monetio[grib2io]"
+                )
+        else:
+            parser_map = {
+                "hdf": vzp.HDFParser,
+                "netcdf3": vzp.NetCDF3Parser,
+                "zarr": vzp.ZarrParser,
+                "fits": vzp.FITSParser,
+                "dmrpp": vzp.DMRPPParser,
+            }
+            parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+
         parser = parser_cls()
 
         concat_dim = kwargs.get("concat_dim", "time")
@@ -610,14 +633,24 @@ class PandasDriver:
         storage_options = dict(kwargs.get("storage_options", {}))
         registry, file_list = _select_store(file_list, storage_options)
 
-        parser_map = {
-            "hdf": vzp.HDFParser,
-            "netcdf3": vzp.NetCDF3Parser,
-            "zarr": vzp.ZarrParser,
-            "fits": vzp.FITSParser,
-            "dmrpp": vzp.DMRPPParser,
-        }
-        parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+        if virtualizarr_parser.lower() == "grib2":
+            try:
+                from grib2io.xarray_backend import Grib2ioParser as parser_cls
+            except ImportError:
+                raise ImportError(
+                    "GRIB2 virtualization requires 'grib2io'. "
+                    "Install with: pip install monetio[grib2io]"
+                )
+        else:
+            parser_map = {
+                "hdf": vzp.HDFParser,
+                "netcdf3": vzp.NetCDF3Parser,
+                "zarr": vzp.ZarrParser,
+                "fits": vzp.FITSParser,
+                "dmrpp": vzp.DMRPPParser,
+            }
+            parser_cls = parser_map.get(virtualizarr_parser.lower(), vzp.HDFParser)
+
         parser = parser_cls()
 
         concat_dim = kwargs.get("concat_dim", "time")
