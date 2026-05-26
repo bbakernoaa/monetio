@@ -21,6 +21,7 @@ VALID_DATA_VARS = (
     "totaldustaod550",
 )
 
+
 @register_reader("icap_mme")
 class ICAPMMEReader(GriddedReader):
     """
@@ -137,6 +138,7 @@ class ICAPMMEReader(GriddedReader):
 
         return ds
 
+
 def build_urls(
     dates: pd.DatetimeIndex | list[datetime] | datetime | str,
     filetype: str = "MMC",
@@ -188,6 +190,7 @@ def build_urls(
         fnames.append(fname)
 
     return urls, fnames
+
 
 def retrieve(url: str, fname: str, download: bool = False, verbose: bool = True) -> str | Path:
     """

@@ -6,6 +6,7 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+
 @register_reader("nasa_modis")
 class NASAMODISReader(GriddedReader):
     """
@@ -82,6 +83,7 @@ class NASAMODISReader(GriddedReader):
         ds = update_history(ds, "Read NASA MODIS data.")
 
         return ds
+
 
 def nasa_modis_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

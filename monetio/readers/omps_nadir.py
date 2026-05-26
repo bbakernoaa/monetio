@@ -13,6 +13,7 @@ from .sat_utils import (
     update_history,
 )
 
+
 @register_reader("omps_nadir")
 class OMPSNadirReader(GriddedReader):
     """
@@ -243,6 +244,7 @@ class OMPSNadirReader(GriddedReader):
 
         return sorted(urls)
 
+
 def omps_nadir_preprocess(ds: xr.Dataset, product: str = "v8toz") -> xr.Dataset:
     """
     Preprocess OMPS Nadir dataset lazily.
@@ -293,6 +295,7 @@ def omps_nadir_preprocess(ds: xr.Dataset, product: str = "v8toz") -> xr.Dataset:
 
     return ds
 
+
 def _preprocess_v8toz(ds: xr.Dataset) -> xr.Dataset:
     """
     Preprocess NOAA V8TOZ Total Ozone EDR.
@@ -338,6 +341,7 @@ def _preprocess_v8toz(ds: xr.Dataset) -> xr.Dataset:
         ds["ozone_column"] = ds["ozone_column"].where(ds["quality_flag"] == 0)
 
     return ds
+
 
 def _preprocess_sdr(ds: xr.Dataset) -> xr.Dataset:
     """

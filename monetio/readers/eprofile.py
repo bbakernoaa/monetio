@@ -8,6 +8,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
+
 @register_reader("eprofile")
 class EPROFILEReader(GriddedReader):
     """
@@ -85,6 +86,7 @@ class EPROFILEReader(GriddedReader):
         )
 
         return ds
+
 
 def eprofile_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

@@ -9,6 +9,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import apply_lazy_conversion, update_history
 
+
 @register_reader("umbc_aerosol")
 class UMBCAerosolReader(GriddedReader):
     """
@@ -114,6 +115,7 @@ class UMBCAerosolReader(GriddedReader):
         ds = update_history(ds, "Read UMBC Aerosol data.")
 
         return ds
+
 
 def umbc_aerosol_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

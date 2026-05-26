@@ -5,6 +5,7 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+
 @register_reader("mrms")
 class MRMSReader(GriddedReader):
     """
@@ -80,6 +81,7 @@ class MRMSReader(GriddedReader):
         ds = update_history(ds, "Read MRMS data.")
 
         return ds
+
 
 def mrms_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

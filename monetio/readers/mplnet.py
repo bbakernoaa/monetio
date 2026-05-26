@@ -5,6 +5,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
+
 @register_reader("mplnet")
 class MPLNETReader(GriddedReader):
     """
@@ -74,6 +75,7 @@ class MPLNETReader(GriddedReader):
         )
 
         return ds
+
 
 def mplnet_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

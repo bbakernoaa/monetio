@@ -5,6 +5,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
+
 @register_reader("grib2")
 class Grib2Reader(GriddedReader):
     """

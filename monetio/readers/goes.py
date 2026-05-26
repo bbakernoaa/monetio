@@ -9,6 +9,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import add_time_coord, standardize_satellite_coords, update_history
 
+
 @register_reader("goes")
 class GOESReader(GriddedReader):
     """
@@ -173,6 +174,7 @@ class GOESReader(GriddedReader):
 
         return sorted(list(set(urls)))
 
+
 def goes_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """
     Preprocess GOES dataset: calculate grid and standardize coordinates.
@@ -207,6 +209,7 @@ def goes_preprocess(ds: xr.Dataset) -> xr.Dataset:
     ds = update_history(ds, "Preprocessed GOES data.")
 
     return ds
+
 
 def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     """

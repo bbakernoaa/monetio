@@ -16,6 +16,7 @@ from .base import (
 from .sat_utils import update_history
 from .ufs_specs import DIAGNOSTICS
 
+
 @register_reader("ufs")
 class UFSReader(GriddedReader):
     """
@@ -218,6 +219,7 @@ class UFSReader(GriddedReader):
 
         return ds
 
+
 def _calc_pressure(ds: xr.Dataset) -> xr.DataArray:
     """
     Calculate mid-layer pressure from hybrid coordinates.
@@ -257,6 +259,7 @@ def _calc_pressure(ds: xr.Dataset) -> xr.DataArray:
 
     p_mid.attrs.update({"units": "Pa", "long_name": "Pressure at layer mid-points"})
     return p_mid
+
 
 def _calc_hgt(ds: xr.Dataset) -> xr.DataArray:
     """

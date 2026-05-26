@@ -5,6 +5,7 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+
 @register_reader("era5")
 class ERA5Reader(GriddedReader):
     """
@@ -74,6 +75,7 @@ class ERA5Reader(GriddedReader):
         ds = update_history(ds, "Read ERA5 data.")
 
         return ds
+
 
 def era5_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

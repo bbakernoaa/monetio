@@ -8,6 +8,7 @@ from .sat_utils import standardize_satellite_coords, tai93_to_datetime, update_h
 
 MOPITT_MISSING = -9999.0
 
+
 @register_reader("mopitt")
 class MOPITTReader(GriddedReader):
     """
@@ -79,6 +80,7 @@ class MOPITTReader(GriddedReader):
         ds = update_history(ds, "Read MOPITT L3 data.")
 
         return ds
+
 
 def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """
@@ -172,6 +174,7 @@ def mopitt_preprocess(ds: xr.Dataset) -> xr.Dataset:
 
     return ds
 
+
 def _add_mopitt_pressure(ds: xr.Dataset) -> xr.Dataset:
     """
     Calculate 3D pressure array lazily for MOPITT.
@@ -224,6 +227,7 @@ def _add_mopitt_pressure(ds: xr.Dataset) -> xr.Dataset:
     ds_sorted["pressure"] = p_center.assign_attrs({"units": "hPa", "long_name": "Center Pressure"})
 
     return update_history(ds_sorted, "Calculated 3D center pressure lazily.")
+
 
 def _combine_mopitt_apriori(ds: xr.Dataset) -> xr.Dataset:
     """

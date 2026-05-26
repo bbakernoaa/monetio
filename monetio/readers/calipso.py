@@ -8,6 +8,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+
 @register_reader("calipso")
 class CALIPSOReader(GriddedReader):
     """
@@ -89,6 +90,7 @@ class CALIPSOReader(GriddedReader):
         ds = update_history(ds, "Read CALIPSO L2 data.")
 
         return ds
+
 
 def calipso_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.Dataset:
     """

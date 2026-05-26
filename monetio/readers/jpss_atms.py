@@ -5,6 +5,7 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+
 @register_reader("jpss_atms")
 class JPSSATMSReader(GriddedReader):
     """
@@ -79,6 +80,7 @@ class JPSSATMSReader(GriddedReader):
         ds = update_history(ds, "Read JPSS ATMS meteorological profile data.")
 
         return ds
+
 
 def jpss_atms_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

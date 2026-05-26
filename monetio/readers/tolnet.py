@@ -6,6 +6,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
+
 @register_reader("tolnet")
 class TOLNetReader(GriddedReader):
     """
@@ -116,6 +117,7 @@ class TOLNetReader(GriddedReader):
         """
         return super().harmonize(ds)
 
+
 def read_tolnet(fname: str, chunks=None, **kwargs) -> xr.Dataset:
     """
     Read a single TOLNet HDF5 file lazily.
@@ -178,6 +180,7 @@ def read_tolnet(fname: str, chunks=None, **kwargs) -> xr.Dataset:
     ds = tolnet_preprocess(ds_data)
 
     return ds
+
 
 def tolnet_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

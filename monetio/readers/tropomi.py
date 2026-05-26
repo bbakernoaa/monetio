@@ -12,6 +12,7 @@ from .sat_utils import (
     update_history,
 )
 
+
 @register_reader("tropomi")
 class TROPOMIReader(GriddedReader):
     """
@@ -145,6 +146,7 @@ class TROPOMIReader(GriddedReader):
 
         return ds
 
+
 def tropomi_preprocess(
     ds: xr.Dataset, calculate_pressure: bool = True, qa_threshold: float | None = None
 ) -> xr.Dataset:
@@ -221,6 +223,7 @@ def tropomi_preprocess(
     )
 
     return ds
+
 
 def _add_pressure_levels(ds: xr.Dataset) -> xr.Dataset:
     """

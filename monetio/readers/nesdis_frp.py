@@ -13,6 +13,7 @@ from .sat_utils import update_history
 
 BASE_URL = "https://gsce-dtn.sdstate.edu/index.php/s/e8wPYPOL1bGXk5z/download?path=%2F"
 
+
 @register_reader("nesdis_frp")
 class NESDISFRPReader(GriddedReader):
     """
@@ -147,6 +148,7 @@ class NESDISFRPReader(GriddedReader):
 
         return urls
 
+
 def read_nesdis_frp_binary(fname: str, **kwargs) -> xr.Dataset:
     """
     Read a single NESDIS FRP tile from a binary file.
@@ -232,6 +234,7 @@ def read_nesdis_frp_binary(fname: str, **kwargs) -> xr.Dataset:
         ds = ds.assign_coords(time=date).expand_dims("time")
 
     return ds
+
 
 def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
     """

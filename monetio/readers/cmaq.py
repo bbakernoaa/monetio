@@ -21,6 +21,7 @@ from .base import (
 from .cmaq_specs import DIAGNOSTICS
 from .sat_utils import update_history
 
+
 @register_reader("cmaq")
 class CMAQReader(GriddedReader):
     """
@@ -146,6 +147,7 @@ class CMAQReader(GriddedReader):
         ds = update_history(ds, "Harmonized CMAQ dataset.")
 
         return ds
+
 
 def cmaq_preprocess(
     ds: xr.Dataset,

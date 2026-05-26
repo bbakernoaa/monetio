@@ -11,6 +11,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
+
 @register_reader("nesdis_edr_viirs")
 class NESDISEDRVIIRSReader(GriddedReader):
     """
@@ -152,6 +153,7 @@ class NESDISEDRVIIRSReader(GriddedReader):
             urls.append(url)
         return urls
 
+
 def read_nesdis_edr_binary(fname: str, **kwargs) -> xr.Dataset:
     """
     Read NESDIS EDR VIIRS binary data into an xarray.Dataset.
@@ -221,6 +223,7 @@ def read_nesdis_edr_binary(fname: str, **kwargs) -> xr.Dataset:
         pass
 
     return ds
+
 
 def nesdis_edr_viirs_preprocess(ds: xr.Dataset, resolution: str = "high") -> xr.Dataset:
     """

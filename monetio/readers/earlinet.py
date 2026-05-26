@@ -5,6 +5,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
+
 @register_reader("earlinet")
 class EARLINETReader(GriddedReader):
     """
@@ -74,6 +75,7 @@ class EARLINETReader(GriddedReader):
         )
 
         return ds
+
 
 def earlinet_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

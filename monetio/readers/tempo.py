@@ -5,6 +5,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+
 @register_reader("tempo")
 class TEMPOReader(GriddedReader):
     """
@@ -123,6 +124,7 @@ class TEMPOReader(GriddedReader):
 
         return ds
 
+
 def tempo_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.Dataset:
     """
     Preprocess TEMPO dataset: standardize coordinates, handle units,
@@ -206,6 +208,7 @@ def tempo_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.Da
     ds = update_history(ds, "Preprocessed TEMPO data.")
 
     return ds
+
 
 def _add_pressure(ds: xr.Dataset) -> xr.Dataset:
     """

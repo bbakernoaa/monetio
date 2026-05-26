@@ -8,6 +8,7 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+
 @register_reader("gems")
 class GEMSReader(GriddedReader):
     """
@@ -134,6 +135,7 @@ class GEMSReader(GriddedReader):
         ds = update_history(ds, "Read GEMS L2 data.")
 
         return ds
+
 
 def gems_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.Dataset:
     """

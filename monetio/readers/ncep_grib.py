@@ -8,6 +8,7 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import update_history
 
+
 @register_reader("ncep_grib")
 class NCEPGribReader(GriddedReader):
     """
@@ -91,6 +92,7 @@ class NCEPGribReader(GriddedReader):
         ds = update_history(ds, "Read NCEP GRIB data.")
 
         return ds
+
 
 def ncep_grib_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

@@ -21,6 +21,7 @@ from .base import (
 from .camx_specs import COARSE, DIAGNOSTICS, FINE, NOY_GAS, POC
 from .sat_utils import update_history
 
+
 @register_reader("camx")
 class CAMxReader(GriddedReader):
     """
@@ -149,6 +150,7 @@ class CAMxReader(GriddedReader):
 
         return ds
 
+
 def camx_preprocess(
     ds: xr.Dataset,
     *,
@@ -218,6 +220,7 @@ def camx_preprocess(
 
     return ds
 
+
 def _predefined_mapping_tables(ds: xr.Dataset) -> xr.Dataset:
     """
     Adds mapping tables for backward compatibility.
@@ -278,6 +281,7 @@ def _predefined_mapping_tables(ds: xr.Dataset) -> xr.Dataset:
     }
     ds = ds.assign_attrs({"mapping_tables": mapping_tables})
     return ds
+
 
 # Legacy aliases for backward compatibility
 fine = FINE

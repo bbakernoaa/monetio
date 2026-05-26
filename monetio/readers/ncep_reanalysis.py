@@ -8,6 +8,7 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
+
 @register_reader("ncep_reanalysis")
 class NCEPReanalysisReader(GriddedReader):
     """
@@ -134,6 +135,7 @@ class NCEPReanalysisReader(GriddedReader):
             urls.append(url)
 
         return urls
+
 
 def ncep_reanalysis_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

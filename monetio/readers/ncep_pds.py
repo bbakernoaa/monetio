@@ -8,6 +8,7 @@ import xarray as xr
 from .base import GriddedReader
 from .sat_utils import update_history
 
+
 class NCEPPDSReader(GriddedReader):
     """
     Base reader for NCEP products on AWS Public Dataset (PDS).
