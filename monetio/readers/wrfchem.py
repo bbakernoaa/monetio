@@ -18,7 +18,6 @@ from .sat_utils import update_history
 from .time_utils import parse_wrf_times
 from .wrfchem_specs import DIAGNOSTICS
 
-
 @register_reader("wrfchem")
 class WRFChemReader(GriddedReader):
     """
@@ -107,7 +106,7 @@ class WRFChemReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -163,7 +162,6 @@ class WRFChemReader(GriddedReader):
         ds = update_history(ds, "Harmonized WRF-Chem dataset.")
 
         return ds
-
 
 def wrfchem_preprocess(
     ds: xr.Dataset,
@@ -266,7 +264,6 @@ def wrfchem_preprocess(
     )
 
     return ds
-
 
 def _parse_wrf_times(ds: xr.Dataset) -> xr.Dataset:
     """

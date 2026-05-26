@@ -21,7 +21,6 @@ from .base import (
 from .camx_specs import COARSE, DIAGNOSTICS, FINE, NOY_GAS, POC
 from .sat_utils import update_history
 
-
 @register_reader("camx")
 class CAMxReader(GriddedReader):
     """
@@ -94,7 +93,6 @@ class CAMxReader(GriddedReader):
                 earth_radius=earth_radius,
                 convert_to_ppb=convert_to_ppb,
             )
-
         # 2. Open the dataset using standard xarray (via XarrayDriver)
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
@@ -105,7 +103,7 @@ class CAMxReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -150,7 +148,6 @@ class CAMxReader(GriddedReader):
         ds = update_history(ds, "Harmonized CAMx dataset.")
 
         return ds
-
 
 def camx_preprocess(
     ds: xr.Dataset,
@@ -221,7 +218,6 @@ def camx_preprocess(
 
     return ds
 
-
 def _predefined_mapping_tables(ds: xr.Dataset) -> xr.Dataset:
     """
     Adds mapping tables for backward compatibility.
@@ -282,7 +278,6 @@ def _predefined_mapping_tables(ds: xr.Dataset) -> xr.Dataset:
     }
     ds = ds.assign_attrs({"mapping_tables": mapping_tables})
     return ds
-
 
 # Legacy aliases for backward compatibility
 fine = FINE

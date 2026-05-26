@@ -5,7 +5,6 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("era5")
 class ERA5Reader(GriddedReader):
     """
@@ -58,12 +57,11 @@ class ERA5Reader(GriddedReader):
         """
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = era5_preprocess
-
         ds = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -76,7 +74,6 @@ class ERA5Reader(GriddedReader):
         ds = update_history(ds, "Read ERA5 data.")
 
         return ds
-
 
 def era5_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

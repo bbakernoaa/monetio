@@ -5,7 +5,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("tempo")
 class TEMPOReader(GriddedReader):
     """
@@ -84,7 +83,6 @@ class TEMPOReader(GriddedReader):
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
-
         dsets = []
         for g in groups:
             g_kwargs = kwargs.copy()
@@ -95,7 +93,7 @@ class TEMPOReader(GriddedReader):
                     files,
                     use_virtualizarr=use_virtualizarr,
                     virtualizarr_file=virtualizarr_file,
-                    virtualizarr_parser=virtualizarr_parser,
+                    virtualizarr_parser="hdf5",
                     virtualizarr_backend=virtualizarr_backend,
                     icechunk_repo=icechunk_repo,
                     use_icechunk=use_icechunk,
@@ -124,7 +122,6 @@ class TEMPOReader(GriddedReader):
         ds = update_history(ds, "Read TEMPO L2 data.")
 
         return ds
-
 
 def tempo_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.Dataset:
     """
@@ -209,7 +206,6 @@ def tempo_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.Da
     ds = update_history(ds, "Preprocessed TEMPO data.")
 
     return ds
-
 
 def _add_pressure(ds: xr.Dataset) -> xr.Dataset:
     """

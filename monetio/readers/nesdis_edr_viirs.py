@@ -11,7 +11,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
-
 @register_reader("nesdis_edr_viirs")
 class NESDISEDRVIIRSReader(GriddedReader):
     """
@@ -92,7 +91,7 @@ class NESDISEDRVIIRSReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -152,7 +151,6 @@ class NESDISEDRVIIRSReader(GriddedReader):
             url = f"ftp://{server}{base_dir}/{year}/{filename}"
             urls.append(url)
         return urls
-
 
 def read_nesdis_edr_binary(fname: str, **kwargs) -> xr.Dataset:
     """
@@ -223,7 +221,6 @@ def read_nesdis_edr_binary(fname: str, **kwargs) -> xr.Dataset:
         pass
 
     return ds
-
 
 def nesdis_edr_viirs_preprocess(ds: xr.Dataset, resolution: str = "high") -> xr.Dataset:
     """

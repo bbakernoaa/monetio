@@ -8,7 +8,6 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("ncep_reanalysis")
 class NCEPReanalysisReader(GriddedReader):
     """
@@ -76,12 +75,11 @@ class NCEPReanalysisReader(GriddedReader):
 
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = ncep_reanalysis_preprocess
-
         ds = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="netcdf3",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -136,7 +134,6 @@ class NCEPReanalysisReader(GriddedReader):
             urls.append(url)
 
         return urls
-
 
 def ncep_reanalysis_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

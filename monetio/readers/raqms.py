@@ -12,7 +12,6 @@ from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 from .time_utils import parse_wrf_times
 
-
 @register_reader("raqms")
 class RAQMSReader(GriddedReader):
     """
@@ -115,13 +114,12 @@ class RAQMSReader(GriddedReader):
 
         # 2. Open the dataset using standard xarray (via XarrayDriver)
         # Use fpaths instead of files to ensure consistent set of files
-        ds = self.driver.open(fpaths, **kwargs)
+        ds = self.driver.open(fpaths, virtualizarr_parser="hdf5", **kwargs)
 
         # Update history
         ds = update_history(ds, "Read RAQMS data.")
 
         return ds
-
 
 def raqms_preprocess(
     ds: xr.Dataset,
@@ -207,7 +205,6 @@ def raqms_preprocess(
 
     return ds
 
-
 def _fix_grid(ds: xr.Dataset) -> xr.Dataset:
     """
     Fix grid and coordinates for RAQMS.
@@ -285,7 +282,6 @@ def _fix_grid(ds: xr.Dataset) -> xr.Dataset:
 
     return ds
 
-
 def _fix_time(ds: xr.Dataset) -> xr.Dataset:
     """
     Fix time coordinate for RAQMS.
@@ -331,7 +327,6 @@ def _fix_time(ds: xr.Dataset) -> xr.Dataset:
         # Update history
         ds = update_history(ds, "Optimized time parsing.")
     return ds
-
 
 def _fix_pres(ds: xr.Dataset) -> xr.Dataset:
     """

@@ -5,7 +5,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import standardize_satellite_coords, tai93_to_datetime, update_history
 
-
 @register_reader("modis_l2")
 class MODISL2Reader(GriddedReader):
     """
@@ -81,7 +80,7 @@ class MODISL2Reader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -103,7 +102,6 @@ class MODISL2Reader(GriddedReader):
         ds = update_history(ds, "Read MODIS L2 data.")
 
         return ds
-
 
 def modis_l2_preprocess(ds: xr.Dataset, variable_dict: dict = None) -> xr.Dataset:
     """

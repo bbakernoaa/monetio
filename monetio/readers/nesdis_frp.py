@@ -13,7 +13,6 @@ from .sat_utils import update_history
 
 BASE_URL = "https://gsce-dtn.sdstate.edu/index.php/s/e8wPYPOL1bGXk5z/download?path=%2F"
 
-
 @register_reader("nesdis_frp")
 class NESDISFRPReader(GriddedReader):
     """
@@ -95,12 +94,11 @@ class NESDISFRPReader(GriddedReader):
             kwargs["concat_dim"] = "tile"
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
-
         ds = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -148,7 +146,6 @@ class NESDISFRPReader(GriddedReader):
             urls.append(url)
 
         return urls
-
 
 def read_nesdis_frp_binary(fname: str, **kwargs) -> xr.Dataset:
     """
@@ -235,7 +232,6 @@ def read_nesdis_frp_binary(fname: str, **kwargs) -> xr.Dataset:
         ds = ds.assign_coords(time=date).expand_dims("time")
 
     return ds
-
 
 def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
     """

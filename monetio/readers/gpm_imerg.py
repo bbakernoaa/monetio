@@ -8,7 +8,6 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("gpm_imerg")
 class GPMIMERGReader(GriddedReader):
     """
@@ -81,12 +80,11 @@ class GPMIMERGReader(GriddedReader):
         # GPM IMERG HDF5 files often need the h5netcdf engine
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
-
         ds = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -158,7 +156,6 @@ class GPMIMERGReader(GriddedReader):
             urls.append(url)
 
         return urls
-
 
 def gpm_imerg_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

@@ -43,7 +43,6 @@ JRR_SPECS = {
     },
 }
 
-
 @register_reader("nesdis_viirs_jrr")
 @register_reader("viirs_jrr")
 class VIIRSJRRReader(GriddedReader):
@@ -134,7 +133,7 @@ class VIIRSJRRReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -202,7 +201,6 @@ class VIIRSJRRReader(GriddedReader):
 
         return sorted(urls)
 
-
 def viirs_jrr_preprocess(
     ds: xr.Dataset, product: str = "AOD", qa_threshold: float | None = None
 ) -> xr.Dataset:
@@ -254,7 +252,6 @@ def viirs_jrr_preprocess(
     ds = update_history(ds, f"Preprocessed NESDIS VIIRS JRR {product} data.")
 
     return ds
-
 
 # Legacy Alias
 VIIRSJRRAODReader = VIIRSJRRReader

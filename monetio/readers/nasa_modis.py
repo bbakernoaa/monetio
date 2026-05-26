@@ -6,7 +6,6 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("nasa_modis")
 class NASAMODISReader(GriddedReader):
     """
@@ -70,7 +69,7 @@ class NASAMODISReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -83,7 +82,6 @@ class NASAMODISReader(GriddedReader):
         ds = update_history(ds, "Read NASA MODIS data.")
 
         return ds
-
 
 def nasa_modis_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

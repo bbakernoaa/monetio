@@ -6,7 +6,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
-
 @register_reader("tolnet")
 class TOLNetReader(GriddedReader):
     """
@@ -80,7 +79,7 @@ class TOLNetReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -116,7 +115,6 @@ class TOLNetReader(GriddedReader):
             Harmonized dataset.
         """
         return super().harmonize(ds)
-
 
 def read_tolnet(fname: str, chunks=None, **kwargs) -> xr.Dataset:
     """
@@ -180,7 +178,6 @@ def read_tolnet(fname: str, chunks=None, **kwargs) -> xr.Dataset:
     ds = tolnet_preprocess(ds_data)
 
     return ds
-
 
 def tolnet_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

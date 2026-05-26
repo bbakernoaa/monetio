@@ -9,7 +9,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import add_time_coord, standardize_satellite_coords, update_history
 
-
 @register_reader("nesdis_eps_viirs")
 class NESDISEPSVIIRSReader(GriddedReader):
     """
@@ -79,7 +78,7 @@ class NESDISEPSVIIRSReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -125,7 +124,6 @@ class NESDISEPSVIIRSReader(GriddedReader):
             url = f"ftp://{server}{base_dir}/{year}/npp_eaot_ip_gridded_0.25_{yyyymmdd}.high.nc"
             urls.append(url)
         return urls
-
 
 def nesdis_eps_viirs_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

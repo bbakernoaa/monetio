@@ -21,7 +21,6 @@ VALID_DATA_VARS = (
     "totaldustaod550",
 )
 
-
 @register_reader("icap_mme")
 class ICAPMMEReader(GriddedReader):
     """
@@ -122,7 +121,7 @@ class ICAPMMEReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -137,7 +136,6 @@ class ICAPMMEReader(GriddedReader):
         ds = update_history(ds, "Read ICAP-MME data.")
 
         return ds
-
 
 def build_urls(
     dates: pd.DatetimeIndex | list[datetime] | datetime | str,
@@ -190,7 +188,6 @@ def build_urls(
         fnames.append(fname)
 
     return urls, fnames
-
 
 def retrieve(url: str, fname: str, download: bool = False, verbose: bool = True) -> str | Path:
     """

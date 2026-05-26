@@ -11,7 +11,6 @@ from .base import GriddedReader, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
 
-
 @register_reader("geoms")
 class GEOMSReader(GriddedReader):
     """
@@ -97,7 +96,6 @@ class GEOMSReader(GriddedReader):
 
         return ds
 
-
 def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True) -> xr.Dataset:
     """
     Internal function to open a single GEOMS file.
@@ -168,7 +166,6 @@ def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True
     ds = geoms_preprocess(ds, rename_all=rename_all, squeeze=squeeze)
 
     return ds
-
 
 def geoms_preprocess(
     ds: xr.Dataset, *, rename_all: bool = True, squeeze: bool = True
@@ -270,7 +267,6 @@ def geoms_preprocess(
 
     return ds
 
-
 def _handle_strings(ds: xr.Dataset) -> xr.Dataset:
     """
     Decodes byte strings and handles object-type strings lazily.
@@ -302,7 +298,6 @@ def _handle_strings(ds: xr.Dataset) -> xr.Dataset:
             ds[vn] = decoded.astype(str)
     return ds
 
-
 def _decode_obj(x: Any) -> str:
     """
     Helper to decode object that might be bytes.
@@ -320,7 +315,6 @@ def _decode_obj(x: Any) -> str:
     if isinstance(x, bytes):
         return x.decode("utf-8")
     return str(x)
-
 
 def _convert_times_lazy(ds: xr.Dataset) -> xr.Dataset:
     """
@@ -350,7 +344,6 @@ def _convert_times_lazy(ds: xr.Dataset) -> xr.Dataset:
             )
     return ds
 
-
 def _mjd2000_to_datetime(x: np.ndarray) -> np.ndarray:
     """
     Vectorized conversion from MJD2000 to datetime64[ns].
@@ -379,7 +372,6 @@ def _mjd2000_to_datetime(x: np.ndarray) -> np.ndarray:
     # when possible, though apply_ufunc will pass numpy arrays here anyway.
     return pd.to_datetime(jd, unit="D", origin="julian").to_numpy().astype("datetime64[ns]")
 
-
 def _read_hdf4(
     sd: Any,
 ) -> tuple[dict[str, tuple[tuple[str, ...], np.ndarray, dict[str, Any]]], dict[str, Any]]:
@@ -407,7 +399,6 @@ def _read_hdf4(
     attrs = sd.attributes()
     return data_vars, attrs
 
-
 def _rename_h5_dim(s: str) -> str:
     """
     Parses HDF5 dimension label.
@@ -432,7 +423,6 @@ def _rename_h5_dim(s: str) -> str:
     label, num, _ = m.groups()
     return f"fakeDim{num}{label}"
 
-
 def _rename_var(vn: str, *, under: str = "_", dot: str = "_") -> str:
     """
     Standardizes variable names.
@@ -452,7 +442,6 @@ def _rename_var(vn: str, *, under: str = "_", dot: str = "_") -> str:
         Standardized name.
     """
     return vn.lower().replace("_", under).replace(".", dot)
-
 
 def _dti_from_mjd2000(x: Any) -> pd.DatetimeIndex:
     """

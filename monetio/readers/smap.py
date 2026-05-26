@@ -8,7 +8,6 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("smap")
 class SMAPReader(GriddedReader):
     """
@@ -83,7 +82,7 @@ class SMAPReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -135,7 +134,6 @@ class SMAPReader(GriddedReader):
             pass
 
         return urls
-
 
 def smap_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

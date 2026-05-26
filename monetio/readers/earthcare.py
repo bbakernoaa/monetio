@@ -8,7 +8,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("earthcare")
 class EarthCAREReader(GriddedReader):
     """
@@ -69,7 +68,7 @@ class EarthCAREReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -84,7 +83,6 @@ class EarthCAREReader(GriddedReader):
         ds = update_history(ds, "Read EarthCARE L2 data.")
 
         return ds
-
 
 def earthcare_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

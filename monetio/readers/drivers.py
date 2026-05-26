@@ -335,6 +335,7 @@ class XarrayDriver:
                 registry, file_list = _select_store(file_list, storage_options)
 
                 concat_dim = xr_kwargs.get("concat_dim", "time")
+                parallel_sweep = xr_kwargs.get("parallel", True)
                 try:
                     vds = open_virtual_mfdataset(
                         file_list,
@@ -342,10 +343,17 @@ class XarrayDriver:
                         parser=parser,
                         combine="nested",
                         concat_dim=concat_dim,
+                        parallel=parallel_sweep,
+                        loadable_variables=[],
                     )
                 except ValueError:
                     vds = open_virtual_mfdataset(
-                        file_list, registry=registry, parser=parser, combine="by_coords"
+                        file_list,
+                        registry=registry,
+                        parser=parser,
+                        combine="by_coords",
+                        parallel=parallel_sweep,
+                        loadable_variables=[],
                     )
 
                 # --- Branch on backend ---

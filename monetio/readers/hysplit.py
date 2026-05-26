@@ -10,7 +10,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader, update_history
 from .drivers import FileUtility
 
-
 @register_reader("hysplit")
 class HYSPLITReader(GriddedReader):
     def open_dataset(
@@ -94,7 +93,7 @@ class HYSPLITReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -113,11 +112,9 @@ class HYSPLITReader(GriddedReader):
     def harmonize(self, ds):
         return ds
 
-
 # -----------------------------------------------------------------------------
 # HYSPLIT Core Logic Ported
 # -----------------------------------------------------------------------------
-
 
 def open_dataset_hysplit(
     fname,
@@ -140,7 +137,6 @@ def open_dataset_hysplit(
         return fix_grid_continuity(dset)
     else:
         return dset
-
 
 class ModelBin:
     def __init__(
@@ -463,7 +459,6 @@ class ModelBin:
             return False
         return True
 
-
 def check_drange(drange, pdate1, pdate2):
     savedata = True
     testf = True
@@ -477,7 +472,6 @@ def check_drange(drange, pdate1, pdate2):
     else:
         savedata = False
     return testf, savedata
-
 
 def fix_grid_continuity(dset: xr.Dataset) -> xr.Dataset:
     """
@@ -516,7 +510,6 @@ def fix_grid_continuity(dset: xr.Dataset) -> xr.Dataset:
 
     return dset
 
-
 def check_grid_continuity(dset: xr.Dataset) -> bool:
     """
     Check if the grid indices x and y are continuous (step of 1).
@@ -539,7 +532,6 @@ def check_grid_continuity(dset: xr.Dataset) -> bool:
         if not (dset.y.diff("y") == 1).all():
             return False
     return True
-
 
 def get_latlongrid(attrs: dict, xindx: np.ndarray, yindx: np.ndarray) -> list[np.ndarray]:
     """
@@ -579,7 +571,6 @@ def get_latlongrid(attrs: dict, xindx: np.ndarray, yindx: np.ndarray) -> list[np
     # Return as numpy-like data to match expected signature
     return [lon_2d.transpose("y", "x").data, lat_2d.transpose("y", "x").data]
 
-
 def getlatlon(attrs: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Generate 1D latitude and longitude arrays from HYSPLIT attributes.
@@ -610,7 +601,6 @@ def getlatlon(attrs: dict) -> tuple[np.ndarray, np.ndarray]:
     lon = np.where(lon >= 180 + lon_tolerance, lon - 360, lon)
 
     return lat, lon
-
 
 def combine_dataset(
     blist,
@@ -722,7 +712,6 @@ def combine_dataset(
 
     return rval
 
-
 def add_species(dset: xr.Dataset, species: list[str] = None) -> xr.Dataset:
     """
     Sum multiple species into a single DataArray/Dataset.
@@ -759,7 +748,6 @@ def add_species(dset: xr.Dataset, species: list[str] = None) -> xr.Dataset:
     res.attrs["Species ID"] = sflist
     return update_history(res, f"Added species sum: {sflist}")
 
-
 def reset_latlon_coords(hxr):
     mgrid = get_latlongrid(hxr.attrs, hxr.x, hxr.y)
     if "latitude" in hxr.coords:
@@ -771,11 +759,9 @@ def reset_latlon_coords(hxr):
     hxr = update_history(hxr, "Reset lat/lon coordinates.")
     return hxr
 
-
 # -----------------------------------------------------------------------------
 # HYSPLIT Exporter / Utility Ported from cdump2netcdf.py
 # -----------------------------------------------------------------------------
-
 
 def thickness_hash(xrash: xr.Dataset | xr.DataArray) -> dict:
     """
@@ -797,7 +783,6 @@ def thickness_hash(xrash: xr.Dataset | xr.DataArray) -> dict:
     xlevs = xrash.z.data
     dhash = dict(zip(xlevs, delta.data))
     return dhash
-
 
 def get_thickness(xrash: xr.Dataset | xr.DataArray) -> xr.DataArray:
     """
@@ -822,7 +807,6 @@ def get_thickness(xrash: xr.Dataset | xr.DataArray) -> xr.DataArray:
     delta = z - z_prev
     return delta.rename("thickness")
 
-
 def remove_dep(xrash: xr.Dataset | xr.DataArray) -> xr.Dataset | xr.DataArray:
     """
     Mask the deposition layer (z=0) if present backend-agnostic.
@@ -839,7 +823,6 @@ def remove_dep(xrash: xr.Dataset | xr.DataArray) -> xr.Dataset | xr.DataArray:
         Data with deposition layer masked.
     """
     return xrash.where(xrash.z > 0)
-
 
 def mass_loading(
     xrash: xr.DataArray | xr.Dataset, delta: xr.DataArray | np.ndarray | None = None
@@ -900,7 +883,6 @@ def mass_loading(
             ml = update_history(ml, "Calculated mass loading using standardized preprocessing.")
 
     return ml
-
 
 def cdump2awips(xrash1, dt, outname, mscale=1, munit="unit", format="NETCDF4"):
     from netCDF4 import Dataset

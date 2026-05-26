@@ -8,7 +8,6 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import update_history
 
-
 @register_reader("ncep_grib")
 class NCEPGribReader(GriddedReader):
     """
@@ -68,7 +67,6 @@ class NCEPGribReader(GriddedReader):
         # Default to grib2io engine
         if "engine" not in kwargs:
             kwargs["engine"] = "grib2io"
-
         # Also supports open_mfdataset logic
         if "concat_dim" not in kwargs:
             kwargs["concat_dim"] = "time"
@@ -80,7 +78,7 @@ class NCEPGribReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="grib2",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -93,7 +91,6 @@ class NCEPGribReader(GriddedReader):
         ds = update_history(ds, "Read NCEP GRIB data.")
 
         return ds
-
 
 def ncep_grib_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

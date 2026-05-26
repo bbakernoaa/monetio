@@ -5,7 +5,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import update_history
 
-
 @register_reader("grib2")
 class Grib2Reader(GriddedReader):
     """
@@ -64,7 +63,6 @@ class Grib2Reader(GriddedReader):
         """
         if "engine" not in kwargs:
             kwargs["engine"] = engine
-
         if filters is not None and "backend_kwargs" not in kwargs:
             kwargs["backend_kwargs"] = {"filters": filters}
 
@@ -74,7 +72,7 @@ class Grib2Reader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="grib2",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,

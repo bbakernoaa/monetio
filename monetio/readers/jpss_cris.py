@@ -5,7 +5,6 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("jpss_cris")
 class JPSSCrISReader(GriddedReader):
     """
@@ -67,7 +66,7 @@ class JPSSCrISReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -80,7 +79,6 @@ class JPSSCrISReader(GriddedReader):
         ds = update_history(ds, "Read JPSS CrIS meteorological profile data.")
 
         return ds
-
 
 def jpss_cris_preprocess(ds: xr.Dataset) -> xr.Dataset:
     """

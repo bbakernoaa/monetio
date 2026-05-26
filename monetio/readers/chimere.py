@@ -8,7 +8,6 @@ import xarray as xr
 from .base import GriddedReader, _scientific_hygiene, register_reader
 from .sat_utils import update_history
 
-
 @register_reader("chimere")
 class ChimereReader(GriddedReader):
     """
@@ -87,7 +86,7 @@ class ChimereReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -102,7 +101,6 @@ class ChimereReader(GriddedReader):
         ds = update_history(ds, "Read Chimere data.")
 
         return ds
-
 
 def chimere_preprocess(
     ds: xr.Dataset, *, var_list: list[str] | None = None, surf_only: bool = False

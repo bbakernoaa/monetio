@@ -13,7 +13,6 @@ from .sat_utils import (
     update_history,
 )
 
-
 @register_reader("omps_nadir")
 class OMPSNadirReader(GriddedReader):
     """
@@ -117,7 +116,6 @@ class OMPSNadirReader(GriddedReader):
             kwargs["concat_dim"] = "time"
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
-
         dsets = []
         for g in groups:
             g_kwargs = kwargs.copy()
@@ -143,7 +141,7 @@ class OMPSNadirReader(GriddedReader):
 
             try:
                 # Open without the preprocessor at this stage
-                ds_g = super().open_dataset(g_files, **g_kwargs)
+                ds_g = super().open_dataset(g_files, **g_kwargs, virtualizarr_parser="hdf5")
                 dsets.append(ds_g)
             except (OSError, RuntimeError, ValueError):
                 # Not all groups may be present in all files
@@ -245,7 +243,6 @@ class OMPSNadirReader(GriddedReader):
 
         return sorted(urls)
 
-
 def omps_nadir_preprocess(ds: xr.Dataset, product: str = "v8toz") -> xr.Dataset:
     """
     Preprocess OMPS Nadir dataset lazily.
@@ -296,7 +293,6 @@ def omps_nadir_preprocess(ds: xr.Dataset, product: str = "v8toz") -> xr.Dataset:
 
     return ds
 
-
 def _preprocess_v8toz(ds: xr.Dataset) -> xr.Dataset:
     """
     Preprocess NOAA V8TOZ Total Ozone EDR.
@@ -342,7 +338,6 @@ def _preprocess_v8toz(ds: xr.Dataset) -> xr.Dataset:
         ds["ozone_column"] = ds["ozone_column"].where(ds["quality_flag"] == 0)
 
     return ds
-
 
 def _preprocess_sdr(ds: xr.Dataset) -> xr.Dataset:
     """

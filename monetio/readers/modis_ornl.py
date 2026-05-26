@@ -18,7 +18,6 @@ except ImportError:
 
 DEFAULT_WSDL = "https://modis.ornl.gov/cgi-bin/MODIS/soapservice/MODIS_soapservice.wsdl"
 
-
 @register_reader("modis_ornl")
 class MODISORNLReader(GriddedReader):
     """
@@ -94,7 +93,6 @@ class MODISORNLReader(GriddedReader):
 
         return ds
 
-
 def _nearest(items: pd.DatetimeIndex, pivot: pd.Timestamp) -> pd.Timestamp:
     """
     Find the nearest date in a list.
@@ -112,7 +110,6 @@ def _nearest(items: pd.DatetimeIndex, pivot: pd.Timestamp) -> pd.Timestamp:
         The nearest date.
     """
     return min(items, key=lambda x: abs(x - pivot))
-
 
 def _get_single_retrieval(
     date: pd.Timestamp,
@@ -197,7 +194,6 @@ def _get_single_retrieval(
 
     return ds
 
-
 def _make_xarray_dataset(grid_data: np.ndarray, metadata: dict) -> xr.Dataset:
     """
     Create an xarray Dataset from raw data and metadata.
@@ -242,7 +238,6 @@ def _make_xarray_dataset(grid_data: np.ndarray, metadata: dict) -> xr.Dataset:
     ds = update_history(ds, "Created xarray Dataset from MODIS ORNL subset.")
 
     return ds
-
 
 def _get_latlon(
     xll: float, yll: float, cell_width: float, nx: int, ny: int

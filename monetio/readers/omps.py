@@ -10,7 +10,6 @@ from .sat_utils import (
     update_history,
 )
 
-
 @register_reader("omps")
 class OMPSReader(GriddedReader):
     """
@@ -77,7 +76,7 @@ class OMPSReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -90,7 +89,6 @@ class OMPSReader(GriddedReader):
         ds = update_history(ds, f"Read OMPS {product} data.")
 
         return ds
-
 
 def omps_preprocess(ds: xr.Dataset, product: str = "nmto3_l2") -> xr.Dataset:
     """
@@ -127,7 +125,6 @@ def omps_preprocess(ds: xr.Dataset, product: str = "nmto3_l2") -> xr.Dataset:
     ds = _scientific_hygiene(ds)
 
     return ds
-
 
 def _preprocess_nmto3_l2(ds: xr.Dataset) -> xr.Dataset:
     """
@@ -210,7 +207,6 @@ def _preprocess_nmto3_l2(ds: xr.Dataset) -> xr.Dataset:
     ds = update_history(ds, "Preprocessed OMPS L2 data.")
 
     return ds
-
 
 def _preprocess_nmto3_l3(ds: xr.Dataset) -> xr.Dataset:
     """

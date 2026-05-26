@@ -9,7 +9,6 @@ from .base import GriddedReader, _scientific_hygiene, register_reader
 from .nasa_utils import setup_netrc
 from .sat_utils import standardize_satellite_coords, update_history
 
-
 @register_reader("merra2")
 class MERRA2Reader(GriddedReader):
     """
@@ -93,12 +92,11 @@ class MERRA2Reader(GriddedReader):
 
         if virtualizarr is not None:
             kwargs["virtualizarr_file"] = virtualizarr
-
         ds = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -209,7 +207,6 @@ class MERRA2Reader(GriddedReader):
 
         return urls
 
-
 def merra2_preprocess(ds: xr.Dataset, product: str | None = None) -> xr.Dataset:
     """
     Preprocess MERRA-2 dataset: standardize coordinates and metadata.
@@ -280,7 +277,6 @@ def merra2_preprocess(ds: xr.Dataset, product: str | None = None) -> xr.Dataset:
     ds = update_history(ds, "Preprocessed MERRA-2 data using standardized preprocessing.")
 
     return ds
-
 
 def _add_merra2_pressure(ds: xr.Dataset) -> xr.Dataset:
     """

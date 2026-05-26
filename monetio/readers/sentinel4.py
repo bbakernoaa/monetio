@@ -11,7 +11,6 @@ import xarray as xr
 from .base import GriddedReader, register_reader
 from .sat_utils import apply_qa_mask, standardize_satellite_coords, update_history
 
-
 @register_reader("sentinel4")
 class Sentinel4Reader(GriddedReader):
     """
@@ -95,7 +94,7 @@ class Sentinel4Reader(GriddedReader):
                     files,
                     use_virtualizarr=use_virtualizarr,
                     virtualizarr_file=virtualizarr_file,
-                    virtualizarr_parser=virtualizarr_parser,
+                    virtualizarr_parser="hdf5",
                     virtualizarr_backend=virtualizarr_backend,
                     icechunk_repo=icechunk_repo,
                     use_icechunk=use_icechunk,
@@ -113,7 +112,7 @@ class Sentinel4Reader(GriddedReader):
                     files,
                     use_virtualizarr=use_virtualizarr,
                     virtualizarr_file=virtualizarr_file,
-                    virtualizarr_parser=virtualizarr_parser,
+                    virtualizarr_parser="hdf5",
                     virtualizarr_backend=virtualizarr_backend,
                     icechunk_repo=icechunk_repo,
                     use_icechunk=use_icechunk,
@@ -135,7 +134,6 @@ class Sentinel4Reader(GriddedReader):
         ds = update_history(ds, "Read Sentinel-4 L2 data.")
 
         return ds
-
 
 def sentinel4_preprocess(ds: xr.Dataset, qa_threshold: float | None = None) -> xr.Dataset:
     """
