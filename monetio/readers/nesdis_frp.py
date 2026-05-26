@@ -23,6 +23,14 @@ class NESDISFRPReader(GriddedReader):
     def open_dataset(
         self,
         files: str | list[str] = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        virtualizarr_parser: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        use_dask: bool = False,
         date: datetime.datetime | str | pd.Timestamp = None,
         ftype: str = "meanFRP",
         **kwargs,
@@ -34,6 +42,22 @@ class NESDISFRPReader(GriddedReader):
         ----------
         files : str or list[str], optional
             File path(s) or URL(s).
+        use_virtualizarr : bool, optional
+            Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
+        virtualizarr_file : str or None, optional
+            Path to save/load the VirtualiZarr reference JSON file, by default None.
+        virtualizarr_parser : str or None, optional
+            The VirtualiZarr parser to use (e.g. 'hdf5', 'netcdf3', 'zarr', 'grib2').
+        virtualizarr_backend : str, optional
+            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
+        icechunk_repo : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_icechunk : bool, optional
+            Whether to use Icechunk, by default False.
+        icechunk_url : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_dask : bool, optional
+            Whether to use Dask for lazy loading, by default False.
         date : datetime.datetime, str, or pd.Timestamp, optional
             Date to retrieve. If files is None, this is used to build URLs.
         ftype : str, optional
@@ -72,7 +96,18 @@ class NESDISFRPReader(GriddedReader):
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
 
-        ds = super().open_dataset(files, **kwargs)
+        ds = super().open_dataset(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_backend=virtualizarr_backend,
+            icechunk_repo=icechunk_repo,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            use_dask=use_dask,
+            **kwargs,
+        )
 
         # Update history
         ds = update_history(ds, f"Read NESDIS {ftype} data.")
