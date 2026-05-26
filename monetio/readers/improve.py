@@ -196,7 +196,9 @@ def read_improve_file(fname: str, delimiter: str = "\t", **kwargs: Any) -> pd.Da
     # Determine storage options if S3
     storage_options = kwargs.get("storage_options")
     if fname.startswith("s3://") and storage_options is None:
-        storage_options = {"anon": True}
+        from .drivers import get_default_storage_options
+
+        storage_options = get_default_storage_options(fname)
 
     # Find the data section
     skiprows = 0

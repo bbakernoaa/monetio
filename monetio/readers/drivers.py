@@ -20,10 +20,30 @@ except ImportError:
     HAS_OBSTORE_FSSPEC = False
 
 
+def get_default_storage_options(path: str) -> dict:
+    """Get default storage options for a given path/protocol.
+
+    Parameters
+    ----------
+    path : str
+        File path or URL.
+
+    Returns
+    -------
+    dict
+        Default storage options (e.g. ``{"anon": True}``).
+    """
+    if path.startswith("s3://"):
+        if HAS_OBSTORE_FSSPEC:
+            return {"skip_signature": True}
+        return {"anon": True}
+    return {}
+
+
 def _build_s3_config(storage_options: dict) -> dict:
     """Build an S3Store config dict from fsspec-style storage_options."""
     s3_config = {}
-    if storage_options.get("anon", True):
+    if storage_options.get("anon", True) or storage_options.get("skip_signature", False):
         s3_config["skip_signature"] = "true"
     if "client_kwargs" in storage_options and "region_name" in storage_options["client_kwargs"]:
         s3_config["region"] = storage_options["client_kwargs"]["region_name"]
@@ -127,11 +147,12 @@ class FileUtility:
                 and "storage_options" not in kwargs
                 and "skip_signature" not in kwargs
             ):
-                # Check if we are using obstore's fsspec wrapper
-                if HAS_OBSTORE_FSSPEC:
-                    kwargs["skip_signature"] = True
-                else:
-                    kwargs["anon"] = True
+                kwargs.update(get_default_storage_options(path))
+
+            # If we are using obstore, map fsspec 'anon' to obstore 'skip_signature'
+            if HAS_OBSTORE_FSSPEC and kwargs.get("anon") is True:
+                kwargs.pop("anon")
+                kwargs["skip_signature"] = True
 
             return fsspec.filesystem("s3", **kwargs)
         elif path.startswith("http://") or path.startswith("https://"):

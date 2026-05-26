@@ -418,7 +418,9 @@ def read_openaq_json(fn: str, storage_options: dict = None, **kwargs: Any) -> pd
         fn = fn.replace("https://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches")
         fn = fn.replace("http://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches")
         if storage_options is None:
-            storage_options = {"anon": True}
+            from .drivers import get_default_storage_options
+
+            storage_options = get_default_storage_options(fn)
 
     try:
         df = pd.read_json(fn, lines=True, storage_options=storage_options)
