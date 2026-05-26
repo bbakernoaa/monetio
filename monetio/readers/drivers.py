@@ -544,8 +544,21 @@ class PandasDriver:
         read_method: str | Callable = "read_csv",
         lazy: bool = False,
         meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        virtualizarr_parser: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        use_dask: bool = False,
+        as_xarray: bool = False,
         **kwargs,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:
+        # Handle 'use_dask' as alias for 'lazy'
+        if use_dask:
+            lazy = True
+
         file_list = FileUtility.expand_paths(files)
 
         # Get the actual reading function
