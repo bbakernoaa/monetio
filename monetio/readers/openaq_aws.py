@@ -381,11 +381,9 @@ def _to_datetime_index(dates, **kwargs):
 
 def get_paths(dates, *, siteid=None, country=None, provider=None):
     """Get site-day paths, searching independently by location ID, country, and provider."""
-    from ..util import _import_required
+    from .drivers import FileUtility
 
-    s3fs = _import_required("s3fs")
-
-    fs = s3fs.S3FileSystem(anon=True)
+    fs = FileUtility.get_fs("s3://openaq-data-archive")
 
     dates = _to_datetime_index(dates)
     location_ids = _maybe_to_list(siteid)
@@ -450,11 +448,9 @@ def get_paths(dates, *, siteid=None, country=None, provider=None):
 
 def get_providers():
     """Get OpenAQ data providers by searching the bucket paths."""
-    from ..util import _import_required
+    from .drivers import FileUtility
 
-    s3fs = _import_required("s3fs")
-
-    fs = s3fs.S3FileSystem(anon=True)
+    fs = FileUtility.get_fs("s3://openaq-data-archive")
     paths = fs.glob("openaq-data-archive/records/csv.gz/provider=*", maxdepth=1)
     providers = [p.split("=")[1] for p in paths]
     return providers
@@ -462,11 +458,9 @@ def get_providers():
 
 def get_provider_countries(provider):
     """Get countries for a given provider."""
-    from ..util import _import_required
+    from .drivers import FileUtility
 
-    s3fs = _import_required("s3fs")
-
-    fs = s3fs.S3FileSystem(anon=True)
+    fs = FileUtility.get_fs("s3://openaq-data-archive")
     glb = f"openaq-data-archive/records/csv.gz/provider={provider.lower()}/country=*"
     paths = fs.glob(glb, maxdepth=1)
     countries = [p.split("=")[2] for p in paths]
@@ -477,11 +471,9 @@ def get_locations(*, provider=None, country=None):
     """Get location IDs corresponding to provider(s) and/or country(ies)."""
     import re
 
-    from ..util import _import_required
+    from .drivers import FileUtility
 
-    s3fs = _import_required("s3fs")
-
-    fs = s3fs.S3FileSystem(anon=True)
+    fs = FileUtility.get_fs("s3://openaq-data-archive")
     country = _maybe_to_list(country)
     if provider is None:
         providers = get_providers()

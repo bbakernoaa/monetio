@@ -91,7 +91,7 @@ def test_viirs_jrr_eager_lazy_consistency():
 
 
 def test_viirs_jrr_build_urls(monkeypatch):
-    class MockS3:
+    class MockFS:
         def glob(self, pattern):
             if "VIIRS-JRR-AOD" in pattern:
                 return ["bucket/VIIRS-JRR-AOD/2024/01/01/file1.nc"]
@@ -99,7 +99,10 @@ def test_viirs_jrr_build_urls(monkeypatch):
                 return ["bucket/VIIRS-JRR-ADP/2024/01/01/file2.nc"]
             return []
 
-    monkeypatch.setattr("s3fs.S3FileSystem", lambda **kwargs: MockS3())
+    from monetio.readers.drivers import FileUtility
+
+    monkeypatch.setattr(FileUtility, "get_fs", lambda path, **kwargs: MockFS())
+    monkeypatch.setattr(FileUtility, "expand_paths", lambda path, **kwargs: MockFS().glob(path))
 
     reader = VIIRSJRRReader()
     urls_aod = reader.build_urls("2024-01-01", satellite="snpp", product="AOD")

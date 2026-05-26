@@ -139,16 +139,19 @@ def test_omps_nadir_nasa_fallback(product):
 
 
 def test_omps_nadir_build_urls(monkeypatch):
-    class MockS3:
+    class MockFS:
         def glob(self, pattern):
             if "OMPS_V8TOZ/2024/01/01/" in pattern:
                 return [
-                    "bucket/OMPS_V8TOZ/2024/01/01/file1.nc",
-                    "bucket/OMPS_V8TOZ/2024/01/01/file2.nc",
+                    "s3://bucket/OMPS_V8TOZ/2024/01/01/file1.nc",
+                    "s3://bucket/OMPS_V8TOZ/2024/01/01/file2.nc",
                 ]
             return []
 
-    monkeypatch.setattr("s3fs.S3FileSystem", lambda **kwargs: MockS3())
+    from monetio.readers.drivers import FileUtility
+
+    monkeypatch.setattr(FileUtility, "get_fs", lambda path, **kwargs: MockFS())
+    monkeypatch.setattr(FileUtility, "expand_paths", lambda path, **kwargs: MockFS().glob(path))
 
     reader = OMPSNadirReader()
     urls = reader.build_urls("2024-01-01", satellite="snpp", product="v8toz")

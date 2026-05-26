@@ -359,9 +359,9 @@ def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> lis
     List[str]
         List of S3 URLs.
     """
-    import s3fs
+    from .drivers import FileUtility
 
-    fs = s3fs.S3FileSystem(anon=True)
+    fs = FileUtility.get_fs("s3://openaq-fetches")
     s3bucket = "openaq-fetches/realtime"
 
     dates = pd.to_datetime(dates)

@@ -14,7 +14,7 @@ from .sat_utils import add_time_coord, standardize_satellite_coords, update_hist
 class GOESReader(GriddedReader):
     """
     Reader for GOES-R Series (GOES-16, 17, 18) ABI data.
-    Supports local files and S3 (via s3fs).
+    Supports local files and S3 (via obstore or s3fs).
     """
 
     def open_dataset(
@@ -141,17 +141,15 @@ class GOESReader(GriddedReader):
         List[str]
             List of S3 URLs.
         """
-        from ..util import _import_required
-
-        s3fs = _import_required("s3fs")
+        from .drivers import FileUtility
 
         if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
         else:
             dates = pd.to_datetime(dates)
 
-        fs = s3fs.S3FileSystem(anon=True)
         bucket = f"noaa-goes{satellite}"
+        fs = FileUtility.get_fs(f"s3://{bucket}")
 
         urls = []
         for d in dates:

@@ -171,7 +171,7 @@ class VIIRSJRRReader(GriddedReader):
         List[str]
             List of S3 URLs.
         """
-        import s3fs
+        from .drivers import FileUtility
 
         if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
@@ -189,14 +189,13 @@ class VIIRSJRRReader(GriddedReader):
         if not bucket:
             raise ValueError(f"Unknown satellite: {satellite}. Choose from {list(sat_map.keys())}")
 
-        fs = s3fs.S3FileSystem(anon=True)
         urls = []
         for d in dates.floor("D").unique():
-            prefix = f"{bucket}/VIIRS-JRR-{product}/{d.strftime('%Y/%m/%d')}/"
-            # We use glob to find all granules for the day
+            prefix = f"s3://{bucket}/VIIRS-JRR-{product}/{d.strftime('%Y/%m/%d')}/"
+            # Use FileUtility to expand paths, which leverages obstore/fsspec
             try:
-                found = fs.glob(f"{prefix}*.nc")
-                urls.extend([f"s3://{f}" for f in found])
+                found = FileUtility.expand_paths(f"{prefix}*.nc")
+                urls.extend(found)
             except Exception:
                 continue
 

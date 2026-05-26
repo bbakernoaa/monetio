@@ -11,6 +11,14 @@ try:
 except ImportError:
     dd = None
 
+try:
+    import obstore.fsspec
+
+    obstore.fsspec.register()
+    HAS_OBSTORE_FSSPEC = True
+except ImportError:
+    HAS_OBSTORE_FSSPEC = False
+
 
 def _build_s3_config(storage_options: dict) -> dict:
     """Build an S3Store config dict from fsspec-style storage_options."""
@@ -101,21 +109,41 @@ class FileUtility:
     """
 
     @staticmethod
-    def get_fs(path: str):
+    def get_fs(path: str, **kwargs):
         """
         Returns the correct filesystem (local, s3, or http) based on the protocol.
+
+        Parameters
+        ----------
+        path : str
+            File path or URL.
+        **kwargs : dict
+            Additional arguments passed to fsspec.filesystem.
         """
         if path.startswith("s3://"):
-            # anon=True means public bucket. Use anon=False to use your AWS credentials.
-            return fsspec.filesystem("s3", anon=True)
+            # Default to anonymous access for S3 if not specified
+            if (
+                "anon" not in kwargs
+                and "storage_options" not in kwargs
+                and "skip_signature" not in kwargs
+            ):
+                # Check if we are using obstore's fsspec wrapper
+                if HAS_OBSTORE_FSSPEC:
+                    kwargs["skip_signature"] = True
+                else:
+                    kwargs["anon"] = True
+
+            return fsspec.filesystem("s3", **kwargs)
         elif path.startswith("http://") or path.startswith("https://"):
-            return fsspec.filesystem("http")
+            return fsspec.filesystem("http", **kwargs)
         elif path.startswith("ftp://"):
-            return fsspec.filesystem("ftp")
-        return fsspec.filesystem("file")
+            return fsspec.filesystem("ftp", **kwargs)
+        elif path.startswith("file://"):
+            return fsspec.filesystem("file", **kwargs)
+        return fsspec.filesystem("file", **kwargs)
 
     @staticmethod
-    def expand_paths(path_input: str | list[str], fs=None) -> list[str]:
+    def expand_paths(path_input: str | list[str], fs=None, **kwargs) -> list[str]:
         """
         Converts a string (with wildcards), a single path, or a list of paths
         into a guaranteed list of file paths/objects.
@@ -132,7 +160,7 @@ class FileUtility:
         if isinstance(path_input, str):
             # If no specific filesystem provided, guess it from the path
             if fs is None:
-                fs = FileUtility.get_fs(path_input)
+                fs = FileUtility.get_fs(path_input, **kwargs)
 
             # Use fsspec/s3fs to glob wildcards (works for s3://bucket/data/*.nc too!)
             if any(char in path_input for char in ["*", "?"]):
@@ -143,12 +171,27 @@ class FileUtility:
                     pass
 
                 files = sorted(fs.glob(path_input))
-                # fs.glob usually returns paths without the protocol (e.g. 'bucket/file.nc')
-                if path_input.startswith("s3://") and files and not files[0].startswith("s3://"):
-                    files = [f"s3://{f}" for f in files]
 
+                # Ensure paths have the protocol if the input had it
                 if not files:
                     raise FileNotFoundError(f"No files found matching pattern: {path_input}")
+
+                # fsspec.unstrip_protocol is the standard way to restore the protocol
+                # but it might not be available or consistent across all versions/fs.
+                # Manual fix for common cases in monetio:
+                protocol = ""
+                if path_input.startswith("s3://"):
+                    protocol = "s3://"
+                elif path_input.startswith("http://"):
+                    protocol = "http://"
+                elif path_input.startswith("https://"):
+                    protocol = "https://"
+
+                if protocol and not str(files[0]).startswith(protocol):
+                    files = [
+                        f"{protocol}{f}" if not str(f).startswith(protocol) else f for f in files
+                    ]
+
                 return files
             else:
                 # It is a specific single file
@@ -162,7 +205,7 @@ class FileUtility:
 class XarrayDriver:
     """
     The unified driver for opening gridded data (NetCDF, GRIB, HDF).
-    Supports S3 via fsspec.
+    Supports S3 via obstore or fsspec.
     """
 
     def open(
@@ -588,7 +631,10 @@ class PandasDriver:
             for f in file_list:
                 if f.startswith("s3://"):
                     if "storage_options" not in kwargs:
-                        kwargs["storage_options"] = {"anon": True}
+                        if HAS_OBSTORE_FSSPEC:
+                            kwargs["storage_options"] = {"skip_signature": True}
+                        else:
+                            kwargs["storage_options"] = {"anon": True}
 
                 d = dask.delayed(reader_func)(f, **kwargs)
                 if preprocess:
@@ -608,9 +654,12 @@ class PandasDriver:
 
             for f in file_list:
                 if f.startswith("s3://"):
-                    # Pandas can read S3 URLs directly if s3fs is installed!
+                    # Pandas can read S3 URLs directly!
                     if "storage_options" not in kwargs:
-                        kwargs["storage_options"] = {"anon": True}  # Default to public
+                        if HAS_OBSTORE_FSSPEC:
+                            kwargs["storage_options"] = {"skip_signature": True}
+                        else:
+                            kwargs["storage_options"] = {"anon": True}  # Default to public
                     df = reader_func(f, **kwargs)
                 else:
                     df = reader_func(f, **kwargs)
