@@ -1,3 +1,4 @@
+import os
 import warnings
 from collections.abc import Callable
 from typing import Union
@@ -43,10 +44,22 @@ def get_default_storage_options(path: str) -> dict:
 def _build_s3_config(storage_options: dict) -> dict:
     """Build an S3Store config dict from fsspec-style storage_options."""
     s3_config = {}
+    # S3Store expects string values for config keys in some versions,
+    # or boolean if using latest obstore. Let's use strings to be safe.
     if storage_options.get("anon", True) or storage_options.get("skip_signature", False):
         s3_config["skip_signature"] = "true"
     if "client_kwargs" in storage_options and "region_name" in storage_options["client_kwargs"]:
         s3_config["region"] = storage_options["client_kwargs"]["region_name"]
+    elif "region_name" in storage_options:
+        s3_config["region"] = storage_options["region_name"]
+
+    # If no region is provided, obstore might fail if it can't detect it.
+    # For common public buckets, us-east-1 is a safe default if detection fails.
+    if "region" not in s3_config:
+        # Check environment or use a sensible default for public data if anon
+        if s3_config.get("skip_signature") == "true":
+            s3_config["region"] = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+
     return s3_config
 
 

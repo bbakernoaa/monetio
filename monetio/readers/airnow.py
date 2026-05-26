@@ -377,8 +377,8 @@ def build_urls(
 
     urls = []
     fnames = []
-    # Use S3 bucket directly
-    base_url = "s3://files.airnowtech.org/airnow/"
+    # Use HTTPS by default as S3 access can be restricted or require region config
+    base_url = "https://files.airnowtech.org/airnow/"
     for dt in dates:
         if daily:
             fname = "daily_data.dat"
