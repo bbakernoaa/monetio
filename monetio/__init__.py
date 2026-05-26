@@ -127,43 +127,6 @@ def load(source: str, files=None, **kwargs):
     return reader.open_dataset(files=files, **kwargs)
 
 
-def virtualize(source: str, files=None, output: str = None, backend: str = "kerchunk", **kwargs):
-    """
-    Pre-process files into a virtual reference (e.g., Kerchunk JSON or Icechunk repo).
-
-    Usage:
-        monetio.virtualize("merra2", files="data/*.nc4", output="merra2_ref.json")
-
-    Parameters
-    ----------
-    source : str
-        The reader source ID (e.g., "merra2", "gfs").
-    files : str or list of str, optional
-        File path(s) or glob pattern(s).
-    output : str, optional
-        Path to save the output reference. For 'kerchunk' backend, this is the JSON file path.
-        For 'icechunk' backend, this is the Icechunk repository URL/path.
-    backend : str, optional
-        The virtualization backend. Must be "kerchunk" (default) or "icechunk".
-    **kwargs : dict
-        Additional arguments passed to the reader and driver.
-    """
-    if output is None:
-        raise ValueError("The 'output' parameter is required for virtualization.")
-
-    use_icechunk = backend == "icechunk"
-
-    return load(
-        source,
-        files=files,
-        use_virtualizarr=True,
-        virtualizarr_file=None if use_icechunk else output,
-        use_icechunk=use_icechunk,
-        icechunk_url=output if use_icechunk else None,
-        **kwargs,
-    )
-
-
 from . import grids
 from .models import (
     camx,

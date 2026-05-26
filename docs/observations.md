@@ -94,43 +94,6 @@ Global hourly and synoptic surface observations.
 
 - **Source ID**: `ish` or `ish_lite`
 
-### PAMS
-
-Photochemical Assessment Monitoring Stations.
-
-- **Source ID**: `pams`
-
-### NDBC
-
-National Data Buoy Center (buoy meteorological data).
-
-- **Source ID**: `ndbc`
-
-### SURFRAD
-
-Surface Radiation Budget Network.
-
-- **Source ID**: `surfrad`
-
-### SOLRAD
-
-NOAA Solar Radiation Network.
-
-- **Source ID**: `solrad`
-
-### TCCON
-
-Total Carbon Column Observing Network (ground-based FTIR).
-
-- **Source ID**: `tccon`
-- **Variables**: `xco2`, `xch4`, `xn2o`, `xco`, etc.
-
-### AmeriFlux
-
-Eddy covariance tower network for carbon, water vapor, and energy fluxes.
-
-- **Source ID**: `ameriflux`
-
 ### Other Networks
 
 - **HYTRAJ**: HYSPLIT Trajectories (`hytraj`)
