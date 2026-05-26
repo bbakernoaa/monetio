@@ -1,8 +1,10 @@
-"""NADP Reader"""
+"""NADP Reader."""
+
+from __future__ import annotations
 
 import functools
 from datetime import datetime
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -23,6 +25,64 @@ META_URLS = {
     "airmon": "https://bit.ly/2xMlgTW",
     "amon": "https://bit.ly/2sJmkCg",
     "amnet": "https://bit.ly/2sJmkCg",
+}
+
+# Network Specifications
+NADP_SPECS = {
+    "ntn": {
+        "parse_dates": [2, 3],
+        "rename_cols": {"dateon": "time", "dateoff": "time_off"},
+        "cleaning_cols": ["mg", "br", "so4", "cl", "no3", "nh4", "k", "na", "ca"],
+        "flag_col_prefix": "flag",
+        "flag_values": ["<"],
+        "mask_negative": True,
+    },
+    "mdn": {
+        "parse_dates": [1, 2],
+        "rename_cols": {"dateon": "time", "dateoff": "time_off"},
+        "cleaning_cols": ["rgppt", "svol", "subppt", "hgconc", "hgdep"],
+        "flag_col": "qr",
+        "flag_contains": "C",
+    },
+    "airmon": {
+        "parse_dates": [2, 3],
+        "rename_cols": {"dateon": "time", "dateoff": "time_off"},
+        "cleaning_cols": [
+            "subppt",
+            "pptnws",
+            "pptbel",
+            "svol",
+            "ca",
+            "mg",
+            "k",
+            "na",
+            "nh4",
+            "no3",
+            "cl",
+            "so4",
+            "po4",
+            "phlab",
+            "phfield",
+            "conduclab",
+            "conducfield",
+        ],
+        "flag_col": "qrcode",
+        "flag_contains": "C",
+    },
+    "amon": {
+        "parse_dates": [2, 3],
+        "rename_cols": {"startdate": "time", "enddate": "time_off"},
+        "cleaning_cols": ["airvol", "conc"],
+        "flag_col": "qr",
+        "flag_contains": "C",
+    },
+    "amnet": {
+        "parse_dates": [2, 3],
+        "rename_cols": {"startdate": "time", "enddate": "time_off"},
+        "cleaning_cols": ["airvol", "conc"],
+        "flag_col": "qr",
+        "flag_contains": "C",
+    },
 }
 
 
@@ -49,21 +109,10 @@ def read_nadp(filename: str, network: str = "ntn", **kwargs: dict) -> pd.DataFra
     >>> df = read_nadp("NTN-All-w.csv", network="ntn")
     """
     network = network.lower()
-    if network == "ntn":
-        parse_dates = [2, 3]
-        rename_cols = {"dateon": "time", "dateoff": "time_off"}
-    elif network == "mdn":
-        parse_dates = [1, 2]
-        rename_cols = {"dateon": "time", "dateoff": "time_off"}
-    elif network in ["airmon", "amon", "amnet"]:
-        parse_dates = [2, 3]
-        if network == "airmon":
-            rename_cols = {"dateon": "time", "dateoff": "time_off"}
-        else:
-            rename_cols = {"startdate": "time", "enddate": "time_off"}
-    else:
-        parse_dates = False
-        rename_cols = {}
+    spec = NADP_SPECS.get(network, {})
+
+    parse_dates = spec.get("parse_dates", [])
+    rename_cols = spec.get("rename_cols", {})
 
     # Use FileUtility to handle remote files
     fs = FileUtility.get_fs(filename)
@@ -75,8 +124,9 @@ def read_nadp(filename: str, network: str = "ntn", **kwargs: dict) -> pd.DataFra
     # Handle date parsing
     if parse_dates:
         for col_idx in parse_dates:
-            col_name = df.columns[col_idx]
-            df[col_name] = pd.to_datetime(df[col_name], errors="coerce")
+            if col_idx < len(df.columns):
+                col_name = df.columns[col_idx]
+                df[col_name] = pd.to_datetime(df[col_name], errors="coerce")
     df = df.rename(columns=rename_cols)
 
     # Ensure flag/status columns are strings for later .str.contains usage
@@ -87,61 +137,38 @@ def read_nadp(filename: str, network: str = "ntn", **kwargs: dict) -> pd.DataFra
     # Update history for I/O
     df = update_history(df, f"Read NADP {network} data.")
 
-    # Apply network-specific cleaning
-    if network == "ntn":
-        cols = ["mg", "br", "so4", "cl", "no3", "nh4", "k", "na", "ca"]
-        for col in cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-                flag = "flag" + col
-                if flag in df.columns:
-                    mask = (df[flag] == "<") | (df[col] < 0)
-                    df[col] = df[col].mask(mask)
-    elif network == "mdn":
-        cols = ["rgppt", "svol", "subppt", "hgconc", "hgdep"]
-        available_cols = [c for c in cols if c in df.columns]
-        if available_cols:
-            df[available_cols] = df[available_cols].apply(pd.to_numeric, errors="coerce")
-            if "qr" in df.columns:
-                mask = df.qr.str.contains("C", na=False)
-                for col in available_cols:
-                    df[col] = df[col].mask(mask)
-    elif network == "airmon":
-        cols = [
-            "subppt",
-            "pptnws",
-            "pptbel",
-            "svol",
-            "ca",
-            "mg",
-            "k",
-            "na",
-            "nh4",
-            "no3",
-            "cl",
-            "so4",
-            "po4",
-            "phlab",
-            "phfield",
-            "conduclab",
-            "conducfield",
-        ]
-        available_cols = [c for c in cols if c in df.columns]
-        if available_cols:
-            df[available_cols] = df[available_cols].apply(pd.to_numeric, errors="coerce")
-            if "qrcode" in df.columns:
-                mask = df.qrcode.str.contains("C", na=False)
-                for col in available_cols:
-                    df[col] = df[col].mask(mask)
-    elif network in ["amon", "amnet"]:
-        cols = ["airvol", "conc"]
-        available_cols = [c for c in cols if c in df.columns]
-        if available_cols:
-            df[available_cols] = df[available_cols].apply(pd.to_numeric, errors="coerce")
-            if "qr" in df.columns:
-                mask = df.qr.str.contains("C", na=False)
-                for col in available_cols:
-                    df[col] = df[col].mask(mask)
+    # Apply network-specific cleaning from spec
+    cleaning_cols = spec.get("cleaning_cols", [])
+    available_cols = [c for c in cleaning_cols if c in df.columns]
+
+    if available_cols:
+        # Convert to numeric
+        df[available_cols] = df[available_cols].apply(pd.to_numeric, errors="coerce")
+
+        # 1. Prefix-based flags (e.g. NTN flagmg for mg)
+        prefix = spec.get("flag_col_prefix")
+        flag_vals = spec.get("flag_values", [])
+        mask_neg = spec.get("mask_negative", False)
+
+        if prefix or mask_neg:
+            for col in available_cols:
+                mask = pd.Series(False, index=df.index)
+                if prefix:
+                    flag_col = prefix + col
+                    if flag_col in df.columns:
+                        for fv in flag_vals:
+                            mask |= df[flag_col] == fv
+                if mask_neg:
+                    mask |= df[col] < 0
+                df[col] = df[col].mask(mask)
+
+        # 2. Global flag column (e.g. MDN 'qr' contains 'C')
+        flag_col = spec.get("flag_col")
+        flag_contains = spec.get("flag_contains")
+        if flag_col and flag_contains and flag_col in df.columns:
+            mask = df[flag_col].str.contains(flag_contains, na=False)
+            for col in available_cols:
+                df[col] = df[col].mask(mask)
 
     return df
 
@@ -169,14 +196,14 @@ class NADPReader(PointReader):
         weekly: bool = True,
         as_xarray: bool = True,
         lazy: bool = False,
-        **kwargs: dict,
-    ) -> xr.Dataset | pd.DataFrame:
+        **kwargs: Any,
+    ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
-        Open NADP dataset.
+        Retrieve and load NADP (National Atmospheric Deposition Program) data.
 
         Parameters
         ----------
-        files : Union[str, List[str]], optional
+        files : str or list of str, optional
             File paths or URLs. If None, uses `network`, `siteid`, and `weekly` to build URL.
         use_virtualizarr : bool, optional
             Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
@@ -194,7 +221,7 @@ class NADPReader(PointReader):
             Path to the Icechunk repository, by default None.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
-        dates : Union[datetime, List[datetime], pd.DatetimeIndex], optional
+        dates : datetime, list of datetime, or pd.DatetimeIndex, optional
             Dates to filter data.
         network : str, optional
             NADP network (NTN, MDN, AMON, AIRMON, AMNET), by default "NTN".
@@ -206,19 +233,24 @@ class NADPReader(PointReader):
             If True, returns an xarray.Dataset, by default True.
         lazy : bool, optional
             If True, returns a dask-backed object, by default False.
-        **kwargs : dict
+        **kwargs : Any
             Additional arguments passed to the reader and driver.
 
         Returns
         -------
-        Union[xr.Dataset, pd.DataFrame]
+        xr.Dataset, pd.DataFrame, or dd.DataFrame
             The loaded dataset.
+
+        Examples
+        --------
+        >>> reader = NADPReader()
+        >>> ds = reader.open_dataset(network="NTN", siteid="TX01")
         """
         if files is None:
             files = self.build_url(network=network, siteid=siteid, weekly=weekly)
 
         # We use read_nadp as the custom read_method
-        def _reader(f, **inner_kwargs):
+        def _reader(f: str, **inner_kwargs: Any) -> pd.DataFrame:
             return read_nadp(f, network=network, **inner_kwargs)
 
         df = self.driver.open(
@@ -254,21 +286,21 @@ class NADPReader(PointReader):
         return df
 
     def _postprocess(
-        self, df: Union[pd.DataFrame, "dd.DataFrame"], network: str
-    ) -> Union[pd.DataFrame, "dd.DataFrame"]:
+        self, df: pd.DataFrame | dd.DataFrame, network: str
+    ) -> pd.DataFrame | dd.DataFrame:
         """
         Merge with station metadata and harmonize column names.
 
         Parameters
         ----------
-        df : Union[pd.DataFrame, dd.DataFrame]
+        df : pd.DataFrame or dd.DataFrame
             Input dataframe.
         network : str
             NADP network name.
 
         Returns
         -------
-        Union[pd.DataFrame, dd.DataFrame]
+        pd.DataFrame or dd.DataFrame
             Post-processed dataframe.
 
         Examples
