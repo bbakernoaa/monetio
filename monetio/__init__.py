@@ -159,9 +159,7 @@ def virtualize(
         Dataset opened through the virtualized references.
     """
     if backend not in {"kerchunk", "icechunk"}:
-        raise ValueError(
-            f"Invalid backend '{backend}'. Expected one of: 'kerchunk', 'icechunk'."
-        )
+        raise ValueError(f"Invalid backend '{backend}'. Expected one of: 'kerchunk', 'icechunk'.")
 
     use_icechunk = backend == "icechunk"
     return load(
