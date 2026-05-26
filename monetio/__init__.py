@@ -127,6 +127,55 @@ def load(source: str, files=None, **kwargs):
     return reader.open_dataset(files=files, **kwargs)
 
 
+def virtualize(
+    source: str,
+    files,
+    output: str,
+    backend: str = "kerchunk",
+    concat_dim: str = "time",
+    **kwargs,
+):
+    """Pre-compute and persist VirtualiZarr references for a supported source.
+
+    Parameters
+    ----------
+    source : str
+        Registered reader source name (e.g. ``"gfs"`` or ``"merra2"``).
+    files : str | list[str]
+        Input file path(s) or glob expression.
+    output : str
+        Output reference path. For ``backend="kerchunk"``, this is a JSON file.
+        For ``backend="icechunk"``, this is an Icechunk repository URL/path.
+    backend : {"kerchunk", "icechunk"}, optional
+        Virtualization backend, by default ``"kerchunk"``.
+    concat_dim : str, optional
+        Dimension used when combining multiple files, by default ``"time"``.
+    **kwargs : dict
+        Additional keyword arguments forwarded to :func:`load`.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset opened through the virtualized references.
+    """
+    if backend not in {"kerchunk", "icechunk"}:
+        raise ValueError(
+            f"Invalid backend '{backend}'. Expected one of: 'kerchunk', 'icechunk'."
+        )
+
+    use_icechunk = backend == "icechunk"
+    return load(
+        source,
+        files=files,
+        use_virtualizarr=True,
+        virtualizarr_file=None if use_icechunk else output,
+        use_icechunk=use_icechunk,
+        icechunk_url=output if use_icechunk else None,
+        concat_dim=concat_dim,
+        **kwargs,
+    )
+
+
 from . import grids
 from .models import (
     camx,
