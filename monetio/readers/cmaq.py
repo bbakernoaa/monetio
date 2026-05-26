@@ -36,12 +36,12 @@ class CMAQReader(GriddedReader):
         drop_duplicates: bool = False,
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
+        virtualizarr_parser: str | None = None,
         virtualizarr_backend: str = "kerchunk",
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         use_dask: bool = False,
-        virtualizarr_parser: str = "hdf",
         **kwargs: Any,
     ) -> xr.Dataset:
         """
@@ -50,7 +50,7 @@ class CMAQReader(GriddedReader):
         Parameters
         ----------
         files : Union[str, List[str]]
-            File path, list of paths, or glob pattern.
+            File path(s), URL(s), or glob pattern.
         earth_radius : float, optional
             Earth radius in meters, by default 6370000.
         convert_to_ppb : bool, optional
@@ -61,6 +61,8 @@ class CMAQReader(GriddedReader):
             Whether to use VirtualiZarr, by default False.
         virtualizarr_file : str or None, optional
             Path to the VirtualiZarr file, by default None.
+        virtualizarr_parser : str or None, optional
+            The VirtualiZarr parser to use (e.g. 'hdf5').
         virtualizarr_backend : str, optional
             VirtualiZarr backend, by default "kerchunk".
         icechunk_repo : str or None, optional
@@ -101,12 +103,12 @@ class CMAQReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
+            virtualizarr_parser=virtualizarr_parser,
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
             icechunk_url=icechunk_url,
             use_dask=use_dask,
-            virtualizarr_parser=virtualizarr_parser,
             **kwargs,
         )
 
