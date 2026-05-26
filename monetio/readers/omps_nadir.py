@@ -117,7 +117,6 @@ class OMPSNadirReader(GriddedReader):
             kwargs["concat_dim"] = "time"
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
-
         dsets = []
         for g in groups:
             g_kwargs = kwargs.copy()
@@ -143,7 +142,7 @@ class OMPSNadirReader(GriddedReader):
 
             try:
                 # Open without the preprocessor at this stage
-                ds_g = super().open_dataset(g_files, **g_kwargs)
+                ds_g = super().open_dataset(g_files, **g_kwargs, virtualizarr_parser="hdf5")
                 dsets.append(ds_g)
             except (OSError, RuntimeError, ValueError):
                 # Not all groups may be present in all files

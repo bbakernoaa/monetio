@@ -76,12 +76,11 @@ class NCEPReanalysisReader(GriddedReader):
 
         if "preprocess" not in kwargs:
             kwargs["preprocess"] = ncep_reanalysis_preprocess
-
         ds = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="netcdf3",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,

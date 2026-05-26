@@ -76,7 +76,6 @@ class NCEPPDSReader(GriddedReader):
 
         if "engine" not in kwargs:
             kwargs["engine"] = "grib2io"
-
         # Note: Some kwargs passed to build_urls might not be valid for the driver,
         # but XarrayDriver.open generally handles this by consuming what it knows
         # and ignoring/forwarding the rest.
@@ -84,7 +83,7 @@ class NCEPPDSReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="grib2",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,

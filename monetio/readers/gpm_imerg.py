@@ -81,12 +81,11 @@ class GPMIMERGReader(GriddedReader):
         # GPM IMERG HDF5 files often need the h5netcdf engine
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
-
         ds = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,

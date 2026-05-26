@@ -64,7 +64,7 @@ class EARLINETReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,

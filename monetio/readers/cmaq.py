@@ -88,7 +88,6 @@ class CMAQReader(GriddedReader):
                 earth_radius=earth_radius,
                 convert_to_ppb=convert_to_ppb,
             )
-
         # 2. Open the dataset using standard xarray (via XarrayDriver)
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
@@ -103,7 +102,7 @@ class CMAQReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,

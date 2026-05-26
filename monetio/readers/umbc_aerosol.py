@@ -72,7 +72,6 @@ class UMBCAerosolReader(GriddedReader):
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
-
         dsets = []
         all_attrs = {}
         for g in groups:
@@ -84,7 +83,7 @@ class UMBCAerosolReader(GriddedReader):
                     files,
                     use_virtualizarr=use_virtualizarr,
                     virtualizarr_file=virtualizarr_file,
-                    virtualizarr_parser=virtualizarr_parser,
+                    virtualizarr_parser="hdf5",
                     virtualizarr_backend=virtualizarr_backend,
                     icechunk_repo=icechunk_repo,
                     use_icechunk=use_icechunk,

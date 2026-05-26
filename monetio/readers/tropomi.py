@@ -103,7 +103,6 @@ class TROPOMIReader(GriddedReader):
 
         if "engine" not in kwargs:
             kwargs["engine"] = "h5netcdf"
-
         dsets = []
         for g in groups:
             # We copy kwargs to avoid modifying the original dict in the loop
@@ -115,7 +114,7 @@ class TROPOMIReader(GriddedReader):
                     files,
                     use_virtualizarr=use_virtualizarr,
                     virtualizarr_file=virtualizarr_file,
-                    virtualizarr_parser=virtualizarr_parser,
+                    virtualizarr_parser="hdf5",
                     virtualizarr_backend=virtualizarr_backend,
                     icechunk_repo=icechunk_repo,
                     use_icechunk=use_icechunk,

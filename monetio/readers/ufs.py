@@ -90,13 +90,12 @@ class UFSReader(GriddedReader):
             kwargs["concat_dim"] = "time"
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
-
         # Open dataset
         ds = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_parser="hdf5",
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,
@@ -107,7 +106,7 @@ class UFSReader(GriddedReader):
 
         # Merge PM25 file if present
         if fname_pm25 is not None:
-            ds_pm25 = self.driver.open(fname_pm25, **kwargs)
+            ds_pm25 = self.driver.open(fname_pm25, virtualizarr_parser="hdf5", **kwargs)
             ds_pm25 = ds_pm25.drop_vars(["lat", "lon", "pfull"], errors="ignore")
             ds_pm25.attrs = {}
             from monetio.util import _try_merge_exact
