@@ -381,9 +381,12 @@ def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> lis
         days_available = [folder.split("/")[-1] for folder in folders]
     else:
         # Fallback: assume all requested dates might be available via HTTPS
-        days_available = [
-            d.strftime(r"%Y-%m-%d") for d in pd.to_datetime(dates).floor("D").unique()
-        ]
+        # Use .dt accessor if it's a Series, otherwise floor directly if it's a DatetimeIndex
+        dates_dt = pd.to_datetime(dates)
+        if hasattr(dates_dt, "dt"):
+            days_available = [d.strftime(r"%Y-%m-%d") for d in dates_dt.dt.floor("D").unique()]
+        else:
+            days_available = [d.strftime(r"%Y-%m-%d") for d in dates_dt.floor("D").unique()]
 
     dates_available = pd.to_datetime(days_available, format=r"%Y-%m-%d", errors="coerce")
 
