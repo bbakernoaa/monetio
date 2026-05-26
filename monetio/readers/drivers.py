@@ -1,3 +1,4 @@
+import os
 import warnings
 from collections.abc import Callable
 from typing import Union
@@ -11,14 +12,54 @@ try:
 except ImportError:
     dd = None
 
+try:
+    import obstore.fsspec
+
+    obstore.fsspec.register()
+    HAS_OBSTORE_FSSPEC = True
+except ImportError:
+    HAS_OBSTORE_FSSPEC = False
+
+
+def get_default_storage_options(path: str) -> dict:
+    """Get default storage options for a given path/protocol.
+
+    Parameters
+    ----------
+    path : str
+        File path or URL.
+
+    Returns
+    -------
+    dict
+        Default storage options (e.g. ``{"anon": True}``).
+    """
+    if path.startswith("s3://"):
+        if HAS_OBSTORE_FSSPEC:
+            return {"skip_signature": True}
+        return {"anon": True}
+    return {}
+
 
 def _build_s3_config(storage_options: dict) -> dict:
     """Build an S3Store config dict from fsspec-style storage_options."""
     s3_config = {}
-    if storage_options.get("anon", True):
+    # S3Store expects string values for config keys in some versions,
+    # or boolean if using latest obstore. Let's use strings to be safe.
+    if storage_options.get("anon", True) or storage_options.get("skip_signature", False):
         s3_config["skip_signature"] = "true"
     if "client_kwargs" in storage_options and "region_name" in storage_options["client_kwargs"]:
         s3_config["region"] = storage_options["client_kwargs"]["region_name"]
+    elif "region_name" in storage_options:
+        s3_config["region"] = storage_options["region_name"]
+
+    # If no region is provided, obstore might fail if it can't detect it.
+    # For common public buckets, us-east-1 is a safe default if detection fails.
+    if "region" not in s3_config:
+        # Check environment or use a sensible default for public data if anon
+        if s3_config.get("skip_signature") == "true":
+            s3_config["region"] = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+
     return s3_config
 
 
@@ -101,21 +142,42 @@ class FileUtility:
     """
 
     @staticmethod
-    def get_fs(path: str):
+    def get_fs(path: str, **kwargs):
         """
         Returns the correct filesystem (local, s3, or http) based on the protocol.
+
+        Parameters
+        ----------
+        path : str
+            File path or URL.
+        **kwargs : dict
+            Additional arguments passed to fsspec.filesystem.
         """
         if path.startswith("s3://"):
-            # anon=True means public bucket. Use anon=False to use your AWS credentials.
-            return fsspec.filesystem("s3", anon=True)
+            # Default to anonymous access for S3 if not specified
+            if (
+                "anon" not in kwargs
+                and "storage_options" not in kwargs
+                and "skip_signature" not in kwargs
+            ):
+                kwargs.update(get_default_storage_options(path))
+
+            # If we are using obstore, map fsspec 'anon' to obstore 'skip_signature'
+            if HAS_OBSTORE_FSSPEC and kwargs.get("anon") is True:
+                kwargs.pop("anon")
+                kwargs["skip_signature"] = True
+
+            return fsspec.filesystem("s3", **kwargs)
         elif path.startswith("http://") or path.startswith("https://"):
-            return fsspec.filesystem("http")
+            return fsspec.filesystem("http", **kwargs)
         elif path.startswith("ftp://"):
-            return fsspec.filesystem("ftp")
-        return fsspec.filesystem("file")
+            return fsspec.filesystem("ftp", **kwargs)
+        elif path.startswith("file://"):
+            return fsspec.filesystem("file", **kwargs)
+        return fsspec.filesystem("file", **kwargs)
 
     @staticmethod
-    def expand_paths(path_input: str | list[str], fs=None) -> list[str]:
+    def expand_paths(path_input: str | list[str], fs=None, **kwargs) -> list[str]:
         """
         Converts a string (with wildcards), a single path, or a list of paths
         into a guaranteed list of file paths/objects.
@@ -132,7 +194,7 @@ class FileUtility:
         if isinstance(path_input, str):
             # If no specific filesystem provided, guess it from the path
             if fs is None:
-                fs = FileUtility.get_fs(path_input)
+                fs = FileUtility.get_fs(path_input, **kwargs)
 
             # Use fsspec/s3fs to glob wildcards (works for s3://bucket/data/*.nc too!)
             if any(char in path_input for char in ["*", "?"]):
@@ -143,12 +205,27 @@ class FileUtility:
                     pass
 
                 files = sorted(fs.glob(path_input))
-                # fs.glob usually returns paths without the protocol (e.g. 'bucket/file.nc')
-                if path_input.startswith("s3://") and files and not files[0].startswith("s3://"):
-                    files = [f"s3://{f}" for f in files]
 
+                # Ensure paths have the protocol if the input had it
                 if not files:
                     raise FileNotFoundError(f"No files found matching pattern: {path_input}")
+
+                # fsspec.unstrip_protocol is the standard way to restore the protocol
+                # but it might not be available or consistent across all versions/fs.
+                # Manual fix for common cases in monetio:
+                protocol = ""
+                if path_input.startswith("s3://"):
+                    protocol = "s3://"
+                elif path_input.startswith("http://"):
+                    protocol = "http://"
+                elif path_input.startswith("https://"):
+                    protocol = "https://"
+
+                if protocol and not str(files[0]).startswith(protocol):
+                    files = [
+                        f"{protocol}{f}" if not str(f).startswith(protocol) else f for f in files
+                    ]
+
                 return files
             else:
                 # It is a specific single file
@@ -162,7 +239,7 @@ class FileUtility:
 class XarrayDriver:
     """
     The unified driver for opening gridded data (NetCDF, GRIB, HDF).
-    Supports S3 via fsspec.
+    Supports S3 via obstore or fsspec.
     """
 
     def open(
@@ -588,7 +665,10 @@ class PandasDriver:
             for f in file_list:
                 if f.startswith("s3://"):
                     if "storage_options" not in kwargs:
-                        kwargs["storage_options"] = {"anon": True}
+                        if HAS_OBSTORE_FSSPEC:
+                            kwargs["storage_options"] = {"skip_signature": True}
+                        else:
+                            kwargs["storage_options"] = {"anon": True}
 
                 d = dask.delayed(reader_func)(f, **kwargs)
                 if preprocess:
@@ -608,9 +688,12 @@ class PandasDriver:
 
             for f in file_list:
                 if f.startswith("s3://"):
-                    # Pandas can read S3 URLs directly if s3fs is installed!
+                    # Pandas can read S3 URLs directly!
                     if "storage_options" not in kwargs:
-                        kwargs["storage_options"] = {"anon": True}  # Default to public
+                        if HAS_OBSTORE_FSSPEC:
+                            kwargs["storage_options"] = {"skip_signature": True}
+                        else:
+                            kwargs["storage_options"] = {"anon": True}  # Default to public
                     df = reader_func(f, **kwargs)
                 else:
                     df = reader_func(f, **kwargs)

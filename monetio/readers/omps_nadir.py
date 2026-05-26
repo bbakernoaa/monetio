@@ -188,9 +188,7 @@ class OMPSNadirReader(GriddedReader):
         List[str]
             List of S3 URLs.
         """
-        from ..util import _import_required
-
-        s3fs = _import_required("s3fs")
+        from .drivers import FileUtility
 
         if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
@@ -228,17 +226,16 @@ class OMPSNadirReader(GriddedReader):
         elif product.lower() == "np_sdr":
             dirs_to_search.append("OMPS-NP-GEO")
 
-        fs = s3fs.S3FileSystem(anon=True)
         urls = []
         for d in dates.floor("D").unique():
             for dn in dirs_to_search:
-                prefix = f"{bucket}/{dn}/{d.strftime('%Y/%m/%d')}/"
+                prefix = f"s3://{bucket}/{dn}/{d.strftime('%Y/%m/%d')}/"
                 try:
-                    found = fs.glob(f"{prefix}*.nc")
+                    found = FileUtility.expand_paths(f"{prefix}*.nc")
                     # Also try .h5 for SDRs
                     if not found and "SDR" in dn:
-                        found = fs.glob(f"{prefix}*.h5")
-                    urls.extend([f"s3://{f}" for f in found])
+                        found = FileUtility.expand_paths(f"{prefix}*.h5")
+                    urls.extend(found)
                 except Exception:
                     continue
 

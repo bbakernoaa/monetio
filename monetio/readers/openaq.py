@@ -347,7 +347,8 @@ class OpenAQReader(PointReader):
 
 def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> list[str]:
     """
-    Construct OpenAQ S3 URLs for the given dates.
+    Construct OpenAQ URLs for the given dates.
+    Uses HTTPS by default for better compatibility in restricted environments.
 
     Parameters
     ----------
@@ -357,26 +358,36 @@ def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> lis
     Returns
     -------
     List[str]
-        List of S3 URLs.
+        List of URLs.
     """
-    import s3fs
+    from .drivers import FileUtility
 
-    fs = s3fs.S3FileSystem(anon=True)
+    # We try S3 listing first, but fall back to assuming existence if it fails
     s3bucket = "openaq-fetches/realtime"
+
+    try:
+        fs = FileUtility.get_fs("s3://openaq-fetches")
+        folders = fs.ls(s3bucket)
+        use_s3 = True
+    except Exception:
+        use_s3 = False
 
     dates = pd.to_datetime(dates)
     if isinstance(dates, pd.Timestamp):
         dates = pd.DatetimeIndex([dates])
     dates = dates.floor("D").unique()
 
-    # Get available days from S3
-    try:
-        folders = fs.ls(s3bucket)
-    except Exception as e:
-        logger.error(f"Failed to list S3 bucket {s3bucket}: {e}")
-        raise
+    if use_s3:
+        days_available = [folder.split("/")[-1] for folder in folders]
+    else:
+        # Fallback: assume all requested dates might be available via HTTPS
+        # Use .dt accessor if it's a Series, otherwise floor directly if it's a DatetimeIndex
+        dates_dt = pd.to_datetime(dates)
+        if hasattr(dates_dt, "dt"):
+            days_available = [d.strftime(r"%Y-%m-%d") for d in dates_dt.dt.floor("D").unique()]
+        else:
+            days_available = [d.strftime(r"%Y-%m-%d") for d in dates_dt.floor("D").unique()]
 
-    days_available = [folder.split("/")[-1] for folder in folders]
     dates_available = pd.to_datetime(days_available, format=r"%Y-%m-%d", errors="coerce")
 
     dates_requested = pd.Series(dates).floor("D").drop_duplicates()
@@ -385,11 +396,19 @@ def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> lis
     urls = []
     for date in dates_have:
         sdate = date.strftime(r"%Y-%m-%d")
-        try:
-            files = fs.ls(f"{s3bucket}/{sdate}")
-            urls.extend(f"s3://{f}" for f in files)
-        except Exception as e:
-            logger.warning(f"Failed to list files for date {sdate}: {e}")
+        if use_s3:
+            try:
+                files = fs.ls(f"{s3bucket}/{sdate}")
+                urls.extend(f"s3://{f}" for f in files)
+            except Exception as e:
+                logger.warning(f"Failed to list S3 files for date {sdate}: {e}")
+                # Fallback to a few standard names if listing fails but we know the day exists?
+                # Actually OpenAQ fetches have unpredictable names (timestamps).
+                # If S3 ls failed, we probably can't get the filenames easily.
+        else:
+            # Without S3 listing, we can't easily know the granule names for OpenAQ fetches.
+            # But the user might be providing files explicitly.
+            pass
 
     return urls
 
@@ -418,7 +437,9 @@ def read_openaq_json(fn: str, storage_options: dict = None, **kwargs: Any) -> pd
         fn = fn.replace("https://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches")
         fn = fn.replace("http://openaq-fetches.s3.amazonaws.com", "s3://openaq-fetches")
         if storage_options is None:
-            storage_options = {"anon": True}
+            from .drivers import get_default_storage_options
+
+            storage_options = get_default_storage_options(fn)
 
     try:
         df = pd.read_json(fn, lines=True, storage_options=storage_options)

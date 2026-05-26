@@ -108,9 +108,11 @@ class AirNowReader(PointReader):
             raise ValueError("Must provide either 'files' or 'dates'.")
 
         # Define per-file preprocessing
-        storage_options = kwargs.get("storage_options", {})
+        storage_options = kwargs.get("storage_options")
         if not storage_options and any(str(f).startswith("s3://") for f in files):
-            storage_options = {"anon": True}
+            from .drivers import get_default_storage_options
+
+            storage_options = get_default_storage_options(str(files[0]))
 
         read_func = partial(read_airnow_csv, daily=daily, storage_options=storage_options)
 
@@ -375,8 +377,8 @@ def build_urls(
 
     urls = []
     fnames = []
-    # Use S3 bucket directly
-    base_url = "s3://files.airnowtech.org/airnow/"
+    # Use HTTPS by default as S3 access can be restricted or require region config
+    base_url = "https://files.airnowtech.org/airnow/"
     for dt in dates:
         if daily:
             fname = "daily_data.dat"
