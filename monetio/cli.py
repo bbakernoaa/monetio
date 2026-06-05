@@ -39,7 +39,9 @@ def handle_save(
 
         if as_pandas or isinstance(obj, pd.DataFrame | pd.Series):
             if is_zarr or is_icechunk:
-                click.echo("Error: Cannot save Pandas/Tabular data as Zarr/Icechunk. Use NetCDF/CSV.")
+                click.echo(
+                    "Error: Cannot save Pandas/Tabular data as Zarr/Icechunk. Use NetCDF/CSV."
+                )
                 return
 
             # Handle dask dataframe
@@ -75,7 +77,9 @@ def handle_save(
                     session.commit(msg)
                     click.echo(msg)
                 except ImportError:
-                    click.echo("Error: Icechunk not installed. Install with 'pip install icechunk'.")
+                    click.echo(
+                        "Error: Icechunk not installed. Install with 'pip install icechunk'."
+                    )
                 except Exception as e:
                     click.echo(f"Error saving to Icechunk: {e}")
             elif is_zarr:

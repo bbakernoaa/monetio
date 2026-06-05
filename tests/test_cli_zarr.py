@@ -1,12 +1,13 @@
 import gzip
 from unittest.mock import patch
+
 import pandas as pd
-import xarray as xr
 import pytest
+import xarray as xr
 from click.testing import CliRunner
+
 from monetio.cli import cli
-import os
-import shutil
+
 
 @pytest.fixture
 def mock_ish_history():
@@ -26,7 +27,13 @@ def mock_ish_history():
         }
     )
 
+
 def test_cli_to_zarr_and_append(tmp_path, mock_ish_history):
+    import importlib.util
+
+    if importlib.util.find_spec("zarr") is None:
+        pytest.skip("zarr not installed")
+
     # Setup mock data - Step 1
     line1 = "2020 09 01 00  256  184 10185  220   40 0 0 0"
     fn1 = tmp_path / "722244-00358-2020_1.gz"
@@ -53,7 +60,9 @@ def test_cli_to_zarr_and_append(tmp_path, mock_ish_history):
             f.write((line2 + "\n").encode())
 
         # 3. Append
-        result = runner.invoke(cli, ["to-zarr", "ish_lite", "-f", str(fn2), "-o", str(output_zarr), "--append"])
+        result = runner.invoke(
+            cli, ["to-zarr", "ish_lite", "-f", str(fn2), "-o", str(output_zarr), "--append"]
+        )
         assert result.exit_code == 0
         assert "Appended to" in result.output
 
@@ -62,6 +71,7 @@ def test_cli_to_zarr_and_append(tmp_path, mock_ish_history):
     assert ds.sizes["time"] == 2
     assert "temp" in ds.data_vars
     assert ds.attrs["Conventions"] == "CF-1.8 UGRID-1.0"
+
 
 def test_cli_to_icechunk_logic(tmp_path, mock_ish_history):
     # Setup mock data
@@ -78,17 +88,20 @@ def test_cli_to_icechunk_logic(tmp_path, mock_ish_history):
         self.history = mock_ish_history
 
     # Mock icechunk if not installed
-    try:
-        import icechunk
-    except ImportError:
+    import importlib.util
+
+    if importlib.util.find_spec("icechunk") is None:
         import sys
         from unittest.mock import MagicMock
+
         mock_icechunk = MagicMock()
         sys.modules["icechunk"] = mock_icechunk
 
     with patch("monetio.readers.ish.ISH.read_ish_history", autospec=True, side_effect=side_effect):
         with patch("xarray.Dataset.to_zarr") as mock_to_zarr:
-             result = runner.invoke(cli, ["to-icechunk", "ish_lite", "-f", str(fn), "--icechunk-url", icechunk_url])
+            result = runner.invoke(
+                cli, ["to-icechunk", "ish_lite", "-f", str(fn), "--icechunk-url", icechunk_url]
+            )
 
     assert result.exit_code == 0
     if "Error: Icechunk not installed" in result.output:
@@ -97,6 +110,7 @@ def test_cli_to_icechunk_logic(tmp_path, mock_ish_history):
     assert "Saved to Icechunk repository" in result.output
     # Verify it called to_zarr (with the store)
     assert mock_to_zarr.called
+
 
 def test_cli_to_icechunk_append_logic(tmp_path, mock_ish_history):
     # Setup mock data
@@ -115,12 +129,24 @@ def test_cli_to_icechunk_append_logic(tmp_path, mock_ish_history):
     # Mock icechunk
     import sys
     from unittest.mock import MagicMock
+
     mock_icechunk = MagicMock()
     sys.modules["icechunk"] = mock_icechunk
 
     with patch("monetio.readers.ish.ISH.read_ish_history", autospec=True, side_effect=side_effect):
         with patch("xarray.Dataset.to_zarr") as mock_to_zarr:
-             result = runner.invoke(cli, ["to-icechunk", "ish_lite", "-f", str(fn), "--icechunk-url", icechunk_url, "--append"])
+            result = runner.invoke(
+                cli,
+                [
+                    "to-icechunk",
+                    "ish_lite",
+                    "-f",
+                    str(fn),
+                    "--icechunk-url",
+                    icechunk_url,
+                    "--append",
+                ],
+            )
 
     assert result.exit_code == 0
     assert "Appended to Icechunk repository" in result.output
