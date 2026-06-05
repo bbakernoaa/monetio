@@ -67,6 +67,40 @@ class BaseReader(abc.ABC):
         return ds
 
 
+def _ensure_time_dimension(ds: xr.Dataset) -> xr.Dataset:
+    """Ensure ``time`` is represented as a dimension when possible."""
+    if not isinstance(ds, xr.Dataset):
+        return ds
+
+    if "time" in ds.dims:
+        return ds
+
+    if "time" in ds.coords:
+        time_dims = ds["time"].dims
+
+        # Promote scalar time to a singleton dimension.
+        if len(time_dims) == 0:
+            time_val = ds["time"].values
+            if hasattr(time_val, "item"):
+                time_val = time_val.item()
+            ds = ds.expand_dims({"time": [time_val]})
+            return ds
+
+        # If time is a 1D coordinate attached to another dimension, swap dimensions.
+        if len(time_dims) == 1 and time_dims[0] in ds.dims:
+            try:
+                ds = ds.swap_dims({time_dims[0]: "time"})
+            except Exception:
+                pass
+            return ds
+
+    if "time" in ds.variables and "time" not in ds.coords:
+        ds = ds.set_coords("time")
+        return _ensure_time_dimension(ds)
+
+    return ds
+
+
 class GriddedReader(BaseReader):
     """
     Base class for gridded data (Models, Satellites) that utilizes XarrayDriver.
@@ -131,7 +165,9 @@ class GriddedReader(BaseReader):
             use_dask=use_dask,
             **kwargs,
         )
-        return self.harmonize(ds)
+        ds = self.harmonize(ds)
+        ds = _ensure_time_dimension(ds)
+        return ds
 
     def to_kerchunk(self, files: str | list[str], virtualizarr_file: str | None = None, **kwargs):
         """Generate Kerchunk references for the given files."""
@@ -388,6 +424,8 @@ class PointReader(BaseReader):
 
         # Update history
         ds = update_history(ds, "Converted to xarray Dataset with UGRID convention.")
+
+        ds = _ensure_time_dimension(ds)
 
         return ds
 

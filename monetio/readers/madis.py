@@ -24,8 +24,10 @@ class MADISReader(PointReader):
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         use_dask: bool = False,
+        as_xarray: bool = True,
+        expand2d: bool = True,
         **kwargs,
-    ) -> xr.Dataset:
+    ) -> xr.Dataset | pd.DataFrame:
         """
         Reads MADIS NetCDF files.
 
@@ -54,8 +56,8 @@ class MADISReader(PointReader):
 
         Returns
         -------
-        xr.Dataset
-            The MADIS dataset.
+        xr.Dataset or pd.DataFrame
+            UGRID xarray dataset by default, or DataFrame if ``as_xarray=False``.
         """
         # MADIS files are NetCDF but contain point data.
         # We can use xarray to open them and then convert to the MONETIO point format.
@@ -78,7 +80,17 @@ class MADISReader(PointReader):
         else:
             ds = datasets[0]
 
-        return self.harmonize(ds)
+        ds = self.harmonize(ds)
+
+        df = ds.to_dataframe().reset_index()
+        df.attrs = dict(ds.attrs)
+
+        if not as_xarray:
+            return df
+
+        ds_out = self.to_xarray(df, expand2d=expand2d)
+        ds_out = update_history(ds_out, "Converted MADIS data to UGRID xarray format.")
+        return ds_out
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """

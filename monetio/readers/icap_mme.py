@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import GriddedReader, _ensure_time_dimension, register_reader
 from .drivers import FileUtility
 from .sat_utils import update_history
 
@@ -132,6 +132,7 @@ class ICAPMMEReader(GriddedReader):
         )
 
         ds = self.harmonize(ds)
+        ds = _ensure_time_dimension(ds)
 
         # Update history
         ds = update_history(ds, "Read ICAP-MME data.")

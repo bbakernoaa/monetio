@@ -391,8 +391,6 @@ class XarrayDriver:
 
                 parser = HDFParser()
 
-            import os
-
             # --- Kerchunk cache: load existing refs if available ---
             refs = None
             if (
@@ -525,8 +523,16 @@ class XarrayDriver:
                 else:
                     # Logic for standard engine/remote access
                     if filename.startswith("s3://") or filename.startswith("http"):
-                        fs = FileUtility.get_fs(filename)
-                        file_obj = fs.open(filename)
+                        engine = xr_kwargs.get("engine", None)
+                        if engine == "grib2io":
+                            # Use native grib2io file-like support for remote files.
+                            storage_options = xr_kwargs.pop("storage_options", {})
+                            fs = FileUtility.get_fs(filename, **storage_options)
+                            file_obj = fs.open(filename, mode="rb")
+                        else:
+                            storage_options = xr_kwargs.get("storage_options", {})
+                            fs = FileUtility.get_fs(filename, **storage_options)
+                            file_obj = fs.open(filename)
                     else:
                         file_obj = filename
 
@@ -591,6 +597,21 @@ class XarrayDriver:
                 # If concat_dim is provided, ensure we use nested combine to avoid xarray errors
                 if "concat_dim" in xr_kwargs and "combine" not in xr_kwargs:
                     xr_kwargs["combine"] = "nested"
+
+                # Use native grib2io file-like support for remote files.
+                engine = xr_kwargs.get("engine", None)
+                if (
+                    engine == "grib2io"
+                    and isinstance(file_list, list)
+                    and file_list
+                    and (file_list[0].startswith("s3://") or file_list[0].startswith("http"))
+                ):
+                    storage_options = xr_kwargs.pop("storage_options", {})
+                    file_objs = []
+                    for f in file_list:
+                        fs = FileUtility.get_fs(f, **storage_options)
+                        file_objs.append(fs.open(f, mode="rb"))
+                    file_list = file_objs
 
                 if "engine" not in xr_kwargs:
                     try:
@@ -685,22 +706,67 @@ class PandasDriver:
         try:
             # Extract preprocess if present
             preprocess = kwargs.pop("preprocess", None)
+            _skipped = 0
 
-            for f in file_list:
-                if f.startswith("s3://"):
-                    # Pandas can read S3 URLs directly!
-                    if "storage_options" not in kwargs:
-                        if HAS_OBSTORE_FSSPEC:
-                            kwargs["storage_options"] = {"skip_signature": True}
+            # Use concurrent downloads for S3 files when there are many
+            if len(file_list) > 5 and file_list[0].startswith("s3://"):
+                import concurrent.futures
+
+                if "storage_options" not in kwargs:
+                    if HAS_OBSTORE_FSSPEC:
+                        kwargs["storage_options"] = {"skip_signature": True}
+                    else:
+                        kwargs["storage_options"] = {"anon": True}
+
+                def _read_one(f):
+                    df = reader_func(f, **kwargs)
+                    if preprocess:
+                        df = preprocess(df)
+                    return df
+
+                max_workers = min(32, len(file_list))
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(_read_one, f): f for f in file_list}
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            data_frames.append(future.result())
+                        except FileNotFoundError:
+                            _skipped += 1
+                        except Exception:
+                            _skipped += 1
+
+                if _skipped > 0:
+                    warnings.warn(
+                        f"PandasDriver: Skipped {_skipped} missing/failed files "
+                        f"out of {len(file_list)} total.",
+                        stacklevel=2,
+                    )
+            else:
+                for f in file_list:
+                    try:
+                        if f.startswith("s3://"):
+                            if "storage_options" not in kwargs:
+                                if HAS_OBSTORE_FSSPEC:
+                                    kwargs["storage_options"] = {"skip_signature": True}
+                                else:
+                                    kwargs["storage_options"] = {"anon": True}
+                            df = reader_func(f, **kwargs)
                         else:
-                            kwargs["storage_options"] = {"anon": True}  # Default to public
-                    df = reader_func(f, **kwargs)
-                else:
-                    df = reader_func(f, **kwargs)
+                            df = reader_func(f, **kwargs)
 
-                if preprocess:
-                    df = preprocess(df)
-                data_frames.append(df)
+                        if preprocess:
+                            df = preprocess(df)
+                        data_frames.append(df)
+                    except FileNotFoundError:
+                        _skipped += 1
+                        continue
+
+                if _skipped > 0:
+                    warnings.warn(
+                        f"PandasDriver: Skipped {_skipped} missing files "
+                        f"out of {len(file_list)} total.",
+                        stacklevel=2,
+                    )
 
             if not data_frames:
                 return pd.DataFrame()

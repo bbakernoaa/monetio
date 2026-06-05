@@ -149,6 +149,11 @@ class ISH:
 
         self.history.columns = [i.lower() for i in self.history.columns]
         if dates is not None:
+            # Ensure dates is a DatetimeIndex (not a single Timestamp)
+            if not hasattr(dates, "__len__"):
+                dates = pd.DatetimeIndex([dates])
+            elif not isinstance(dates, pd.DatetimeIndex):
+                dates = pd.DatetimeIndex(dates)
             index1 = (self.history.end >= dates.min()) & (self.history.begin <= dates.max())
             self.history = self.history.loc[index1, :]
         self.history = self.history.dropna(subset=["lat", "lon"])

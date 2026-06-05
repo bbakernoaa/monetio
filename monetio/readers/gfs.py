@@ -97,7 +97,13 @@ class GEFSReader(NCEPPDSReader):
                     bucket = "noaa-gefs-pds"
                     # s3://noaa-gefs-pds/gefs.20250324/00/atmos/pgrb2ap5/geavg.t00z.pgrb2a.0p50.f000
                     res_dir = "pgrb2ap5" if "0p50" in prod else "pgrb2bp5"
-                    url = f"s3://{bucket}/gefs.{d_str}/{h_str}/atmos/{res_dir}/{prod}.f{lt_str}"
+                    if product in ("aerosol", "chem", "a2d_0p25"):
+                        url = (
+                            f"s3://{bucket}/gefs.{d_str}/{h_str}/chem/pgrb2ap25/"
+                            f"gefs.chem.t{h_str}z.a2d_0p25.f{lt_str}.grib2"
+                        )
+                    else:
+                        url = f"s3://{bucket}/gefs.{d_str}/{h_str}/atmos/{res_dir}/{prod}.f{lt_str}"
                 else:
                     # https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20250325/00/atmos/pgrb2ap5/geavg.t00z.pgrb2a.0p50.f000
                     res_dir = "pgrb2ap5" if "0p50" in prod else "pgrb2bp5"

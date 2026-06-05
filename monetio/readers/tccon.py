@@ -2,6 +2,7 @@
 TCCON (Total Carbon Column Observing Network) Reader.
 """
 
+import pandas as pd
 import xarray as xr
 
 from .base import PointReader, register_reader
@@ -26,8 +27,10 @@ class TCCONReader(PointReader):
         icechunk_url: str | None = None,
         use_dask: bool = False,
         siteid: str | list[str] = None,
+        as_xarray: bool = True,
+        expand2d: bool = True,
         **kwargs,
-    ) -> xr.Dataset:
+    ) -> xr.Dataset | pd.DataFrame:
         """
         Reads TCCON data.
 
@@ -59,8 +62,8 @@ class TCCONReader(PointReader):
 
         Returns
         -------
-        xr.Dataset
-            The TCCON dataset.
+        xr.Dataset or pd.DataFrame
+            UGRID xarray dataset by default, or DataFrame if ``as_xarray=False``.
         """
         if files is None:
             if siteid is None:
@@ -79,7 +82,15 @@ class TCCONReader(PointReader):
         # Update history
         ds = update_history(ds, "Read TCCON GGG2020 data.")
 
-        return ds
+        df = ds.to_dataframe().reset_index()
+        df.attrs = dict(ds.attrs)
+
+        if not as_xarray:
+            return df
+
+        ds_out = self.to_xarray(df, expand2d=expand2d)
+        ds_out = update_history(ds_out, "Converted TCCON data to UGRID xarray format.")
+        return ds_out
 
     def build_urls(self, siteid: str | list[str]) -> list[str]:
         """

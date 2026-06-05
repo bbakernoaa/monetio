@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .base import GriddedReader, register_reader, update_history
+from .base import GriddedReader, _ensure_time_dimension, register_reader, update_history
 from .drivers import FileUtility
 
 
@@ -108,6 +108,7 @@ class HYSPLITReader(GriddedReader):
         )
 
         ds = update_history(ds, "Read HYSPLIT data.")
+        ds = _ensure_time_dimension(ds)
         return ds
 
     def harmonize(self, ds):

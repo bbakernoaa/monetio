@@ -38,6 +38,7 @@ class IAGOSReader(PointReader):
         use_dask: bool = False,
         dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
         as_xarray: bool = True,
+        expand2d: bool = True,
         lazy: bool = False,
         **kwargs,
     ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
@@ -85,7 +86,7 @@ class IAGOSReader(PointReader):
 
         if not files:
             if as_xarray:
-                return xr.Dataset()
+                return xr.Dataset(attrs={"Conventions": "CF-1.8 UGRID-1.0"})
             return pd.DataFrame()
 
         # IAGOS data is NetCDF. We use xr.open_mfdataset for robustness.
@@ -94,8 +95,14 @@ class IAGOSReader(PointReader):
 
         ds = self.harmonize(ds)
 
+        df = ds.to_dataframe().reset_index()
+        df.attrs = dict(ds.attrs)
+
         if not as_xarray:
-            return ds.to_dataframe().reset_index()
+            return df
+
+        ds = self.to_xarray(df, expand2d=expand2d)
+        ds = update_history(ds, "Converted IAGOS data to UGRID xarray format.")
 
         ds = update_history(ds, "Read IAGOS data using standardized preprocessing.")
         return ds

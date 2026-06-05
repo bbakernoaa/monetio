@@ -5,7 +5,7 @@ from typing import Any
 
 import xarray as xr
 
-from .base import GriddedReader, _scientific_hygiene, register_reader
+from .base import GriddedReader, _ensure_time_dimension, _scientific_hygiene, register_reader
 from .sat_utils import update_history
 
 
@@ -97,6 +97,7 @@ class ChimereReader(GriddedReader):
         )
 
         ds = self.harmonize(ds)
+        ds = _ensure_time_dimension(ds)
 
         # Update history
         ds = update_history(ds, "Read Chimere data.")

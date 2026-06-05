@@ -113,7 +113,6 @@ class NCEPPDSReader(GriddedReader):
             "lat_0": "latitude",
             "lon_0": "longitude",
             "time": "time",
-            "valid_time": "time",
             "step": "step",
         }
 
@@ -124,6 +123,18 @@ class NCEPPDSReader(GriddedReader):
 
         if actual_rename:
             ds = ds.rename(actual_rename)
+
+        # Normalize GRIB valid_time -> time consistently.
+        if "valid_time" in ds.coords or "valid_time" in ds.dims:
+            if "time" in ds.coords or "time" in ds.dims or "time" in ds.variables:
+                if "valid_time" in ds.variables:
+                    ds = ds.drop_vars("valid_time")
+            else:
+                if "valid_time" in ds.coords and "valid_time" not in ds.dims:
+                    valid_time_dims = ds["valid_time"].dims
+                    if len(valid_time_dims) == 1 and valid_time_dims[0] in ds.dims:
+                        ds = ds.swap_dims({valid_time_dims[0]: "valid_time"})
+                ds = ds.rename({"valid_time": "time"})
 
         # Variable Mapping
         var_mapping = {

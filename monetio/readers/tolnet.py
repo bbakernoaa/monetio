@@ -3,7 +3,7 @@
 import pandas as pd
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import GriddedReader, _ensure_time_dimension, register_reader
 from .sat_utils import update_history
 
 
@@ -94,6 +94,7 @@ class TOLNetReader(GriddedReader):
 
         # Update history
         ds = update_history(ds, "Read TOLNet data using standardized preprocessing.")
+        ds = _ensure_time_dimension(ds)
 
         return ds
 

@@ -193,6 +193,9 @@ class ISHLiteReader(PointReader):
 
         if files is None and dates is not None:
             dates = pd.to_datetime(dates)
+            # Ensure dates is always a DatetimeIndex, not a single Timestamp
+            if not hasattr(dates, "__len__"):
+                dates = pd.DatetimeIndex([dates])
             if ish.history is None:
                 ish.read_ish_history(dates=dates)
             dfloc_urls = ish.history.copy()
@@ -236,7 +239,9 @@ class ISHLiteReader(PointReader):
         if dates is not None:
             dates = pd.to_datetime(dates)
             # Use exclusive upper bound to match unit test expectations in legacy
-            df = df.loc[(df.time >= dates.min()) & (df.time < dates.max())]
+            # For single-date queries, include the full day (min == max otherwise)
+            _end = dates.max() + pd.Timedelta(days=1) if len(dates) == 1 else dates.max()
+            df = df.loc[(df.time >= dates.min()) & (df.time < _end)]
 
         # Merge with metadata
         if ish.history is None:
@@ -245,6 +250,10 @@ class ISHLiteReader(PointReader):
         df = add_ish_metadata(df, ish.history)
 
         df = self.harmonize(df)
+
+        # Rename temperature to standard name for model-obs pairing
+        if "temp" in df.columns:
+            df = df.rename(columns={"temp": "t2m"})
 
         if as_xarray:
             from ..util import ds_to_2d

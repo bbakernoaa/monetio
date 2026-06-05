@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import xarray as xr
 
-from .base import GriddedReader, _scientific_hygiene, register_reader
+from .base import GriddedReader, _ensure_time_dimension, _scientific_hygiene, register_reader
 from .sat_utils import update_history
 
 
@@ -90,6 +90,7 @@ class NCEPGribReader(GriddedReader):
 
         # Update history
         ds = update_history(ds, "Read NCEP GRIB data.")
+        ds = _ensure_time_dimension(ds)
 
         return ds
 
@@ -129,6 +130,18 @@ def ncep_grib_preprocess(ds: xr.Dataset) -> xr.Dataset:
         to_coord = [v for v in rename_dict.values() if v in ds.variables and v not in ds.coords]
         if to_coord:
             ds = ds.set_coords(to_coord)
+
+    # Normalize valid_time -> time for GRIB interoperability.
+    if "valid_time" in ds.coords or "valid_time" in ds.dims:
+        if "time" in ds.coords or "time" in ds.dims or "time" in ds.variables:
+            if "valid_time" in ds.variables:
+                ds = ds.drop_vars("valid_time")
+        else:
+            if "valid_time" in ds.coords and "valid_time" not in ds.dims:
+                valid_time_dims = ds["valid_time"].dims
+                if len(valid_time_dims) == 1 and valid_time_dims[0] in ds.dims:
+                    ds = ds.swap_dims({valid_time_dims[0]: "valid_time"})
+            ds = ds.rename({"valid_time": "time"})
 
     # 2. Generate 2D Latitude and Longitude lazily
     if "latitude" in ds.coords and "longitude" in ds.coords:

@@ -4,6 +4,7 @@ Test TCCON Reader
 
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
 
 from monetio.readers.tccon import TCCONReader
@@ -45,4 +46,4 @@ def test_tccon_reader_logic(monkeypatch):
     assert "longitude" in ds.coords
     assert "time" in ds.coords
     assert ds.siteid == "pasadena01"
-    assert ds.latitude.values[0] == 34.1
+    assert ds.latitude.values[0] == pytest.approx(34.1)

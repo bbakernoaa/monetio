@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import xarray as xr
 
-from .base import GriddedReader, register_reader
+from .base import GriddedReader, _ensure_time_dimension, register_reader
 from .sat_utils import update_history
 from .time_utils import parse_wrf_times
 
@@ -119,6 +119,7 @@ class RAQMSReader(GriddedReader):
 
         # Update history
         ds = update_history(ds, "Read RAQMS data.")
+        ds = _ensure_time_dimension(ds)
 
         return ds
 
