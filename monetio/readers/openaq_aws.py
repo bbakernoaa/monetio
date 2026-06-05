@@ -164,7 +164,9 @@ class OpenAQAWSReader(PointReader):
 
         if as_xarray:
             # Defer wide_fmt expansion to to_xarray (via ds_to_2d) to keep it lazy.
-            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
+            # Filter out expand2d from kwargs if present to avoid double-passing
+            to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
+            ds = self.to_xarray(df, expand2d=wide_fmt, **to_xr_kwargs)
 
             # Update history
             ds = update_history(ds, "Read OpenAQ AWS archive data.")
@@ -241,7 +243,10 @@ class OpenAQAWSReader(PointReader):
         return super().harmonize(df)
 
     def to_xarray(
-        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs
+        self,
+        df: Union[pd.DataFrame, "dd.DataFrame"],
+        expand2d: bool = True,
+        **kwargs,
     ) -> xr.Dataset:
         """
         Convert to Xarray with consistent naming for OpenAQ variables.

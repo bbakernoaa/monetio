@@ -146,7 +146,9 @@ class AirNowReader(PointReader):
             df = df.compute(num_workers=n_procs)
 
         if as_xarray:
-            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
+            # Filter out expand2d from kwargs if present to avoid double-passing
+            to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
+            ds = self.to_xarray(df, expand2d=wide_fmt, **to_xr_kwargs)
 
             # Ensure history from _post_process and harmonize is there
             # even if lost in DataFrame stage (Dask doesn't support .attrs)

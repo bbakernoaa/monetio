@@ -156,7 +156,9 @@ class OpenAQReader(PointReader):
         if as_xarray:
             # Pop expand2d from kwargs if present to avoid multiple values error
             exp2d = kwargs.pop("expand2d", wide_fmt)
-            ds = self.to_xarray(df, expand2d=exp2d, **kwargs)
+            # Filter out expand2d from kwargs if still present (defensive)
+            to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
+            ds = self.to_xarray(df, expand2d=exp2d, **to_xr_kwargs)
 
             # Update history
             ds = update_history(ds, "Read OpenAQ data.")
@@ -292,7 +294,10 @@ class OpenAQReader(PointReader):
         return df
 
     def to_xarray(
-        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs: Any
+        self,
+        df: Union[pd.DataFrame, "dd.DataFrame"],
+        expand2d: bool = True,
+        **kwargs: Any,
     ) -> xr.Dataset:
         """
         Convert OpenAQ DataFrame to Xarray Dataset, ensuring consistent naming.

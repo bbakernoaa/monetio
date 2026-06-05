@@ -119,7 +119,9 @@ class NDBCReader(PointReader):
         if as_xarray:
             # NDBC is already "wide" (one row per time/station)
             # expand2d=True will use ds_to_2d which works fine.
-            ds = self.to_xarray(df, expand2d=wide_fmt, **kwargs)
+            # Filter out expand2d from kwargs if present to avoid double-passing
+            to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
+            ds = self.to_xarray(df, expand2d=wide_fmt, **to_xr_kwargs)
             ds = update_history(ds, "Read NDBC buoy data.")
             return ds
 

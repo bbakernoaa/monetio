@@ -520,7 +520,9 @@ class ISHReader(PointReader):
             from ..util import ds_to_2d
 
             # We first convert to 1D
-            ds = self.to_xarray(df, expand2d=False, **kwargs)
+            # Filter out expand2d from kwargs to avoid double-passing it
+            to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
+            ds = self.to_xarray(df, expand2d=False, **to_xr_kwargs)
 
             # Metadata variables to preserve
             meta_coords = [
