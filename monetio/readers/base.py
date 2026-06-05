@@ -169,6 +169,7 @@ class PointReader(BaseReader):
         lazy: bool = False,
         use_dask: bool = False,
         meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
+        expand2d: bool = True,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -225,7 +226,7 @@ class PointReader(BaseReader):
         df = force_object_strings(df)
 
         if as_xarray:
-            return self.to_xarray(df, **kwargs)
+            return self.to_xarray(df, expand2d=expand2d, **kwargs)
 
         return df
 
@@ -254,7 +255,10 @@ class PointReader(BaseReader):
         return super().harmonize(df)
 
     def to_xarray(
-        self, df: Union[pd.DataFrame, "dd.DataFrame"], expand2d: bool = True, **kwargs
+        self,
+        df: Union[pd.DataFrame, "dd.DataFrame"],
+        expand2d: bool = True,
+        **kwargs,
     ) -> xr.Dataset:
         """
         Convert the DataFrame to an xarray Dataset in UGRID convention.

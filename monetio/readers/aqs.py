@@ -528,7 +528,9 @@ class AQSReader(PointReader):
             df = add_monitor_metadata(df, daily=daily, network=network)
 
         if as_xarray:
-            ds = self.to_xarray(df, expand2d=wide_fmt, wide_fmt=wide_fmt, **kwargs)
+            # Filter out expand2d from kwargs if present to avoid double-passing
+            to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
+            ds = self.to_xarray(df, expand2d=wide_fmt, wide_fmt=wide_fmt, **to_xr_kwargs)
             ds = update_history(ds, "Read AQS data.")
             return ds
 
