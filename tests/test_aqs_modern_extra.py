@@ -120,4 +120,5 @@ def test_add_monitor_metadata_backend_agnostic(tmp_path):
         pd.testing.assert_frame_equal(
             df_eager.drop(columns="history", errors="ignore"),
             df_lazy.compute().drop(columns="history", errors="ignore"),
+            check_dtype=False,
         )

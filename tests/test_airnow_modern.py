@@ -19,6 +19,7 @@ def mock_airnow_file(tmp_path):
 
 def test_airnow_eager_lazy_consistency_modern(mock_airnow_file, monkeypatch):
     """Verify Eager and Lazy loading produce identical results and lazy triggers no computes."""
+    pytest.importorskip("timezonefinder")
     try:
         import dask.dataframe as dd  # noqa: F401
     except ImportError:

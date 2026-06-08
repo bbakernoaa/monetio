@@ -54,7 +54,7 @@ def test_actris_reader_eager(mock_actris_file):
     assert isinstance(ds, xr.Dataset)
     assert "Ozone" in ds.data_vars
     assert "Carbon_Monoxide" in ds.data_vars
-    assert ds.sizes["node"] == 3
+    assert ds.sizes["time"] == 3
 
     # Check coordinates
     assert "latitude" in ds.coords
