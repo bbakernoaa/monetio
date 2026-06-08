@@ -77,6 +77,7 @@ def test_grib2io_passes_icechunk_backend_kwargs(monkeypatch):
 
 
 def test_grib2io_legacy_icechunk_repo_translates_to_native_kwargs(monkeypatch):
+    pytest.importorskip("grib2io")
     driver = XarrayDriver()
     captured = {}
 
