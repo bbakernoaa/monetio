@@ -1,9 +1,11 @@
 """GFS, GEFS, and GDAS Readers for AWS Open Data"""
 
 import datetime
+from collections.abc import Sequence
 from typing import Any
 
 import pandas as pd
+import xarray as xr
 
 from .base import register_reader
 from .ncep_pds import NCEPPDSReader
@@ -110,6 +112,87 @@ class GEFSReader(NCEPPDSReader):
                     url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.{d_str}/{h_str}/atmos/{res_dir}/{prod}.f{lt_str}"
                 urls.append(url)
         return urls
+
+    def open_chem(
+        self,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,
+        hour: int = 0,
+        lead_time: int | list[int] = 0,
+        source: str = "aws",
+        short_name: str | Sequence[str] | None = None,
+        type_of_first_fixed_surface: int | None = None,
+        value_of_first_fixed_surface: float | int | None = None,
+        use_dask: bool = True,
+        use_icechunk: bool = True,
+        storage_options: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> xr.Dataset:
+        """
+        Open GEFS chemistry (single variable or all variables) with grib2io defaults.
+
+        This wraps the common cloud-native workflow so users only provide dates
+        and optionally tune backend knobs.
+        """
+        merged_filters: dict[str, Any] = {}
+        if short_name is not None:
+            if isinstance(short_name, str):
+                merged_filters["shortName"] = short_name
+            else:
+                merged_filters["shortName"] = list(short_name)
+        if type_of_first_fixed_surface is not None:
+            merged_filters["typeOfFirstFixedSurface"] = type_of_first_fixed_surface
+        if value_of_first_fixed_surface is not None:
+            merged_filters["valueOfFirstFixedSurface"] = value_of_first_fixed_surface
+        if filters:
+            merged_filters.update(filters)
+
+        merged_storage = dict(storage_options or {})
+        merged_storage.setdefault("anon", True)
+
+        open_kwargs: dict[str, Any] = {
+            "dates": dates,
+            "hour": hour,
+            "lead_time": lead_time,
+            "source": source,
+            "product": "aerosol",
+            "use_dask": use_dask,
+            "use_icechunk": use_icechunk,
+            "storage_options": merged_storage,
+            **kwargs,
+        }
+        if merged_filters:
+            open_kwargs["filters"] = merged_filters
+
+        return self.open_dataset(**open_kwargs)
+
+    def open_aerosol_aod550(
+        self,
+        dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str,
+        hour: int = 0,
+        lead_time: int | list[int] = 0,
+        source: str = "aws",
+        use_dask: bool = True,
+        use_icechunk: bool = True,
+        storage_options: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> xr.Dataset:
+        """Backward-compatible helper for GEFS chemistry AOD550."""
+
+        return self.open_chem(
+            dates=dates,
+            hour=hour,
+            lead_time=lead_time,
+            source=source,
+            short_name="totAOD550",
+            type_of_first_fixed_surface=10,
+            use_dask=use_dask,
+            use_icechunk=use_icechunk,
+            storage_options=storage_options,
+            filters=filters,
+            **kwargs,
+        )
 
 
 @register_reader("gdas")

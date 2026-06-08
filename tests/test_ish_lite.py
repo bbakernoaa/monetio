@@ -90,8 +90,8 @@ def test_ish_lite_resampling_logic(tmp_path, mock_history):
         )
 
     assert len(ds.time) == 1
-    assert ds.temp.values[0, 0] == 21.0  # Average of 20, 21, 22
-    assert ds.press.values[0, 0] == 1001.0
+    assert ds.t2m.values[0] == 21.0  # Average of 20, 21, 22
+    assert ds.press.values[0] == 1001.0
     assert "Resampled ISH Lite data" in ds.attrs["history"]
 
 

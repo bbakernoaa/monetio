@@ -63,7 +63,8 @@ def handle_save(
                 try:
                     import icechunk
 
-                    repo = icechunk.Repository.open_or_create(url)
+                    storage = icechunk.local_filesystem_storage(url)
+                    repo = icechunk.Repository.open_or_create(storage)
                     session = repo.writable_session("main")
                     if append:
                         obj.to_zarr(

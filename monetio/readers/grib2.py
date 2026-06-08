@@ -64,8 +64,21 @@ class Grib2Reader(GriddedReader):
         """
         if "engine" not in kwargs:
             kwargs["engine"] = engine
-        if filters is not None and "backend_kwargs" not in kwargs:
-            kwargs["backend_kwargs"] = {"filters": filters}
+        if filters is not None:
+            kwargs.setdefault("filters", filters)
+            if "backend_kwargs" in kwargs and isinstance(kwargs["backend_kwargs"], dict):
+                kwargs["backend_kwargs"].setdefault("filters", filters)
+
+        # Apply safe defaults for remote S3 GRIB2 scans.
+        file_list = [files] if isinstance(files, str) else list(files)
+        is_s3 = any(str(f).startswith("s3://") for f in file_list)
+        if is_s3:
+            storage_options = dict(kwargs.get("storage_options", {}))
+            storage_options.setdefault("anon", True)
+            kwargs["storage_options"] = storage_options
+            kwargs.setdefault("max_workers", 4)
+            kwargs.setdefault("network_timeout", 300)
+            kwargs.setdefault("max_concurrent_requests", 2)
 
         # Use the driver to open files
         # XarrayDriver handles S3, multiple files, etc.

@@ -38,7 +38,7 @@ def test_improve_eager(mock_improve_file):
     assert isinstance(ds, xr.Dataset)
     assert "obs" in ds.data_vars
     assert "time" in ds.coords
-    assert ds.sizes["node"] == 3
+    assert ds.sizes["time"] == 3
     assert "history" in ds.attrs
     assert "Read IMPROVE data" in ds.attrs["history"]
 

@@ -109,8 +109,9 @@ class TROPOMIReader(GriddedReader):
             g_kwargs = kwargs.copy()
             g_kwargs["group"] = g
             try:
-                # We open without the TROPOMI preprocess at this stage
-                ds_g = super().open_dataset(
+                # Open without TROPOMI preprocess or _ensure_time_dimension
+                # (tropomi_preprocess handles time dimension creation itself)
+                ds_g = self.driver.open(
                     files,
                     use_virtualizarr=use_virtualizarr,
                     virtualizarr_file=virtualizarr_file,
@@ -183,7 +184,7 @@ def tropomi_preprocess(
         delta_time = ds.data_vars["delta_time"]
         if "y" in delta_time.dims:
             scan_time = ref_time + delta_time.astype("timedelta64[ms]")
-            ds = ds.assign_coords(time=scan_time)
+            ds = ds.drop_vars("time").assign_coords(time=scan_time)
 
     # 3. Calculate Pressure (Lazy) - must happen before dim rename if it depends on 'y'
     if calculate_pressure:

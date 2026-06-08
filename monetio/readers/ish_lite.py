@@ -288,6 +288,8 @@ class ISHLiteReader(PointReader):
                     if c in ds.coords or c in ds.data_vars:
                         val = ds[c]
                         if "time" in val.dims:
+                            if val.sizes["time"] == 0:
+                                continue
                             val = val.isel(time=0, drop=True)
                         metadata[c] = val
 

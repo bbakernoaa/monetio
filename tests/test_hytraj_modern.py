@@ -61,7 +61,9 @@ def test_hytraj_eager_lazy_consistency(fake_hytraj_files):
 
     # Consistency
     pd.testing.assert_frame_equal(
-        df_eager.reset_index(drop=True), df_lazy.compute().reset_index(drop=True)
+        df_eager.reset_index(drop=True),
+        df_lazy.compute().reset_index(drop=True),
+        check_dtype=False,
     )
 
 

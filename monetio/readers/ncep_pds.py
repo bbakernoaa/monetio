@@ -1,6 +1,7 @@
 """Base Reader for NCEP products on AWS Public Dataset (PDS) or NOMADS."""
 
 import datetime
+import inspect
 
 import pandas as pd
 import xarray as xr
@@ -71,11 +72,44 @@ class NCEPPDSReader(GriddedReader):
         if files is None:
             if dates is None:
                 raise ValueError("Either 'files' or 'dates' must be provided.")
-            # Pass all kwargs to build_urls so it can handle 'product', 'source', etc.
-            files = self.build_urls(dates, hour=hour, lead_time=lead_time, **kwargs)
+            # Route only build_urls-specific kwargs there, and keep xarray kwargs separate.
+            build_params = set(inspect.signature(self.build_urls).parameters)
+            build_kwargs = {
+                k: kwargs.pop(k)
+                for k in list(kwargs)
+                if k in build_params and k not in {"self", "dates", "hour", "lead_time"}
+            }
+            files = self.build_urls(dates, hour=hour, lead_time=lead_time, **build_kwargs)
 
-        if "engine" not in kwargs:
-            kwargs["engine"] = "grib2io"
+        if "engine" in kwargs and kwargs["engine"] != "grib2io":
+            raise ValueError(
+                f"Unsupported engine '{kwargs['engine']}' for NCEP GRIB products. "
+                "Use engine='grib2io'."
+            )
+        kwargs["engine"] = "grib2io"
+
+        # Translate deprecated VirtualiZarr/Icechunk flags to non-deprecated args.
+        if virtualizarr_backend == "icechunk":
+            use_icechunk = True
+            virtualizarr_backend = "kerchunk"
+        if icechunk_repo is not None and icechunk_url is None:
+            icechunk_url = icechunk_repo
+            icechunk_repo = None
+
+        # Apply safe defaults for remote S3 GRIB2 scans unless the caller overrides.
+        file_list = [files] if isinstance(files, str) else list(files)
+        is_s3 = any(str(f).startswith("s3://") for f in file_list)
+        if is_s3:
+            storage_options = dict(kwargs.get("storage_options", {}))
+            storage_options.setdefault("anon", True)
+
+            kwargs["storage_options"] = storage_options
+            kwargs.setdefault("max_workers", 4)
+            kwargs.setdefault("network_timeout", 300)
+            kwargs.setdefault("max_concurrent_requests", 2)
+            kwargs.setdefault("retry_attempts", 3)
+            kwargs.setdefault("retry_base_sleep", 1.0)
+
         # Note: Some kwargs passed to build_urls might not be valid for the driver,
         # but XarrayDriver.open generally handles this by consuming what it knows
         # and ignoring/forwarding the rest.
@@ -83,7 +117,7 @@ class NCEPPDSReader(GriddedReader):
             files,
             use_virtualizarr=use_virtualizarr,
             virtualizarr_file=virtualizarr_file,
-            virtualizarr_parser="grib2",
+            virtualizarr_parser=virtualizarr_parser,
             virtualizarr_backend=virtualizarr_backend,
             icechunk_repo=icechunk_repo,
             use_icechunk=use_icechunk,

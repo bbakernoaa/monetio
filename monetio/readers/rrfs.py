@@ -143,7 +143,19 @@ class RRFSReader(NCEPPDSReader):
             kwargs["domain"] = "conus"
 
         return super().open_dataset(
-            files=files, dates=dates, hour=hour, lead_time=lead_time, **kwargs
+            files=files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            virtualizarr_parser="grib2",
+            virtualizarr_backend=virtualizarr_backend,
+            icechunk_repo=icechunk_repo,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            use_dask=use_dask,
+            dates=dates,
+            hour=hour,
+            lead_time=lead_time,
+            **kwargs,
         )
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:

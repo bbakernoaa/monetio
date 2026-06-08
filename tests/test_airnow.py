@@ -31,6 +31,8 @@ def mock_airnow_file(tmp_path):
 
 
 def test_airnow_eager_vs_lazy_local(mock_airnow_file, monkeypatch):
+    pytest.importorskip("timezonefinder")
+
     def mock_read_monitor(*args, **kwargs):
         return pd.DataFrame(
             {

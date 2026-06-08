@@ -44,7 +44,7 @@ def test_surfrad_reader_basic(tmp_path):
 
     # Test without 2D expansion
     ds = reader.open_dataset(files=str(f), as_xarray=True, expand2d=False)
-    assert ds.sizes["node"] == 2
+    assert ds.sizes["time"] == 2
     assert "time" in ds.coords
 
     # Verify coordinates

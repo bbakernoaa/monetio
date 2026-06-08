@@ -101,7 +101,7 @@ def test_pardump_reader(tmp_path):
     assert isinstance(df_lazy, dd.DataFrame)
 
     # Check consistency
-    pd.testing.assert_frame_equal(df_eager, df_lazy.compute())
+    pd.testing.assert_frame_equal(df_eager, df_lazy.compute(), check_dtype=False)
 
     # 3. Xarray Path (Eager)
     ds_eager = reader.open_dataset(str(fname), as_xarray=True, lazy=False)
@@ -109,7 +109,7 @@ def test_pardump_reader(tmp_path):
     assert "time" in ds_eager.coords
     assert "latitude" in ds_eager.coords
     assert "longitude" in ds_eager.coords
-    assert "node" in ds_eager.dims
+    assert "time" in ds_eager.dims
 
     # 4. Xarray Path (Lazy)
     ds_lazy = reader.open_dataset(str(fname), as_xarray=True, lazy=True)

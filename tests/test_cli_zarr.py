@@ -69,7 +69,7 @@ def test_cli_to_zarr_and_append(tmp_path, mock_ish_history):
     # Verify content
     ds = xr.open_zarr(output_zarr)
     assert ds.sizes["time"] == 2
-    assert "temp" in ds.data_vars
+    assert "t2m" in ds.data_vars
     assert ds.attrs["Conventions"] == "CF-1.8 UGRID-1.0"
 
 

@@ -83,8 +83,8 @@ def test_ish_resampling_logic(tmp_path, mock_history):
         )
 
     assert len(ds.time) == 1
-    assert ds.t.values[0, 0] == 21.0  # Average of 20, 21, 22
-    assert ds.p.values[0, 0] == 1001.0
+    assert ds.t.values[0] == 21.0  # Average of 20, 21, 22
+    assert ds.p.values[0] == 1001.0
 
 
 def test_ish_metadata_merging_robustness(tmp_path, mock_history):
@@ -139,7 +139,8 @@ def test_ish_lite_multi_site_resample(monkeypatch, tmp_path):
     ds = reader.open_dataset(
         files=[str(fn1), str(fn2)], as_xarray=True, resample=True, window="h", lazy=False
     )
-    assert ds.sizes["node"] == 2
+    # After resampling, time dimension should have 1 step (all data at same hour)
+    assert ds.sizes["time"] == 1
 
 
 def test_read_ish_file_timeout(tmp_path):

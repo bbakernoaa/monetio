@@ -98,12 +98,15 @@ def test_parameter_propagation():
 
     reader = HRRRReader()
     mock_ds = MagicMock()
-    with patch.object(reader, "build_urls", return_value=["dummy.grib2"]) as mock_build:
-        with patch("monetio.readers.base.GriddedReader.open_dataset", return_value=mock_ds):
-            with patch.object(reader, "harmonize", return_value=mock_ds):
-                reader.open_dataset(dates="2025-03-25", source="nomads", product="nat")
-                # We expect dates to be converted to DatetimeIndex of length 1 if passed as string
-                mock_build.assert_called()
-                args, kwargs = mock_build.call_args
-                assert kwargs["source"] == "nomads"
-                assert kwargs["product"] == "nat"
+    with patch(
+        "monetio.readers.base.GriddedReader.open_dataset", return_value=mock_ds
+    ) as mock_open:
+        with patch.object(reader, "harmonize", return_value=mock_ds):
+            reader.open_dataset(dates="2025-03-25", source="nomads", product="nat")
+
+            open_args, _ = mock_open.call_args
+            files = open_args[0]
+            assert isinstance(files, list)
+            assert len(files) == 1
+            assert "nomads.ncep.noaa.gov" in files[0]
+            assert "wrfnat" in files[0]

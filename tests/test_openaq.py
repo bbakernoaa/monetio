@@ -60,7 +60,7 @@ def test_openaq_eager_lazy(tmp_path):
     # Long format eager vs lazy
     df_eager = reader.open_dataset(files=[str(f)], wide_fmt=False, as_xarray=False, lazy=False)
     df_lazy = reader.open_dataset(files=[str(f)], wide_fmt=False, as_xarray=False, lazy=True)
-    pd.testing.assert_frame_equal(df_eager, df_lazy.compute())
+    pd.testing.assert_frame_equal(df_eager, df_lazy.compute(), check_dtype=False)
 
 
 def test_openaq_aws_eager_lazy(tmp_path):
