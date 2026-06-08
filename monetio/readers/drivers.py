@@ -1,4 +1,5 @@
 import os
+import time
 import warnings
 from collections.abc import Callable
 from typing import Union
@@ -13,12 +14,11 @@ except ImportError:
     dd = None
 
 try:
-    import obstore.fsspec
+    import obstore  # noqa: F401
 
-    obstore.fsspec.register()
-    HAS_OBSTORE_FSSPEC = True
+    HAS_OBSTORE = True
 except ImportError:
-    HAS_OBSTORE_FSSPEC = False
+    HAS_OBSTORE = False
 
 
 def get_default_storage_options(path: str) -> dict:
@@ -35,8 +35,6 @@ def get_default_storage_options(path: str) -> dict:
         Default storage options (e.g. ``{"anon": True}``).
     """
     if path.startswith("s3://"):
-        if HAS_OBSTORE_FSSPEC:
-            return {"skip_signature": True}
         return {"anon": True}
     return {}
 
@@ -61,6 +59,23 @@ def _build_s3_config(storage_options: dict) -> dict:
             s3_config["region"] = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
     return s3_config
+
+
+def _should_fallback_to_s3fs_fileobj(error: Exception) -> bool:
+    """Detect obstore/fsspec S3 issues that can be bypassed with s3fs file objects.
+
+    .. deprecated::
+        Retained only for backward compatibility with external callers.
+        MONETIO no longer registers obstore.fsspec globally, so the failure modes
+        this detects should not occur in normal usage.
+    """
+    msg = str(error).lower()
+
+    return (
+        ("default_fill_cache" in msg and "not valid for store 's3'" in msg)
+        or "169.254.169.254" in msg
+        or "unknownconfigurationkey" in msg
+    )
 
 
 def _select_store(file_list: list[str], storage_options: dict) -> tuple:
@@ -136,6 +151,52 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
     return xr.open_zarr(session.store, consolidated=False)
 
 
+def _is_transient_network_error(exc: Exception) -> bool:
+    """Return True when the exception looks transient and retryable."""
+    msg = str(exc).lower()
+    retry_tokens = [
+        "timeout",
+        "timed out",
+        "connect",
+        "connection reset",
+        "dns error",
+        "nodename nor servname",
+        "name or service not known",
+    ]
+    if any(token in msg for token in retry_tokens):
+        return True
+    return "icechunk" in type(exc).__name__.lower()
+
+
+def _call_with_retries(
+    func: Callable,
+    *args,
+    attempts: int = 1,
+    base_sleep: float = 1.0,
+    **kwargs,
+):
+    """Execute a callable with transient network retries."""
+    retry_attempts = max(1, int(attempts))
+    retry_sleep = max(0.0, float(base_sleep))
+
+    for attempt in range(1, retry_attempts + 1):
+        try:
+            return func(*args, **kwargs)
+        except Exception as exc:
+            if attempt >= retry_attempts or not _is_transient_network_error(exc):
+                raise
+            sleep_seconds = retry_sleep * (2 ** (attempt - 1))
+            warnings.warn(
+                f"Transient network error in {func.__name__} "
+                f"(attempt {attempt}/{retry_attempts}): {exc}. "
+                f"Retrying in {sleep_seconds:.1f}s.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            if sleep_seconds > 0:
+                time.sleep(sleep_seconds)
+
+
 class FileUtility:
     """
     Helper class to manage file path expansion (Local + S3 + HTTP).
@@ -155,17 +216,8 @@ class FileUtility:
         """
         if path.startswith("s3://"):
             # Default to anonymous access for S3 if not specified
-            if (
-                "anon" not in kwargs
-                and "storage_options" not in kwargs
-                and "skip_signature" not in kwargs
-            ):
+            if "anon" not in kwargs and "storage_options" not in kwargs:
                 kwargs.update(get_default_storage_options(path))
-
-            # If we are using obstore, map fsspec 'anon' to obstore 'skip_signature'
-            if HAS_OBSTORE_FSSPEC and kwargs.get("anon") is True:
-                kwargs.pop("anon")
-                kwargs["skip_signature"] = True
 
             return fsspec.filesystem("s3", **kwargs)
         elif path.startswith("http://") or path.startswith("https://"):
@@ -242,6 +294,121 @@ class XarrayDriver:
     Supports S3 via obstore or fsspec.
     """
 
+    def _open_grib2io_native(
+        self,
+        file_list: list[str],
+        xr_kwargs: dict,
+        preprocess: Callable | None,
+        retry_attempts: int,
+        retry_base_sleep: float,
+        icechunk_url: str | None = None,
+    ) -> xr.Dataset:
+        """Open GRIB2 data via native xarray+grib2io backend."""
+        xr_kwargs["engine"] = "grib2io"
+
+        # Keep public S3 reads safe by default unless the caller set explicit options.
+        if (
+            file_list
+            and str(file_list[0]).startswith("s3://")
+            and "storage_options" not in xr_kwargs
+        ):
+            xr_kwargs["storage_options"] = get_default_storage_options(str(file_list[0]))
+
+        # Icechunk path: delegate to grib2io's own open_mfdataset, which builds a
+        # SINGLE combined manifest across all files and writes ONE icechunk store
+        # with ONE commit. Routing through xarray.open_mfdataset instead would open
+        # each file via the backend separately, creating one icechunk store/commit
+        # per file -- slow and unsafe for concurrent local commits.
+        if xr_kwargs.get("use_icechunk"):
+            from grib2io.xarray_backend import open_mfdataset as grib2io_open_mfdataset
+
+            mf_kwargs = dict(xr_kwargs)
+            # engine/use_icechunk are passed explicitly; xarray-combine-only kwargs
+            # are not used by grib2io's icechunk path.
+            mf_kwargs.pop("engine", None)
+            mf_kwargs.pop("use_icechunk", None)
+            for key in (
+                "combine",
+                "concat_dim",
+                "coords",
+                "compat",
+                "data_vars",
+                "ids",
+                "infer_order",
+                "join",
+            ):
+                mf_kwargs.pop(key, None)
+            # grib2io writes the store at store_path; map MONETIO's icechunk_url.
+            if icechunk_url and "store_path" not in mf_kwargs:
+                mf_kwargs["store_path"] = icechunk_url
+            if preprocess:
+                mf_kwargs["preprocess"] = preprocess
+
+            return _call_with_retries(
+                grib2io_open_mfdataset,
+                file_list,
+                attempts=retry_attempts,
+                base_sleep=retry_base_sleep,
+                use_icechunk=True,
+                **mf_kwargs,
+            )
+
+        # Default to nested concatenation along time for multi-file GRIB2 scans.
+        # grib2io messages frequently lack the dimension coordinates that
+        # open_mfdataset's default combine="by_coords" needs, so prefer the
+        # documented nested/time pattern unless the caller specifies otherwise.
+        # coords="minimal"/compat="override" tolerate per-file scalar coords
+        # (e.g. fixed-surface coords like "entire_atmosphere") that vary across
+        # forecast lead times.
+        if len(file_list) > 1:
+            xr_kwargs.setdefault("concat_dim", "time")
+            xr_kwargs.setdefault("combine", "nested")
+            xr_kwargs.setdefault("coords", "minimal")
+            xr_kwargs.setdefault("compat", "override")
+
+        if preprocess:
+            xr_kwargs["preprocess"] = preprocess
+
+        with warnings.catch_warnings():
+            # Keep logs clean while preserving actionable user warnings.
+            warnings.filterwarnings(
+                "ignore",
+                message=".*pkg_resources is deprecated as an API.*",
+                category=UserWarning,
+            )
+
+            if len(file_list) == 1:
+                # Remove open_mfdataset-only kwargs to avoid open_dataset type errors.
+                mfdataset_keys = [
+                    "combine",
+                    "concat_dim",
+                    "parallel",
+                    "compat",
+                    "data_vars",
+                    "coords",
+                    "ids",
+                    "infer_order",
+                    "join",
+                ]
+                for key in mfdataset_keys:
+                    xr_kwargs.pop(key, None)
+
+                return _call_with_retries(
+                    xr.open_dataset,
+                    file_list[0],
+                    attempts=retry_attempts,
+                    base_sleep=retry_base_sleep,
+                    **xr_kwargs,
+                )
+
+            return _call_with_retries(
+                xr.open_mfdataset,
+                file_list,
+                attempts=retry_attempts,
+                base_sleep=retry_base_sleep,
+                **xr_kwargs,
+            )
+
     def open(
         self,
         files: str | list[str],
@@ -301,17 +468,18 @@ class XarrayDriver:
         if virtualizarr_backend == "icechunk":
             warnings.warn(
                 "The 'virtualizarr_backend' parameter is deprecated. Use 'use_icechunk=True' instead.",
-                FutureWarning,
+                DeprecationWarning,
                 stacklevel=2,
             )
             use_icechunk = True
         if icechunk_repo is not None:
             warnings.warn(
                 "The 'icechunk_repo' parameter is deprecated. Use 'icechunk_url' instead.",
-                FutureWarning,
+                DeprecationWarning,
                 stacklevel=2,
             )
             icechunk_url = icechunk_repo
+            use_icechunk = True
 
         # Validate backend selection
         if not use_icechunk and virtualizarr_backend not in ("kerchunk", "icechunk"):
@@ -341,6 +509,10 @@ class XarrayDriver:
         if "lazy" in xr_kwargs:
             use_dask = xr_kwargs.pop("lazy")
 
+        # Optional retry knobs for transient remote read failures.
+        retry_attempts = int(xr_kwargs.pop("retry_attempts", 3))
+        retry_base_sleep = float(xr_kwargs.pop("retry_base_sleep", 1.0))
+
         # If laziness or specific chunking is requested, ensure auto-chunking is used.
         if (use_dask or use_cubed or "chunks" in xr_kwargs) and "chunks" not in xr_kwargs:
             xr_kwargs["chunks"] = {}
@@ -349,17 +521,38 @@ class XarrayDriver:
         preprocess = xr_kwargs.pop("preprocess", None)
         read_method = xr_kwargs.pop("read_method", None)
 
-        if use_virtualizarr:
-            try:
-                import ujson  # noqa: F401
-                import zarr  # noqa: F401
-                from virtualizarr import open_virtual_mfdataset
-            except ImportError:
-                raise ImportError(
-                    "VirtualiZarr support requires additional packages. "
-                    "Install with: pip install monetio[virtualizarr]"
+        if xr_kwargs.get("engine") == "grib2io":
+            if use_virtualizarr:
+                warnings.warn(
+                    "For engine='grib2io', use_virtualizarr is ignored; native backend path is used.",
+                    DeprecationWarning,
+                    stacklevel=2,
                 )
 
+            # Inject use_icechunk into xr_kwargs — grib2io's xarray backend
+            # uses this to activate its icechunk-aware S3 path.
+            xr_kwargs.setdefault("use_icechunk", use_icechunk)
+
+            # VirtualiZarr-only concepts must not reach the native
+            # grib2io/xarray backend kwargs. Note: use_icechunk IS a valid
+            # grib2io backend kwarg and must be preserved.
+            xr_kwargs.pop("use_virtualizarr", None)
+            xr_kwargs.pop("virtualizarr_backend", None)
+            xr_kwargs.pop("virtualizarr_file", None)
+            xr_kwargs.pop("virtualizarr_parser", None)
+            xr_kwargs.pop("icechunk_url", None)
+            xr_kwargs.pop("icechunk_repo", None)
+
+            return self._open_grib2io_native(
+                file_list=file_list,
+                xr_kwargs=xr_kwargs,
+                preprocess=preprocess,
+                retry_attempts=retry_attempts,
+                retry_base_sleep=retry_base_sleep,
+                icechunk_url=icechunk_url,
+            )
+
+        if use_virtualizarr:
             # Determine Parser
             parser_map = {
                 "hdf5": "HDFParser",
@@ -373,20 +566,89 @@ class XarrayDriver:
             parser_name = virtualizarr_parser
             if parser_name is None:
                 engine = xr_kwargs.get("engine", "")
-                if engine == "grib2io":
+                first_file = str(file_list[0]).lower() if file_list else ""
+                looks_like_grib2 = any(
+                    token in first_file for token in [".grib2", ".grb2", "pgrb2"]
+                )
+                if engine == "grib2io" or looks_like_grib2:
                     parser_name = "grib2"
                 elif engine == "zarr":
                     parser_name = "zarr"
                 else:
                     parser_name = "hdf5"
 
+            if parser_name not in parser_map:
+                raise ValueError(
+                    f"Unsupported virtualizarr_parser '{parser_name}'. "
+                    f"Choose one of {sorted(parser_map)}."
+                )
+
+            # In MONETIO, GRIB virtual references must be routed through grib2io.
+            if parser_name == "grib2":
+                xr_kwargs["engine"] = "grib2io"
+
+                # Normalize remote S3/HTTP access through explicit fsspec file objects.
+                if (
+                    isinstance(file_list, list)
+                    and file_list
+                    and (
+                        str(file_list[0]).startswith("s3://")
+                        or str(file_list[0]).startswith("http")
+                    )
+                ):
+                    storage_options = xr_kwargs.pop("storage_options", {})
+                    file_objs = []
+                    for f in file_list:
+                        fs = FileUtility.get_fs(str(f), **storage_options)
+                        file_objs.append(fs.open(str(f), mode="rb"))
+                    file_list = file_objs
+
+                # GRIB2 virtual access is handled natively by grib2io/xarray.
+                if preprocess:
+                    xr_kwargs["preprocess"] = preprocess
+                if "concat_dim" in xr_kwargs and "combine" not in xr_kwargs:
+                    xr_kwargs["combine"] = "nested"
+
+                if len(file_list) == 1:
+                    return _call_with_retries(
+                        xr.open_dataset,
+                        file_list[0],
+                        attempts=retry_attempts,
+                        base_sleep=retry_base_sleep,
+                        **xr_kwargs,
+                    )
+
+                return _call_with_retries(
+                    xr.open_mfdataset,
+                    file_list,
+                    attempts=retry_attempts,
+                    base_sleep=retry_base_sleep,
+                    **xr_kwargs,
+                )
+
+            try:
+                import ujson  # noqa: F401
+                import zarr  # noqa: F401
+                from virtualizarr import open_virtual_mfdataset
+            except ImportError:
+                raise ImportError(
+                    "VirtualiZarr support requires additional packages. "
+                    "Install with: pip install monetio[virtualizarr]"
+                )
+
             try:
                 import virtualizarr.parsers as parsers
 
-                parser_cls_name = parser_map.get(parser_name, "HDFParser")
+                parser_cls_name = parser_map[parser_name]
                 parser_cls = getattr(parsers, parser_cls_name)
                 parser = parser_cls()
-            except (ImportError, AttributeError):
+            except (ImportError, AttributeError) as e:
+                if parser_name == "grib2":
+                    raise ImportError(
+                        "virtualizarr GRIB2 parser is unavailable. "
+                        "Install/upgrade virtualizarr with GRIB2 parser support. "
+                        "MONETIO will not fall back to non-GRIB parsers for GRIB data."
+                    ) from e
                 from virtualizarr.parsers import HDFParser
 
                 parser = HDFParser()
@@ -411,9 +673,15 @@ class XarrayDriver:
 
                 concat_dim = xr_kwargs.get("concat_dim", "time")
                 parallel_sweep = xr_kwargs.get("parallel", True)
+                # virtualizarr>=2 expects 'dask'/'lithops'/Executor/False, not True.
+                if parallel_sweep is True:
+                    parallel_sweep = "dask"
                 try:
-                    vds = open_virtual_mfdataset(
+                    vds = _call_with_retries(
+                        open_virtual_mfdataset,
                         file_list,
+                        attempts=retry_attempts,
+                        base_sleep=retry_base_sleep,
                         registry=registry,
                         parser=parser,
                         combine="nested",
@@ -422,8 +690,11 @@ class XarrayDriver:
                         loadable_variables=[],
                     )
                 except ValueError:
-                    vds = open_virtual_mfdataset(
+                    vds = _call_with_retries(
+                        open_virtual_mfdataset,
                         file_list,
+                        attempts=retry_attempts,
+                        base_sleep=retry_base_sleep,
                         registry=registry,
                         parser=parser,
                         combine="by_coords",
@@ -485,8 +756,11 @@ class XarrayDriver:
             for k in mfdataset_keys:
                 xr_kwargs.pop(k, None)
 
-            ds = xr.open_dataset(
+            ds = _call_with_retries(
+                xr.open_dataset,
                 mapper,
+                attempts=retry_attempts,
+                base_sleep=retry_base_sleep,
                 engine="zarr",
                 backend_kwargs={"consolidated": False},
                 consolidated=False,
@@ -686,10 +960,7 @@ class PandasDriver:
             for f in file_list:
                 if f.startswith("s3://"):
                     if "storage_options" not in kwargs:
-                        if HAS_OBSTORE_FSSPEC:
-                            kwargs["storage_options"] = {"skip_signature": True}
-                        else:
-                            kwargs["storage_options"] = {"anon": True}
+                        kwargs["storage_options"] = {"anon": True}
 
                 d = dask.delayed(reader_func)(f, **kwargs)
                 if preprocess:
@@ -713,10 +984,7 @@ class PandasDriver:
                 import concurrent.futures
 
                 if "storage_options" not in kwargs:
-                    if HAS_OBSTORE_FSSPEC:
-                        kwargs["storage_options"] = {"skip_signature": True}
-                    else:
-                        kwargs["storage_options"] = {"anon": True}
+                    kwargs["storage_options"] = {"anon": True}
 
                 def _read_one(f):
                     df = reader_func(f, **kwargs)
@@ -746,10 +1014,7 @@ class PandasDriver:
                     try:
                         if f.startswith("s3://"):
                             if "storage_options" not in kwargs:
-                                if HAS_OBSTORE_FSSPEC:
-                                    kwargs["storage_options"] = {"skip_signature": True}
-                                else:
-                                    kwargs["storage_options"] = {"anon": True}
+                                kwargs["storage_options"] = {"anon": True}
                             df = reader_func(f, **kwargs)
                         else:
                             df = reader_func(f, **kwargs)
