@@ -708,15 +708,15 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
     yda = xr.DataArray(y, dims=y_dim)
 
     # 3. Backend-Agnostic Chunking
-    # Proactively check for Dask-backed data variables
-    is_dask = len(ds.chunks) > 0 or any(hasattr(ds[v].data, "dask") for v in ds.data_vars)
-
-    if is_dask:
-        # Use existing chunks or default to 'auto'
-        x_chunks = ds.chunks.get(x_dim, "auto")
-        y_chunks = ds.chunks.get(y_dim, "auto")
-        xda = xda.chunk({x_dim: x_chunks})
-        yda = yda.chunk({y_dim: y_chunks})
+    if ds.chunks:
+        # Match coordinate chunking to data variables to maintain laziness.
+        # We avoid hardcoded 'auto' and instead respect existing dataset chunks.
+        x_chunks = {d: ds.chunks[d] for d in xda.dims if d in ds.chunks}
+        y_chunks = {d: ds.chunks[d] for d in yda.dims if d in ds.chunks}
+        if x_chunks:
+            xda = xda.chunk(x_chunks)
+        if y_chunks:
+            yda = yda.chunk(y_chunks)
 
     # Broadcast to 2D
     yv, xv = xr.broadcast(yda, xda)
