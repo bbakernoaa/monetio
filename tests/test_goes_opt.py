@@ -82,9 +82,11 @@ def test_goes_opt_values():
     # Longitude should be centered around -75 (based on mock)
     assert np.nanmean(ds_out.longitude.values) < 0
 
+
 def test_add_goes_latlon_aero_protocol():
     """Verify _add_goes_latlon follows the Aero Protocol (Eager vs Lazy identity)."""
     from monetio.readers.goes import _add_goes_latlon
+
     # 1. Setup mock data
     x = np.linspace(-0.1, 0.1, 10).astype(np.float32)
     y = np.linspace(0.1, -0.1, 8).astype(np.float32)

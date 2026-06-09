@@ -136,9 +136,11 @@ def test_cmaq_diagnostics():
 if __name__ == "__main__":
     pytest.main([__file__])
 
+
 def test_add_ioapi_latlon_aero_protocol():
     """Verify _add_ioapi_latlon follows the Aero Protocol (Eager vs Lazy identity)."""
     from monetio.readers.base import _add_ioapi_latlon
+
     # 1. Setup mock data
     ds = xr.Dataset({"O3": (("y", "x"), np.random.rand(5, 5))})
     ds.attrs.update({"NCOLS": 5, "NROWS": 5, "XORIG": 0, "YORIG": 0, "XCELL": 1000, "YCELL": 1000})

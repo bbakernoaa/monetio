@@ -64,6 +64,7 @@ def test_ncep_grib_reader_open(monkeypatch):
     assert "test" in ds.data_vars
     assert "history" in ds.attrs
 
+
 def test_ncep_grib_preprocess_aero_protocol():
     """Verify ncep_grib_preprocess follows the Aero Protocol (Eager vs Lazy identity)."""
     # 1. Setup mock data
