@@ -81,3 +81,47 @@ def test_goes_opt_values():
 
     # Longitude should be centered around -75 (based on mock)
     assert np.nanmean(ds_out.longitude.values) < 0
+
+def test_add_goes_latlon_aero_protocol():
+    """Verify _add_goes_latlon follows the Aero Protocol (Eager vs Lazy identity)."""
+    from monetio.readers.goes import _add_goes_latlon
+    # 1. Setup mock data
+    x = np.linspace(-0.1, 0.1, 10).astype(np.float32)
+    y = np.linspace(0.1, -0.1, 8).astype(np.float32)
+    ds = xr.Dataset(
+        {"AOD": (("y", "x"), np.random.rand(8, 10).astype(np.float32))}, coords={"x": x, "y": y}
+    )
+    proj = xr.DataArray(
+        np.int32(0),
+        attrs={
+            "perspective_point_height": 35786023.0,
+            "semi_major_axis": 6378137.0,
+            "semi_minor_axis": 6356752.31414,
+            "inverse_flattening": 298.257222103,
+            "latitude_of_projection_origin": 0.0,
+            "longitude_of_projection_origin": -75.0,
+            "sweep_angle_axis": "x",
+            "grid_mapping_name": "geostationary",
+        },
+    )
+    ds["goes_imager_projection"] = proj
+
+    # 2. Eager execution
+    ds_eager = _add_goes_latlon(ds.copy())
+
+    # 3. Lazy execution
+    ds_lazy = ds.chunk({"x": 5, "y": 4})
+    ds_lazy_out = _add_goes_latlon(ds_lazy)
+
+    # 4. Assertions
+    from dask.array import Array
+
+    assert isinstance(ds_lazy_out.latitude.data, Array)
+    assert isinstance(ds_lazy_out.longitude.data, Array)
+
+    xr.testing.assert_allclose(ds_eager.latitude, ds_lazy_out.latitude.compute())
+    xr.testing.assert_allclose(ds_eager.longitude, ds_lazy_out.longitude.compute())
+    assert (
+        "Generated Latitude/Longitude coordinates" in ds_eager.attrs["history"]
+        or "Optimized GOES coordinate generation" in ds_eager.attrs["history"]
+    )
