@@ -21,6 +21,8 @@ VALID_DATA_VARS = (
     "totaldustaod550",
 )
 
+ICAP_DEFAULT_BASE_URL = "https://nrlgodae1.nrlmry.navy.mil/ftp/outgoing/nrl/ICAP-MME/"
+
 
 @register_reader("icap_mme")
 class ICAPMMEReader(GriddedReader):
@@ -42,6 +44,7 @@ class ICAPMMEReader(GriddedReader):
         dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
         product: str = "MMC",
         data_var: str = "dustaod550",
+        base_url: str = ICAP_DEFAULT_BASE_URL,
         download: bool = False,
         **kwargs: Any,
     ) -> xr.Dataset:
@@ -74,6 +77,9 @@ class ICAPMMEReader(GriddedReader):
             ICAP product (e.g., 'MMC', 'C4', 'MME'), by default 'MMC'.
         data_var : str, optional
             Data variable (e.g., 'dustaod550'), by default 'dustaod550'.
+        base_url : str, optional
+            Root URL used to construct ICAP file paths, by default
+            "https://nrlgodae1.nrlmry.navy.mil/".
         download : bool, optional
             Whether to download files to local directory, by default False.
         **kwargs : Any
@@ -103,7 +109,12 @@ class ICAPMMEReader(GriddedReader):
                     f"Invalid input for 'data_var': '{data_var}'. Must be one of {VALID_DATA_VARS}."
                 )
 
-            urls, fnames = build_urls(dates, filetype=product, data_var=data_var)
+            urls, fnames = build_urls(
+                dates,
+                filetype=product,
+                data_var=data_var,
+                base_url=base_url,
+            )
             if download:
                 files = []
                 for url, fname in zip(urls, fnames):
@@ -144,6 +155,7 @@ def build_urls(
     dates: pd.DatetimeIndex | list[datetime] | datetime | str,
     filetype: str = "MMC",
     data_var: str = "dustaod550",
+    base_url: str = ICAP_DEFAULT_BASE_URL,
     verbose: bool = True,
 ) -> tuple[list[str], list[str]]:
     """
@@ -157,6 +169,9 @@ def build_urls(
         ICAP product type (MMC, C4, MME), by default "MMC".
     data_var : str, optional
         Data variable name, by default "dustaod550".
+    base_url : str, optional
+        Root URL used to construct ICAP file paths, by default
+        "https://nrlgodae1.nrlmry.navy.mil/".
     verbose : bool, optional
         Whether to print status messages, by default True.
 
@@ -180,13 +195,13 @@ def build_urls(
     fnames = []
     if verbose:
         print("Building ICAP-MME URLs...")
-    base_url = "https://usgodae.org/ftp/outgoing/nrl/ICAP-MME/"
+    normalized_base_url = base_url.rstrip("/") + "/"
 
     for dt in dates:
         fname = "icap_{}_{}_{}.nc".format(
             dt.strftime(r"%Y%m%d%H"), filetype.upper(), data_var.lower()
         )
-        url = base_url + dt.strftime(r"%Y/%Y%m/") + fname
+        url = normalized_base_url + dt.strftime(r"%Y/%Y%m/") + fname
         urls.append(url)
         fnames.append(fname)
 

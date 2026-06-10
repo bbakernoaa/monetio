@@ -5,6 +5,7 @@ import pytest
 import xarray as xr
 
 from monetio.readers.icap_mme import ICAPMMEReader
+from monetio.readers.icap_mme import build_urls
 
 
 def create_mock_icap_ds(lazy=False):
@@ -87,6 +88,26 @@ def test_open_dataset_invalid_param():
     with pytest.raises(ValueError, match="Invalid input for 'data_var'"):
         open_dataset(date, data_var="asdf", verify=False)
         open_mfdataset([date], data_var="asdf", verify=False)
+
+
+def test_build_urls_defaults_to_new_nrl_endpoint():
+    urls, fnames = build_urls("2024-02-01", filetype="C4", data_var="dustaod550", verbose=False)
+
+    assert len(urls) == 1
+    assert len(fnames) == 1
+    assert urls[0].startswith("https://nrlgodae1.nrlmry.navy.mil/ftp/outgoing/nrl/ICAP-MME/")
+
+
+def test_build_urls_honors_base_url_override():
+    urls, _ = build_urls(
+        "2024-02-01",
+        filetype="C4",
+        data_var="dustaod550",
+        base_url="https://example.org/custom-root",
+        verbose=False,
+    )
+
+    assert urls[0].startswith("https://example.org/custom-root/")
 
 
 @pytest.mark.network
