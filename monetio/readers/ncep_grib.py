@@ -150,26 +150,15 @@ def ncep_grib_preprocess(ds: xr.Dataset) -> xr.Dataset:
             lat_dim = ds.latitude.dims[0]
             lon_dim = ds.longitude.dims[0]
 
-            # Extract data and attributes to create new DataArrays for broadcast.
-            # This avoids alignment issues when re-assigning to the dataset.
-            lon_data = ds.longitude.data
-            lat_data = ds.latitude.data
+            # Create new DataArrays for broadcast to avoid alignment issues.
+            # We preserve existing laziness (NumPy or Dask) without manual wrapping.
+            lon1d = xr.DataArray(ds.longitude.data, dims="x", attrs=ds.longitude.attrs)
+            lat1d = xr.DataArray(ds.latitude.data, dims="y", attrs=ds.latitude.attrs)
 
-            # If the dataset is chunked but coordinates are not, wrap them in dask
-            # to maintain laziness throughout the broadcast.
             if ds.chunks:
-                try:
-                    import dask.array as da
-
-                    if not hasattr(lon_data, "dask"):
-                        lon_data = da.from_array(lon_data, chunks=ds.chunks.get(lon_dim, -1))
-                    if not hasattr(lat_data, "dask"):
-                        lat_data = da.from_array(lat_data, chunks=ds.chunks.get(lat_dim, -1))
-                except ImportError:
-                    pass
-
-            lon1d = xr.DataArray(lon_data, dims="x", attrs=ds.longitude.attrs)
-            lat1d = xr.DataArray(lat_data, dims="y", attrs=ds.latitude.attrs)
+                # Align coordinate chunking with dataset chunks to maintain laziness.
+                lon1d = lon1d.chunk({d: ds.chunks[d] for d in lon1d.dims if d in ds.chunks})
+                lat1d = lat1d.chunk({d: ds.chunks[d] for d in lat1d.dims if d in ds.chunks})
 
             # Broadcast to 2D
             # xr.broadcast will handle both NumPy and Dask lazily

@@ -223,7 +223,7 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     xr.Dataset
         Dataset with 'latitude' and 'longitude' coordinates added.
     """
-    from pyproj import CRS, Proj
+    from pyproj import CRS
 
     proj_var = ds.goes_imager_projection
     proj_dict = proj_var.attrs.copy()
@@ -245,16 +245,18 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
     y_m = ds.y * satellite_height
 
     # 2. Broadcast to 2D (y, x) lazily
-    if hasattr(ds, "chunks") and ds.chunks:
-        x_m = x_m.chunk({"x": ds.chunks.get("x", "auto")})
-        y_m = y_m.chunk({"y": ds.chunks.get("y", "auto")})
-
     # Note: GOES data variables usually have dimensions (y, x)
+    if ds.chunks:
+        # Match coordinate chunking to data variables to maintain laziness.
+        # This ensures that derived 2D coordinates are also lazy when the dataset is.
+        x_m = x_m.chunk({d: ds.chunks[d] for d in x_m.dims if d in ds.chunks})
+        y_m = y_m.chunk({d: ds.chunks[d] for d in y_m.dims if d in ds.chunks})
+
     y_2d, x_2d = xr.broadcast(y_m, x_m)
 
-    def _proj_inv(xv: np.ndarray, yv: np.ndarray, p_srs: str) -> tuple:
+    def _proj_inv(xv: np.ndarray, yv: np.ndarray, p_srs: str) -> tuple[np.ndarray, np.ndarray]:
         """
-        Element-wise inverse projection wrapper.
+        Element-wise inverse projection kernel using pyproj.Transformer.
 
         Parameters
         ----------
@@ -267,17 +269,28 @@ def _add_goes_latlon(ds: xr.Dataset) -> xr.Dataset:
 
         Returns
         -------
-        tuple
+        tuple[np.ndarray, np.ndarray]
             (latitude, longitude) as float32 NumPy arrays.
         """
+        from functools import lru_cache
+
+        from pyproj import Transformer
+
+        @lru_cache(maxsize=1)
+        def _get_transformer(srs):
+            return Transformer.from_crs(srs, "EPSG:4326", always_xy=True)
+
         # Ensure p_srs is a string if it came as a Dask scalar/array
         if isinstance(p_srs, np.ndarray | np.generic):
             p_srs = p_srs.item()
         if hasattr(p_srs, "decode"):
             p_srs = p_srs.decode()
 
-        p = Proj(p_srs)
-        lon, lat = p(xv, yv, inverse=True)
+        # GOES projection is geostationary. Transformer is more efficient than Proj.
+        # We use a cached transformer from the input SRS to WGS84 (EPSG:4326).
+        transformer = _get_transformer(p_srs)
+        lon, lat = transformer.transform(xv, yv)
+
         # Handle out of disk values (GOES specific)
         lon = np.where(lon < 400, lon, np.nan)
         lat = np.where(lat < 100, lat, np.nan)

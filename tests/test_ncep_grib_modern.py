@@ -63,3 +63,29 @@ def test_ncep_grib_reader_open(monkeypatch):
     ds = reader.open_dataset("dummy.grib2")
     assert "test" in ds.data_vars
     assert "history" in ds.attrs
+
+
+def test_ncep_grib_preprocess_aero_protocol():
+    """Verify ncep_grib_preprocess follows the Aero Protocol (Eager vs Lazy identity)."""
+    # 1. Setup mock data
+    lon = np.linspace(0, 359, 10)
+    lat = np.linspace(-90, 90, 5)
+    ds = xr.Dataset(
+        {"TMP_2maboveground": (("lat", "lon"), np.random.rand(5, 10))},
+        coords={"latitude": (("lat",), lat), "longitude": (("lon",), lon)},
+    )
+
+    # 2. Eager execution
+    ds_eager = ncep_grib_preprocess(ds.copy())
+
+    # 3. Lazy execution
+    ds_lazy = ds.chunk({"lat": 3, "lon": 5})
+    ds_lazy_out = ncep_grib_preprocess(ds_lazy)
+
+    # 4. Assertions
+    from dask.array import Array
+
+    assert isinstance(ds_lazy_out.latitude.data, Array)
+
+    xr.testing.assert_allclose(ds_eager.latitude, ds_lazy_out.latitude.compute())
+    assert "Generated 2D latitude/longitude coordinates lazily" in ds_eager.attrs["history"]

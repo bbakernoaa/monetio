@@ -135,3 +135,28 @@ def test_cmaq_diagnostics():
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+def test_add_ioapi_latlon_aero_protocol():
+    """Verify _add_ioapi_latlon follows the Aero Protocol (Eager vs Lazy identity)."""
+    from monetio.readers.base import _add_ioapi_latlon
+
+    # 1. Setup mock data
+    ds = xr.Dataset({"O3": (("y", "x"), np.random.rand(5, 5))})
+    ds.attrs.update({"NCOLS": 5, "NROWS": 5, "XORIG": 0, "YORIG": 0, "XCELL": 1000, "YCELL": 1000})
+    proj4 = "+proj=lcc +lat_1=33 +lat_2=45 +lat_0=40 +lon_0=-97 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+
+    # 2. Eager execution
+    ds_eager = _add_ioapi_latlon(ds.copy(), proj4)
+
+    # 3. Lazy execution
+    ds_lazy = ds.chunk({"x": 3, "y": 3})
+    ds_lazy_out = _add_ioapi_latlon(ds_lazy, proj4)
+
+    # 4. Assertions
+    from dask.array import Array
+
+    assert isinstance(ds_lazy_out.latitude.data, Array)
+
+    xr.testing.assert_allclose(ds_eager.latitude, ds_lazy_out.latitude.compute())
+    assert "Generated Latitude/Longitude coordinates" in ds_eager.attrs["history"]
