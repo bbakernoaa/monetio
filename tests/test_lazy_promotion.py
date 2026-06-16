@@ -112,13 +112,36 @@ def test_nesdis_frp_preprocess_lazy():
             coords={"tile": ((), tile_data[0])},
         )
 
-        # Preprocess
-        ds_out = nesdis_frp_preprocess(ds, ftype="meanFRP")
+        # Mock fv3grid to avoid network calls and SSL issues in CI
+        from unittest.mock import patch
 
-        # FRP should still be lazy
-        assert hasattr(ds_out.meanFRP.data, "dask")
-        # Tile should still be lazy (we avoided .values)
-        assert hasattr(ds_out.tile.data, "dask")
+        with patch("fv3grid.get_fv3_grid") as mock_get_grid:
+            mock_grid = xr.Dataset(
+                coords={
+                    "latitude": (("y", "x"), np.zeros((2, 2))),
+                    "longitude": (("y", "x"), np.zeros((2, 2))),
+                }
+            )
+            mock_get_grid.return_value = mock_grid
+
+            # Preprocess
+            ds_out = nesdis_frp_preprocess(ds, ftype="meanFRP")
+
+            # FRP should still be lazy
+            assert hasattr(ds_out.meanFRP.data, "dask")
+            # Tile should still be lazy (we avoided .values)
+            assert hasattr(ds_out.tile.data, "dask")
+            # get_fv3_grid should NOT have been called because tile was dask-backed
+            assert not mock_get_grid.called
+
+        # Now test with eager tile to ensure it IS called
+        ds_eager = ds.copy()
+        ds_eager.coords["tile"] = 1
+        with patch("fv3grid.get_fv3_grid") as mock_get_grid:
+            mock_get_grid.return_value = mock_grid
+            ds_out_eager = nesdis_frp_preprocess(ds_eager, ftype="meanFRP")
+            assert mock_get_grid.called
+            assert "latitude" in ds_out_eager.coords
 
     except ImportError:
         pytest.skip("Dask not installed")
