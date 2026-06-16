@@ -131,7 +131,8 @@ class AMDARReader(PointReader):
         # Handle time if needed
         if "time" in ds.variables:
             if ds["time"].attrs.get("units") == "seconds since 1970-01-01 00:00:00.0 +0000":
-                ds["time"] = pd.to_datetime(ds["time"].values, unit="s")
+                ds["time"] = ds["time"].astype("datetime64[s]")
+                ds = update_history(ds, "Converted time from epoch seconds to datetime64.")
 
         # Set coordinates
         coords = ["time", "siteid", "latitude", "longitude", "altitude", "pressure"]

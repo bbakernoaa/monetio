@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
+from monetio.readers.amdar import AMDARReader
 from monetio.readers.base import _ensure_time_dimension
 from monetio.readers.madis import MADISReader
 from monetio.readers.nesdis_frp import nesdis_frp_preprocess
@@ -43,6 +44,33 @@ def test_ensure_time_dimension_lazy():
 
         # Verify result is correct when computed
         assert ds_lazy_out.time.values[0] == time_val
+    except ImportError:
+        pytest.skip("Dask not installed")
+
+
+def test_amdar_harmonize_lazy():
+    try:
+        import dask.array as da_lazy
+
+        # Epoch seconds for 2023-01-01 00:00:00
+        seconds = 1672531200
+        time_data = da_lazy.from_array([seconds], chunks=1)
+
+        ds = xr.Dataset(
+            {"time": (("node",), time_data)},
+            attrs={"units": "seconds since 1970-01-01 00:00:00.0 +0000"},
+        )
+        ds["time"].attrs["units"] = "seconds since 1970-01-01 00:00:00.0 +0000"
+
+        reader = AMDARReader()
+        ds_out = reader.harmonize(ds)
+
+        # Should still be lazy
+        assert hasattr(ds_out.time.data, "dask")
+
+        # Should be converted to datetime64
+        assert ds_out.time.dtype.kind == "M"
+        assert ds_out.time.compute()[0] == np.datetime64("2023-01-01")
     except ImportError:
         pytest.skip("Dask not installed")
 
