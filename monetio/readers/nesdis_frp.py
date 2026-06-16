@@ -264,11 +264,15 @@ def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
     # We assume C384 for now as per legacy reader
     res = "C384"
     # ds.tile is usually a scalar coordinate if it's from a single file (tile)
-    # but could be an array if concatenated.
-    try:
-        tile = int(ds.tile.values) if not hasattr(ds.tile.data, "dask") else None
-    except (TypeError, ValueError):
-        tile = None
+    # but could be an array if concatenated. We avoid .values to maintain laziness.
+    tile = None
+    if not hasattr(ds.tile.data, "dask"):
+        try:
+            # item() is safe for scalar-like arrays and avoids the .values breaker
+            tile = int(ds.tile.item())
+        except (TypeError, ValueError):
+            # ndim > 0 or not convertible
+            pass
 
     # If tile is dask-backed, we might need to be careful.
     # But tile should be a coordinate, usually small and eager.
@@ -282,8 +286,8 @@ def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
             lat = grid.latitude
 
             ds = ds.assign_coords(
-                latitude=(("x", "y"), lat),
-                longitude=(("x", "y"), lon),
+                latitude=(("x", "y"), lat.data),
+                longitude=(("x", "y"), lon.data),
             )
 
             ds.latitude.attrs.update({"units": "degrees_north", "standard_name": "latitude"})

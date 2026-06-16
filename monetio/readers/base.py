@@ -80,10 +80,8 @@ def _ensure_time_dimension(ds: xr.Dataset) -> xr.Dataset:
 
         # Promote scalar time to a singleton dimension.
         if len(time_dims) == 0:
-            time_val = ds["time"].values
-            if hasattr(time_val, "item"):
-                time_val = time_val.item()
-            ds = ds.expand_dims({"time": [time_val]})
+            ds = ds.expand_dims("time")
+            ds = update_history(ds, "Promoted scalar time coordinate to dimension.")
             return ds
 
         # If time is a 1D coordinate attached to another dimension, swap dimensions.
