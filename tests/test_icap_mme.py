@@ -4,7 +4,8 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from monetio.readers.icap_mme import ICAPMMEReader, build_urls
+from monetio.readers.icap_mme import ICAPMMEReader
+from monetio.readers.icap_mme import build_urls
 
 
 def create_mock_icap_ds(lazy=False):
