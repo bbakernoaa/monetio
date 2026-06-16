@@ -2,13 +2,10 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from monetio.readers.amdar import AMDARReader
-from monetio.readers.base import _ensure_time_dimension
-from monetio.readers.madis import MADISReader
-from monetio.readers.nesdis_frp import nesdis_frp_preprocess
-
 
 def test_ensure_time_dimension_lazy():
+    from monetio.readers.base import _ensure_time_dimension
+
     da = xr.DataArray(np.random.rand(3), dims="x", name="test")
     time_val = np.datetime64("2023-01-01")
 
@@ -49,6 +46,8 @@ def test_ensure_time_dimension_lazy():
 
 
 def test_amdar_harmonize_lazy():
+    from monetio.readers.amdar import AMDARReader
+
     try:
         import dask.array as da_lazy
 
@@ -76,6 +75,8 @@ def test_amdar_harmonize_lazy():
 
 
 def test_madis_harmonize_lazy():
+    from monetio.readers.madis import MADISReader
+
     try:
         import dask.array as da_lazy
 
@@ -103,6 +104,8 @@ def test_madis_harmonize_lazy():
 
 
 def test_nesdis_frp_preprocess_lazy():
+    from monetio.readers.nesdis_frp import nesdis_frp_preprocess
+
     try:
         import dask.array as da_lazy
 

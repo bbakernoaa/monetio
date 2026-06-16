@@ -2,6 +2,7 @@ import os
 import time
 import warnings
 from collections.abc import Callable
+from functools import partial
 from typing import Union
 
 import fsspec
@@ -162,6 +163,8 @@ def _is_transient_network_error(exc: Exception) -> bool:
         "dns error",
         "nodename nor servname",
         "name or service not known",
+        "not enough data",  # Windows SSL [ASN1: NOT_ENOUGH_DATA]
+        "eof occurred",
     ]
     if any(token in msg for token in retry_tokens):
         return True
@@ -949,6 +952,10 @@ class PandasDriver:
         else:
             raise ValueError(f"Pandas method '{read_method}' not found and not callable.")
 
+        # Optional retry knobs for transient remote read failures.
+        retry_attempts = int(kwargs.pop("retry_attempts", 3))
+        retry_base_sleep = float(kwargs.pop("retry_base_sleep", 1.0))
+
         if lazy:
             import dask
             import dask.dataframe as dd
@@ -962,7 +969,18 @@ class PandasDriver:
                     if "storage_options" not in kwargs:
                         kwargs["storage_options"] = {"anon": True}
 
-                d = dask.delayed(reader_func)(f, **kwargs)
+                # Wrap the reader function with retries for remote access
+                if str(f).startswith(("http", "s3://", "ftp://")):
+                    func_to_call = partial(
+                        _call_with_retries,
+                        reader_func,
+                        attempts=retry_attempts,
+                        base_sleep=retry_base_sleep,
+                    )
+                else:
+                    func_to_call = reader_func
+
+                d = dask.delayed(func_to_call)(f, **kwargs)
                 if preprocess:
                     d = dask.delayed(preprocess)(d)
                 delayed_dfs.append(d)
@@ -1012,10 +1030,16 @@ class PandasDriver:
             else:
                 for f in file_list:
                     try:
-                        if f.startswith("s3://"):
-                            if "storage_options" not in kwargs:
+                        if str(f).startswith(("http", "s3://", "ftp://")):
+                            if str(f).startswith("s3://") and "storage_options" not in kwargs:
                                 kwargs["storage_options"] = {"anon": True}
-                            df = reader_func(f, **kwargs)
+                            df = _call_with_retries(
+                                reader_func,
+                                f,
+                                attempts=retry_attempts,
+                                base_sleep=retry_base_sleep,
+                                **kwargs,
+                            )
                         else:
                             df = reader_func(f, **kwargs)
 
