@@ -1,10 +1,11 @@
 import numpy as np
 import pytest
 import xarray as xr
-import pandas as pd
+
 from monetio.readers.base import _ensure_time_dimension
 from monetio.readers.madis import MADISReader
 from monetio.readers.nesdis_frp import nesdis_frp_preprocess
+
 
 def test_ensure_time_dimension_lazy():
     da = xr.DataArray(np.random.rand(3), dims="x", name="test")
@@ -20,11 +21,12 @@ def test_ensure_time_dimension_lazy():
     # Lazy case
     try:
         import dask.array as da_lazy
+
         # Scalar dask array for time
         time_lazy = da_lazy.from_array(time_val)
         ds_lazy = xr.Dataset(
             {"a": (("x",), da_lazy.from_array(np.random.rand(3), chunks=2))},
-            coords={"time": xr.DataArray(time_lazy, coords={}, dims=[])}
+            coords={"time": xr.DataArray(time_lazy, coords={}, dims=[])},
         )
 
         # Check that it is indeed lazy
@@ -44,16 +46,18 @@ def test_ensure_time_dimension_lazy():
     except ImportError:
         pytest.skip("Dask not installed")
 
+
 def test_madis_harmonize_lazy():
     try:
         import dask.array as da_lazy
+
         # Epoch seconds for 2023-01-01 00:00:00
         seconds = 1672531200
         time_data = da_lazy.from_array([seconds], chunks=1)
 
         ds = xr.Dataset(
             {"time": (("node",), time_data)},
-            attrs={"units": "seconds since 1970-01-01 00:00:00.0 +0000"}
+            attrs={"units": "seconds since 1970-01-01 00:00:00.0 +0000"},
         )
         ds["time"].attrs["units"] = "seconds since 1970-01-01 00:00:00.0 +0000"
 
@@ -69,13 +73,15 @@ def test_madis_harmonize_lazy():
     except ImportError:
         pytest.skip("Dask not installed")
 
+
 def test_nesdis_frp_preprocess_lazy():
     try:
         import dask.array as da_lazy
+
         tile_data = da_lazy.from_array([1], chunks=1)
         ds = xr.Dataset(
             {"frp": (("x", "y"), da_lazy.from_array(np.random.rand(2, 2), chunks=1))},
-            coords={"tile": ((), tile_data[0])}
+            coords={"tile": ((), tile_data[0])},
         )
 
         # Preprocess
