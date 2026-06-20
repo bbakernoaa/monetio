@@ -348,14 +348,21 @@ def build_urls(
     fnames = []
 
     def check_url(p_y):
+        from .drivers import _call_with_retries
+
         p, y = p_y
         url, fname = build_url(p, y, daily=daily)
-        try:
+
+        def _check_core():
             with requests.get(url, stream=True, timeout=10) as r:
                 if r.status_code == 200:
                     content_length = int(r.headers.get("Content-Length", 0))
                     if content_length > 500:
                         return url, fname
+            return None
+
+        try:
+            return _call_with_retries(_check_core)
         except Exception:
             pass
         return None
@@ -473,11 +480,17 @@ class AQSReader(PointReader):
                 return pd.DataFrame()
 
             if download:
+                from .drivers import _call_with_retries
+
                 for url, fname in zip(urls, fnames):
                     if not os.path.isfile(fname):
-                        r = requests.get(url)
-                        with open(fname, "wb") as f:
-                            f.write(r.content)
+
+                        def _dl_core():
+                            r = requests.get(url)
+                            with open(fname, "wb") as f:
+                                f.write(r.content)
+
+                        _call_with_retries(_dl_core)
                 files = fnames
             elif local:
                 files = fnames

@@ -100,20 +100,23 @@ def _consume(endpoint, *, params=None, timeout=10, retry=5, limit=500, npages=No
     for page in range(1, npages + 1):
         params["page"] = page
 
-        tries = 0
-        while tries < retry:
+        from .drivers import _call_with_retries
+
+        def _get_core():
             logger.debug(f"GET {url} params={params}")
             r = requests.get(url, params=params, headers=headers, timeout=timeout)
-            tries += 1
             if r.status_code == 408:
-                logger.info(f"request timed out (try {tries}/{retry})")
-                time.sleep(tries + 0.1 * rand())
+                logger.info("request timed out")
+                r.raise_for_status()
             elif r.status_code == 429:
-                logger.info(f"rate limited (try {tries}/{retry})")
-                time.sleep(tries * 5 + 0.2 * rand())
-            else:
-                break
-        r.raise_for_status()
+                logger.info("rate limited")
+                # Sleep is handled by _call_with_retries or we can add it here
+                time.sleep(5 + 0.2 * rand())
+                r.raise_for_status()
+            r.raise_for_status()
+            return r
+
+        r = _call_with_retries(_get_core, attempts=retry)
 
         this_data = r.json()
         found = this_data["meta"]["found"]

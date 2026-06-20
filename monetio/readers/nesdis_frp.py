@@ -278,7 +278,16 @@ def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
     # But tile should be a coordinate, usually small and eager.
     if tile is not None:
         try:
+            import warnings
+
             import fv3grid as fg
+
+            warnings.warn(
+                "The use of 'fv3grid' for grid retrieval is deprecated and will be "
+                "removed in a future version. Grid generation will be moved to internal utilities.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
             grid = fg.get_fv3_grid(res=res, tile=tile)
             # Wrap longitudes to [-180, 180]

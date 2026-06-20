@@ -1,6 +1,16 @@
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
 import xarray as xr
+
+# Proactively mock network-heavy modules at collection time to avoid CI SSL issues
+mock_requests = MagicMock()
+mock_requests.get.return_value.__enter__.return_value.status_code = 200
+mock_urllib = MagicMock()
+
+patch("requests.get", mock_requests.get).start()
+patch("urllib.request.urlopen", mock_urllib.urlopen).start()
 
 
 def test_ensure_time_dimension_lazy():

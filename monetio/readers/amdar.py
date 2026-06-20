@@ -64,9 +64,12 @@ class AMDARReader(PointReader):
 
             files = sorted(glob.glob(files)) if "*" in files else [files]
 
+        from .drivers import _call_with_retries
+
         datasets = []
         for f in files:
-            ds = xr.open_dataset(f, **kwargs)
+            # Wrap open_dataset with retries to handle transient SSL errors in CI
+            ds = _call_with_retries(xr.open_dataset, f, **kwargs)
             # Standardize dimension to node
             if "recNum" in ds.dims:
                 ds = ds.rename({"recNum": "node"})

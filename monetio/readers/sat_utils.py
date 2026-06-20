@@ -339,12 +339,9 @@ def tai93_to_datetime(time_array: xr.DataArray) -> xr.DataArray:
     --------
     >>> ds["time"] = tai93_to_datetime(ds["Scan_Start_Time"])
     """
+    from .time_utils import tai93_to_datetime_vec
 
-    def _convert(t):
-        # pd.to_datetime expects 1D input
-        return pd.to_datetime(t.ravel(), unit="s", origin="1993-01-01").values.reshape(t.shape)
-
-    return apply_lazy_conversion(time_array, _convert, "datetime64[ns]")
+    return apply_lazy_conversion(time_array, tai93_to_datetime_vec, "datetime64[ns]")
 
 
 def add_time_coord(

@@ -165,6 +165,10 @@ def _is_transient_network_error(exc: Exception) -> bool:
         "name or service not known",
         "not enough data",  # Windows SSL [ASN1: NOT_ENOUGH_DATA]
         "eof occurred",
+        "ssl: decryption alert",
+        "ssl: unexpected message",
+        "handshake_failure",
+        "connection refused",
     ]
     if any(token in msg for token in retry_tokens):
         return True

@@ -110,7 +110,10 @@ def parse_wrf_times(times_arr):
         s = np.char.replace(s.astype(str), "_", " ")
 
     # Force ns to match project expectations and avoid discrepancies with Pandas 3.0+
-    return pd.to_datetime(s.ravel()).values.astype("datetime64[ns]").reshape(s.shape)
+    # pd.to_datetime on a numpy array is fast and avoids hidden compute if called inside apply_ufunc.
+    # We use to_numpy() if it exists (DataArray) or np.asarray.
+    s_obj = s.to_numpy() if hasattr(s, "to_numpy") else np.asarray(s)
+    return pd.to_datetime(s_obj.ravel()).values.astype("datetime64[ns]").reshape(s.shape)
 
 
 def parse_yyyymmdd_hhmm(yyyymmdd, hhmm):
@@ -173,3 +176,11 @@ def parse_yyyymmdd_hhmm(yyyymmdd, hhmm):
 
     # Return with original shape
     return res.values.astype("datetime64[ns]").reshape(y.shape)
+
+
+def tai93_to_datetime_vec(x):
+    """
+    Vectorized conversion from TAI93 to datetime64[ns].
+    Used inside apply_ufunc to avoid lazy breaking.
+    """
+    return pd.to_datetime(x.ravel(), unit="s", origin="1993-01-01").values.reshape(x.shape)
