@@ -190,4 +190,8 @@ def tai93_to_datetime_vec(x: np.ndarray) -> np.ndarray:
     np.ndarray
         Array of datetime64[ns] objects.
     """
-    return pd.to_datetime(x.ravel(), unit="s", origin="1993-01-01").values.reshape(x.shape).astype("datetime64[ns]")
+    return (
+        pd.to_datetime(x.ravel(), unit="s", origin="1993-01-01")
+        .values.reshape(x.shape)
+        .astype("datetime64[ns]")
+    )
