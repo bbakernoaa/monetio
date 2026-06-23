@@ -346,13 +346,35 @@ class PointReader(BaseReader):
             ds = xr.Dataset()
             # Exception to "No Hidden Computes": lengths=True is required by Xarray
             # to determine dimension sizes for the Dataset structure.
+            # Dask DataFrames (dask-expr) have a to_dask_array() method.
             for col in temp_df.columns:
-                ds[col] = (("node",), temp_df[col].to_dask_array(lengths=True))
+                try:
+                    # In newer dask-expr, we might need to handle column selection
+                    # or metadata consistency.
+                    da = temp_df[col].to_dask_array(lengths=True)
+                    ds[col] = (("node",), da)
+                except Exception:
+                    # Fallback for complex structures or dask-expr edge cases
+                    # We convert each column via delayed if necessary, but to_dask_array
+                    # is the preferred path.
+                    import dask
+                    import dask.array as da_arr
+
+                    da = da_arr.from_delayed(
+                        dask.delayed(lambda x: x.values)(temp_df[col]),
+                        shape=(np.nan,),
+                        dtype=temp_df[col].dtype,
+                    )
+                    ds[col] = (("node",), da)
         else:
             # 3b. Eager Path
             # Consistently use 1D for both Eager and Lazy by default.
             ds = temp_df.reset_index(drop=True).to_xarray()
             if "index" in ds.dims:
+                if "node" in ds.dims or "node" in ds.variables:
+                    # 'node' already exists, likely because it was a column in the DataFrame.
+                    # We drop it first to avoid conflict when renaming 'index' to 'node'.
+                    ds = ds.drop_vars("node", errors="ignore")
                 ds = ds.rename({"index": "node"})
 
         # Set standard coordinates

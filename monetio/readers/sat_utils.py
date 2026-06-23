@@ -313,12 +313,18 @@ def jpss_time_to_datetime(
     -------
     xr.DataArray
         Time array in datetime64[ns].
+
+    Examples
+    --------
+    >>> ds["time"] = jpss_time_to_datetime(ds["Time"])
     """
-
-    def _convert(t):
-        return pd.to_datetime(t, unit=unit, origin=origin)
-
-    return apply_lazy_conversion(time_array, _convert, "datetime64[ns]")
+    # Vectorized backend-agnostic conversion preserving sub-second precision.
+    # We convert to nanoseconds first to avoid truncation during origin addition.
+    mult_map = {"s": 1e9, "ms": 1e6, "us": 1e3, "ns": 1}
+    mult = mult_map.get(unit, 1)
+    return ((time_array * mult).astype("timedelta64[ns]") + np.datetime64(origin)).astype(
+        "datetime64[ns]"
+    )
 
 
 def tai93_to_datetime(time_array: xr.DataArray) -> xr.DataArray:
@@ -339,12 +345,10 @@ def tai93_to_datetime(time_array: xr.DataArray) -> xr.DataArray:
     --------
     >>> ds["time"] = tai93_to_datetime(ds["Scan_Start_Time"])
     """
-
-    def _convert(t):
-        # pd.to_datetime expects 1D input
-        return pd.to_datetime(t.ravel(), unit="s", origin="1993-01-01").values.reshape(t.shape)
-
-    return apply_lazy_conversion(time_array, _convert, "datetime64[ns]")
+    # Vectorized backend-agnostic conversion preserving sub-second precision.
+    return ((time_array * 1e9).astype("timedelta64[ns]") + np.datetime64("1993-01-01")).astype(
+        "datetime64[ns]"
+    )
 
 
 def add_time_coord(

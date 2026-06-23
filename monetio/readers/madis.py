@@ -1,10 +1,17 @@
 """MADIS (Meteorological Assimilation Data Ingest System) Reader"""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pandas as pd
 import xarray as xr
 
 from .base import PointReader, register_reader
 from .sat_utils import update_history
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 
 @register_reader("madis")
@@ -26,8 +33,9 @@ class MADISReader(PointReader):
         use_dask: bool = False,
         as_xarray: bool = True,
         expand2d: bool = True,
+        lazy: bool = False,
         **kwargs,
-    ) -> xr.Dataset | pd.DataFrame:
+    ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
         Reads MADIS NetCDF files.
 
@@ -51,46 +59,99 @@ class MADISReader(PointReader):
             Path to the Icechunk repository, by default None.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
+        as_xarray : bool, optional
+            Whether to return an xarray.Dataset, by default True.
+        expand2d : bool, optional
+            Whether to expand to 2D (time, node) structure, by default True.
+        lazy : bool, optional
+            Whether to return a dask-backed object, by default False.
         **kwargs : dict
-            Additional arguments passed to PandasDriver.open or to_xarray.
+            Additional arguments passed to XarrayDriver.open or to_xarray.
 
         Returns
         -------
-        xr.Dataset or pd.DataFrame
-            UGRID xarray dataset by default, or DataFrame if ``as_xarray=False``.
+        xr.Dataset or pd.DataFrame or dd.DataFrame
+            UGRID xarray dataset by default, or DataFrame.
         """
-        # MADIS files are NetCDF but contain point data.
-        # We can use xarray to open them and then convert to the MONETIO point format.
-        if isinstance(files, str):
-            import glob
+        from .drivers import XarrayDriver
 
-            files = sorted(glob.glob(files)) if "*" in files else [files]
+        # Handle 'use_dask' as an alias for 'lazy'
+        if use_dask:
+            lazy = True
 
-        datasets = []
-        for f in files:
-            ds = xr.open_dataset(f, **kwargs)
-            # MADIS files often have 'recNum' as the dimension
+        if lazy and "chunks" not in kwargs:
+            kwargs["chunks"] = "auto"
+
+        def _madis_preprocess(ds):
             if "recNum" in ds.dims:
                 ds = ds.rename({"recNum": "node"})
-            datasets.append(ds)
+            # Also handle if it's already named 'node' to prevent double rename/conflicts
+            return ds
 
-        if len(datasets) > 1:
-            # Consolidate
-            ds = xr.concat(datasets, dim="node")
+        # Chain preprocess if provided
+        user_preprocess = kwargs.get("preprocess")
+        if user_preprocess:
+
+            def chained_preprocess(ds):
+                ds = _madis_preprocess(ds)
+                return user_preprocess(ds)
+
+            kwargs["preprocess"] = chained_preprocess
         else:
-            ds = datasets[0]
+            kwargs["preprocess"] = _madis_preprocess
+
+        # MADIS files are NetCDF. We use XarrayDriver for robustness.
+        dr = XarrayDriver()
+        ds = dr.open(
+            files,
+            use_virtualizarr=use_virtualizarr,
+            virtualizarr_file=virtualizarr_file,
+            virtualizarr_parser=virtualizarr_parser,
+            virtualizarr_backend=virtualizarr_backend,
+            icechunk_repo=icechunk_repo,
+            use_icechunk=use_icechunk,
+            icechunk_url=icechunk_url,
+            use_dask=use_dask,
+            concat_dim="node",
+            combine="nested",
+            **kwargs,
+        )
 
         ds = self.harmonize(ds)
 
-        df = ds.to_dataframe().reset_index()
+        if as_xarray:
+            # For Xarray output, we can bypass the DataFrame round-trip
+            # and use ds_to_2d directly if expand2d is True.
+            from ..util import ds_to_2d
+
+            ds_out = ds
+            if expand2d:
+                # pivot defaults to True in ds_to_2d
+                pivot = kwargs.get("wide_fmt", kwargs.get("pivot", True))
+                ds_out = ds_to_2d(ds, pivot=pivot, fixed_location=self.fixed_location)
+
+            # Add UGRID metadata and ensure time dimension (consistent with to_xarray)
+            ds_out.attrs.update(ds.attrs)
+            if "Conventions" not in ds_out.attrs:
+                ds_out.attrs["Conventions"] = "CF-1.8 UGRID-1.0"
+            elif "UGRID-1.0" not in ds_out.attrs["Conventions"]:
+                ds_out.attrs["Conventions"] += " UGRID-1.0"
+
+            ds_out = update_history(ds_out, "Converted MADIS data to UGRID xarray format.")
+            from .base import _ensure_time_dimension
+
+            return _ensure_time_dimension(ds_out)
+
+        # For DataFrame output (as_xarray=False)
+        if hasattr(ds, "chunks") and ds.chunks:
+            # We must ensure all variables are chunked consistently for to_dask_dataframe
+            # and that it's 1D on 'node'.
+            df = ds.to_dask_dataframe().reset_index()
+        else:
+            df = ds.to_dataframe().reset_index()
+
         df.attrs = dict(ds.attrs)
-
-        if not as_xarray:
-            return df
-
-        ds_out = self.to_xarray(df, expand2d=expand2d)
-        ds_out = update_history(ds_out, "Converted MADIS data to UGRID xarray format.")
-        return ds_out
+        return df
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """
@@ -135,8 +196,10 @@ class MADISReader(PointReader):
 
         # Handle time if it's in seconds since epoch
         if "time" in ds.variables:
+            # Use vectorized .astype('datetime64[s]') to avoid .values compute
             if ds["time"].attrs.get("units") == "seconds since 1970-01-01 00:00:00.0 +0000":
-                ds["time"] = pd.to_datetime(ds["time"].values, unit="s")
+                with xr.set_options(keep_attrs=True):
+                    ds["time"] = ds["time"].astype("datetime64[s]").astype("datetime64[ns]")
 
         # Set coordinates
         coords = ["time", "siteid", "latitude", "longitude", "elevation"]
