@@ -321,7 +321,9 @@ def jpss_time_to_datetime(
 
     def _convert(t, mult_val, origin_val):
         # Convert to nanoseconds and add origin
-        return (t * mult_val).astype("timedelta64[ns]") + np.datetime64(origin_val)
+        # Convert origin_val to str if it's not already to ensure np.datetime64 works
+        ov = str(origin_val) if not isinstance(origin_val, str) else origin_val
+        return (t * mult_val).astype("timedelta64[ns]") + np.datetime64(ov)
 
     mult_map = {"s": 1e9, "ms": 1e6, "us": 1e3, "ns": 1}
     mult = mult_map.get(unit, 1e3)
