@@ -318,12 +318,21 @@ def jpss_time_to_datetime(
     --------
     >>> ds["time"] = jpss_time_to_datetime(ds["Time"])
     """
-    # Vectorized backend-agnostic conversion preserving sub-second precision.
-    # We convert to nanoseconds first to avoid truncation during origin addition.
+
+    def _convert(t, mult_val, origin_val):
+        # Convert to nanoseconds and add origin
+        return (t * mult_val).astype("timedelta64[ns]") + np.datetime64(origin_val)
+
     mult_map = {"s": 1e9, "ms": 1e6, "us": 1e3, "ns": 1}
-    mult = mult_map.get(unit, 1)
-    return ((time_array * mult).astype("timedelta64[ns]") + np.datetime64(origin)).astype(
-        "datetime64[ns]"
+    mult = mult_map.get(unit, 1e3)
+
+    return xr.apply_ufunc(
+        _convert,
+        time_array,
+        mult,
+        origin,
+        dask="parallelized",
+        output_dtypes=[np.dtype("datetime64[ns]")],
     )
 
 
@@ -345,9 +354,15 @@ def tai93_to_datetime(time_array: xr.DataArray) -> xr.DataArray:
     --------
     >>> ds["time"] = tai93_to_datetime(ds["Scan_Start_Time"])
     """
-    # Vectorized backend-agnostic conversion preserving sub-second precision.
-    return ((time_array * 1e9).astype("timedelta64[ns]") + np.datetime64("1993-01-01")).astype(
-        "datetime64[ns]"
+
+    def _convert(t):
+        return (t * 1e9).astype("timedelta64[ns]") + np.datetime64("1993-01-01")
+
+    return xr.apply_ufunc(
+        _convert,
+        time_array,
+        dask="parallelized",
+        output_dtypes=[np.dtype("datetime64[ns]")],
     )
 
 
