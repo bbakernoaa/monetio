@@ -266,12 +266,12 @@ def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
     # ds.tile is usually a scalar coordinate if it's from a single file (tile)
     # but could be an array if concatenated.
     try:
-        tile = int(ds.tile.values) if not hasattr(ds.tile.data, "dask") else None
+        # We use .item() to get the scalar value if it's a coordinate.
+        # This is acceptable for metadata used for structural grid selection.
+        tile = int(ds.tile)
     except (TypeError, ValueError):
         tile = None
 
-    # If tile is dask-backed, we might need to be careful.
-    # But tile should be a coordinate, usually small and eager.
     if tile is not None:
         try:
             import fv3grid as fg
