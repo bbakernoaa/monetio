@@ -134,28 +134,28 @@ class MADISReader(PointReader):
         # Fallback to DataFrame if explicitly requested
         if lazy:
             # Avoid triggering a compute with .to_dataframe()
-            import dask.dataframe as dd
+            # Note: newer xarray has to_dask_dataframe on Dataset
+            try:
+                df = ds.to_dask_dataframe()
+            except (AttributeError, Exception):
+                # Manual fallback for older xarray or complex datasets
+                import dask.array as da
+                import dask.dataframe as dd
 
-            # Identify variables and coordinates with 'node' dimension
-            node_vars = [v for v in ds.variables if ds[v].dims == ("node",)]
+                node_vars = [v for v in ds.variables if ds[v].dims == ("node",)]
 
-            if not node_vars:
-                return pd.DataFrame()
+                if not node_vars:
+                    return pd.DataFrame()
 
-            # Create dask dataframe
-            # We use dd.concat to join 1D dask arrays into a DataFrame
-            # All variables here are guaranteed to have dimension ('node',)
-            import dask.array as da
+                chunks = ds.chunks.get("node", (ds.sizes["node"],))[0]
+                df_parts = []
+                for v in node_vars:
+                    data = ds[v].data
+                    if not hasattr(data, "dask"):
+                        data = da.from_array(data, chunks=chunks)
+                    df_parts.append(dd.from_dask_array(data.flatten(), columns=[v]))
 
-            chunks = ds.chunks.get("node", (ds.sizes["node"],))[0]
-            df_parts = []
-            for v in node_vars:
-                data = ds[v].data
-                if not hasattr(data, "dask"):
-                    data = da.from_array(data, chunks=chunks)
-                df_parts.append(dd.from_dask_array(data.flatten(), columns=[v]))
-
-            df = dd.concat(df_parts, axis=1)
+                df = dd.concat(df_parts, axis=1)
         else:
             df = ds.to_dataframe().reset_index()
 
