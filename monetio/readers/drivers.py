@@ -521,14 +521,7 @@ class XarrayDriver:
         preprocess = xr_kwargs.pop("preprocess", None)
         read_method = xr_kwargs.pop("read_method", None)
 
-        if xr_kwargs.get("engine") == "grib2io":
-            if use_virtualizarr:
-                warnings.warn(
-                    "For engine='grib2io', use_virtualizarr is ignored; native backend path is used.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-
+        if xr_kwargs.get("engine") == "grib2io" and not use_virtualizarr:
             # Inject use_icechunk into xr_kwargs — grib2io's xarray backend
             # uses this to activate its icechunk-aware S3 path.
             xr_kwargs.setdefault("use_icechunk", use_icechunk)
@@ -585,44 +578,164 @@ class XarrayDriver:
 
             # In MONETIO, GRIB virtual references must be routed through grib2io.
             if parser_name == "grib2":
-                xr_kwargs["engine"] = "grib2io"
+                try:
+                    import grib2io
+                    from grib2io.kerchunk import ReferenceGenerator
+                except ImportError:
+                    raise ImportError("grib2io is required for GRIB2 VirtualiZarr reading.")
 
-                # Normalize remote S3/HTTP access through explicit fsspec file objects.
+                try:
+                    import ujson
+                    import zarr
+                    from virtualizarr import open_virtual_dataset
+                    from virtualizarr.parsers import KerchunkJSONParser
+                except ImportError:
+                    raise ImportError(
+                        "VirtualiZarr support for GRIB2 requires virtualizarr, obstore, obspec_utils, ujson, and zarr."
+                    )
+
+                if xr_kwargs.get("engine") == "grib2io":
+                    warnings.warn(
+                        "For engine='grib2io', use_virtualizarr is redirected to the VirtualiZarr GRIB2 pipeline.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+
+                # --- Kerchunk cache: load existing refs if available ---
+                refs = None
                 if (
-                    isinstance(file_list, list)
-                    and file_list
-                    and (
-                        str(file_list[0]).startswith("s3://")
-                        or str(file_list[0]).startswith("http")
-                    )
+                    not use_icechunk
+                    and virtualizarr_file is not None
+                    and os.path.exists(virtualizarr_file)
                 ):
-                    storage_options = xr_kwargs.pop("storage_options", {})
-                    file_objs = []
-                    for f in file_list:
-                        fs = FileUtility.get_fs(str(f), **storage_options)
-                        file_objs.append(fs.open(str(f), mode="rb"))
-                    file_list = file_objs
+                    try:
+                        with open(virtualizarr_file) as f_ref:
+                            refs = ujson.load(f_ref)
+                    except Exception as e:
+                        warnings.warn(f"Failed to load virtualizarr_file {virtualizarr_file}: {e}")
+                        refs = None
 
-                # GRIB2 virtual access is handled natively by grib2io/xarray.
-                if preprocess:
-                    xr_kwargs["preprocess"] = preprocess
-                if "concat_dim" in xr_kwargs and "combine" not in xr_kwargs:
-                    xr_kwargs["combine"] = "nested"
+                if refs is None:
+                    # Pop GRIB2-specific parameters to avoid reaching xarray
+                    filters = xr_kwargs.pop("filters", None)
+                    max_workers = xr_kwargs.pop("max_workers", None)
+                    storage_options = dict(xr_kwargs.get("storage_options", {}))
 
-                if len(file_list) == 1:
-                    return _call_with_retries(
-                        xr.open_dataset,
-                        file_list[0],
-                        attempts=retry_attempts,
-                        base_sleep=retry_base_sleep,
-                        **xr_kwargs,
+                    # 1. Generate the reference manifest using grib2io
+                    gen = ReferenceGenerator(
+                        file_paths=file_list,
+                        filters=filters,
+                        storage_options=storage_options,
+                        max_workers=max_workers,
                     )
+                    manifest = gen.generate()
+
+                    # 2. Write manifest to virtualizarr_file or temporary JSON
+                    manifest_path_str = None
+                    if virtualizarr_file is not None:
+                        manifest_path_str = virtualizarr_file
+                    else:
+                        import tempfile
+                        fd, temp_path_str = tempfile.mkstemp(suffix=".json", prefix="grib2_manifest_")
+                        os.close(fd)
+                        manifest_path_str = temp_path_str
+
+                    try:
+                        with open(manifest_path_str, "w") as f:
+                            ujson.dump(manifest, f)
+
+                        # 3. Resolve store registry and register LocalStore
+                        registry, _ = _select_store(file_list, storage_options)
+                        from obstore.store import LocalStore
+                        registry.register("file:///", LocalStore(prefix="/"))
+
+                        # 4. Open virtual dataset
+                        import pathlib
+                        manifest_file = pathlib.Path(manifest_path_str).resolve()
+                        manifest_url = manifest_file.as_uri()
+
+                        vds = _call_with_retries(
+                            open_virtual_dataset,
+                            url=manifest_url,
+                            registry=registry,
+                            parser=KerchunkJSONParser(),
+                            loadable_variables=[],
+                            attempts=retry_attempts,
+                            base_sleep=retry_base_sleep,
+                        )
+
+                        # 5. Route to icechunk or kerchunk
+                        if use_icechunk:
+                            ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file)
+                            if preprocess:
+                                ds = preprocess(ds)
+                            return ds
+
+                        refs = vds.vz.to_kerchunk()
+
+                        # Write refs to cache if requested
+                        if virtualizarr_file is not None:
+                            try:
+                                with open(virtualizarr_file, "w") as f_ref:
+                                    ujson.dump(refs, f_ref)
+                            except Exception as e:
+                                warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
+
+                    finally:
+                        if virtualizarr_file is None and manifest_path_str is not None:
+                            try:
+                                os.remove(manifest_path_str)
+                            except Exception:
+                                pass
+
+                # --- Materialize Dataset via reference mapper ---
+                remote_protocol = "file"
+                remote_options = {}
+                if file_list[0].startswith("s3://"):
+                    remote_protocol = "s3"
+                    remote_options = dict(xr_kwargs.get("storage_options", {}))
+                    if "anon" not in remote_options:
+                        remote_options["anon"] = True
+                elif file_list[0].startswith("http"):
+                    remote_protocol = "http"
+
+                mapper = fsspec.get_mapper(
+                    "reference://",
+                    fo=refs,
+                    remote_protocol=remote_protocol,
+                    remote_options=remote_options,
+                )
+
+                # Clean up open_mfdataset-only / virtualizarr kwargs
+                mfdataset_keys = [
+                    "combine",
+                    "concat_dim",
+                    "parallel",
+                    "compat",
+                    "data_vars",
+                    "coords",
+                    "ids",
+                    "infer_order",
+                    "join",
+                ]
+                for key in mfdataset_keys:
+                    xr_kwargs.pop(key, None)
+
+                xr_kwargs.pop("engine", None)
+                xr_kwargs.pop("use_virtualizarr", None)
+                xr_kwargs.pop("virtualizarr_backend", None)
+                xr_kwargs.pop("virtualizarr_file", None)
+                xr_kwargs.pop("virtualizarr_parser", None)
+                xr_kwargs.pop("icechunk_url", None)
+                xr_kwargs.pop("icechunk_repo", None)
 
                 return _call_with_retries(
-                    xr.open_mfdataset,
-                    file_list,
+                    xr.open_dataset,
+                    mapper,
                     attempts=retry_attempts,
                     base_sleep=retry_base_sleep,
+                    engine="zarr",
+                    consolidated=False,
                     **xr_kwargs,
                 )
 
