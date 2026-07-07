@@ -265,10 +265,13 @@ def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
     res = "C384"
     # ds.tile is usually a scalar coordinate if it's from a single file (tile)
     # but could be an array if concatenated.
-    try:
-        tile = int(ds.tile.values) if not hasattr(ds.tile.data, "dask") else None
-    except (TypeError, ValueError):
-        tile = None
+    tile = None
+    if not hasattr(ds.tile.data, "dask"):
+        try:
+            if ds.tile.ndim == 0:
+                tile = int(ds.tile)
+        except (TypeError, ValueError):
+            pass
 
     # If tile is dask-backed, we might need to be careful.
     # But tile should be a coordinate, usually small and eager.
@@ -299,6 +302,7 @@ def nesdis_frp_preprocess(ds: xr.Dataset, ftype: str = "meanFRP") -> xr.Dataset:
                 "units": "MW",  # Assuming MW for FRP
             }
         )
+        ds = update_history(ds, f"Updated attributes for {ftype}")
 
     # Provenance
     ds = update_history(ds, f"Preprocessed NESDIS {ftype} data using standardized preprocessing.")

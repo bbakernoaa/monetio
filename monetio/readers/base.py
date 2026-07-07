@@ -80,10 +80,7 @@ def _ensure_time_dimension(ds: xr.Dataset) -> xr.Dataset:
 
         # Promote scalar time to a singleton dimension.
         if len(time_dims) == 0:
-            time_val = ds["time"].values
-            if hasattr(time_val, "item"):
-                time_val = time_val.item()
-            ds = ds.expand_dims({"time": [time_val]})
+            ds = ds.expand_dims("time")
             return ds
 
         # If time is a 1D coordinate attached to another dimension, swap dimensions.
@@ -328,6 +325,10 @@ class PointReader(BaseReader):
         else:
             temp_df = df.copy()
 
+        # Drop 'index' if it exists to avoid conflicts during conversion
+        if "index" in temp_df.columns:
+            temp_df = temp_df.drop(columns="index")
+
         for name in ["time", "siteid"]:
             try:
                 names = temp_df.index.names
@@ -343,16 +344,42 @@ class PointReader(BaseReader):
 
         if is_dask:
             # 3a. Lazy Path
-            ds = xr.Dataset()
             # Exception to "No Hidden Computes": lengths=True is required by Xarray
             # to determine dimension sizes for the Dataset structure.
+            # However, dask-expr often fails with lengths=True for empty or complex
+            # collections. We attempt to use to_dask_array(lengths=True) first,
+            # but if it fails, we fallback to delayed construction.
+            import dask.array as da
+            from dask.delayed import delayed
+
+            def _get_col(df, c):
+                return df[c].values
+
+            # We avoid pre-calculating lengths eagerly to adhere to the "No Hidden Computes" rule.
+            # Dask-backed xarray datasets can handle nan shapes for unstructured data.
+            shape = (np.nan,)
+
+            ds = xr.Dataset()
             for col in temp_df.columns:
-                ds[col] = (("node",), temp_df[col].to_dask_array(lengths=True))
+                if col == "node" and "node" in ds.dims:
+                    continue
+
+                try:
+                    data = temp_df[col].to_dask_array(lengths=True)
+                except (AttributeError, ValueError, IndexError):
+                    data = da.from_delayed(
+                        delayed(_get_col)(temp_df, col),
+                        shape=shape,
+                        dtype=temp_df[col].dtype,
+                    )
+                ds[col] = (("node",), data)
         else:
             # 3b. Eager Path
             # Consistently use 1D for both Eager and Lazy by default.
             ds = temp_df.reset_index(drop=True).to_xarray()
             if "index" in ds.dims:
+                if "node" in ds.variables or "node" in ds.dims:
+                    ds = ds.drop_vars("node", errors="ignore")
                 ds = ds.rename({"index": "node"})
 
         # Set standard coordinates

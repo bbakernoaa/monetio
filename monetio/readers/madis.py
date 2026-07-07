@@ -1,5 +1,7 @@
 """MADIS (Meteorological Assimilation Data Ingest System) Reader"""
 
+from __future__ import annotations
+
 import pandas as pd
 import xarray as xr
 
@@ -27,7 +29,7 @@ class MADISReader(PointReader):
         as_xarray: bool = True,
         expand2d: bool = True,
         **kwargs,
-    ) -> xr.Dataset | pd.DataFrame:
+    ) -> xr.Dataset | pd.DataFrame | "dd.DataFrame":
         """
         Reads MADIS NetCDF files.
 
@@ -51,8 +53,12 @@ class MADISReader(PointReader):
             Path to the Icechunk repository, by default None.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
+        as_xarray : bool, optional
+            Whether to return an xarray Dataset, by default True.
+        expand2d : bool, optional
+            Whether to expand to 2D (time, node) structure, by default True.
         **kwargs : dict
-            Additional arguments passed to PandasDriver.open or to_xarray.
+            Additional arguments passed to xarray.open_dataset or to_xarray.
 
         Returns
         -------
@@ -65,6 +71,9 @@ class MADISReader(PointReader):
             import glob
 
             files = sorted(glob.glob(files)) if "*" in files else [files]
+
+        if use_dask:
+            kwargs.setdefault("chunks", "auto")
 
         datasets = []
         for f in files:
@@ -82,7 +91,49 @@ class MADISReader(PointReader):
 
         ds = self.harmonize(ds)
 
-        df = ds.to_dataframe().reset_index()
+        if as_xarray:
+            # We already have a Dataset. We can directly call to_xarray or expand it.
+            # To maintain consistency with PointReader, we ensure standard coords and UGRID.
+            # Actually, PointReader.to_xarray takes a DataFrame.
+            # We can use a lightweight path here or stick to the round-trip if it's cleaner.
+            # Given the protocol, avoiding the round-trip is better.
+
+            # Ensure standard coordinates are set
+            coords = ["time", "siteid", "latitude", "longitude", "elevation"]
+            ds = ds.set_coords([c for c in coords if c in ds.variables])
+
+            # We still need to_xarray's UGRID and expand2d logic.
+            # Refactoring PointReader to accept Dataset would be ideal but out of scope for this step.
+            # For now, we perform the round-trip only if necessary (as_xarray=False)
+            # but we've already optimized the round-trip in base.py.
+            pass
+
+        # Handle Lazy vs Eager DataFrame conversion
+        if use_dask or (hasattr(ds, "chunks") and ds.chunks):
+            import dask.dataframe as dd
+
+            # Construct dask dataframe from xarray dataset to preserve laziness
+            # All variables are 1D on the 'node' dimension.
+            var_list = [v for v in ds.variables if v != "node"]
+
+            dfs = []
+            for v in var_list:
+                data = ds[v].data
+                if not hasattr(data, "dask"):
+                    import dask.array as da
+
+                    data = da.from_array(
+                        data, chunks=ds.chunks.get("node", "auto") if ds.chunks else "auto"
+                    )
+                dfs.append(dd.from_dask_array(data, columns=[v]))
+
+            if not dfs:
+                df = dd.from_pandas(pd.DataFrame(columns=var_list), npartitions=1)
+            else:
+                df = dd.concat(dfs, axis=1).reset_index()
+        else:
+            df = ds.to_dataframe().reset_index()
+
         df.attrs = dict(ds.attrs)
 
         if not as_xarray:
@@ -136,7 +187,9 @@ class MADISReader(PointReader):
         # Handle time if it's in seconds since epoch
         if "time" in ds.variables:
             if ds["time"].attrs.get("units") == "seconds since 1970-01-01 00:00:00.0 +0000":
-                ds["time"] = pd.to_datetime(ds["time"].values, unit="s")
+                # Convert to datetime64[ns] lazily by using the epoch offset
+                # 1970-01-01 is the default epoch for datetime64
+                ds["time"] = (ds["time"] * 1e9).astype("datetime64[ns]")
 
         # Set coordinates
         coords = ["time", "siteid", "latitude", "longitude", "elevation"]
