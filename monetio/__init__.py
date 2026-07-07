@@ -374,3 +374,9 @@ def coards_to_netcdf(ds, *, lat_name="lat", lon_name="lon"):
     ds["y"] = y
     ds = ds.set_coords(["latitude", "longitude"])
     return ds
+
+# Try to register grib2io codecs for zarr v3 / xarray if installed
+try:
+    import grib2io.codecs
+except ImportError:
+    pass

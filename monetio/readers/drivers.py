@@ -132,6 +132,14 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
     xr.Dataset
         The dataset opened from the Icechunk store.
     """
+    # If the local directory already exists, clear it for a clean, idempotent run
+    if not icechunk_url.startswith("s3://") and os.path.exists(icechunk_url):
+        import shutil
+        try:
+            shutil.rmtree(icechunk_url)
+        except Exception:
+            pass
+
     try:
         import icechunk
     except ImportError:
@@ -139,7 +147,49 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
             "Icechunk backend requires 'icechunk'. Install with: pip install monetio[icechunk]"
         )
 
-    repo = icechunk.Repository.open_or_create(icechunk_url)
+    from virtualizarr.manifests.array import ManifestArray
+    unique_prefixes = set()
+    for var in vds.variables.values():
+        if isinstance(var.data, ManifestArray):
+            for path in var.data.manifest.iter_nonempty_paths():
+                if path.startswith("s3://"):
+                    parts = path[5:].split("/", 1)
+                    prefix = "s3://" + parts[0] + "/"
+                    unique_prefixes.add(prefix)
+                elif path.startswith("http://") or path.startswith("https://"):
+                    parts = path.split("/", 4)
+                    prefix = "/".join(parts[:3]) + "/"
+                    unique_prefixes.add(prefix)
+
+    config = icechunk.RepositoryConfig.default()
+    for prefix in unique_prefixes:
+        if prefix.startswith("s3://"):
+            store_conf = icechunk.s3_store(anonymous=True, region="us-east-1")
+        elif prefix.startswith("http://") or prefix.startswith("https://"):
+            store_conf = icechunk.http_store()
+        else:
+            store_conf = icechunk.local_filesystem_store()
+        
+        container = icechunk.VirtualChunkContainer(
+            url_prefix=prefix,
+            store=store_conf,
+        )
+        config.set_virtual_chunk_container(container)
+
+    authorize = {prefix: None for prefix in unique_prefixes}
+
+    if icechunk_url.startswith("s3://"):
+        parts = icechunk_url[5:].split("/", 1)
+        bucket = parts[0]
+        prefix = parts[1] if len(parts) > 1 else None
+        storage = icechunk.s3_storage(bucket=bucket, prefix=prefix)
+    else:
+        storage = icechunk.local_filesystem_storage(icechunk_url)
+    repo = icechunk.Repository.open_or_create(
+        storage,
+        config=config,
+        authorize_virtual_chunk_access=authorize,
+    )
     session = repo.writable_session("main")
     store = session.store
 
@@ -147,7 +197,7 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
     session.commit("VirtualiZarr references")
 
     # Re-open for reading
-    session = repo.readonly_session()
+    session = repo.readonly_session(branch="main")
     return xr.open_zarr(session.store, consolidated=False)
 
 
@@ -313,6 +363,11 @@ class XarrayDriver:
             and "storage_options" not in xr_kwargs
         ):
             xr_kwargs["storage_options"] = get_default_storage_options(str(file_list[0]))
+
+        # Remove ReferenceGenerator / VirtualiZarr / icechunk-only parameters from xr_kwargs
+        # so they do not cause TypeErrors in standard/fallback paths.
+        for key in ["use_icechunk", "max_workers", "network_timeout", "max_concurrent_requests", "max_scan_attempts", "store_path", "icechunk_url", "icechunk_repo"]:
+            xr_kwargs.pop(key, None)
 
         # Icechunk path: delegate to grib2io's own open_mfdataset, which builds a
         # SINGLE combined manifest across all files and writes ONE icechunk store
@@ -699,11 +754,14 @@ class XarrayDriver:
                 elif file_list[0].startswith("http"):
                     remote_protocol = "http"
 
+                remote_options["asynchronous"] = True
+
                 mapper = fsspec.get_mapper(
                     "reference://",
                     fo=refs,
                     remote_protocol=remote_protocol,
                     remote_options=remote_options,
+                    asynchronous=True,
                 )
 
                 # Clean up open_mfdataset-only / virtualizarr kwargs
@@ -728,6 +786,14 @@ class XarrayDriver:
                 xr_kwargs.pop("virtualizarr_parser", None)
                 xr_kwargs.pop("icechunk_url", None)
                 xr_kwargs.pop("icechunk_repo", None)
+                xr_kwargs.pop("use_icechunk", None)
+                xr_kwargs.pop("store_path", None)
+                xr_kwargs.pop("max_scan_attempts", None)
+                xr_kwargs.pop("network_timeout", None)
+                xr_kwargs.pop("max_concurrent_requests", None)
+                xr_kwargs.pop("storage_options", None)
+                xr_kwargs.pop("filters", None)
+                xr_kwargs.pop("max_workers", None)
 
                 return _call_with_retries(
                     xr.open_dataset,
