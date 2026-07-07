@@ -1,8 +1,8 @@
 import numpy as np
-import pandas as pd
-import pytest
 import xarray as xr
+
 from monetio.readers.amdar import AMDARReader
+
 
 def test_amdar_modern_consistency(tmp_path):
     # 1. Create a dummy AMDAR-like NetCDF file
@@ -12,7 +12,7 @@ def test_amdar_modern_consistency(tmp_path):
     recNum = 5
     ds = xr.Dataset(
         {
-            "observationTime": (("recNum",), [1672531200 + i*3600 for i in range(recNum)]),
+            "observationTime": (("recNum",), [1672531200 + i * 3600 for i in range(recNum)]),
             "latitude": (("recNum",), np.linspace(30, 40, recNum)),
             "longitude": (("recNum",), np.linspace(-100, -90, recNum)),
             "tailNumber": (("recNum",), [f"AC{i}" for i in range(recNum)]),
