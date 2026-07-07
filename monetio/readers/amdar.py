@@ -1,7 +1,14 @@
 """AMDAR/ACARS (Aircraft Meteorological Data Relay) Reader"""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pandas as pd
 import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .base import PointReader, register_reader
 from .sat_utils import update_history
@@ -27,7 +34,7 @@ class AMDARReader(PointReader):
         as_xarray: bool = True,
         expand2d: bool = True,
         **kwargs,
-    ) -> xr.Dataset | pd.DataFrame:
+    ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
         Reads AMDAR/ACARS data. Files are typically NetCDF (from MADIS or BUFR-converted).
 
@@ -51,6 +58,10 @@ class AMDARReader(PointReader):
             Path to the Icechunk repository, by default None.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
+        as_xarray : bool, optional
+            Whether to return an xarray Dataset, by default True.
+        expand2d : bool, optional
+            Whether to expand to 2D (time, node) structure, by default True.
         **kwargs : dict
             Additional arguments passed to Xarray.
 
@@ -63,6 +74,9 @@ class AMDARReader(PointReader):
             import glob
 
             files = sorted(glob.glob(files)) if "*" in files else [files]
+
+        if use_dask:
+            kwargs.setdefault("chunks", "auto")
 
         datasets = []
         for f in files:
@@ -81,15 +95,41 @@ class AMDARReader(PointReader):
 
         ds = self.harmonize(ds)
 
-        df = ds.to_dataframe().reset_index()
+        if as_xarray:
+            # We already have a Dataset. We can directly call to_xarray to apply UGRID/2D logic.
+            ds_out = self.to_xarray(ds, expand2d=expand2d)
+            ds_out = update_history(ds_out, "Converted AMDAR data to UGRID xarray format.")
+            return ds_out
+
+        # Handle Lazy vs Eager DataFrame conversion
+        if use_dask or (hasattr(ds, "chunks") and ds.chunks):
+            import dask.dataframe as dd
+
+            # Construct dask dataframe from xarray dataset to preserve laziness
+            # All variables are 1D on the 'node' dimension.
+            var_list = [v for v in ds.variables if v != "node"]
+
+            dfs = []
+            for v in var_list:
+                data = ds[v].data
+                if not hasattr(data, "dask"):
+                    import dask.array as da
+
+                    data = da.from_array(
+                        data, chunks=ds.chunks.get("node", "auto") if ds.chunks else "auto"
+                    )
+                dfs.append(dd.from_dask_array(data, columns=[v]))
+
+            if not dfs:
+                df = dd.from_pandas(pd.DataFrame(columns=var_list), npartitions=1)
+            else:
+                df = dd.concat(dfs, axis=1).reset_index()
+        else:
+            df = ds.to_dataframe().reset_index()
+
         df.attrs = dict(ds.attrs)
 
-        if not as_xarray:
-            return df
-
-        ds_out = self.to_xarray(df, expand2d=expand2d)
-        ds_out = update_history(ds_out, "Converted AMDAR data to UGRID xarray format.")
-        return ds_out
+        return df
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """
@@ -131,7 +171,9 @@ class AMDARReader(PointReader):
         # Handle time if needed
         if "time" in ds.variables:
             if ds["time"].attrs.get("units") == "seconds since 1970-01-01 00:00:00.0 +0000":
-                ds["time"] = pd.to_datetime(ds["time"].values, unit="s")
+                # Convert to datetime64[ns] lazily by using the epoch offset
+                # 1970-01-01 is the default epoch for datetime64
+                ds["time"] = (ds["time"] * 1e9).astype("datetime64[ns]")
 
         # Set coordinates
         coords = ["time", "siteid", "latitude", "longitude", "altitude", "pressure"]
