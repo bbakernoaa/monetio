@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pandas as pd
 import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 from .base import PointReader, register_reader
 from .sat_utils import update_history
@@ -29,7 +34,7 @@ class AMDARReader(PointReader):
         as_xarray: bool = True,
         expand2d: bool = True,
         **kwargs,
-    ) -> xr.Dataset | pd.DataFrame | "dd.DataFrame":
+    ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
         Reads AMDAR/ACARS data. Files are typically NetCDF (from MADIS or BUFR-converted).
 
