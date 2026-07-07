@@ -97,21 +97,10 @@ class MADISReader(PointReader):
         ds = self.harmonize(ds)
 
         if as_xarray:
-            # We already have a Dataset. We can directly call to_xarray or expand it.
-            # To maintain consistency with PointReader, we ensure standard coords and UGRID.
-            # Actually, PointReader.to_xarray takes a DataFrame.
-            # We can use a lightweight path here or stick to the round-trip if it's cleaner.
-            # Given the protocol, avoiding the round-trip is better.
-
-            # Ensure standard coordinates are set
-            coords = ["time", "siteid", "latitude", "longitude", "elevation"]
-            ds = ds.set_coords([c for c in coords if c in ds.variables])
-
-            # We still need to_xarray's UGRID and expand2d logic.
-            # Refactoring PointReader to accept Dataset would be ideal but out of scope for this step.
-            # For now, we perform the round-trip only if necessary (as_xarray=False)
-            # but we've already optimized the round-trip in base.py.
-            pass
+            # We already have a Dataset. We can directly call to_xarray to apply UGRID/2D logic.
+            ds_out = self.to_xarray(ds, expand2d=expand2d)
+            ds_out = update_history(ds_out, "Converted MADIS data to UGRID xarray format.")
+            return ds_out
 
         # Handle Lazy vs Eager DataFrame conversion
         if use_dask or (hasattr(ds, "chunks") and ds.chunks):
@@ -141,12 +130,7 @@ class MADISReader(PointReader):
 
         df.attrs = dict(ds.attrs)
 
-        if not as_xarray:
-            return df
-
-        ds_out = self.to_xarray(df, expand2d=expand2d)
-        ds_out = update_history(ds_out, "Converted MADIS data to UGRID xarray format.")
-        return ds_out
+        return df
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """

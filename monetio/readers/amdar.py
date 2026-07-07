@@ -95,6 +95,12 @@ class AMDARReader(PointReader):
 
         ds = self.harmonize(ds)
 
+        if as_xarray:
+            # We already have a Dataset. We can directly call to_xarray to apply UGRID/2D logic.
+            ds_out = self.to_xarray(ds, expand2d=expand2d)
+            ds_out = update_history(ds_out, "Converted AMDAR data to UGRID xarray format.")
+            return ds_out
+
         # Handle Lazy vs Eager DataFrame conversion
         if use_dask or (hasattr(ds, "chunks") and ds.chunks):
             import dask.dataframe as dd
@@ -123,12 +129,7 @@ class AMDARReader(PointReader):
 
         df.attrs = dict(ds.attrs)
 
-        if not as_xarray:
-            return df
-
-        ds_out = self.to_xarray(df, expand2d=expand2d)
-        ds_out = update_history(ds_out, "Converted AMDAR data to UGRID xarray format.")
-        return ds_out
+        return df
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """

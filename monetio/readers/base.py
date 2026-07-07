@@ -289,18 +289,18 @@ class PointReader(BaseReader):
 
     def to_xarray(
         self,
-        df: Union[pd.DataFrame, "dd.DataFrame"],
+        obj: Union[pd.DataFrame, "dd.DataFrame", xr.Dataset],
         expand2d: bool = True,
         **kwargs,
     ) -> xr.Dataset:
         """
-        Convert the DataFrame to an xarray Dataset in UGRID convention.
+        Convert a DataFrame or Dataset to an xarray Dataset in UGRID convention.
         By default, returns a 2D dataset (time, node) if expand2d=True.
 
         Parameters
         ----------
-        df : Union[pd.DataFrame, dd.DataFrame]
-            Input dataframe.
+        obj : Union[pd.DataFrame, dd.DataFrame, xr.Dataset]
+            Input dataframe or unstructured dataset.
         expand2d : bool, optional
             Whether to expand to 2D (time, node) structure, by default True.
         **kwargs : dict
@@ -311,76 +311,66 @@ class PointReader(BaseReader):
         xr.Dataset
             The dataset in UGRID convention.
         """
-        # 1. Identify backend
-        try:
-            import dask.dataframe as dd
-
-            is_dask = isinstance(df, dd.DataFrame)
-        except ImportError:
-            is_dask = False
-
-        # 2. Prepare DataFrame (ensure time and siteid are columns)
-        if is_dask:
-            temp_df = df
+        # 1. Handle Dataset Input (Optimization to avoid round-trip)
+        if isinstance(obj, xr.Dataset):
+            ds = obj
+            # Ensure dimension is 'node'
+            if "node" not in ds.dims:
+                # Find the primary dimension (should be 1D)
+                potential_dims = [d for d in ds.dims if d not in ["time", "siteid"]]
+                if potential_dims:
+                    ds = ds.rename({potential_dims[0]: "node"})
         else:
-            temp_df = df.copy()
-
-        # Drop 'index' if it exists to avoid conflicts during conversion
-        if "index" in temp_df.columns:
-            temp_df = temp_df.drop(columns="index")
-
-        for name in ["time", "siteid"]:
+            df = obj
+            # 2. Identify backend
             try:
-                names = temp_df.index.names
-            except AttributeError:
-                names = [temp_df.index.name]
+                import dask.dataframe as dd
 
-            if name in names:
-                temp_df = temp_df.reset_index()
+                is_dask = isinstance(df, dd.DataFrame)
+            except ImportError:
+                is_dask = False
 
-        # 3. Handle Backends
-        # Consistently force object strings for both backends to avoid nullable string issues.
-        temp_df = force_object_strings(temp_df)
+            # 3. Prepare DataFrame (ensure time and siteid are columns)
+            if is_dask:
+                temp_df = df
+            else:
+                temp_df = df.copy()
 
-        if is_dask:
-            # 3a. Lazy Path
-            # Exception to "No Hidden Computes": lengths=True is required by Xarray
-            # to determine dimension sizes for the Dataset structure.
-            # However, dask-expr often fails with lengths=True for empty or complex
-            # collections. We attempt to use to_dask_array(lengths=True) first,
-            # but if it fails, we fallback to delayed construction.
-            import dask.array as da
-            from dask.delayed import delayed
+            # Drop 'index' if it exists to avoid conflicts during conversion
+            if "index" in temp_df.columns:
+                temp_df = temp_df.drop(columns="index")
 
-            def _get_col(df, c):
-                return df[c].values
-
-            # We avoid pre-calculating lengths eagerly to adhere to the "No Hidden Computes" rule.
-            # Dask-backed xarray datasets can handle nan shapes for unstructured data.
-            shape = (np.nan,)
-
-            ds = xr.Dataset()
-            for col in temp_df.columns:
-                if col == "node" and "node" in ds.dims:
-                    continue
-
+            for name in ["time", "siteid"]:
                 try:
-                    data = temp_df[col].to_dask_array(lengths=True)
-                except (AttributeError, ValueError, IndexError):
-                    data = da.from_delayed(
-                        delayed(_get_col)(temp_df, col),
-                        shape=shape,
-                        dtype=temp_df[col].dtype,
-                    )
-                ds[col] = (("node",), data)
-        else:
-            # 3b. Eager Path
-            # Consistently use 1D for both Eager and Lazy by default.
-            ds = temp_df.reset_index(drop=True).to_xarray()
-            if "index" in ds.dims:
-                if "node" in ds.variables or "node" in ds.dims:
-                    ds = ds.drop_vars("node", errors="ignore")
-                ds = ds.rename({"index": "node"})
+                    names = temp_df.index.names
+                except AttributeError:
+                    names = [temp_df.index.name]
+
+                if name in names:
+                    temp_df = temp_df.reset_index()
+
+            # 4. Handle Backends
+            # Consistently force object strings for both backends to avoid nullable string issues.
+            temp_df = force_object_strings(temp_df)
+
+            if is_dask:
+                # 4a. Lazy Path
+                # Exception to "No Hidden Computes": lengths=True is often required by Xarray
+                # to determine dimension sizes for the Dataset structure.
+                # For dask-expr collections, this may trigger a small compute.
+                ds = xr.Dataset()
+                for col in temp_df.columns:
+                    if col == "node" and "node" in ds.dims:
+                        continue
+                    ds[col] = (("node",), temp_df[col].to_dask_array(lengths=True))
+            else:
+                # 4b. Eager Path
+                # Consistently use 1D for both Eager and Lazy by default.
+                ds = temp_df.reset_index(drop=True).to_xarray()
+                if "index" in ds.dims:
+                    if "node" in ds.variables or "node" in ds.dims:
+                        ds = ds.drop_vars("node", errors="ignore")
+                    ds = ds.rename({"index": "node"})
 
         # Set standard coordinates
         coords = [
@@ -433,10 +423,10 @@ class PointReader(BaseReader):
                 if "node" in ds[var].dims:
                     ds[var].attrs.update({"mesh": "mesh", "location": "node"})
 
-        # Copy attributes from DataFrame if they exist (e.g. history).
+        # Copy attributes from input object if they exist (e.g. history).
         # Dask DataFrames don't support .attrs the same way as pandas, so
         # we guard with getattr to avoid AttributeError.
-        df_attrs = getattr(df, "attrs", {}) or {}
+        df_attrs = getattr(obj, "attrs", {}) or {}
         for k, v in df_attrs.items():
             if k not in ds.attrs:
                 ds.attrs[k] = v
