@@ -645,7 +645,6 @@ class XarrayDriver:
             # In MONETIO, GRIB virtual references must be routed through grib2io.
             if parser_name == "grib2":
                 try:
-                    import grib2io
                     from grib2io.kerchunk import ReferenceGenerator
                 except ImportError:
                     raise ImportError("grib2io is required for GRIB2 VirtualiZarr reading.")

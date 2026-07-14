@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from typing import TYPE_CHECKING
 
@@ -783,7 +785,7 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
         return ds
 
 
-def xr_to_dd(ds: xr.Dataset) -> "dd.DataFrame":
+def xr_to_dd(ds: xr.Dataset) -> dd.DataFrame:
     """
     Lazily convert an xarray Dataset to a dask DataFrame.
     Preserves all variables and coordinates that are 1D on the primary dimension.
