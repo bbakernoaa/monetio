@@ -35,11 +35,11 @@ class OpenAQReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
         wide_fmt: bool = True,
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs: Any,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -574,7 +574,7 @@ class OPENAQ:
         *,
         num_workers: int = 1,
         wide_fmt: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         reader = OpenAQReader()
         # num_workers is ignored in modern reader as it relies on dask config

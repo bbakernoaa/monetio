@@ -143,12 +143,12 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
 
     try:
         import icechunk
+        from virtualizarr.manifests.array import ManifestArray
     except ImportError:
         raise ImportError(
-            "Icechunk backend requires 'icechunk'. Install with: pip install monetio[icechunk]"
+            "Icechunk backend requires 'icechunk' and 'virtualizarr'. "
+            "Install with: pip install monetio[icechunk,virtualizarr]"
         )
-
-    from virtualizarr.manifests.array import ManifestArray
 
     unique_prefixes = set()
     for var in vds.variables.values():
@@ -366,14 +366,11 @@ class XarrayDriver:
         ):
             xr_kwargs["storage_options"] = get_default_storage_options(str(file_list[0]))
 
-        # Remove ReferenceGenerator / VirtualiZarr / icechunk-only parameters from xr_kwargs
+        # Remove VirtualiZarr / icechunk-only parameters from xr_kwargs
         # so they do not cause TypeErrors in standard/fallback paths.
+        # Note: 'use_icechunk', 'max_workers', etc. are preserved for the grib2io engine
+        # as it supports them natively in its xarray backend.
         for key in [
-            "use_icechunk",
-            "max_workers",
-            "network_timeout",
-            "max_concurrent_requests",
-            "max_scan_attempts",
             "store_path",
             "icechunk_url",
             "icechunk_repo",
@@ -459,6 +456,12 @@ class XarrayDriver:
                 for key in mfdataset_keys:
                     xr_kwargs.pop(key, None)
 
+                # For single file GRIB2 reading, if we are NOT using the icechunk path,
+                # we should pop 'use_icechunk' as standard xarray.open_dataset with grib2io engine
+                # might not expect it unless it's explicitly supported in that path.
+                # However, existing tests for grib2io expect it in some mocks.
+                # Let's keep it for now as it's passed explicitly in open_mfdataset path too.
+
                 return _call_with_retries(
                     xr.open_dataset,
                     file_list[0],
@@ -478,7 +481,7 @@ class XarrayDriver:
     def open(
         self,
         files: str | list[str],
-        use_dask: bool = False,
+        use_dask: bool = True,
         use_cubed: bool = False,
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
@@ -1118,7 +1121,7 @@ class PandasDriver:
         self,
         files: str | list[str],
         read_method: str | Callable = "read_csv",
-        lazy: bool = False,
+        lazy: bool = True,
         meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
@@ -1127,7 +1130,7 @@ class PandasDriver:
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         as_xarray: bool = False,
         **kwargs,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:

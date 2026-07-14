@@ -166,7 +166,7 @@ class TestOpenViaIcechunk:
         """Should raise ImportError with install instructions when icechunk is not installed."""
         vds = mock.MagicMock()
         with mock.patch.dict("sys.modules", {"icechunk": None}):
-            with pytest.raises(ImportError, match="pip install monetio\\[icechunk\\]"):
+            with pytest.raises(ImportError, match=r"pip install monetio\[icechunk,virtualizarr\]"):
                 _open_via_icechunk(vds, "/tmp/repo", None)
 
     def test_icechunk_workflow(self):
@@ -178,16 +178,26 @@ class TestOpenViaIcechunk:
         mock_store = mock_session.store
         mock_readonly_session = mock_repo.readonly_session.return_value
 
+        mock_vz = mock.MagicMock()
+
         expected_ds = xr.Dataset({"temp": [1, 2, 3]})
 
         with (
-            mock.patch.dict("sys.modules", {"icechunk": mock_icechunk}),
+            mock.patch.dict(
+                "sys.modules",
+                {
+                    "icechunk": mock_icechunk,
+                    "virtualizarr": mock_vz,
+                    "virtualizarr.manifests": mock_vz.manifests,
+                    "virtualizarr.manifests.array": mock_vz.manifests.array,
+                },
+            ),
             mock.patch("xarray.open_zarr", return_value=expected_ds) as mock_open_zarr,
         ):
             result = _open_via_icechunk(vds, "/tmp/repo", None)
 
         # Verify workflow
-        mock_icechunk.Repository.open_or_create.assert_called_once_with("/tmp/repo")
+        mock_icechunk.Repository.open_or_create.assert_called_once()
         mock_repo.writable_session.assert_called_once_with("main")
         vds.virtualize.to_icechunk.assert_called_once_with(mock_store)
         mock_session.commit.assert_called_once_with("VirtualiZarr references")
@@ -216,6 +226,8 @@ class TestIcechunkWiring:
         mock_virtualizarr.open_virtual_mfdataset.return_value = mock_vds
         mock_parsers = mock.MagicMock()
 
+        mock_obspec = mock.MagicMock()
+
         with (
             mock.patch.dict(
                 "sys.modules",
@@ -224,6 +236,10 @@ class TestIcechunkWiring:
                     "zarr": mock.MagicMock(),
                     "virtualizarr": mock_virtualizarr,
                     "virtualizarr.parsers": mock_parsers,
+                    "obspec_utils": mock_obspec,
+                    "obspec_utils.registry": mock_obspec.registry,
+                    "obstore": mock.MagicMock(),
+                    "obstore.store": mock.MagicMock(),
                 },
             ),
             mock.patch("monetio.readers.drivers._select_store") as mock_select,

@@ -25,7 +25,7 @@ class TCCONReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         siteid: str | list[str] = None,
         as_xarray: bool = True,
         expand2d: bool = True,

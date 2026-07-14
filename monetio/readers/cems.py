@@ -36,12 +36,12 @@ class CEMSReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         dates: pd.DatetimeIndex | list[datetime] | datetime | str | None = None,
         states: str | list[str] = "md",
         n_procs: int = 1,
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs: dict,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """

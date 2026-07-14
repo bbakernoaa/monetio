@@ -26,7 +26,7 @@ class GPMIMERGReader(GriddedReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
         product: str = "3B-HHR",
         version: str = "07",

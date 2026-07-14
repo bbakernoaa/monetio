@@ -197,11 +197,11 @@ class SOLRADReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         dates: datetime | list[datetime] | pd.DatetimeIndex | None = None,
         sites: list[str] | None = None,
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs: dict,
     ) -> Union[xr.Dataset, pd.DataFrame, "dd.DataFrame"]:
         """

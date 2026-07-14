@@ -23,13 +23,13 @@ class HYSPLITReader(GriddedReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         drange: list[datetime.datetime] | None = None,
         century: int | None = None,
         verbose: bool = False,
         sample_time_stamp: str = "start",
         check_grid: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs: Any,
     ) -> xr.Dataset:
         """

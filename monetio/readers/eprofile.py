@@ -25,7 +25,7 @@ class EPROFILEReader(GriddedReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         dates: pd.DatetimeIndex | list | pd.Timestamp | str | None = None,
         **kwargs,
     ) -> xr.Dataset:

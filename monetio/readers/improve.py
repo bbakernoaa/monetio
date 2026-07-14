@@ -33,11 +33,11 @@ class IMPROVEReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         add_meta: bool = False,
         delimiter: str = "\t",
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         pivot: bool = True,
         **kwargs: Any,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:

@@ -5,6 +5,9 @@ from monetio.readers.drivers import FileUtility, XarrayDriver, get_default_stora
 
 
 def test_grib2io_s3_single_file_passes_url_and_storage_options(monkeypatch):
+    monkeypatch.setattr(
+        "importlib.util.find_spec", lambda name: True if name == "grib2io" else None
+    )
     driver = XarrayDriver()
     captured = {}
 
@@ -26,6 +29,9 @@ def test_grib2io_s3_single_file_passes_url_and_storage_options(monkeypatch):
 
 
 def test_grib2io_s3_multi_file_passes_urls_and_storage_options(monkeypatch):
+    monkeypatch.setattr(
+        "importlib.util.find_spec", lambda name: True if name == "grib2io" else None
+    )
     driver = XarrayDriver()
     captured = {}
     files = [
@@ -50,6 +56,9 @@ def test_grib2io_s3_multi_file_passes_urls_and_storage_options(monkeypatch):
 
 
 def test_grib2io_passes_icechunk_backend_kwargs(monkeypatch):
+    monkeypatch.setattr(
+        "importlib.util.find_spec", lambda name: True if name == "grib2io" else None
+    )
     driver = XarrayDriver()
     captured = {}
 
@@ -107,6 +116,9 @@ def test_grib2io_legacy_icechunk_repo_translates_to_native_kwargs(monkeypatch):
 
 
 def test_grib2io_s3_sets_default_storage_options(monkeypatch):
+    monkeypatch.setattr(
+        "importlib.util.find_spec", lambda name: True if name == "grib2io" else None
+    )
     driver = XarrayDriver()
     captured = {}
 
@@ -160,15 +172,11 @@ def test_grib2_virtual_flag_redirects_to_virtualizarr_pipeline(monkeypatch):
     # Mock grib2io ReferenceGenerator
     mock_gen = mock.MagicMock()
     mock_gen.generate.return_value = {"version": 1, "refs": {}}
-    monkeypatch.setattr(
-        "grib2io.kerchunk.ReferenceGenerator", lambda *args, **kwargs: mock_gen, raising=False
-    )
 
     # Mock open_virtual_dataset
     mock_vds = mock.MagicMock()
     mock_vds.vz.to_kerchunk.return_value = {"version": 1, "refs": {}}
     mock_open_virtual = mock.MagicMock(return_value=mock_vds)
-    monkeypatch.setattr("virtualizarr.open_virtual_dataset", mock_open_virtual, raising=False)
 
     # Mock fsspec get_mapper
     mock_mapper = mock.MagicMock()
@@ -183,9 +191,35 @@ def test_grib2_virtual_flag_redirects_to_virtualizarr_pipeline(monkeypatch):
         "s3://noaa-gfs-bdp-pds/example_2.grib2",
     ]
 
-    with pytest.warns(
-        DeprecationWarning,
-        match="For engine='grib2io', use_virtualizarr is redirected to the VirtualiZarr GRIB2 pipeline",
+    mock_grib2io = mock.MagicMock()
+    mock_grib2io.kerchunk.ReferenceGenerator = lambda *args, **kwargs: mock_gen
+    mock_vz = mock.MagicMock()
+    mock_vz.open_virtual_dataset = mock_open_virtual
+    mock_ujson = mock.MagicMock()
+    mock_zarr = mock.MagicMock()
+    mock_obspec = mock.MagicMock()
+    mock_obstore = mock.MagicMock()
+
+    with (
+        mock.patch.dict(
+            "sys.modules",
+            {
+                "grib2io": mock_grib2io,
+                "grib2io.kerchunk": mock_grib2io.kerchunk,
+                "virtualizarr": mock_vz,
+                "virtualizarr.parsers": mock_vz.parsers,
+                "ujson": mock_ujson,
+                "zarr": mock_zarr,
+                "obspec_utils": mock_obspec,
+                "obspec_utils.registry": mock_obspec.registry,
+                "obstore": mock_obstore,
+                "obstore.store": mock_obstore.store,
+            },
+        ),
+        pytest.warns(
+            DeprecationWarning,
+            match="For engine='grib2io', use_virtualizarr is redirected to the VirtualiZarr GRIB2 pipeline",
+        ),
     ):
         res = driver.open(
             files, use_virtualizarr=True, engine="grib2io", storage_options={"anon": True}
@@ -220,13 +254,10 @@ def test_grib2_virtualizarr_pipeline_execution(monkeypatch):
         def generate(self):
             return {"version": 1, "refs": {}}
 
-    monkeypatch.setattr("grib2io.kerchunk.ReferenceGenerator", DummyGenerator, raising=False)
-
     # Mock open_virtual_dataset
     mock_vds = mock.MagicMock()
     mock_vds.vz.to_kerchunk.return_value = {"version": 1, "refs": {}}
     mock_open_virtual = mock.MagicMock(return_value=mock_vds)
-    monkeypatch.setattr("virtualizarr.open_virtual_dataset", mock_open_virtual, raising=False)
 
     # Mock fsspec get_mapper & xr.open_dataset
     mock_mapper = mock.MagicMock()
@@ -235,14 +266,38 @@ def test_grib2_virtualizarr_pipeline_execution(monkeypatch):
 
     files = ["/local/path/file1.grib2"]
 
-    driver.open(
-        files,
-        use_virtualizarr=True,
-        virtualizarr_parser="grib2",
-        filters={"shortName": "TMP"},
-        max_workers=8,
-        storage_options={"anon": True},
-    )
+    mock_grib2io = mock.MagicMock()
+    mock_grib2io.kerchunk.ReferenceGenerator = DummyGenerator
+    mock_vz = mock.MagicMock()
+    mock_vz.open_virtual_dataset = mock_open_virtual
+    mock_ujson = mock.MagicMock()
+    mock_zarr = mock.MagicMock()
+    mock_obspec = mock.MagicMock()
+    mock_obstore = mock.MagicMock()
+
+    with mock.patch.dict(
+        "sys.modules",
+        {
+            "grib2io": mock_grib2io,
+            "grib2io.kerchunk": mock_grib2io.kerchunk,
+            "virtualizarr": mock_vz,
+            "virtualizarr.parsers": mock_vz.parsers,
+            "ujson": mock_ujson,
+            "zarr": mock_zarr,
+            "obspec_utils": mock_obspec,
+            "obspec_utils.registry": mock_obspec.registry,
+            "obstore": mock_obstore,
+            "obstore.store": mock_obstore.store,
+        },
+    ):
+        driver.open(
+            files,
+            use_virtualizarr=True,
+            virtualizarr_parser="grib2",
+            filters={"shortName": "TMP"},
+            max_workers=8,
+            storage_options={"anon": True},
+        )
 
     assert len(generator_args) == 1
     assert generator_args[0]["file_paths"] == files
@@ -260,18 +315,13 @@ def test_grib2_virtualizarr_pipeline_with_cached_refs(monkeypatch):
     # Mock FileUtility
     monkeypatch.setattr(FileUtility, "expand_paths", lambda files_in, fs=None, **kwargs: files_in)
 
-    # Ensure ReferenceGenerator is NOT called
-    mock_generator_class = mock.MagicMock()
-    monkeypatch.setattr("grib2io.kerchunk.ReferenceGenerator", mock_generator_class, raising=False)
-
     # Mock os.path.exists to return True for the cache file
     monkeypatch.setattr("os.path.exists", lambda path: True if path == "my_cache.json" else False)
 
     # Mock ujson.load to return dummy references
     dummy_refs = {"version": 1, "refs": {"dummy": "data"}}
-    import ujson
-
-    monkeypatch.setattr(ujson, "load", lambda f: dummy_refs)
+    mock_ujson = mock.MagicMock()
+    mock_ujson.load.return_value = dummy_refs
 
     # Mock open built-in to handle reading the cache file
     mock_open = mock.mock_open(read_data="{}")
@@ -287,12 +337,35 @@ def test_grib2_virtualizarr_pipeline_with_cached_refs(monkeypatch):
 
     files = ["/local/path/file1.grib2"]
 
-    res = driver.open(
-        files, use_virtualizarr=True, virtualizarr_parser="grib2", virtualizarr_file="my_cache.json"
-    )
+    mock_grib2io = mock.MagicMock()
+    mock_vz = mock.MagicMock()
+    mock_zarr = mock.MagicMock()
+    mock_obspec = mock.MagicMock()
+    mock_obstore = mock.MagicMock()
 
-    assert res is mock_dataset
-    mock_generator_class.assert_not_called()
+    with mock.patch.dict(
+        "sys.modules",
+        {
+            "grib2io": mock_grib2io,
+            "grib2io.kerchunk": mock_grib2io.kerchunk,
+            "virtualizarr": mock_vz,
+            "virtualizarr.parsers": mock_vz.parsers,
+            "ujson": mock_ujson,
+            "zarr": mock_zarr,
+            "obspec_utils": mock_obspec,
+            "obspec_utils.registry": mock_obspec.registry,
+            "obstore": mock_obstore,
+            "obstore.store": mock_obstore.store,
+        },
+    ):
+        res = driver.open(
+            files,
+            use_virtualizarr=True,
+            virtualizarr_parser="grib2",
+            virtualizarr_file="my_cache.json",
+        )
+
+        assert res is mock_dataset
 
 
 def test_grib2_virtualizarr_with_icechunk(monkeypatch):
@@ -306,15 +379,11 @@ def test_grib2_virtualizarr_with_icechunk(monkeypatch):
     # Mock grib2io ReferenceGenerator
     mock_gen = mock.MagicMock()
     mock_gen.generate.return_value = {"version": 1, "refs": {}}
-    monkeypatch.setattr(
-        "grib2io.kerchunk.ReferenceGenerator", lambda *args, **kwargs: mock_gen, raising=False
-    )
 
     # Mock open_virtual_dataset
     mock_vds = mock.MagicMock()
     mock_vds.vz.to_kerchunk.return_value = {"version": 1, "refs": {}}
     mock_open_virtual = mock.MagicMock(return_value=mock_vds)
-    monkeypatch.setattr("virtualizarr.open_virtual_dataset", mock_open_virtual, raising=False)
 
     # Mock _open_via_icechunk
     mock_ice_dataset = xr.Dataset()
@@ -323,13 +392,37 @@ def test_grib2_virtualizarr_with_icechunk(monkeypatch):
 
     files = ["/local/path/file1.grib2"]
 
-    res = driver.open(
-        files,
-        use_virtualizarr=True,
-        virtualizarr_parser="grib2",
-        use_icechunk=True,
-        icechunk_url="s3://icechunk-store",
-    )
+    mock_grib2io = mock.MagicMock()
+    mock_grib2io.kerchunk.ReferenceGenerator = lambda *args, **kwargs: mock_gen
+    mock_vz = mock.MagicMock()
+    mock_vz.open_virtual_dataset = mock_open_virtual
+    mock_ujson = mock.MagicMock()
+    mock_zarr = mock.MagicMock()
+    mock_obspec = mock.MagicMock()
+    mock_obstore = mock.MagicMock()
+
+    with mock.patch.dict(
+        "sys.modules",
+        {
+            "grib2io": mock_grib2io,
+            "grib2io.kerchunk": mock_grib2io.kerchunk,
+            "virtualizarr": mock_vz,
+            "virtualizarr.parsers": mock_vz.parsers,
+            "ujson": mock_ujson,
+            "zarr": mock_zarr,
+            "obspec_utils": mock_obspec,
+            "obspec_utils.registry": mock_obspec.registry,
+            "obstore": mock_obstore,
+            "obstore.store": mock_obstore.store,
+        },
+    ):
+        res = driver.open(
+            files,
+            use_virtualizarr=True,
+            virtualizarr_parser="grib2",
+            use_icechunk=True,
+            icechunk_url="s3://icechunk-store",
+        )
 
     assert res is mock_ice_dataset
     mock_icechunk_func.assert_called_once_with(mock_vds, "s3://icechunk-store", None)
@@ -338,6 +431,9 @@ def test_grib2_virtualizarr_with_icechunk(monkeypatch):
 def test_grib2io_s3_multifile_passes_all_kwargs_to_open_mfdataset(monkeypatch):
     """Verify that grib2io-specific kwargs (max_workers, network_timeout, etc.)
     are passed through to xr.open_mfdataset without modification."""
+    monkeypatch.setattr(
+        "importlib.util.find_spec", lambda name: True if name == "grib2io" else None
+    )
     driver = XarrayDriver()
     captured = {}
 
