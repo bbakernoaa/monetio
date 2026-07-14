@@ -1,5 +1,7 @@
 """MODIS L2 Swath Reader"""
 
+from functools import partial
+
 import xarray as xr
 
 from .base import GriddedReader, register_reader
@@ -65,7 +67,7 @@ class MODISL2Reader(GriddedReader):
         >>> ds = reader.open_dataset('MYD04_L2.A2023126.1830.061.2023127154555.hdf', variable_dict=vdict)
         """
         if "preprocess" not in kwargs:
-            kwargs["preprocess"] = lambda ds: modis_l2_preprocess(ds, variable_dict=variable_dict)
+            kwargs["preprocess"] = partial(modis_l2_preprocess, variable_dict=variable_dict)
 
         # If variable_dict is provided, we can try to only load those variables
         # plus the required coordinates (Latitude, Longitude, Scan_Start_Time)

@@ -156,7 +156,22 @@ def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True
             dims = tuple(_rename_h5_dim(str(d)) for d in v.dims)
             # We wrap in DataArray with lazy loading using dask.array.from_array.
             # This allows backend-agnostic lazy evaluation without immediate v[...] compute.
-            data_lazy = da_array.from_array(v, chunks="auto")
+            # We avoid chunks='auto' for object dtypes as dask doesn't support it.
+            # We also provide a name to avoid tokenization errors with some h5py versions.
+            name = f"geoms-{Path(fp).name}-{k}"
+            if v.dtype.kind == "O" or v.size < 10000:
+                # For small arrays or object types, load eagerly to avoid tokenization issues
+                # and because object-type h5py datasets are problematic for dask.
+                data_lazy = da_array.from_array(np.asarray(v), chunks=-1, name=name)
+            else:
+                # For larger data arrays, try to stay lazy.
+                # If dask tokenization fails due to h5py object, we might still have issues
+                # but providing a name should help.
+                try:
+                    data_lazy = da_array.from_array(v, chunks="auto", name=name)
+                except Exception:
+                    # Fallback to single chunk if auto-chunking fails
+                    data_lazy = da_array.from_array(v, chunks=-1, name=name)
             data_vars[k] = (dims, data_lazy, dict(v.attrs))
 
         attrs = dict(f.attrs)
@@ -256,12 +271,27 @@ def geoms_preprocess(
         ds = ds.rename_vars({old: _rename_var(old) for old in ds.data_vars})
 
     if "latitude_instrument" in ds.coords and "latitude" not in ds.coords:
-        ds = ds.rename(
-            {
-                "latitude_instrument": "latitude",
-                "longitude_instrument": "longitude",
-            }
-        )
+        rename_dict = {"latitude_instrument": "latitude"}
+        if "longitude_instrument" in ds.coords and "longitude" not in ds.coords:
+            rename_dict["longitude_instrument"] = "longitude"
+
+        # Check for conflicts. If 'latitude' already exists as a data variable,
+        # we might need to drop it before renaming the instrument coordinate.
+        for old, new in list(rename_dict.items()):
+            if new in ds.variables and new not in ds.coords:
+                # To avoid hidden compute (.equals()), we rename the existing variable.
+                # In GEOMS, these are often redundant but may differ.
+                ds = ds.rename({new: f"{new}_original"})
+
+        try:
+            ds = ds.rename(rename_dict)
+        except ValueError:
+            # Final fallback: use assign_coords and drop
+            for old, new in rename_dict.items():
+                if old in ds.variables:
+                    ds = ds.assign_coords({new: ds[old]})
+                    if old != new:
+                        ds = ds.drop_vars(old)
 
     if squeeze:
         ds = ds.squeeze()

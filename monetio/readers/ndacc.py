@@ -100,14 +100,27 @@ class NDACCReader(GEOMSReader):
             use_icechunk=use_icechunk,
             icechunk_url=icechunk_url,
             use_dask=use_dask,
-            **kwargs,
+            as_xarray=as_xarray,
+            **{k: v for k, v in kwargs.items() if k not in ["dates", "siteid", "instrument"]},
         )
 
-        if not as_xarray:
-            return ds.to_dataframe().reset_index()
+        if as_xarray:
+            # Update history
+            ds = update_history(ds, "Read NDACC data using standardized preprocessing.")
+            return ds
 
-        # Update history
-        ds = update_history(ds, "Read NDACC data using standardized preprocessing.")
+        # Handle Lazy vs Eager DataFrame conversion
+        # GriddedReader (super) might have returned a Dataset if as_xarray was forced or if it's NetCDF
+        if isinstance(ds, xr.Dataset):
+            if use_dask or (hasattr(ds, "chunks") and ds.chunks):
+                from ..util import xr_to_dd
+
+                df = xr_to_dd(ds)
+            else:
+                df = ds.to_dataframe().reset_index()
+
+            df.attrs = dict(ds.attrs)
+            return df
 
         return ds
 
