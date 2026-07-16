@@ -332,8 +332,8 @@ def build_url(param: str, year: str, daily: bool = False) -> tuple[str, str]:
     }
     code = mapping.get(p, p + "_")
 
-    url = f"{beginning}{code}{year}.zip"
     fname = f"{fname_prefix}{code}{year}.zip"
+    url = f"{AQS_BASE_URL}{fname}"
     return url, fname
 
 
