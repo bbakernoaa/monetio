@@ -316,12 +316,9 @@ class FileUtility:
                 # but it might not be available or consistent across all versions/fs.
                 # Manual fix for common cases in monetio:
                 protocol = ""
-                if path_input.startswith("s3://"):
-                    protocol = "s3://"
-                elif path_input.startswith("http://"):
-                    protocol = "http://"
-                elif path_input.startswith("https://"):
-                    protocol = "https://"
+                possible_protocol, _host_path = path_input.split("://", 1)
+                if possible_protocol in ("s3", "http", "https", "ftp"):
+                    protocol = f"{possible_protocol}://"
 
                 if protocol and not str(files[0]).startswith(protocol):
                     files = [
