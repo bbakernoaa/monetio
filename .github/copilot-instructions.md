@@ -54,7 +54,7 @@ All instruction files should be written so they are easy for humans to scan and 
 
 ---
 ## 3. Strict EE2 Environment & Safety Constraints
-* **Path Sanitation:** Do not append or prepend the current directory (`.`), `$USHmodel`, or `$EXECmodel` to the system `$PATH`. Invoke scripts and executables explicitly via their fully qualified environment pathing.
+* **PATH Sanitation:** Do not append or prepend the current directory (`.`), `$USHmodel`, or `$EXECmodel` to the system `$PATH`. Invoke scripts and executables explicitly via their fully qualified environment pathing.
 * **No Background Processes:** Never use the ampersand `&` to run processes in the background. The scheduler loses control of backgrounded children, violating operational policy.
 * **Context-Aware Environments (Modules vs. Conda/Apptainer):**
   * **If writing an Operational Script (J-Job, Ex-script):** Explicitly load the target machine's software stack using `module purge`, followed by `module use "${REPO_ROOT}/modelfiles"`, and `module load ${MACHINE}`.
