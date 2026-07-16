@@ -345,7 +345,7 @@ class XarrayDriver:
         self,
         file_list: list[str],
         xr_kwargs: dict,
-        preprocess: Callable | None,
+        preprocess: Callable[[xr.Dataset], xr.Dataset] | None,
         retry_attempts: int,
         retry_base_sleep: float,
         icechunk_url: str | None = None,
