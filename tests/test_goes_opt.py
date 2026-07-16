@@ -93,9 +93,10 @@ def test_add_goes_latlon_aero_protocol():
     ds = xr.Dataset(
         {"AOD": (("y", "x"), np.random.rand(8, 10).astype(np.float32))}, coords={"x": x, "y": y}
     )
-    proj = xr.DataArray(
+    ds["goes_imager_projection"] = (
+        (),
         np.int32(0),
-        attrs={
+        {
             "perspective_point_height": 35786023.0,
             "semi_major_axis": 6378137.0,
             "semi_minor_axis": 6356752.31414,
@@ -106,7 +107,6 @@ def test_add_goes_latlon_aero_protocol():
             "grid_mapping_name": "geostationary",
         },
     )
-    ds["goes_imager_projection"] = proj
 
     # 2. Eager execution
     ds_eager = _add_goes_latlon(ds.copy())
