@@ -34,7 +34,7 @@ def test_madis_modern_consistency(tmp_path):
     ds_lazy = reader.open_dataset(str(fn), use_dask=True, as_xarray=True)
     assert hasattr(ds_lazy.temperature.data, "dask")
 
-    # 4. Assert Identity
+    # 4. Assert Identical
     xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
 
     # Check that time was converted correctly
