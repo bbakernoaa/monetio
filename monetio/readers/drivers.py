@@ -773,16 +773,20 @@ class XarrayDriver:
                     "infer_order",
                     "join",
                 ]
-                for key in mfdataset_keys:
-                    xr_kwargs.pop(key, None)
-
-                xr_kwargs.pop("engine", None)
-                xr_kwargs.pop("use_virtualizarr", None)
-                xr_kwargs.pop("virtualizarr_backend", None)
-                xr_kwargs.pop("virtualizarr_file", None)
-                xr_kwargs.pop("virtualizarr_parser", None)
-                xr_kwargs.pop("icechunk_url", None)
-                xr_kwargs.pop("icechunk_repo", None)
+                virtualizarr_keys = [
+                    "use_virtualizarr",
+                    "virtualizarr_backend",
+                    "virtualizarr_file",
+                    "virtualizarr_parser",
+                ]
+                import itertools
+                for key in itertools.chain(
+                    mfdataset_keys, virtualizarr_keys, ["engine", "icechunk_url", "icechunk_repo"]
+                ):
+                    try:
+                        del xr_kwargs[key]
+                    except KeyError:
+                        pass
                 xr_kwargs.pop("use_icechunk", None)
                 xr_kwargs.pop("store_path", None)
                 xr_kwargs.pop("max_scan_attempts", None)
