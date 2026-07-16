@@ -62,7 +62,7 @@ class GEMSReader(GriddedReader):
         variable_dict : dict, optional
             Dictionary mapping variable names to processing options (scale, minimum, maximum).
         **kwargs : dict
-            Additional arguments passed to XarrayDriver.open.
+            Additional arguments passed to `XarrayDriver.open`.
 
         Returns
         -------
