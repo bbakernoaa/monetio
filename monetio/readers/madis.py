@@ -178,7 +178,7 @@ class MADISReader(PointReader):
             if ds["time"].attrs.get("units") == "seconds since 1970-01-01 00:00:00.0 +0000":
                 # Convert to datetime64[ns] lazily by using the epoch offset
                 # 1970-01-01 is the default epoch for datetime64
-                ds["time"] = (ds["time"] * 1e9).astype("datetime64[ns]")
+                ds["time"] = (ds["time"] * 1_000_000_000).astype("datetime64[ns]")
 
         # Set coordinates
         coords = ["time", "siteid", "latitude", "longitude", "elevation"]
