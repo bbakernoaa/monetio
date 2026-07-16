@@ -124,7 +124,6 @@ def calipso_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.
         # Profile_Time is often seconds since a reference
         # But for now, let's just make sure it's a coord
         if "time" not in ds.coords:
-            if "Profile_Time" in ds.variables:
                 ds = ds.rename({"Profile_Time": "time"})
                 if ds["time"].ndim == 1:
                     ds = ds.set_coords("time")
