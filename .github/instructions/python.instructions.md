@@ -34,7 +34,7 @@ When writing standard meteorological data pipelines, enforce these four competin
 
 ### A. The "Optional Dask" Architecture
 * **Backend Agnostic:** Functions must accept generic `xr.DataArray` or `xr.Dataset` inputs. Never assume or force data to be exclusively Dask-backed or NumPy-backed.
-* **No Hidden Computes:** NEVER call `.compute()`, `.load()`, or `.values` inside a downstream processing function. This immediately breaks laziness for Dask users and risks memory crashes on the login or compute nodes.
+* **No Hidden Computes:** NEVER call `.compute()`, `.load()`, `.persist()`, or `.values` inside a downstream processing function. This immediately breaks laziness for Dask users and risks memory crashes on the login or compute nodes.
 * **No Forced Chunking:** Do not hardcode explicit `.chunk()` calls inside calculation functions. Chunking operations belong strictly at the initial I/O stage or must be passed as an optional parameter.
 * **High-Performance Vectorization:** Native Python loops are strictly forbidden for numerical operations. Use `xarray.apply_ufunc` with `dask='parallelized'` capability to natively support both eager and lazy backends simultaneously.
 
