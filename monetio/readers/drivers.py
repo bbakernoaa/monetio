@@ -318,9 +318,10 @@ class FileUtility:
                 # but it might not be available or consistent across all versions/fs.
                 # Manual fix for common cases in monetio:
                 protocol = ""
-                possible_protocol, _host_path = path_input.split("://", 1)
-                if possible_protocol in ("s3", "http", "https", "ftp"):
-                    protocol = f"{possible_protocol}://"
+                if "://" in path_input:
+                    possible_protocol, _host_path = path_input.split("://", 1)
+                    if possible_protocol in ("s3", "http", "https", "ftp"):
+                        protocol = f"{possible_protocol}://"
 
                 if protocol and not str(files[0]).startswith(protocol):
                     files = [
@@ -365,16 +366,7 @@ class XarrayDriver:
 
         # Remove ReferenceGenerator / VirtualiZarr / icechunk-only parameters from xr_kwargs
         # so they do not cause TypeErrors in standard/fallback paths.
-        for key in [
-            "use_icechunk",
-            "max_workers",
-            "network_timeout",
-            "max_concurrent_requests",
-            "max_scan_attempts",
-            "store_path",
-            "icechunk_url",
-            "icechunk_repo",
-        ]:
+        for key in ["store_path", "icechunk_url", "icechunk_repo"]:
             xr_kwargs.pop(key, None)
 
         # Icechunk path: delegate to grib2io's own open_mfdataset, which builds a
