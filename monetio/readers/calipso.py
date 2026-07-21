@@ -121,12 +121,15 @@ def calipso_preprocess(ds: xr.Dataset, variable_dict: dict | None = None) -> xr.
 
     # 2. Handle Time
     if "Profile_Time" in ds.variables:
-        # Profile_Time is often seconds since a reference
-        # But for now, let's just make sure it's a coord
+        # Profile_Time is in TAI-93 (seconds since 1993-01-01)
+        # Convert lazily to standard datetime64[ns]
+        from .sat_utils import tai93_to_datetime
+
+        ds["Profile_Time"] = tai93_to_datetime(ds["Profile_Time"])
         if "time" not in ds.coords:
-                ds = ds.rename({"Profile_Time": "time"})
-                if ds["time"].ndim == 1:
-                    ds = ds.set_coords("time")
+            ds = ds.rename({"Profile_Time": "time"})
+            if ds["time"].ndim == 1:
+                ds = ds.set_coords("time")
 
     # 3. Apply scale factors if not already applied by engine
     # CALIOP variables often have scale_factor attributes

@@ -47,5 +47,11 @@ def test_calipso_reader_logic(lazy, monkeypatch):
     assert "time" in ds.coords
     assert ds.dims == {"y": 10, "z": 30}
 
+    # Verify time is converted to standard datetime64[ns]
+    assert np.issubdtype(ds.coords["time"].dtype, np.datetime64)
+    # 0 seconds since 1993-01-01 should be 1993-01-01T00:00:00
+    assert ds.coords["time"].values[0] == np.datetime64("1993-01-01T00:00:00")
+
     if lazy:
         assert ds.Extinction_Coefficient_532.chunks is not None
+        assert ds.coords["time"].chunks is not None
