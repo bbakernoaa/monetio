@@ -26,6 +26,9 @@ def test_modis_l2_preprocess_eager_lazy_consistency():
     qf_data[2, 2] = 0  # Should be masked if thresh=1
     qf_data[3, 3] = 3  # Should be kept if thresh=3
 
+    aod_data[2, 2] = 0.5
+    aod_data[3, 3] = 0.5
+
     # Scan Start Time: seconds since 1993-01-01
     # 2023-01-01 00:00:00 is 946684800 seconds after 1993-01-01
     time_data = np.full((n_rows,), 946684800.0)
@@ -43,8 +46,8 @@ def test_modis_l2_preprocess_eager_lazy_consistency():
     )
 
     variable_dict = {
-        "AOD": {"scale": 1.0, "minimum": 0.0, "maximum": 1.0, "quality_flag": 1},
-        "Quality_Assurance": {},
+        "AOD": {"scale": 1.0, "minimum": 0.0, "maximum": 1.0},
+        "Quality_Assurance": {"quality_flag": 1},
     }
 
     # 2. Run Eager (NumPy)
@@ -73,10 +76,8 @@ def test_modis_l2_preprocess_eager_lazy_consistency():
     # Eager check
     assert np.isnan(ds_eager.AOD.values[0, 0])  # < 0.0
     assert np.isnan(ds_eager.AOD.values[1, 1])  # > 1.0
-    if qf_data[2, 2] < 1:
-        assert np.isnan(ds_eager.AOD.values[2, 2])
-    else:
-        assert not np.isnan(ds_eager.AOD.values[2, 2])
+    assert np.isnan(ds_eager.AOD.values[2, 2])  # masked due to QA flag < 1
+    assert ds_eager.AOD.values[3, 3] == 0.5  # kept due to QA flag >= 1
 
     # Consistency check
     xr.testing.assert_allclose(ds_eager, ds_lazy.compute())
