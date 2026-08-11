@@ -45,6 +45,7 @@ While these modules still exist as wrappers to maintain backward compatibility, 
 
 ```python
 from monetio.obs import airnow
+
 df = airnow.add_data(dates)
 ```
 
@@ -52,6 +53,7 @@ df = airnow.add_data(dates)
 
 ```python
 import monetio as mio
+
 df = mio.load("airnow", files=dates)
 ```
 
