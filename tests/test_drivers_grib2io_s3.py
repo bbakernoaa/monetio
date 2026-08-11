@@ -150,6 +150,7 @@ def test_get_fs_passes_s3_kwargs_through(monkeypatch):
 
 
 def test_grib2_virtual_flag_redirects_to_virtualizarr_pipeline(monkeypatch):
+    pytest.importorskip("grib2io")
     from unittest import mock
 
     driver = XarrayDriver()
@@ -196,6 +197,7 @@ def test_grib2_virtual_flag_redirects_to_virtualizarr_pipeline(monkeypatch):
 
 
 def test_grib2_virtualizarr_pipeline_execution(monkeypatch):
+    pytest.importorskip("grib2io")
     from unittest import mock
 
     driver = XarrayDriver()
@@ -253,6 +255,7 @@ def test_grib2_virtualizarr_pipeline_execution(monkeypatch):
 
 
 def test_grib2_virtualizarr_pipeline_with_cached_refs(monkeypatch):
+    pytest.importorskip("grib2io")
     from unittest import mock
 
     driver = XarrayDriver()
@@ -296,6 +299,7 @@ def test_grib2_virtualizarr_pipeline_with_cached_refs(monkeypatch):
 
 
 def test_grib2_virtualizarr_with_icechunk(monkeypatch):
+    pytest.importorskip("grib2io")
     from unittest import mock
 
     driver = XarrayDriver()
@@ -338,6 +342,7 @@ def test_grib2_virtualizarr_with_icechunk(monkeypatch):
 def test_grib2io_s3_multifile_passes_all_kwargs_to_open_mfdataset(monkeypatch):
     """Verify that grib2io-specific kwargs (max_workers, network_timeout, etc.)
     are passed through to xr.open_mfdataset without modification."""
+    pytest.importorskip("grib2io")
     driver = XarrayDriver()
     captured = {}
 
