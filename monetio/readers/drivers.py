@@ -318,9 +318,10 @@ class FileUtility:
                 # but it might not be available or consistent across all versions/fs.
                 # Manual fix for common cases in monetio:
                 protocol = ""
-                possible_protocol, _host_path = path_input.split("://", 1)
-                if possible_protocol in ("s3", "http", "https", "ftp"):
-                    protocol = f"{possible_protocol}://"
+                if "://" in path_input:
+                    possible_protocol, _host_path = path_input.split("://", 1)
+                    if possible_protocol in ("s3", "http", "https", "ftp"):
+                        protocol = f"{possible_protocol}://"
 
                 if protocol and not str(files[0]).startswith(protocol):
                     files = [
@@ -363,10 +364,13 @@ class XarrayDriver:
         ):
             xr_kwargs["storage_options"] = get_default_storage_options(str(file_list[0]))
 
+        # Extract MONETIO-specific and icechunk-only parameters first
+        use_icechunk = xr_kwargs.get("use_icechunk", False)
+
         # Remove ReferenceGenerator / VirtualiZarr / icechunk-only parameters from xr_kwargs
         # so they do not cause TypeErrors in standard/fallback paths.
+        # But we MUST preserve "use_icechunk" if use_icechunk is False, because native grib2io/xarray engine expects it.
         for key in [
-            "use_icechunk",
             "max_workers",
             "network_timeout",
             "max_concurrent_requests",
@@ -377,12 +381,19 @@ class XarrayDriver:
         ]:
             xr_kwargs.pop(key, None)
 
+        if not use_icechunk:
+            # Native grib2io backend expects "use_icechunk" to be passed if False
+            xr_kwargs["use_icechunk"] = False
+        else:
+            # If we are on the Icechunk path, we pop "use_icechunk" since it's passed explicitly to grib2io_open_mfdataset
+            xr_kwargs.pop("use_icechunk", None)
+
         # Icechunk path: delegate to grib2io's own open_mfdataset, which builds a
         # SINGLE combined manifest across all files and writes ONE icechunk store
         # with ONE commit. Routing through xarray.open_mfdataset instead would open
         # each file via the backend separately, creating one icechunk store/commit
         # per file -- slow and unsafe for concurrent local commits.
-        if xr_kwargs.get("use_icechunk"):
+        if use_icechunk:
             from grib2io.xarray_backend import open_mfdataset as grib2io_open_mfdataset
 
             mf_kwargs = dict(xr_kwargs)
