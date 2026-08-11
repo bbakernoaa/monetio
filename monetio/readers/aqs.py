@@ -307,7 +307,6 @@ def load_aqs_file(url: str) -> pd.DataFrame:
 
 def build_url(param: str, year: str, daily: bool = False) -> tuple[str, str]:
     """Build URL and filename for AQS data."""
-    beginning = f"{AQS_BASE_URL}{'daily_' if daily else 'hourly_'}"
     fname_prefix = "daily_" if daily else "hourly_"
 
     p = param.upper()
