@@ -25,7 +25,7 @@ class TCCONReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         siteid: str | list[str] = None,
         as_xarray: bool = True,
         expand2d: bool = True,
@@ -70,11 +70,16 @@ class TCCONReader(PointReader):
                 raise ValueError("Either 'files' or 'siteid' must be provided.")
             files = self.build_urls(siteid)
 
-        if "engine" not in kwargs:
-            kwargs["engine"] = "netcdf4"
+        # Pop standard monetio kwargs that xr.open_mfdataset doesn't know
+        xr_kwargs = kwargs.copy()
+        for k in ["lazy", "as_xarray", "expand2d", "use_dask", "siteid"]:
+            xr_kwargs.pop(k, None)
+
+        if "engine" not in xr_kwargs:
+            xr_kwargs["engine"] = "netcdf4"
 
         # TCCON GGG2020 is NetCDF, treat as PointReader for harmonization
-        ds = xr.open_mfdataset(files, **kwargs)
+        ds = xr.open_mfdataset(files, **xr_kwargs)
 
         # Harmonize
         ds = self.harmonize(ds)
@@ -82,15 +87,23 @@ class TCCONReader(PointReader):
         # Update history
         ds = update_history(ds, "Read TCCON GGG2020 data.")
 
-        df = ds.to_dataframe().reset_index()
+        if as_xarray:
+            # Directly apply UGRID/2D logic if requested, avoiding round-trip
+            ds_out = self.to_xarray(ds, expand2d=expand2d, **kwargs)
+            ds_out = update_history(ds_out, "Converted TCCON data to UGRID xarray format.")
+            return ds_out
+
+        # Handle Lazy vs Eager DataFrame conversion
+        if use_dask or (hasattr(ds, "chunks") and ds.chunks):
+            from ..util import xr_to_dd
+
+            df = xr_to_dd(ds)
+        else:
+            df = ds.to_dataframe().reset_index()
+
         df.attrs = dict(ds.attrs)
 
-        if not as_xarray:
-            return df
-
-        ds_out = self.to_xarray(df, expand2d=expand2d)
-        ds_out = update_history(ds_out, "Converted TCCON data to UGRID xarray format.")
-        return ds_out
+        return df
 
     def build_urls(self, siteid: str | list[str]) -> list[str]:
         """

@@ -116,7 +116,7 @@ class GriddedReader(BaseReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -199,8 +199,8 @@ class PointReader(BaseReader):
         # Standard PointReader kwargs
         read_method: str = "read_csv",
         as_xarray: bool = True,
-        lazy: bool = False,
-        use_dask: bool = False,
+        lazy: bool = True,
+        use_dask: bool = True,
         meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
         expand2d: bool = True,
         **kwargs,

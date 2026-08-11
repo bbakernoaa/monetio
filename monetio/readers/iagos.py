@@ -35,11 +35,11 @@ class IAGOSReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
         as_xarray: bool = True,
         expand2d: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs,
     ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
@@ -89,23 +89,34 @@ class IAGOSReader(PointReader):
                 return xr.Dataset(attrs={"Conventions": "CF-1.8 UGRID-1.0"})
             return pd.DataFrame()
 
+        # Pop standard monetio kwargs that xr.open_mfdataset doesn't know
+        xr_kwargs = kwargs.copy()
+        for k in ["lazy", "as_xarray", "expand2d", "use_dask", "dates", "api_key"]:
+            xr_kwargs.pop(k, None)
+
         # IAGOS data is NetCDF. We use xr.open_mfdataset for robustness.
         # It handles both single and multiple files, and laziness.
-        ds = xr.open_mfdataset(files, combine="nested", concat_dim="time", **kwargs)
+        ds = xr.open_mfdataset(files, combine="nested", concat_dim="time", **xr_kwargs)
 
         ds = self.harmonize(ds)
 
-        df = ds.to_dataframe().reset_index()
+        if as_xarray:
+            # Directly apply UGRID/2D logic if requested, avoiding round-trip
+            ds = self.to_xarray(ds, expand2d=expand2d, **kwargs)
+            ds = update_history(ds, "Read IAGOS data using standardized preprocessing.")
+            return ds
+
+        # Handle Lazy vs Eager DataFrame conversion
+        if lazy or (hasattr(ds, "chunks") and ds.chunks):
+            from ..util import xr_to_dd
+
+            df = xr_to_dd(ds)
+        else:
+            df = ds.to_dataframe().reset_index()
+
         df.attrs = dict(ds.attrs)
 
-        if not as_xarray:
-            return df
-
-        ds = self.to_xarray(df, expand2d=expand2d)
-        ds = update_history(ds, "Converted IAGOS data to UGRID xarray format.")
-
-        ds = update_history(ds, "Read IAGOS data using standardized preprocessing.")
-        return ds
+        return df
 
     def build_urls(
         self,

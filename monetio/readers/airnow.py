@@ -33,7 +33,7 @@ class AirNowReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
         download: bool = False,
         wide_fmt: bool = True,
@@ -41,7 +41,7 @@ class AirNowReader(PointReader):
         daily: bool = False,
         bad_utcoffset: str = "drop",
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """

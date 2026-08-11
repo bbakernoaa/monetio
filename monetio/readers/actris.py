@@ -42,108 +42,115 @@ def get_ebas_catalog() -> str:
         return ""
 
 
-def parse_ebas_header(filename: str) -> dict[str, Any]:
+def parse_ebas_header(filename: str | None = None, f: Any = None) -> dict[str, Any]:
     """
     Parse EBAS NASA-Ames 1001 file header metadata.
 
     Parameters
     ----------
-    filename : str
+    filename : str, optional
         Path to the EBAS file.
+    f : file-like, optional
+        Open file-like object.
 
     Returns
     -------
     Dict[str, Any]
         Dictionary containing header metadata.
     """
-    fs = FileUtility.get_fs(filename)
+    if f is None:
+        if filename is None:
+            return {}
+        fs = FileUtility.get_fs(filename)
+        with fs.open(filename, "r") as f_obj:
+            return parse_ebas_header(f=f_obj)
+
     header = {}
-    with fs.open(filename, "r") as f:
-        line1 = f.readline().split()
-        if not line1:
-            return {}
-        try:
-            n_header = int(line1[0])
-            format_code = int(line1[1])
-        except (ValueError, IndexError):
-            return {}
+    line1 = f.readline().split()
+    if not line1:
+        return {}
+    try:
+        n_header = int(line1[0])
+        format_code = int(line1[1])
+    except (ValueError, IndexError):
+        return {}
 
-        if format_code != 1001:
-            # We only support 1001 for now
-            return {}
+    if format_code != 1001:
+        # We only support 1001 for now
+        return {}
 
-        header["n_header"] = n_header
-        header["PI"] = f.readline().strip()
-        header["organization"] = f.readline().strip()
-        header["submitter"] = f.readline().strip()
-        header["project"] = f.readline().strip()
-        header["volume"] = f.readline().strip()
+    header["n_header"] = n_header
+    header["PI"] = f.readline().strip()
+    header["organization"] = f.readline().strip()
+    header["submitter"] = f.readline().strip()
+    header["project"] = f.readline().strip()
+    header["volume"] = f.readline().strip()
 
-        # Dates
-        date_line = f.readline().split()
-        try:
-            header["date_valid"] = datetime.datetime(
-                int(date_line[0]), int(date_line[1]), int(date_line[2])
-            )
-        except (ValueError, IndexError):
-            header["date_valid"] = datetime.datetime(1970, 1, 1)
+    # Dates
+    date_line = f.readline().split()
+    try:
+        header["date_valid"] = datetime.datetime(
+            int(date_line[0]), int(date_line[1]), int(date_line[2])
+        )
+    except (ValueError, IndexError):
+        header["date_valid"] = datetime.datetime(1970, 1, 1)
 
-        header["dt"] = f.readline().strip()
-        header["ivar_name"] = f.readline().strip()
+    header["dt"] = f.readline().strip()
+    header["ivar_name"] = f.readline().strip()
 
-        # Number of DVARs
-        try:
-            n_vars = int(f.readline().strip())
-        except ValueError:
-            n_vars = 0
-        header["n_vars"] = n_vars
+    # Number of DVARs
+    try:
+        n_vars = int(f.readline().strip())
+    except ValueError:
+        n_vars = 0
+    header["n_vars"] = n_vars
 
-        # Scales
-        header["scales"] = [float(x) for x in f.readline().split()]
+    # Scales
+    header["scales"] = [float(x) for x in f.readline().split()]
 
-        # Missing values
-        header["missing_values"] = [float(x) for x in f.readline().split()]
+    # Missing values
+    header["missing_values"] = [float(x) for x in f.readline().split()]
 
-        # DVAR names and units
-        var_names = [header["ivar_name"]]
-        for _ in range(n_vars):
-            vname = f.readline().strip()
-            var_names.append(vname)
-        header["var_names"] = var_names
+    # DVAR names and units
+    var_names = [header["ivar_name"]]
+    for _ in range(n_vars):
+        vname = f.readline().strip()
+        var_names.append(vname)
+    header["var_names"] = var_names
 
-        # The rest are metadata lines (e.g. Station latitude, etc.)
-        metadata = []
-        current_line = 13 + n_vars
-        while current_line <= n_header:
-            line = f.readline().strip()
-            metadata.append(line)
-            current_line += 1
+    # The rest are metadata lines (e.g. Station latitude, etc.)
+    metadata = []
+    current_line = 13 + n_vars
+    while current_line <= n_header:
+        line = f.readline().strip()
+        metadata.append(line)
+        current_line += 1
 
-        header["metadata"] = metadata
+    header["metadata"] = metadata
 
-        # Try to extract site metadata from EBAS-style metadata lines
-        for line in metadata:
-            if "Station latitude:" in line:
-                try:
-                    header["latitude"] = float(line.split(":")[1].split()[0])
-                except (ValueError, IndexError):
-                    pass
-            elif "Station longitude:" in line:
-                try:
-                    header["longitude"] = float(line.split(":")[1].split()[0])
-                except (ValueError, IndexError):
-                    pass
-            elif "Station altitude:" in line:
-                try:
-                    header["elevation"] = float(line.split(":")[1].split()[0])
-                except (ValueError, IndexError):
-                    pass
-            elif "Station name:" in line:
-                header["siteid"] = line.split(":")[1].strip()
-            elif "Station code:" in line:
-                header["site_code"] = line.split(":")[1].strip()
-                if "siteid" not in header:
-                    header["siteid"] = header["site_code"]
+    # Try to extract site metadata from EBAS-style metadata lines
+    for line in metadata:
+        if "Station latitude:" in line:
+            try:
+                header["latitude"] = float(line.split(":")[1].split()[0])
+            except (ValueError, IndexError):
+                pass
+        elif "Station longitude:" in line:
+            try:
+                header["longitude"] = float(line.split(":")[1].split()[0])
+            except (ValueError, IndexError):
+                pass
+        elif "Station altitude:" in line:
+            try:
+                header["elevation"] = float(line.split(":")[1].split()[0])
+            except (ValueError, IndexError):
+                pass
+        elif "Station name:" in line:
+            header["siteid"] = line.split(":")[1].strip()
+        elif "Station code:" in line:
+            header["site_code"] = line.split(":")[1].strip()
+            if "siteid" not in header:
+                header["siteid"] = header["site_code"]
 
     return header
 
@@ -165,7 +172,10 @@ def read_actris(filename: str, **kwargs) -> pd.DataFrame:
     pd.DataFrame
         Data from the file.
     """
-    header = parse_ebas_header(filename)
+    header = kwargs.get("header")
+    if header is None:
+        header = parse_ebas_header(filename)
+
     if not header:
         return pd.DataFrame()
 
@@ -175,6 +185,7 @@ def read_actris(filename: str, **kwargs) -> pd.DataFrame:
         names=header["var_names"],
         sep=r"\s+",
         skipinitialspace=True,
+        storage_options=kwargs.get("storage_options"),
     )
 
     # Convert IVAR (usually start_time in days from reference date) to time
@@ -217,11 +228,12 @@ class ACTRISReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str | None = None,
         siteid: str | None = None,
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
+        expand2d: bool = False,
         **kwargs,
     ) -> xr.Dataset | pd.DataFrame | dd.DataFrame:
         """
@@ -281,7 +293,11 @@ class ACTRISReader(PointReader):
         if str(first_file).endswith(".nc"):
             # NetCDF format from THREDDS
             # OPeNDAP URLs work better with Xarray/NetCDF4
-            ds = xr.open_mfdataset(files, **kwargs)
+            xr_kwargs = kwargs.copy()
+            for k in ["lazy", "as_xarray", "expand2d", "use_dask", "dates", "siteid"]:
+                xr_kwargs.pop(k, None)
+
+            ds = xr.open_mfdataset(files, **xr_kwargs)
             # Coordinate standardization is already somewhat standard in EBAS NetCDF
             # but we may need to rename to match PointReader conventions
             rename_dict = {}
@@ -295,9 +311,21 @@ class ACTRISReader(PointReader):
                 ds = ds.rename(rename_dict)
 
             ds = update_history(ds, "Read ACTRIS/EBAS NetCDF data.")
-            if not as_xarray:
-                return ds.to_dataframe().reset_index()
-            return ds
+
+            if as_xarray:
+                # Directly apply UGRID/2D logic if requested, avoiding round-trip
+                return self.to_xarray(ds, expand2d=expand2d, **kwargs)
+
+            # Handle Lazy vs Eager DataFrame conversion for NetCDF path
+            if lazy or (hasattr(ds, "chunks") and ds.chunks):
+                from ..util import xr_to_dd
+
+                df = xr_to_dd(ds)
+            else:
+                df = ds.to_dataframe().reset_index()
+
+            df.attrs = dict(ds.attrs)
+            return df
 
         # Default to NASA-Ames 1001 format
         # We need metadata from the first file to setup lazy processing
@@ -307,8 +335,8 @@ class ACTRISReader(PointReader):
 
         header = parse_ebas_header(expanded_files[0])
 
-        # EBAS NASA-Ames files are space-separated
-        kwargs.setdefault("read_method", read_actris)
+        # Pass header to read_actris to avoid re-parsing
+        kwargs.setdefault("read_method", functools.partial(read_actris, header=header))
 
         # Use base class to open
         df = super().open_dataset(
@@ -329,11 +357,8 @@ class ACTRISReader(PointReader):
         df = self.harmonize(df)
 
         if as_xarray:
-            # Default to expand2d=False for ACTRIS as it's often irregular
-            if "expand2d" not in kwargs:
-                kwargs["expand2d"] = False
-
-            ds = self.to_xarray(df, **kwargs)
+            # ACTRIS data is often irregular, so we default expand2d to False in the signature.
+            ds = self.to_xarray(df, expand2d=expand2d, **kwargs)
 
             # Apply scaling and missing values lazily in Xarray
             ds = actris_preprocess(ds, header)
@@ -484,5 +509,7 @@ def actris_preprocess(ds: xr.Dataset, header: dict[str, Any]) -> xr.Dataset:
         # Scaling
         if scale != 1.0:
             ds[col] = ds[col].astype(float) * scale
+
+    ds = update_history(ds, "Applied ACTRIS scaling and missing value masking.")
 
     return ds

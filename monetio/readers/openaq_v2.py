@@ -226,7 +226,7 @@ class OpenAQV2Reader(PointReader):
         sites: list[str] = None,
         wide_fmt: bool = True,
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs: Any,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """

@@ -29,7 +29,7 @@ class RAQMSReader(GriddedReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         convert_to_ppb: bool = True,
         var_list: list[str] | None = None,
         surf_only: bool = False,

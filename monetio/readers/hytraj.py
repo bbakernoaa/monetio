@@ -35,11 +35,11 @@ class HYTRAJReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         taglist: list[Any] | None = None,
         renumber: bool = False,
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs: Any,
     ) -> pd.DataFrame | xr.Dataset | dd.DataFrame:
         """

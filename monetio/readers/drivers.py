@@ -135,6 +135,7 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
     # If the local directory already exists, clear it for a clean, idempotent run
     if not icechunk_url.startswith("s3://") and os.path.exists(icechunk_url):
         import shutil
+
         try:
             shutil.rmtree(icechunk_url)
         except Exception:
@@ -142,12 +143,13 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
 
     try:
         import icechunk
+        from virtualizarr.manifests.array import ManifestArray
     except ImportError:
         raise ImportError(
-            "Icechunk backend requires 'icechunk'. Install with: pip install monetio[icechunk]"
+            "Icechunk backend requires 'icechunk' and 'virtualizarr'. "
+            "Install with: pip install monetio[icechunk,virtualizarr]"
         )
 
-    from virtualizarr.manifests.array import ManifestArray
     unique_prefixes = set()
     for var in vds.variables.values():
         if isinstance(var.data, ManifestArray):
@@ -169,7 +171,7 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
             store_conf = icechunk.http_store()
         else:
             store_conf = icechunk.local_filesystem_store()
-        
+
         container = icechunk.VirtualChunkContainer(
             url_prefix=prefix,
             store=store_conf,
@@ -361,9 +363,15 @@ class XarrayDriver:
         ):
             xr_kwargs["storage_options"] = get_default_storage_options(str(file_list[0]))
 
-        # Remove ReferenceGenerator / VirtualiZarr / icechunk-only parameters from xr_kwargs
+        # Remove VirtualiZarr / icechunk-only parameters from xr_kwargs
         # so they do not cause TypeErrors in standard/fallback paths.
-        for key in ["use_icechunk", "max_workers", "network_timeout", "max_concurrent_requests", "max_scan_attempts", "store_path", "icechunk_url", "icechunk_repo"]:
+        # Note: 'use_icechunk', 'max_workers', etc. are preserved for the grib2io engine
+        # as it supports them natively in its xarray backend.
+        for key in [
+            "store_path",
+            "icechunk_url",
+            "icechunk_repo",
+        ]:
             xr_kwargs.pop(key, None)
 
         # Icechunk path: delegate to grib2io's own open_mfdataset, which builds a
@@ -445,6 +453,12 @@ class XarrayDriver:
                 for key in mfdataset_keys:
                     xr_kwargs.pop(key, None)
 
+                # For single file GRIB2 reading, if we are NOT using the icechunk path,
+                # we should pop 'use_icechunk' as standard xarray.open_dataset with grib2io engine
+                # might not expect it unless it's explicitly supported in that path.
+                # However, existing tests for grib2io expect it in some mocks.
+                # Let's keep it for now as it's passed explicitly in open_mfdataset path too.
+
                 return _call_with_retries(
                     xr.open_dataset,
                     file_list[0],
@@ -464,7 +478,7 @@ class XarrayDriver:
     def open(
         self,
         files: str | list[str],
-        use_dask: bool = False,
+        use_dask: bool = True,
         use_cubed: bool = False,
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
@@ -631,7 +645,6 @@ class XarrayDriver:
             # In MONETIO, GRIB virtual references must be routed through grib2io.
             if parser_name == "grib2":
                 try:
-                    import grib2io
                     from grib2io.kerchunk import ReferenceGenerator
                 except ImportError:
                     raise ImportError("grib2io is required for GRIB2 VirtualiZarr reading.")
@@ -688,7 +701,10 @@ class XarrayDriver:
                         manifest_path_str = virtualizarr_file
                     else:
                         import tempfile
-                        fd, temp_path_str = tempfile.mkstemp(suffix=".json", prefix="grib2_manifest_")
+
+                        fd, temp_path_str = tempfile.mkstemp(
+                            suffix=".json", prefix="grib2_manifest_"
+                        )
                         os.close(fd)
                         manifest_path_str = temp_path_str
 
@@ -699,10 +715,12 @@ class XarrayDriver:
                         # 3. Resolve store registry and register LocalStore
                         registry, _ = _select_store(file_list, storage_options)
                         from obstore.store import LocalStore
+
                         registry.register("file:///", LocalStore(prefix="/"))
 
                         # 4. Open virtual dataset
                         import pathlib
+
                         manifest_file = pathlib.Path(manifest_path_str).resolve()
                         manifest_url = manifest_file.as_uri()
 
@@ -731,7 +749,9 @@ class XarrayDriver:
                                 with open(virtualizarr_file, "w") as f_ref:
                                     ujson.dump(refs, f_ref)
                             except Exception as e:
-                                warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
+                                warnings.warn(
+                                    f"Failed to save virtualizarr_file {virtualizarr_file}: {e}"
+                                )
 
                     finally:
                         if virtualizarr_file is None and manifest_path_str is not None:
@@ -1102,7 +1122,7 @@ class PandasDriver:
         self,
         files: str | list[str],
         read_method: str | Callable = "read_csv",
-        lazy: bool = False,
+        lazy: bool = True,
         meta: pd.DataFrame | pd.Series | dict | tuple | None = None,
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
@@ -1111,7 +1131,7 @@ class PandasDriver:
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         as_xarray: bool = False,
         **kwargs,
     ) -> Union[pd.DataFrame, "dd.DataFrame"]:

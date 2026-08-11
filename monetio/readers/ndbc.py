@@ -26,14 +26,14 @@ class NDBCReader(PointReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         stations: str | list[str] = None,
         years: int | list[int] = None,
         realtime: bool = True,
         wide_fmt: bool = True,
         n_procs: int = 1,
         as_xarray: bool = True,
-        lazy: bool = False,
+        lazy: bool = True,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """

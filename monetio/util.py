@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import datetime
+from typing import TYPE_CHECKING
 
 import numpy as np
 import xarray as xr
+
+if TYPE_CHECKING:
+    import dask.dataframe as dd
 
 
 def normalize_pandas_freq(freq: str) -> str:
@@ -777,6 +783,61 @@ def ds_to_2d(ds, pivot=True, fixed_location=False):
 
         warnings.warn(f"ds_to_2d failed: {e}. Returning 1D dataset.")
         return ds
+
+
+def xr_to_dd(ds: xr.Dataset) -> dd.DataFrame:
+    """
+    Lazily convert an xarray Dataset to a dask DataFrame.
+    Preserves all variables and coordinates that are 1D on the primary dimension.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Input dataset.
+
+    Returns
+    -------
+    dask.dataframe.DataFrame
+        The resulting dask DataFrame.
+    """
+    import dask.array as da
+    import dask.dataframe as dd
+    import pandas as pd
+
+    # 1. Identify primary dimension (usually 'node' or 'time' for point data)
+    if "node" in ds.dims:
+        primary_dim = "node"
+    elif "time" in ds.dims:
+        primary_dim = "time"
+    elif len(ds.dims) >= 1:
+        primary_dim = list(ds.dims)[0]
+    else:
+        return dd.from_pandas(pd.DataFrame(), npartitions=1)
+
+    # 2. Collect all variables and coordinates associated with this dimension
+    # We include everything that has primary_dim as its ONLY dimension
+    items = []
+    for v in ds.variables:
+        if primary_dim in ds[v].dims and len(ds[v].dims) == 1:
+            items.append(v)
+
+    if not items:
+        return dd.from_pandas(pd.DataFrame(), npartitions=1)
+
+    # 3. Construct dask arrays for each item
+    dfs = []
+    for v in items:
+        data = ds[v].data
+        if not hasattr(data, "dask"):
+            # If it's already a numpy array, we still want it in dask for concat consistency.
+            # Respect existing dataset chunks if any.
+            chunks = ds.chunks.get(primary_dim, "auto") if ds.chunks else "auto"
+            data = da.from_array(data, chunks=chunks)
+
+        dfs.append(dd.from_dask_array(data, columns=[v]))
+
+    # 4. Concatenate and reset index to ensure it's a simple RangeIndex
+    return dd.concat(dfs, axis=1).reset_index(drop=True)
 
 
 def _try_merge_exact(left, right, *, right_name=None):

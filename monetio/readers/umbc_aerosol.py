@@ -26,7 +26,7 @@ class UMBCAerosolReader(GriddedReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         **kwargs,
     ) -> xr.Dataset:
         """

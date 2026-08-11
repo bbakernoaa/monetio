@@ -28,7 +28,7 @@ class Sentinel4Reader(GriddedReader):
         icechunk_repo: str | None = None,
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
-        use_dask: bool = False,
+        use_dask: bool = True,
         group: str | list[str] | None = None,
         qa_threshold: float | None = None,
         **kwargs,
