@@ -369,11 +369,9 @@ class XarrayDriver:
 
         # Remove ReferenceGenerator / VirtualiZarr / icechunk-only parameters from xr_kwargs
         # so they do not cause TypeErrors in standard/fallback paths.
-        # But we MUST preserve "use_icechunk" if use_icechunk is False, because native grib2io/xarray engine expects it.
+        # But we MUST preserve "use_icechunk" (set to False), "max_workers", "network_timeout",
+        # and "max_concurrent_requests" because native grib2io/xarray engine expects them.
         for key in [
-            "max_workers",
-            "network_timeout",
-            "max_concurrent_requests",
             "max_scan_attempts",
             "store_path",
             "icechunk_url",
@@ -385,8 +383,14 @@ class XarrayDriver:
             # Native grib2io backend expects "use_icechunk" to be passed if False
             xr_kwargs["use_icechunk"] = False
         else:
-            # If we are on the Icechunk path, we pop "use_icechunk" since it's passed explicitly to grib2io_open_mfdataset
-            xr_kwargs.pop("use_icechunk", None)
+            # If we are on the Icechunk path, we pop these keys since they are handled explicitly by grib2io_open_mfdataset
+            for key in [
+                "use_icechunk",
+                "max_workers",
+                "network_timeout",
+                "max_concurrent_requests",
+            ]:
+                xr_kwargs.pop(key, None)
 
         # Icechunk path: delegate to grib2io's own open_mfdataset, which builds a
         # SINGLE combined manifest across all files and writes ONE icechunk store
