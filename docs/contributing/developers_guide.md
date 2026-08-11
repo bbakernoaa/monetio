@@ -60,6 +60,7 @@ import numpy as np
 import dask.array as da
 from my_module import my_function
 
+
 @pytest.mark.parametrize("use_dask", [True, False])
 def test_my_function(use_dask):
     # Setup data

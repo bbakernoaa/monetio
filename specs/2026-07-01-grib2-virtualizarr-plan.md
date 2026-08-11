@@ -61,159 +61,157 @@
 - [ ] **Step 1: Replace old GRIB2 short-circuit logic**
   Replace the block under `if parser_name == "grib2":` inside the `if use_virtualizarr:` section of `XarrayDriver.open` with the new pipeline logic:
   ```python
-            if parser_name == "grib2":
-                try:
-                    import grib2io
-                    from grib2io.kerchunk import ReferenceGenerator
-                except ImportError:
-                    raise ImportError("grib2io is required for GRIB2 VirtualiZarr reading.")
+  if parser_name == "grib2":
+      try:
+          import grib2io
+          from grib2io.kerchunk import ReferenceGenerator
+      except ImportError:
+          raise ImportError("grib2io is required for GRIB2 VirtualiZarr reading.")
 
-                try:
-                    import ujson
-                    import zarr
-                    from virtualizarr import open_virtual_dataset
-                    from virtualizarr.parsers import KerchunkJSONParser
-                except ImportError:
-                    raise ImportError(
-                        "VirtualiZarr support for GRIB2 requires virtualizarr, obstore, obspec_utils, ujson, and zarr."
-                    )
+      try:
+          import ujson
+          import zarr
+          from virtualizarr import open_virtual_dataset
+          from virtualizarr.parsers import KerchunkJSONParser
+      except ImportError:
+          raise ImportError(
+              "VirtualiZarr support for GRIB2 requires virtualizarr, obstore, obspec_utils, ujson, and zarr."
+          )
 
-                # --- Kerchunk cache: load existing refs if available ---
-                refs = None
-                if (
-                    not use_icechunk
-                    and virtualizarr_file is not None
-                    and os.path.exists(virtualizarr_file)
-                ):
-                    try:
-                        with open(virtualizarr_file) as f_ref:
-                            refs = ujson.load(f_ref)
-                    except Exception as e:
-                        warnings.warn(f"Failed to load virtualizarr_file {virtualizarr_file}: {e}")
-                        refs = None
+      # --- Kerchunk cache: load existing refs if available ---
+      refs = None
+      if not use_icechunk and virtualizarr_file is not None and os.path.exists(virtualizarr_file):
+          try:
+              with open(virtualizarr_file) as f_ref:
+                  refs = ujson.load(f_ref)
+          except Exception as e:
+              warnings.warn(f"Failed to load virtualizarr_file {virtualizarr_file}: {e}")
+              refs = None
 
-                if refs is None:
-                    # Pop GRIB2-specific parameters to avoid reaching xarray
-                    filters = xr_kwargs.pop("filters", None)
-                    max_workers = xr_kwargs.pop("max_workers", None)
-                    storage_options = dict(xr_kwargs.get("storage_options", {}))
+      if refs is None:
+          # Pop GRIB2-specific parameters to avoid reaching xarray
+          filters = xr_kwargs.pop("filters", None)
+          max_workers = xr_kwargs.pop("max_workers", None)
+          storage_options = dict(xr_kwargs.get("storage_options", {}))
 
-                    # 1. Generate the reference manifest using grib2io
-                    gen = ReferenceGenerator(
-                        file_paths=file_list,
-                        filters=filters,
-                        storage_options=storage_options,
-                        max_workers=max_workers,
-                    )
-                    manifest = gen.generate()
+          # 1. Generate the reference manifest using grib2io
+          gen = ReferenceGenerator(
+              file_paths=file_list,
+              filters=filters,
+              storage_options=storage_options,
+              max_workers=max_workers,
+          )
+          manifest = gen.generate()
 
-                    # 2. Write manifest to virtualizarr_file or temporary JSON
-                    manifest_path_str = None
-                    if virtualizarr_file is not None:
-                        manifest_path_str = virtualizarr_file
-                    else:
-                        import tempfile
-                        fd, temp_path_str = tempfile.mkstemp(suffix=".json", prefix="grib2_manifest_")
-                        os.close(fd)
-                        manifest_path_str = temp_path_str
+          # 2. Write manifest to virtualizarr_file or temporary JSON
+          manifest_path_str = None
+          if virtualizarr_file is not None:
+              manifest_path_str = virtualizarr_file
+          else:
+              import tempfile
 
-                    try:
-                        with open(manifest_path_str, "w") as f:
-                            ujson.dump(manifest, f)
+              fd, temp_path_str = tempfile.mkstemp(suffix=".json", prefix="grib2_manifest_")
+              os.close(fd)
+              manifest_path_str = temp_path_str
 
-                        # 3. Resolve store registry and register LocalStore
-                        registry, _ = _select_store(file_list, storage_options)
-                        from obstore.store import LocalStore
-                        registry.register("file:///", LocalStore(prefix="/"))
+          try:
+              with open(manifest_path_str, "w") as f:
+                  ujson.dump(manifest, f)
 
-                        # 4. Open virtual dataset
-                        manifest_file = pathlib.Path(manifest_path_str).resolve()
-                        manifest_url = manifest_file.as_uri()
+              # 3. Resolve store registry and register LocalStore
+              registry, _ = _select_store(file_list, storage_options)
+              from obstore.store import LocalStore
 
-                        vds = _call_with_retries(
-                            open_virtual_dataset,
-                            url=manifest_url,
-                            registry=registry,
-                            parser=KerchunkJSONParser(),
-                            loadable_variables=[],
-                            attempts=retry_attempts,
-                            base_sleep=retry_base_sleep,
-                        )
+              registry.register("file:///", LocalStore(prefix="/"))
 
-                        # 5. Route to icechunk or kerchunk
-                        if use_icechunk:
-                            ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file)
-                            if preprocess:
-                                ds = preprocess(ds)
-                            return ds
+              # 4. Open virtual dataset
+              manifest_file = pathlib.Path(manifest_path_str).resolve()
+              manifest_url = manifest_file.as_uri()
 
-                        refs = vds.vz.to_kerchunk()
+              vds = _call_with_retries(
+                  open_virtual_dataset,
+                  url=manifest_url,
+                  registry=registry,
+                  parser=KerchunkJSONParser(),
+                  loadable_variables=[],
+                  attempts=retry_attempts,
+                  base_sleep=retry_base_sleep,
+              )
 
-                        # Write refs to cache if requested
-                        if virtualizarr_file is not None:
-                            try:
-                                with open(virtualizarr_file, "w") as f_ref:
-                                    ujson.dump(refs, f_ref)
-                            except Exception as e:
-                                warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
+              # 5. Route to icechunk or kerchunk
+              if use_icechunk:
+                  ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file)
+                  if preprocess:
+                      ds = preprocess(ds)
+                  return ds
 
-                    finally:
-                        if virtualizarr_file is None and manifest_path_str is not None:
-                            try:
-                                os.remove(manifest_path_str)
-                            except Exception:
-                                pass
+              refs = vds.vz.to_kerchunk()
 
-                # --- Materialize Dataset via reference mapper ---
-                remote_protocol = "file"
-                remote_options = {}
-                if file_list[0].startswith("s3://"):
-                    remote_protocol = "s3"
-                    remote_options = dict(xr_kwargs.get("storage_options", {}))
-                    if "anon" not in remote_options:
-                        remote_options["anon"] = True
-                elif file_list[0].startswith("http"):
-                    remote_protocol = "http"
+              # Write refs to cache if requested
+              if virtualizarr_file is not None:
+                  try:
+                      with open(virtualizarr_file, "w") as f_ref:
+                          ujson.dump(refs, f_ref)
+                  except Exception as e:
+                      warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
 
-                mapper = fsspec.get_mapper(
-                    "reference://",
-                    fo=refs,
-                    remote_protocol=remote_protocol,
-                    remote_options=remote_options,
-                )
+          finally:
+              if virtualizarr_file is None and manifest_path_str is not None:
+                  try:
+                      os.remove(manifest_path_str)
+                  except Exception:
+                      pass
 
-                # Clean up open_mfdataset-only / virtualizarr kwargs
-                mfdataset_keys = [
-                    "combine",
-                    "concat_dim",
-                    "parallel",
-                    "compat",
-                    "data_vars",
-                    "coords",
-                    "ids",
-                    "infer_order",
-                    "join",
-                ]
-                for key in mfdataset_keys:
-                    xr_kwargs.pop(key, None)
+      # --- Materialize Dataset via reference mapper ---
+      remote_protocol = "file"
+      remote_options = {}
+      if file_list[0].startswith("s3://"):
+          remote_protocol = "s3"
+          remote_options = dict(xr_kwargs.get("storage_options", {}))
+          if "anon" not in remote_options:
+              remote_options["anon"] = True
+      elif file_list[0].startswith("http"):
+          remote_protocol = "http"
 
-                xr_kwargs.pop("engine", None)
-                xr_kwargs.pop("use_virtualizarr", None)
-                xr_kwargs.pop("virtualizarr_backend", None)
-                xr_kwargs.pop("virtualizarr_file", None)
-                xr_kwargs.pop("virtualizarr_parser", None)
-                xr_kwargs.pop("icechunk_url", None)
-                xr_kwargs.pop("icechunk_repo", None)
+      mapper = fsspec.get_mapper(
+          "reference://",
+          fo=refs,
+          remote_protocol=remote_protocol,
+          remote_options=remote_options,
+      )
 
-                return _call_with_retries(
-                    xr.open_dataset,
-                    mapper,
-                    attempts=retry_attempts,
-                    base_sleep=retry_base_sleep,
-                    engine="zarr",
-                    consolidated=False,
-                    **xr_kwargs,
-                )
+      # Clean up open_mfdataset-only / virtualizarr kwargs
+      mfdataset_keys = [
+          "combine",
+          "concat_dim",
+          "parallel",
+          "compat",
+          "data_vars",
+          "coords",
+          "ids",
+          "infer_order",
+          "join",
+      ]
+      for key in mfdataset_keys:
+          xr_kwargs.pop(key, None)
+
+      xr_kwargs.pop("engine", None)
+      xr_kwargs.pop("use_virtualizarr", None)
+      xr_kwargs.pop("virtualizarr_backend", None)
+      xr_kwargs.pop("virtualizarr_file", None)
+      xr_kwargs.pop("virtualizarr_parser", None)
+      xr_kwargs.pop("icechunk_url", None)
+      xr_kwargs.pop("icechunk_repo", None)
+
+      return _call_with_retries(
+          xr.open_dataset,
+          mapper,
+          attempts=retry_attempts,
+          base_sleep=retry_base_sleep,
+          engine="zarr",
+          consolidated=False,
+          **xr_kwargs,
+      )
   ```
 
 ---

@@ -65,7 +65,9 @@ class MODISL2Reader(GriddedReader):
         >>> ds = reader.open_dataset('MYD04_L2.A2023126.1830.061.2023127154555.hdf', variable_dict=vdict)
         """
         if "preprocess" not in kwargs:
-            kwargs["preprocess"] = lambda ds: modis_l2_preprocess(ds, variable_dict=variable_dict)
+            from functools import partial
+
+            kwargs["preprocess"] = partial(modis_l2_preprocess, variable_dict=variable_dict)
 
         # If variable_dict is provided, we can try to only load those variables
         # plus the required coordinates (Latitude, Longitude, Scan_Start_Time)
@@ -123,7 +125,7 @@ def modis_l2_preprocess(ds: xr.Dataset, variable_dict: dict = None) -> xr.Datase
 
     Examples
     --------
-    >>> vdict = {'AOD': {'scale': 0.001, 'quality_flag': 2}, 'Quality_Assurance': {}}
+    >>> vdict = {'AOD': {'scale': 0.001}, 'Quality_Assurance': {'quality_flag': 2}}
     >>> ds = modis_l2_preprocess(ds, variable_dict=vdict)
     """
     # 1. Standardize dimensions and coordinates

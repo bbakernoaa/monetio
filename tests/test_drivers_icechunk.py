@@ -180,14 +180,29 @@ class TestOpenViaIcechunk:
 
         expected_ds = xr.Dataset({"temp": [1, 2, 3]})
 
+        # Mock virtualizarr module to avoid ModuleNotFoundError when running tests without it installed
+        class DummyManifestArray:
+            pass
+
+        mock_virtualizarr = mock.MagicMock()
+        mock_virtualizarr.ManifestArray = DummyManifestArray
+
         with (
-            mock.patch.dict("sys.modules", {"icechunk": mock_icechunk}),
+            mock.patch.dict(
+                "sys.modules",
+                {
+                    "icechunk": mock_icechunk,
+                    "virtualizarr": mock_virtualizarr,
+                    "virtualizarr.manifests.array": mock_virtualizarr,
+                },
+            ),
             mock.patch("xarray.open_zarr", return_value=expected_ds) as mock_open_zarr,
         ):
             result = _open_via_icechunk(vds, "/tmp/repo", None)
 
         # Verify workflow
-        mock_icechunk.Repository.open_or_create.assert_called_once_with("/tmp/repo")
+        mock_icechunk.local_filesystem_storage.assert_called_once_with("/tmp/repo")
+        mock_icechunk.Repository.open_or_create.assert_called_once()
         mock_repo.writable_session.assert_called_once_with("main")
         vds.virtualize.to_icechunk.assert_called_once_with(mock_store)
         mock_session.commit.assert_called_once_with("VirtualiZarr references")
