@@ -133,3 +133,24 @@ def test_airnow_no_hidden_compute(mock_airnow_file, monkeypatch):
     # In Dask-Expr (Pandas 3.0+), lengths=True might trigger a compute of partitions to find sizes.
     # We allow minimal computes for metadata/structure discovery if required by the backend.
     assert compute_calls <= 2
+
+
+def test_airnow_n_procs_deprecation(mock_airnow_file, monkeypatch):
+    """Verify that passing n_procs raises a DeprecationWarning."""
+
+    def mock_read_monitor(*args, **kwargs):
+        return pd.DataFrame(
+            {
+                "siteid": ["012345678", "999999999"],
+                "latitude": [40.0, 35.0],
+                "longitude": [-80.0, -120.0],
+            }
+        )
+
+    import monetio.readers.epa_utils as epa_utils
+
+    monkeypatch.setattr(epa_utils, "read_monitor_file", mock_read_monitor)
+
+    reader = AirNowReader()
+    with pytest.deprecated_call():
+        reader.open_dataset(files=mock_airnow_file, n_procs=2, lazy=False, as_xarray=False)
