@@ -37,7 +37,7 @@ class AirNowReader(PointReader):
         dates: pd.DatetimeIndex | list[datetime] | datetime | str = None,
         download: bool = False,
         wide_fmt: bool = True,
-        n_procs: int = 1,
+        n_procs: int | None = None,
         daily: bool = False,
         bad_utcoffset: str = "drop",
         as_xarray: bool = True,
@@ -74,7 +74,7 @@ class AirNowReader(PointReader):
         wide_fmt : bool, optional
             Whether to return data in wide format (pollutants as columns), by default True.
         n_procs : int, optional
-            Number of processors for dask compute (if not lazy), by default 1.
+            Deprecated. Retained for backward compatibility.
         daily : bool, optional
             Whether to load daily data instead of hourly, by default False.
         bad_utcoffset : str, optional
@@ -135,15 +135,20 @@ class AirNowReader(PointReader):
             **kwargs,
         )
 
-        # Post-processing
-        # We only perform wide_fmt here if NOT lazy, to avoid the hidden compute in long_to_wide
-        do_wide = wide_fmt and not lazy
+        if n_procs is not None:
+            import warnings
+
+            warnings.warn(
+                "The 'n_procs' parameter is deprecated and will be removed in a future release.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        # Post-processing (keep long format during DataFrame processing)
+        do_wide = wide_fmt and not lazy and not as_xarray
         df = self._post_process(df, daily=daily, wide_fmt=do_wide, bad_utcoffset=bad_utcoffset)
 
         df = self.harmonize(df)
-
-        if not lazy and hasattr(df, "compute") and not isinstance(df, pd.DataFrame):
-            df = df.compute(num_workers=n_procs)
 
         if as_xarray:
             # Filter out expand2d from kwargs if present to avoid double-passing
