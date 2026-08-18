@@ -137,6 +137,7 @@ def test_airnow_no_hidden_compute(mock_airnow_file, monkeypatch):
 
 def test_airnow_n_procs_deprecation(mock_airnow_file, monkeypatch):
     """Verify that passing n_procs raises a DeprecationWarning."""
+
     def mock_read_monitor(*args, **kwargs):
         return pd.DataFrame(
             {
