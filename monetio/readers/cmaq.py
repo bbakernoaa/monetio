@@ -80,6 +80,12 @@ class CMAQReader(GriddedReader):
         -------
         xarray.Dataset
             The processed CMAQ dataset.
+
+        Examples
+        --------
+        >>> from monetio.readers.cmaq import CMAQReader
+        >>> reader = CMAQReader()
+        >>> ds = reader.open_dataset("CMAQ_output.nc")
         """
         # 1. Setup preprocessing
         if "preprocess" not in kwargs:
@@ -136,6 +142,12 @@ class CMAQReader(GriddedReader):
         -------
         xr.Dataset
             Harmonized dataset.
+
+        Examples
+        --------
+        >>> from monetio.readers.cmaq import CMAQReader
+        >>> reader = CMAQReader()
+        >>> ds = reader.harmonize(ds)
         """
         # 1. Standardize variable names and drop redundant ones
         ds = _harmonize_ioapi_vars(ds)
