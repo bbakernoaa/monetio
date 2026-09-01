@@ -25,7 +25,10 @@ from .sat_utils import update_history
 @register_reader("camx")
 class CAMxReader(GriddedReader):
     """
-    Reader for CAMx model output files.
+    Reader for Comprehensive Air Quality Model with extensions (CAMx) model output files.
+
+    Inherits from GriddedReader to provide backend-agnostic loading, coordinate harmonization,
+    and diagnostic calculations for CAMx netCDF datasets.
     """
 
     def open_dataset(
@@ -45,41 +48,48 @@ class CAMxReader(GriddedReader):
         **kwargs: Any,
     ) -> xr.Dataset:
         """
-        Reads CAMx netCDF files.
+        Reads and harmonizes CAMx netCDF files into an xarray Dataset.
 
         Parameters
         ----------
-        files : Union[str, List[str]]
-            File path(s), URL(s), or glob pattern.
-        earth_radius : float, optional
-            Earth radius in meters, by default 6370000.
-        convert_to_ppb : bool, optional
-            Convert gas species from ppmV to ppbV, by default True.
-        drop_duplicates : bool, optional
-            Drop duplicate time steps within each file, by default False.
-        use_virtualizarr : bool, optional
-            Whether to use VirtualiZarr, by default False.
-        virtualizarr_file : str or None, optional
-            Path to the VirtualiZarr file, by default None.
-        virtualizarr_parser : str or None, optional
-            The VirtualiZarr parser to use (e.g. 'hdf5').
-        virtualizarr_backend : str, optional
-            VirtualiZarr backend, by default "kerchunk".
-        icechunk_repo : str or None, optional
-            Path to the Icechunk repository, by default None.
-        use_icechunk : bool, optional
-            Whether to use Icechunk, by default False.
-        icechunk_url : str or None, optional
-            Path to the Icechunk repository, by default None.
-        use_dask : bool, optional
-            Whether to use Dask for lazy loading, by default False.
+        files : str or list of str
+            File path(s), URL(s), or glob pattern matching CAMx output file(s).
+        earth_radius : float, default 6370000
+            Earth radius in meters for map projection calculations.
+        convert_to_ppb : bool, default True
+            Whether to convert gas species concentrations from ppmV to ppbV.
+        drop_duplicates : bool, default False
+            Whether to drop duplicate time steps within each file.
+        use_virtualizarr : bool, default False
+            Whether to use VirtualiZarr for dataset opening.
+        virtualizarr_file : str or None, default None
+            Path to the VirtualiZarr metadata file.
+        virtualizarr_parser : str or None, default None
+            The VirtualiZarr parser engine (e.g., 'hdf5').
+        virtualizarr_backend : str, default "kerchunk"
+            Backend engine for VirtualiZarr serialization.
+        icechunk_repo : str or None, default None
+            Path to local Icechunk repository.
+        use_icechunk : bool, default False
+            Whether to enable Icechunk repository streaming.
+        icechunk_url : str or None, default None
+            URL endpoint of the Icechunk repository.
+        use_dask : bool, default False
+            Whether to load dataset lazily using Dask arrays.
         **kwargs : Any
-            Additional arguments passed to the driver.
+            Additional keyword arguments passed to the underlying driver or preprocessing.
 
         Returns
         -------
-        xarray.Dataset
-            The processed CAMx dataset.
+        xr.Dataset
+            The harmonized CAMx model output dataset.
+
+        Examples
+        --------
+        >>> from monetio.readers.camx import CAMxReader
+        >>> reader = CAMxReader()
+        >>> ds = reader.open_dataset("camx_out.nc", convert_to_ppb=True)
+        >>> print(ds)
         """
         # Set default backend kwargs for CAMx if not present
         if "engine" not in kwargs:
@@ -127,17 +137,23 @@ class CAMxReader(GriddedReader):
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """
-        Standardize variable names and metadata.
+        Standardize variable names, metadata attributes, and coordinate dimensions.
 
         Parameters
         ----------
         ds : xr.Dataset
-            CAMx dataset.
+            Input CAMx dataset.
 
         Returns
         -------
         xr.Dataset
-            Harmonized dataset.
+            Harmonized CAMx dataset with standardized variable names and cleaned attributes.
+
+        Examples
+        --------
+        >>> from monetio.readers.camx import CAMxReader
+        >>> reader = CAMxReader()
+        >>> ds_harmonized = reader.harmonize(ds)
         """
         # 1. Standardize variable names and drop redundant ones
         ds = _harmonize_ioapi_vars(ds)
@@ -158,25 +174,29 @@ def camx_preprocess(
     convert_to_ppb: bool = True,
 ) -> xr.Dataset:
     """
-    Preprocess function for a single CAMx file.
+    Preprocess a single CAMx dataset before merging or finalizing.
+
+    Adds lazy diagnostic calculations, assigns grid coordinate projection,
+    formats time dimensions, converts unit scales, and applies scientific hygiene.
 
     Parameters
     ----------
-    ds : xarray.Dataset
+    ds : xr.Dataset
         Input CAMx dataset.
-    earth_radius : float, optional
-        Earth radius in meters, by default 6370000.
-    convert_to_ppb : bool, optional
-        Convert gas species to ppbV, by default True.
+    earth_radius : float, default 6370000
+        Earth radius in meters for grid projection.
+    convert_to_ppb : bool, default True
+        Whether to convert gas species units from ppmV to ppbV.
 
     Returns
     -------
-    xarray.Dataset
-        Processed dataset.
+    xr.Dataset
+        Preprocessed CAMx dataset.
 
     Examples
     --------
-    >>> ds = camx_preprocess(ds, convert_to_ppb=True)
+    >>> from monetio.readers.camx import camx_preprocess
+    >>> ds_preprocessed = camx_preprocess(ds, convert_to_ppb=True)
     """
     # 1. Add lazy diagnostic variables
     for name, spec in DIAGNOSTICS.items():
@@ -223,7 +243,21 @@ def camx_preprocess(
 
 def _predefined_mapping_tables(ds: xr.Dataset) -> xr.Dataset:
     """
-    Adds mapping tables for backward compatibility.
+    Attach predefined observational network mapping tables to dataset attributes.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input CAMx dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with attached `mapping_tables` attribute.
+
+    Examples
+    --------
+    >>> ds_mapped = _predefined_mapping_tables(ds)
     """
     # Ported from legacy code
     to_aqs = {
