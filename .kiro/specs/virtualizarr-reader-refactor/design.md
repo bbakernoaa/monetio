@@ -118,10 +118,9 @@ class XarrayDriver:
         use_virtualizarr: bool = False,
         virtualizarr_file: str | None = None,
         virtualizarr_backend: str = "kerchunk",  # NEW: "kerchunk" | "icechunk"
-        icechunk_repo: str | None = None,         # NEW: path to Icechunk repo
+        icechunk_repo: str | None = None,  # NEW: path to Icechunk repo
         **kwargs,
-    ) -> xr.Dataset:
-        ...
+    ) -> xr.Dataset: ...
 ```
 
 **Store selection logic** (already partially implemented):
@@ -189,6 +188,7 @@ def deprecated_wrapper(legacy_name: str, load_equivalent: str, removal_version: 
     removal_version : str
         Version when the function will be removed.
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -199,7 +199,9 @@ def deprecated_wrapper(legacy_name: str, load_equivalent: str, removal_version: 
                 stacklevel=2,
             )
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 ```
 
@@ -408,8 +410,7 @@ raise ImportError(
 
 ```python
 raise ImportError(
-    "Icechunk backend requires 'icechunk'. "
-    "Install with: pip install monetio[icechunk]"
+    "Icechunk backend requires 'icechunk'. Install with: pip install monetio[icechunk]"
 )
 ```
 
@@ -432,8 +433,7 @@ except (json.JSONDecodeError, KeyError) as e:
 ```python
 if virtualizarr_backend not in ("kerchunk", "icechunk"):
     raise ValueError(
-        f"Invalid virtualizarr_backend '{virtualizarr_backend}'. "
-        "Must be 'kerchunk' or 'icechunk'."
+        f"Invalid virtualizarr_backend '{virtualizarr_backend}'. Must be 'kerchunk' or 'icechunk'."
     )
 ```
 

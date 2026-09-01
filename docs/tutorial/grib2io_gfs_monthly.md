@@ -75,16 +75,16 @@ print(ds)
 
 # Single chemistry variable (example: 2 m TMP if present in selected product).
 ds_var = reader.open_chem(
-  dates=dates,
-  short_name="TMP",
-  type_of_first_fixed_surface=103,
-  value_of_first_fixed_surface=2,
+    dates=dates,
+    short_name="TMP",
+    type_of_first_fixed_surface=103,
+    value_of_first_fixed_surface=2,
 )
 
 # Multiple variables by shortName list.
 ds_multi = reader.open_chem(
-  dates=dates,
-  short_name=["totAOD550", "DUST", "TMP"],
+    dates=dates,
+    short_name=["totAOD550", "DUST", "TMP"],
 )
 
 # All chemistry variables in the file(s): leave short_name unset.
