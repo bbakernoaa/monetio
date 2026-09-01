@@ -148,11 +148,14 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
             "Icechunk backend requires 'icechunk'. Install with: pip install monetio[icechunk]"
         )
 
-    from virtualizarr.manifests.array import ManifestArray
+    try:
+        from virtualizarr.manifests.array import ManifestArray
+    except ImportError:
+        ManifestArray = None
 
     unique_prefixes = set()
     for var in vds.variables.values():
-        if isinstance(var.data, ManifestArray):
+        if ManifestArray is not None and isinstance(var.data, ManifestArray):
             for path in var.data.manifest.iter_nonempty_paths():
                 if path.startswith("s3://"):
                     parts = path[5:].split("/", 1)
@@ -318,9 +321,10 @@ class FileUtility:
                 # but it might not be available or consistent across all versions/fs.
                 # Manual fix for common cases in monetio:
                 protocol = ""
-                possible_protocol, _host_path = path_input.split("://", 1)
-                if possible_protocol in ("s3", "http", "https", "ftp"):
-                    protocol = f"{possible_protocol}://"
+                if "://" in path_input:
+                    possible_protocol, _host_path = path_input.split("://", 1)
+                    if possible_protocol in ("s3", "http", "https", "ftp"):
+                        protocol = f"{possible_protocol}://"
 
                 if protocol and not str(files[0]).startswith(protocol):
                     files = [
@@ -366,11 +370,6 @@ class XarrayDriver:
         # Remove ReferenceGenerator / VirtualiZarr / icechunk-only parameters from xr_kwargs
         # so they do not cause TypeErrors in standard/fallback paths.
         for key in [
-            "use_icechunk",
-            "max_workers",
-            "network_timeout",
-            "max_concurrent_requests",
-            "max_scan_attempts",
             "store_path",
             "icechunk_url",
             "icechunk_repo",
