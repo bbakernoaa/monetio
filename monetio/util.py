@@ -607,13 +607,10 @@ def force_object_strings(df):
     attrs = getattr(df, "attrs", {}).copy()
 
     if is_dask:
-        # For Dask, we use assign to ensure metadata is updated
-        # and we explicitly cast to object.
-        for col in df.columns:
-            # We use .dtype to avoid triggering is_all_strings(df[col])
-            # which would call len(df[col]) and trigger a compute.
-            if pd.api.types.is_string_dtype(df[col].dtype):
-                df = df.assign(**{col: df[col].astype(object)})
+        # For Dask, we use a single assign call to avoid building nested expression trees
+        str_cols = [col for col in df.columns if pd.api.types.is_string_dtype(df[col].dtype)]
+        if str_cols:
+            df = df.assign(**{col: df[col].astype(object) for col in str_cols})
     else:
         df = df.copy()
         for col in df.columns:

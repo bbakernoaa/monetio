@@ -140,6 +140,51 @@ def test_add_data_one_site():
         raise
 
 
+def test_point_reader_to_xarray_eager_and_lazy_dtypes():
+    """Verify PointReader.to_xarray retains correct dtypes in eager and lazy modes."""
+    import dask.dataframe as dd
+    import xarray as xr
+
+    from monetio.readers.base import PointReader
+
+    df_eager = pd.DataFrame(
+        {
+            "siteid": ["S1", "S2"],
+            "time": pd.to_datetime(["2023-01-01 00:00", "2023-01-01 01:00"]),
+            "latitude": [40.0, 41.0],
+            "longitude": [-105.0, -104.0],
+            "elevation": [1600.0, 1500.0],
+            "obs": [10.5, 12.3],
+            "flag": [True, False],
+            "count": [100, 200],
+        }
+    )
+
+    reader = PointReader()
+
+    # Eager path
+    ds_eager = reader.to_xarray(df_eager, expand2d=False)
+    assert isinstance(ds_eager, xr.Dataset)
+    assert np.issubdtype(ds_eager["time"].dtype, np.datetime64)
+    assert ds_eager["latitude"].dtype == np.dtype("float64")
+    assert ds_eager["obs"].dtype == np.dtype("float64")
+    assert ds_eager["count"].dtype == np.dtype("int64")
+    assert ds_eager["flag"].dtype == np.dtype("bool")
+
+    # Lazy path
+    df_lazy = dd.from_pandas(df_eager, npartitions=2)
+    ds_lazy = reader.to_xarray(df_lazy, expand2d=False)
+    assert isinstance(ds_lazy, xr.Dataset)
+    assert np.issubdtype(ds_lazy["time"].dtype, np.datetime64)
+    assert ds_lazy["latitude"].dtype == np.dtype("float64")
+    assert ds_lazy["obs"].dtype == np.dtype("float64")
+    assert ds_lazy["count"].dtype == np.dtype("int64")
+    assert ds_lazy["flag"].dtype == np.dtype("bool")
+
+    # Check that computed lazy dataset matches eager dataset
+    xr.testing.assert_identical(ds_eager, ds_lazy.compute())
+
+
 def test_aeronet_aero_protocol():
     import xarray as xr
 

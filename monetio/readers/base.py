@@ -355,14 +355,14 @@ class PointReader(BaseReader):
 
             if is_dask:
                 # 4a. Lazy Path
-                # Exception to "No Hidden Computes": lengths=True is often required by Xarray
-                # to determine dimension sizes for the Dataset structure.
-                # For dask-expr collections, this may trigger a small compute.
+                # Precompute partition lengths once to avoid redundant length calculations across columns.
+                # Each column retains its native 1D dtype, vectorized memory layout, and isolated task graph.
                 ds = xr.Dataset()
+                lengths = tuple(temp_df.map_partitions(len).compute())
                 for col in temp_df.columns:
                     if col == "node" and "node" in ds.dims:
                         continue
-                    ds[col] = (("node",), temp_df[col].to_dask_array(lengths=True))
+                    ds[col] = (("node",), temp_df[col].to_dask_array(lengths=lengths))
             else:
                 # 4b. Eager Path
                 # Consistently use 1D for both Eager and Lazy by default.
