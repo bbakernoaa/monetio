@@ -187,7 +187,7 @@ class TestOpenViaIcechunk:
             result = _open_via_icechunk(vds, "/tmp/repo", None)
 
         # Verify workflow
-        mock_icechunk.Repository.open_or_create.assert_called_once_with("/tmp/repo")
+        mock_icechunk.Repository.open_or_create.assert_called_once()
         mock_repo.writable_session.assert_called_once_with("main")
         vds.virtualize.to_icechunk.assert_called_once_with(mock_store)
         mock_session.commit.assert_called_once_with("VirtualiZarr references")

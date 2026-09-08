@@ -150,16 +150,20 @@ def test_get_fs_passes_s3_kwargs_through(monkeypatch):
 
 
 def test_grib2_virtual_flag_redirects_to_virtualizarr_pipeline(monkeypatch):
+    pytest.importorskip("grib2io")
     from unittest import mock
+
     driver = XarrayDriver()
-    
+
     # Mock FileUtility to return the exact list of files
     monkeypatch.setattr(FileUtility, "expand_paths", lambda files_in, fs=None, **kwargs: files_in)
 
     # Mock grib2io ReferenceGenerator
     mock_gen = mock.MagicMock()
     mock_gen.generate.return_value = {"version": 1, "refs": {}}
-    monkeypatch.setattr("grib2io.kerchunk.ReferenceGenerator", lambda *args, **kwargs: mock_gen, raising=False)
+    monkeypatch.setattr(
+        "grib2io.kerchunk.ReferenceGenerator", lambda *args, **kwargs: mock_gen, raising=False
+    )
 
     # Mock open_virtual_dataset
     mock_vds = mock.MagicMock()
@@ -180,30 +184,41 @@ def test_grib2_virtual_flag_redirects_to_virtualizarr_pipeline(monkeypatch):
         "s3://noaa-gfs-bdp-pds/example_2.grib2",
     ]
 
-    with pytest.warns(DeprecationWarning, match="For engine='grib2io', use_virtualizarr is redirected to the VirtualiZarr GRIB2 pipeline"):
-        res = driver.open(files, use_virtualizarr=True, engine="grib2io", storage_options={"anon": True})
+    with pytest.warns(
+        DeprecationWarning,
+        match="For engine='grib2io', use_virtualizarr is redirected to the VirtualiZarr GRIB2 pipeline",
+    ):
+        res = driver.open(
+            files, use_virtualizarr=True, engine="grib2io", storage_options={"anon": True}
+        )
 
     assert res is mock_dataset
     mock_open_virtual.assert_called_once()
 
 
 def test_grib2_virtualizarr_pipeline_execution(monkeypatch):
+    pytest.importorskip("grib2io")
     from unittest import mock
+
     driver = XarrayDriver()
-    
+
     # Mock FileUtility
     monkeypatch.setattr(FileUtility, "expand_paths", lambda files_in, fs=None, **kwargs: files_in)
 
     # Track arguments passed to ReferenceGenerator
     generator_args = []
+
     class DummyGenerator:
         def __init__(self, file_paths, filters=None, storage_options=None, max_workers=None):
-            generator_args.append({
-                "file_paths": file_paths,
-                "filters": filters,
-                "storage_options": storage_options,
-                "max_workers": max_workers
-            })
+            generator_args.append(
+                {
+                    "file_paths": file_paths,
+                    "filters": filters,
+                    "storage_options": storage_options,
+                    "max_workers": max_workers,
+                }
+            )
+
         def generate(self):
             return {"version": 1, "refs": {}}
 
@@ -228,7 +243,7 @@ def test_grib2_virtualizarr_pipeline_execution(monkeypatch):
         virtualizarr_parser="grib2",
         filters={"shortName": "TMP"},
         max_workers=8,
-        storage_options={"anon": True}
+        storage_options={"anon": True},
     )
 
     assert len(generator_args) == 1
@@ -240,9 +255,11 @@ def test_grib2_virtualizarr_pipeline_execution(monkeypatch):
 
 
 def test_grib2_virtualizarr_pipeline_with_cached_refs(monkeypatch):
+    pytest.importorskip("grib2io")
     from unittest import mock
+
     driver = XarrayDriver()
-    
+
     # Mock FileUtility
     monkeypatch.setattr(FileUtility, "expand_paths", lambda files_in, fs=None, **kwargs: files_in)
 
@@ -256,6 +273,7 @@ def test_grib2_virtualizarr_pipeline_with_cached_refs(monkeypatch):
     # Mock ujson.load to return dummy references
     dummy_refs = {"version": 1, "refs": {"dummy": "data"}}
     import ujson
+
     monkeypatch.setattr(ujson, "load", lambda f: dummy_refs)
 
     # Mock open built-in to handle reading the cache file
@@ -273,10 +291,7 @@ def test_grib2_virtualizarr_pipeline_with_cached_refs(monkeypatch):
     files = ["/local/path/file1.grib2"]
 
     res = driver.open(
-        files,
-        use_virtualizarr=True,
-        virtualizarr_parser="grib2",
-        virtualizarr_file="my_cache.json"
+        files, use_virtualizarr=True, virtualizarr_parser="grib2", virtualizarr_file="my_cache.json"
     )
 
     assert res is mock_dataset
@@ -284,16 +299,20 @@ def test_grib2_virtualizarr_pipeline_with_cached_refs(monkeypatch):
 
 
 def test_grib2_virtualizarr_with_icechunk(monkeypatch):
+    pytest.importorskip("grib2io")
     from unittest import mock
+
     driver = XarrayDriver()
-    
+
     # Mock FileUtility
     monkeypatch.setattr(FileUtility, "expand_paths", lambda files_in, fs=None, **kwargs: files_in)
 
     # Mock grib2io ReferenceGenerator
     mock_gen = mock.MagicMock()
     mock_gen.generate.return_value = {"version": 1, "refs": {}}
-    monkeypatch.setattr("grib2io.kerchunk.ReferenceGenerator", lambda *args, **kwargs: mock_gen, raising=False)
+    monkeypatch.setattr(
+        "grib2io.kerchunk.ReferenceGenerator", lambda *args, **kwargs: mock_gen, raising=False
+    )
 
     # Mock open_virtual_dataset
     mock_vds = mock.MagicMock()
@@ -313,7 +332,7 @@ def test_grib2_virtualizarr_with_icechunk(monkeypatch):
         use_virtualizarr=True,
         virtualizarr_parser="grib2",
         use_icechunk=True,
-        icechunk_url="s3://icechunk-store"
+        icechunk_url="s3://icechunk-store",
     )
 
     assert res is mock_ice_dataset

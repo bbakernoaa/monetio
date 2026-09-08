@@ -182,7 +182,10 @@ def test_point_reader_to_xarray_eager_and_lazy_dtypes():
     assert ds_lazy["flag"].dtype == np.dtype("bool")
 
     # Check that computed lazy dataset matches eager dataset
-    xr.testing.assert_identical(ds_eager, ds_lazy.compute())
+    ds_lazy_computed = ds_lazy.compute()
+    ds_eager.attrs.pop("history", None)
+    ds_lazy_computed.attrs.pop("history", None)
+    xr.testing.assert_identical(ds_eager, ds_lazy_computed)
 
 
 def test_aeronet_aero_protocol():

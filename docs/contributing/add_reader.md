@@ -49,6 +49,7 @@ from typing import List, Union
 import xarray as xr
 from .base import GriddedReader, register_reader
 
+
 @register_reader("mynewmodel")
 class MyNewModelReader(GriddedReader):
     def open_dataset(
@@ -104,6 +105,7 @@ Always update the `history` attribute of the returned dataset or dataframe to re
 
 ```python
 import datetime
+
 history = f"{datetime.datetime.now()}: Read MyNewModel data."
 ds.attrs["history"] = ds.attrs.get("history", "") + "\n" + history
 ```

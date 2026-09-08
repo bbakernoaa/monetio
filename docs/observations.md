@@ -11,7 +11,7 @@ import monetio as mio
 import pandas as pd
 
 # Load AirNow data
-dates = pd.date_range(start='2018-05-01', end='2018-05-05', freq='h')
+dates = pd.date_range(start="2018-05-01", end="2018-05-05", freq="h")
 df = mio.load("airnow", files=dates)
 ```
 
@@ -61,8 +61,9 @@ Global air quality data platform.
 
 ```python
 import monetio as mio
+
 # Set environment variable OPENAQ_API_KEY
-df = mio.load("openaq_v3", dates='2024-01-01', parameters=['pm25', 'o3'])
+df = mio.load("openaq_v3", dates="2024-01-01", parameters=["pm25", "o3"])
 ```
 
 ### IAGOS

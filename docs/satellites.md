@@ -40,8 +40,9 @@ National Environmental Satellite, Data, and Information Service (NESDIS) Visible
 
 ```python
 import monetio as mio
+
 # Load SNPP AOD from S3
-ds = mio.load("nesdis_viirs_jrr", dates='2024-01-01', satellite='snpp', product='AOD')
+ds = mio.load("nesdis_viirs_jrr", dates="2024-01-01", satellite="snpp", product="AOD")
 ```
 
 ### OMPS
