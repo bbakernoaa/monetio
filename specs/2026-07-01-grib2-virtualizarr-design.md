@@ -1,7 +1,7 @@
 # Design Document: GRIB2 Reading with VirtualiZarr
 
-**Date:** 2026-07-01
-**Feature:** GRIB2 Reading with VirtualiZarr Integration
+**Date:** 2026-07-01<br>
+**Feature:** GRIB2 Reading with VirtualiZarr Integration<br>
 **Status:** Approved
 
 ## 1. Objective
