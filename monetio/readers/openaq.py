@@ -11,6 +11,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import PointReader, register_reader
+from .errors import annotate
 from .sat_utils import update_history
 
 if TYPE_CHECKING:
@@ -357,7 +358,9 @@ def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> lis
             files = fs.ls(f"{s3bucket}/{sdate}")
             urls.extend(f"s3://{f}" for f in files)
         except Exception as e:
-            logger.warning(f"Failed to list files for date {sdate}: {e}")
+            # The date was advertised by the bucket listing, so failing to list
+            # its contents is a lost day of data rather than an empty day.
+            raise annotate(e, f"{s3bucket}/{sdate}") from e
 
     return urls
 
@@ -426,7 +429,7 @@ def read_openaq_json(fn: str, storage_options: dict = None, **kwargs: Any) -> pd
             # Replace +0100 with +01:00 if necessary
             utcoffset_str = utcoffset_str.str.replace(r"(\d{2})(\d{2})$", r"\1:\2", regex=True)
             utcoffset = pd.to_timedelta(utcoffset_str)
-        except Exception:
+        except Exception:  # noqa: BLE001 - an unparseable local-time offset is a per-record gap: UTC is kept and the offset recorded as zero, never guessed
             utcoffset = pd.Timedelta(0)
     else:
         utcoffset = pd.Timedelta(0)
@@ -451,7 +454,7 @@ def read_openaq_json(fn: str, storage_options: dict = None, **kwargs: Any) -> pd
                 elif u == "seconds":
                     u = "s"
                 averagingPeriod.loc[is_unit] = pd.to_timedelta(value[is_unit], unit=u)
-            except Exception:
+            except Exception:  # noqa: BLE001 - an unrecognized averaging-period unit leaves that column of records without a period rather than inventing one; the parsed value is kept
                 pass
 
     # Reassemble DataFrame

@@ -8,6 +8,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import PointReader, register_reader
+from .errors import annotate
 from .sat_utils import update_history
 
 if TYPE_CHECKING:
@@ -244,8 +245,10 @@ def read_ndbc(fn: str, **kwargs) -> pd.DataFrame:
             na_values=["MM", "99", "999", "99.0", "999.0"],
             on_bad_lines="warn",
         )
-    except Exception:
-        return pd.DataFrame()
+    except Exception as e:
+        # An observation file that cannot be read or parsed is a failed
+        # load naming that file, not a station with no data.
+        raise annotate(e, fn) from e
 
     # Extract siteid from filename
     import os
@@ -300,8 +303,10 @@ def get_station_table() -> pd.DataFrame:
         df["longitude"] = locs.apply(lambda x: x[1])
 
         return df[["siteid", "name", "latitude", "longitude"]]
-    except Exception:
-        return pd.DataFrame()
+    except Exception as e:
+        # The station table is required metadata; a failed fetch is a
+        # retrieval failure naming the source, not an empty station list.
+        raise annotate(e, url) from e
 
 
 def add_station_metadata(

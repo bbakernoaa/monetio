@@ -35,12 +35,11 @@ class NCEPGribReader(GriddedReader):
         --------
         >>> from monetio.readers.ncep_grib import NCEPGribReader
         >>> reader = NCEPGribReader()
-        >>> ds = reader.open_dataset("gfs.*.grib2", engine="pynio")
+        >>> ds = reader.open_dataset("gfs.*.grib2", engine="grib2io")
         """
-        # Ensure we have engine='pynio' if not specified
-        # Note: pynio is often used for these files but might be hard to install.
+        # grib2io is the supported GRIB2 decoding engine for these files.
         if "engine" not in kwargs:
-            kwargs["engine"] = "pynio"
+            kwargs["engine"] = "grib2io"
 
         # Also supports open_mfdataset logic
         if "concat_dim" not in kwargs:

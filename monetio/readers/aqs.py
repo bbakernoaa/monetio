@@ -455,7 +455,7 @@ class AQS:
                             return url, fname
                         else:
                             logger.info(f"File is Empty. Not Processing {url}")
-            except Exception:
+            except Exception:  # noqa: BLE001 - per-candidate availability probe; an unreachable candidate is dropped and the remaining candidates still build the URL list (categories: retrieval_failed)
                 pass
             return None
 

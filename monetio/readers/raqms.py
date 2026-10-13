@@ -255,9 +255,14 @@ def _fix_grid(ds: xr.Dataset) -> xr.Dataset:
             ),
         )
 
-    # Invert in z so that index 0 is closest to surface
+    # Invert in z so that index 0 is closest to surface. A positive reverse
+    # index array is used rather than ``slice(None, None, -1)``: a negative
+    # stride applied straight to an on-disk (h5netcdf) variable silently
+    # collapses that dimension to length zero, whereas the explicit index
+    # gather is backend-agnostic and stays lazy for a dask-backed array.
     if "z" in ds.dims:
-        ds = ds.isel(z=slice(None, None, -1))
+        nz = ds.sizes["z"]
+        ds = ds.isel(z=np.arange(nz - 1, -1, -1))
 
     return ds
 

@@ -9,6 +9,7 @@ import xarray as xr
 
 from .base import GriddedReader, register_reader, update_history
 from .drivers import FileUtility
+from .errors import annotate
 
 
 @register_reader("hysplit")
@@ -148,7 +149,7 @@ class ModelBin:
         real4 = ">f"
         int4 = ">i"
         int2 = ">i2"
-        char4 = ">a4"
+        char4 = ">S4"
 
         rec1 = dtype(
             [
@@ -316,7 +317,11 @@ class ModelBin:
     def parse_hdata8(hdata8a, hdata8b, pdate1):
         lev_name = hdata8a["lev"][0]
         col_name = hdata8a["poll"][0].decode("UTF-8")
-        edata = hdata8b.byteswap().newbyteorder()
+        # The concentration block is read big-endian; convert to a native-byte-
+        # order array (value-preserving) before building the record frame, which
+        # is what the old ``byteswap().newbyteorder()`` idiom was reaching for
+        # before numpy 2 removed the no-argument form.
+        edata = np.asarray(hdata8b, dtype=hdata8b.dtype.newbyteorder("="))
         concframe = pd.DataFrame.from_records(edata)
         concframe["levels"] = lev_name
         concframe["time"] = pdate1
@@ -631,8 +636,11 @@ def combine_dataset(
                 )
             try:
                 mlat, mlon = getlatlon(hxr.attrs)
-            except Exception:
-                print("WARNING Cannot open " + fname[0])
+            except Exception as e:
+                # Without the grid attributes this output cannot be placed on a
+                # lat/lon grid or compared with the others, so combining would
+                # silently mix grids. Name the offending file instead.
+                raise annotate(e, fname[0]) from e
             if iii > 0:
                 tt1 = np.array_equal(mlat, mlat_p)
                 tt2 = np.array_equal(mlon, mlon_p)

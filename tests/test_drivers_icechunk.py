@@ -45,7 +45,11 @@ class TestVirtualizarrBackendValidation:
         """Both 'kerchunk' and 'icechunk' should pass validation."""
         driver = XarrayDriver()
         f = tmp_path / "dummy.nc"
-        xr.Dataset({"x": [1, 2, 3]}).to_netcdf(f)
+        # A real data variable, not just the index: a load that opens a file but
+        # yields no data variables is now a refusal (an empty result is
+        # indistinguishable from success), so the dummy must carry one to reach
+        # and pass the backend-validation step the test is exercising.
+        xr.Dataset({"var": ("x", [1, 2, 3])}).to_netcdf(f)
         # kerchunk — should not raise ValueError (may raise other errors due to missing VZ deps)
         # We just verify the validation itself passes by catching only non-ValueError exceptions
         for backend in ("kerchunk", "icechunk"):

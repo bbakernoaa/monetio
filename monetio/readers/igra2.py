@@ -12,6 +12,7 @@ import xarray as xr
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .errors import annotate
 from .sat_utils import update_history
 
 if TYPE_CHECKING:
@@ -43,8 +44,9 @@ def read_igra2(fname: str, **kwargs) -> pd.DataFrame:
             else:
                 lines = content.splitlines()
     except Exception as e:
-        logger.warning(f"Could not read {fname}: {e}")
-        return pd.DataFrame()
+        # An input whose bytes cannot be read or decompressed is a failed
+        # load naming that input, not a silently-empty profile file.
+        raise annotate(e, fname) from e
 
     data_list = []
     current_header = None
@@ -78,7 +80,7 @@ def read_igra2(fname: str, **kwargs) -> pd.DataFrame:
                     "latitude": lat,
                     "longitude": lon,
                 }
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - per-header-line best-effort parse; a malformed header line drops only its own sounding levels, the rest of the file still loads (categories: malformed)
                 logger.debug(f"Failed to parse header line: {line_str}. Error: {e}")
                 current_header = None
         else:
@@ -124,7 +126,7 @@ def read_igra2(fname: str, **kwargs) -> pd.DataFrame:
                     }
                 )
                 data_list.append(data_row)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - per-data-line best-effort parse; a malformed level line drops only that level, the rest of the sounding still loads (categories: malformed)
                 logger.debug(f"Failed to parse data line: {line_str}. Error: {e}")
 
     df = pd.DataFrame(data_list)
@@ -170,8 +172,9 @@ def read_igra2_derived(fname: str, **kwargs) -> pd.DataFrame:
             else:
                 lines = content.splitlines()
     except Exception as e:
-        logger.warning(f"Could not read {fname}: {e}")
-        return pd.DataFrame()
+        # An input whose bytes cannot be read or decompressed is a failed
+        # load naming that input, not a silently-empty derived file.
+        raise annotate(e, fname) from e
 
     data_list = []
     current_header = None
@@ -213,7 +216,7 @@ def read_igra2_derived(fname: str, **kwargs) -> pd.DataFrame:
                     "cape": cape,
                     "cin": cin,
                 }
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - per-header-line best-effort parse; a malformed derived header line drops only its own record, the rest of the file still loads (categories: malformed)
                 logger.debug(f"Failed to parse derived header: {line_str}. Error: {e}")
                 current_header = None
         else:
@@ -240,7 +243,7 @@ def read_igra2_derived(fname: str, **kwargs) -> pd.DataFrame:
                     }
                 )
                 data_list.append(data_row)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - per-data-line best-effort parse; a malformed derived level line drops only that level, the rest of the record still loads (categories: malformed)
                 logger.debug(f"Failed to parse derived data line: {line_str}. Error: {e}")
 
     df = pd.DataFrame(data_list)
@@ -307,8 +310,10 @@ class IGRA2Reader(PointReader):
                 ]
                 self.stations = pd.read_fwf(f, colspecs=colspecs, names=names)
         except Exception as e:
-            logger.warning(f"Could not read station list: {e}")
-            self.stations = pd.DataFrame()
+            # A station list that cannot be read makes site selection
+            # impossible; that is a failure naming the source, not an
+            # empty station table.
+            raise annotate(e, self.station_list_url) from e
         return self.stations
 
     def build_urls(

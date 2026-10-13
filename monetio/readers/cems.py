@@ -109,7 +109,7 @@ class CEMSReader(PointReader):
                         # We use a limited read to get headers and units
                         meta_df = read_cems(file_list[0], nrows=5)
                         unit_map = meta_df.attrs.get("unit_mapping", {})
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - optional unit-mapping recovery by peeking at the first file; the load itself already succeeded and only the units attribute may be missing (categories: malformed, retrieval_failed)
                     import warnings
 
                     warnings.warn(f"CEMS unit mapping recovery failed: {e}")

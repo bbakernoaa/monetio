@@ -52,6 +52,18 @@ def cli():
     pass
 
 
+@cli.command()
+def sources():
+    """List every loadable source, including aliases (from ``available_sources``).
+
+    Enumerated from the manifest so the list cannot drift from the
+    registry — the mechanism that produced the historical ``openaq_v3`` /
+    ``icap_mme`` documentation drift.
+    """
+    for name in monetio.available_sources():
+        click.echo(name)
+
+
 def common_options(f):
     """Decorator for common CLI options."""
     f = click.option(
@@ -77,13 +89,25 @@ def common_options(f):
     multiple=True,
     help="Additional keyword arguments in key=value format.",
 )
-def load(source, dates, output, n_procs, lazy, as_pandas, files, kwargs):
+@click.option(
+    "--no-validate",
+    is_flag=True,
+    help="Skip checking SOURCE against the manifest (pass it straight to monetio.load).",
+)
+def load(source, dates, output, n_procs, lazy, as_pandas, files, kwargs, no_validate):
     """
-    Generic command to load data from any registered source.
+    Generic command to load data from any registered SOURCE.
 
-    Available sources include: aeronet, airnow, aqs, goes, ish, ish_lite, etc.
-    See monetio.load documentation for full list.
+    The source list is enumerated from the manifest (``monetio.available_sources()``),
+    so it includes every canonical name and alias and cannot drift
+    from the registry. Run ``monetio sources`` to list them.
     """
+    if not no_validate and source not in monetio.available_sources():
+        raise click.BadParameter(
+            f"Unknown source {source!r}. Run `monetio sources` for the full list.",
+            param_hint="SOURCE",
+        )
+
     d = parse_dates(dates)
     f = list(files) if files else None
 
@@ -116,7 +140,18 @@ def load(source, dates, output, n_procs, lazy, as_pandas, files, kwargs):
     click.echo(f"Loading {source} data...")
 
     # Build arguments dynamically to avoid passing defaults that might conflict
-    load_kwargs = {"as_xarray": not as_pandas}
+    load_kwargs = {}
+    # ``as_xarray`` is a point-reader option; gridded readers reject it, so it
+    # is only forwarded to sources the manifest declares as point. Saving the
+    # result is handled by ``handle_save``, which adapts to whatever object
+    # type comes back, so gridded loads do not need the flag. An unknown name
+    # (possible with --no-validate) is left to ``load`` to report.
+    try:
+        kind = monetio.source_info(source).kind
+    except ValueError:
+        kind = None
+    if kind == "point":
+        load_kwargs["as_xarray"] = not as_pandas
     if d is not None:
         load_kwargs["dates"] = d
     if f is not None:

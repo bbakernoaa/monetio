@@ -10,6 +10,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import register_reader
+from .errors import annotate
 from .geoms import GEOMSReader
 from .sat_utils import update_history
 
@@ -139,10 +140,9 @@ class NDACCReader(GEOMSReader):
                         break
             return urls
         except Exception as e:
-            import warnings
-
-            warnings.warn(f"Failed to list NDACC files at {base_url}: {e}")
-            return []
+            # A directory we cannot list is a failed retrieval naming that
+            # directory, not an archive with no files in it.
+            raise annotate(e, base_url) from e
 
     def harmonize(self, ds: xr.Dataset) -> xr.Dataset:
         """
