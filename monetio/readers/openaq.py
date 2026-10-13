@@ -375,7 +375,7 @@ def build_urls(dates: pd.DatetimeIndex | list[datetime] | datetime | str) -> lis
         fs = FileUtility.get_fs("s3://openaq-fetches")
         folders = fs.ls(s3bucket)
         use_s3 = True
-    except Exception:
+    except Exception:  # noqa: BLE001 - store availability probe; when the bucket cannot be listed the reader falls back to the requested dates instead of failing the load (categories: retrieval_failed, credential_rejected)
         use_s3 = False
 
     dates = pd.to_datetime(dates)

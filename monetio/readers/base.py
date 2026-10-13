@@ -201,7 +201,7 @@ def _ensure_time_dimension(ds: xr.Dataset) -> xr.Dataset:
         if len(time_dims) == 1 and time_dims[0] in ds.dims:
             try:
                 ds = ds.swap_dims({time_dims[0]: "time"})
-            except Exception:
+            except Exception:  # noqa: BLE001 - best-effort dimension normalization; a frame whose time coordinate cannot become a dimension keeps its original layout and still loads (categories: malformed)
                 pass
             return ds
 

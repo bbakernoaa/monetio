@@ -356,7 +356,7 @@ def build_urls(
                     content_length = int(r.headers.get("Content-Length", 0))
                     if content_length > 500:
                         return url, fname
-        except Exception:
+        except Exception:  # noqa: BLE001 - per-candidate availability probe; an unreachable candidate is dropped and the remaining candidates still build the URL list (categories: retrieval_failed)
             pass
         return None
 

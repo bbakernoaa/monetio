@@ -125,13 +125,13 @@ class TCCONReader(PointReader):
                 fs = fsspec.filesystem("http")
                 found = fs.glob(f"{url_prefix}*.nc")
                 urls.extend(found)
-            except Exception:
+            except Exception:  # noqa: BLE001 - the R0 layout is probed first and a listing failure falls through to the R1 layout below (categories: retrieval_failed, not_found)
                 # Try R1 if R0 fails
                 try:
                     url_prefix_r1 = base_url.replace(".R0/", ".R1/").format(sid)
                     found = fs.glob(f"{url_prefix_r1}*.nc")
                     urls.extend(found)
-                except Exception:
+                except Exception:  # noqa: BLE001 - per-site listing is best-effort; a site unreachable under both layouts is skipped and the remaining sites still resolve (categories: retrieval_failed, not_found)
                     continue
 
         return urls

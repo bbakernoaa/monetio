@@ -448,7 +448,7 @@ def _open_via_icechunk(vds, icechunk_url: str, virtualizarr_file: str | None) ->
         import shutil
         try:
             shutil.rmtree(icechunk_url)
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort cleanup for an idempotent re-run; a store that cannot be cleared is left for the write below to report (categories: permission_denied, not_found)
             pass
 
     try:
@@ -543,7 +543,7 @@ def _call_with_retries(
     for attempt in range(1, retry_attempts + 1):
         try:
             return func(*args, **kwargs)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - retry loop, not a swallow: re-raised below unless the error is transient and attempts remain (categories: retrieval_failed)
             if attempt >= retry_attempts or not _is_transient_network_error(exc):
                 raise
             sleep_seconds = retry_sleep * (2 ** (attempt - 1))
@@ -1121,7 +1121,7 @@ class XarrayDriver:
                     try:
                         with open(virtualizarr_file) as f_ref:
                             refs = ujson.load(f_ref)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - cached references are best-effort; an unreadable cache is discarded and recomputed below (categories: malformed, not_found)
                         warnings.warn(f"Failed to load virtualizarr_file {virtualizarr_file}: {e}")
                         refs = None
 
@@ -1189,13 +1189,19 @@ class XarrayDriver:
                                 with open(virtualizarr_file, "w") as f_ref:
                                     ujson.dump(refs, f_ref)
                             except Exception as e:
-                                warnings.warn(f"Failed to save virtualizarr_file {virtualizarr_file}: {e}")
+                                # The caller asked for the references at this
+                                # path; a failed write must not pass as success
+                                # (that is the silent-discard failure mode).
+                                raise MalformedInputError(
+                                    virtualizarr_file,
+                                    f"could not write virtualizarr references: {e}",
+                                ) from e
 
                     finally:
                         if virtualizarr_file is None and manifest_path_str is not None:
                             try:
                                 os.remove(manifest_path_str)
-                            except Exception:
+                            except Exception:  # noqa: BLE001 - temporary manifest cleanup; the load already succeeded, so an undeletable temp file must not fail it (categories: permission_denied, not_found)
                                 pass
 
                 # --- Materialize Dataset via reference mapper ---
@@ -1721,7 +1727,6 @@ class PandasDriver:
         try:
             # Extract preprocess if present
             preprocess = kwargs.pop("preprocess", None)
-            _skipped = 0
 
             def _read_one(f):
                 if f.startswith("s3://"):
@@ -1758,34 +1763,17 @@ class PandasDriver:
                     # Collect by submission order, not completion order, so the
                     # concatenated rows do not depend on which request finished
                     # first.
+                    #
+                    # A failure is NOT absorbed here. Skipping a missing input
+                    # would grant tolerance that the caller never asked for, and
+                    # the skip would be invisible in the result; tolerated loads
+                    # take the branch above, which records every skip in
+                    # provenance.
                     for future in futures:
-                        try:
-                            data_frames.append(future.result())
-                        except FileNotFoundError:
-                            _skipped += 1
-                        except Exception:
-                            _skipped += 1
-
-                if _skipped > 0:
-                    warnings.warn(
-                        f"PandasDriver: Skipped {_skipped} missing/failed files "
-                        f"out of {len(file_list)} total.",
-                        stacklevel=2,
-                    )
+                        data_frames.append(future.result())
             else:
                 for f in file_list:
-                    try:
-                        data_frames.append(_read_one(f))
-                    except FileNotFoundError:
-                        _skipped += 1
-                        continue
-
-                if _skipped > 0:
-                    warnings.warn(
-                        f"PandasDriver: Skipped {_skipped} missing files "
-                        f"out of {len(file_list)} total.",
-                        stacklevel=2,
-                    )
+                    data_frames.append(_read_one(f))
 
             if not data_frames:
                 return pd.DataFrame()

@@ -303,18 +303,21 @@ def test_gfs_family_shares_module_distinct_classes():
     assert {c.__module__ for c in classes.values()} == {"monetio.readers.gfs"}
 
 
-def test_alias_load_returns_identical_data_gfs(tmp_path):
+def test_alias_load_returns_identical_data_gfs(sample_registry):
     """Loading the same fixture through each GFS-family alias returns
-    equivalent data (US3 scenario 3). A plain netCDF stub is used with an
-    explicit engine so the check stays local and network-free."""
-    ds = xr.Dataset(
-        {"TMP": (("lat", "lon"), np.arange(12.0).reshape(3, 4))},
-        coords={"lat": ("lat", [30.0, 35.0, 40.0]), "lon": ("lon", [-100.0, -95.0, -90.0, -85.0])},
-    )
-    path = str(tmp_path / "ncep_stub.nc")
-    ds.to_netcdf(path)
+    equivalent data (US3 scenario 3).
 
-    results = [monetio.load(name, files=path, engine="netcdf4") for name in ("gfs", "gefs", "gdas")]
+    Uses the recorded GFS GRIB2 sample: these readers are GRIB2-only and reject
+    any other engine, so a netCDF stub cannot exercise them. Resolving through
+    the registry skips the check when the optional ``grib2io`` engine is not
+    installed, rather than failing on it.
+    """
+    sample = sample_registry.require("gfs")
+
+    results = [
+        monetio.load(name, files=sample["files"], **sample["kwargs"])
+        for name in ("gfs", "gefs", "gdas")
+    ]
     base = _normalize_history(results[0])
     for other in results[1:]:
         xr.testing.assert_identical(base, _normalize_history(other))
