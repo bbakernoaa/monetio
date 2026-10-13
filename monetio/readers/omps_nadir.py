@@ -26,6 +26,14 @@ class OMPSNadirReader(GriddedReader):
     def open_dataset(
         self,
         files: str | list[str] = None,
+        use_virtualizarr: bool = False,
+        virtualizarr_file: str | None = None,
+        virtualizarr_parser: str | None = None,
+        virtualizarr_backend: str = "kerchunk",
+        icechunk_repo: str | None = None,
+        use_icechunk: bool = False,
+        icechunk_url: str | None = None,
+        use_dask: bool = False,
         dates: pd.DatetimeIndex | list[datetime.datetime] | datetime.datetime | str = None,
         satellite: str = "snpp",
         product: str = "v8toz",
@@ -39,6 +47,22 @@ class OMPSNadirReader(GriddedReader):
         ----------
         files : Union[str, List[str]], optional
             File path(s) or URL(s).
+        use_virtualizarr : bool, optional
+            Whether to use VirtualiZarr to create a virtual Zarr dataset, by default False.
+        virtualizarr_file : str or None, optional
+            Path to save/load the VirtualiZarr reference JSON file, by default None.
+        virtualizarr_parser : str or None, optional
+            The VirtualiZarr parser to use (e.g. 'hdf5', 'netcdf3', 'zarr', 'grib2').
+        virtualizarr_backend : str, optional
+            Backend for VirtualiZarr references ("kerchunk" or "icechunk"), by default "kerchunk".
+        icechunk_repo : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_icechunk : bool, optional
+            Whether to use Icechunk, by default False.
+        icechunk_url : str or None, optional
+            Path to the Icechunk repository, by default None.
+        use_dask : bool, optional
+            Whether to use Dask for lazy loading, by default False.
         dates : Union[pd.DatetimeIndex, List[datetime], datetime, str], optional
             Dates to retrieve. If files is None, this is used to build URLs.
         satellite : str, optional
@@ -99,7 +123,6 @@ class OMPSNadirReader(GriddedReader):
             kwargs["concat_dim"] = "time"
         if "combine" not in kwargs:
             kwargs["combine"] = "nested"
-
         dsets = []
         included = []
         absent = []
@@ -127,7 +150,7 @@ class OMPSNadirReader(GriddedReader):
 
             try:
                 # Open without the preprocessor at this stage
-                ds_g = super().open_dataset(g_files, **g_kwargs)
+                ds_g = super().open_dataset(g_files, **g_kwargs, virtualizarr_parser="hdf5")
                 dsets.append(ds_g)
                 included.append(g if g is not None else "(root)")
             except Exception as e:
@@ -189,9 +212,7 @@ class OMPSNadirReader(GriddedReader):
         List[str]
             List of S3 URLs.
         """
-        from ..util import _import_required
-
-        s3fs = _import_required("s3fs")
+        from .drivers import FileUtility
 
         if isinstance(dates, str | datetime.datetime | pd.Timestamp):
             dates = pd.DatetimeIndex([pd.to_datetime(dates)])
@@ -229,25 +250,31 @@ class OMPSNadirReader(GriddedReader):
         elif product.lower() == "np_sdr":
             dirs_to_search.append("OMPS-NP-GEO")
 
-        fs = s3fs.S3FileSystem(anon=True)
         urls = []
         for d in dates.floor("D").unique():
             for dn in dirs_to_search:
-                prefix = f"{bucket}/{dn}/{d.strftime('%Y/%m/%d')}/"
-                try:
-                    found = fs.glob(f"{prefix}*.nc")
-                    # Also try .h5 for SDRs
-                    if not found and "SDR" in dn:
-                        found = fs.glob(f"{prefix}*.h5")
-                except Exception as e:
-                    # A failed listing is a retrieval (or credential) problem,
-                    # not "no data for this date": surface it naming the
-                    # prefix that could not be listed rather than skipping.
-                    raise annotate(e, f"s3://{prefix}") from e
-                # A listing that succeeded and simply matched nothing is
-                # legitimately no data for this day; the empty list adds
-                # nothing and the loop carries on.
-                urls.extend([f"s3://{f}" for f in found])
+                prefix = f"s3://{bucket}/{dn}/{d.strftime('%Y/%m/%d')}/"
+                patterns = [f"{prefix}*.nc"]
+                # Also try .h5 for SDRs
+                if "SDR" in dn:
+                    patterns.append(f"{prefix}*.h5")
+                for pattern in patterns:
+                    try:
+                        found = FileUtility.expand_paths(pattern)
+                    except FileNotFoundError:
+                        # expand_paths raises when a glob matches nothing. A
+                        # listing that succeeded and simply matched nothing is
+                        # legitimately no data for this day; try the next
+                        # pattern and let the loop carry on.
+                        continue
+                    except Exception as e:
+                        # A failed listing is a retrieval (or credential)
+                        # problem, not "no data for this date": surface it
+                        # naming the prefix that could not be listed rather
+                        # than skipping.
+                        raise annotate(e, prefix) from e
+                    urls.extend(found)
+                    break
 
         return sorted(urls)
 

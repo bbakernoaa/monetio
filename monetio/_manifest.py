@@ -117,7 +117,7 @@ def _s(name, module, kind, *, aliases=(), caps=_UNVALIDATED, legacy=()):
     )
 
 
-# The 61 registered source names (canonical + aliases), grouped by family.
+# The registered source names (canonical + aliases), grouped by family.
 # Kinds match the reader base classes exactly (verified against READER_REGISTRY).
 SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     # ---- models (gridded) ----
@@ -135,6 +135,11 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     _s("grib2", ".readers.grib2", "gridded"),
     _s("rrfs", ".readers.rrfs", "gridded"),
     _s("gfs", ".readers.gfs", "gridded", aliases=("gefs", "gdas")),
+    _s("hrrr", ".readers.hrrr", "gridded"),
+    _s("nam", ".readers.nam", "gridded"),
+    _s("rap", ".readers.rap", "gridded"),
+    _s("ncep_reanalysis", ".readers.ncep_reanalysis", "gridded"),
+    _s("era5", ".readers.era5", "gridded"),
     # ---- point observations ----
     _s("airnow", ".readers.airnow", "point", caps=_DEFERRED_WIDE, legacy=("obs.airnow",)),
     _s("aeronet", ".readers.aeronet", "point", caps=_DEFERRED, legacy=("obs.aeronet",)),
@@ -156,6 +161,10 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     _s("ndacc", ".readers.ndacc", "gridded", legacy=("obs.ndacc",)),
     _s("pandora", ".readers.pandora", "gridded", legacy=("obs.pandora",)),
     _s("skynet", ".readers.skynet", "point", legacy=("obs.skynet",)),
+    _s("madis", ".readers.madis", "point"),
+    _s("amdar", ".readers.amdar", "point"),
+    _s("ameriflux", ".readers.ameriflux", "point"),
+    _s("tccon", ".readers.tccon", "point"),
     # ---- profile ----
     _s("icartt", ".readers.icartt", "point", legacy=("profile.icartt",)),
     _s("tolnet", ".readers.tolnet", "gridded", caps=_GRID_CONCURRENT, legacy=("profile.tolnet",)),
@@ -186,6 +195,15 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     _s("tropomi", ".readers.tropomi", "gridded"),
     _s("merra2", ".readers.merra2", "gridded"),
     _s("nesdis_viirs_jrr", ".readers.nesdis_viirs_jrr", "gridded", aliases=("viirs_jrr",)),
+    _s("calipso", ".readers.calipso", "gridded"),
+    _s("earthcare", ".readers.earthcare", "gridded"),
+    _s("gems", ".readers.gems", "gridded"),
+    _s("gpm_imerg", ".readers.gpm_imerg", "gridded"),
+    _s("jpss_atms", ".readers.jpss_atms", "gridded"),
+    _s("jpss_cris", ".readers.jpss_cris", "gridded"),
+    _s("mrms", ".readers.mrms", "gridded"),
+    _s("sentinel4", ".readers.sentinel4", "gridded"),
+    _s("smap", ".readers.smap", "gridded"),
 )
 
 

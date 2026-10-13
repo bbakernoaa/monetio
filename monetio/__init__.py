@@ -137,35 +137,49 @@ def load(source: str, files=None, **kwargs):
     return result
 
 
-def virtualize(source: str, files=None, output: str = None, backend: str = "kerchunk", **kwargs):
-    """
-    Pre-process files into a virtual reference (e.g., Kerchunk JSON or Icechunk repo).
-
-    Usage:
-        monetio.virtualize("merra2", files="data/*.nc4", output="merra2_ref.json")
+def virtualize(
+    source: str,
+    files,
+    output: str,
+    backend: str = "kerchunk",
+    concat_dim: str = "time",
+    **kwargs,
+):
+    """Pre-compute and persist VirtualiZarr references for a supported source.
 
     Parameters
     ----------
     source : str
-        The reader source ID (e.g., "merra2", "gfs").
-    files : str or list of str, optional
-        File path(s) or glob pattern(s).
-    output : str, optional
-        Path to save the output reference (required for 'kerchunk' backend).
-    backend : str, optional
-        The virtualization backend. Must be "kerchunk" (default) or "icechunk".
+        Registered reader source name (e.g. ``"gfs"`` or ``"merra2"``).
+    files : str | list[str]
+        Input file path(s) or glob expression.
+    output : str
+        Output reference path. For ``backend="kerchunk"``, this is a JSON file.
+        For ``backend="icechunk"``, this is an Icechunk repository URL/path.
+    backend : {"kerchunk", "icechunk"}, optional
+        Virtualization backend, by default ``"kerchunk"``.
+    concat_dim : str, optional
+        Dimension used when combining multiple files, by default ``"time"``.
     **kwargs : dict
-        Additional arguments passed to the reader and driver.
-    """
-    if backend == "kerchunk" and output is None:
-        raise ValueError("The 'output' parameter is required for the 'kerchunk' backend.")
+        Additional keyword arguments forwarded to :func:`load`.
 
+    Returns
+    -------
+    xarray.Dataset
+        Dataset opened through the virtualized references.
+    """
+    if backend not in {"kerchunk", "icechunk"}:
+        raise ValueError(f"Invalid backend '{backend}'. Expected one of: 'kerchunk', 'icechunk'.")
+
+    use_icechunk = backend == "icechunk"
     return load(
         source,
         files=files,
         use_virtualizarr=True,
-        virtualizarr_file=output,
-        virtualizarr_backend=backend,
+        virtualizarr_file=None if use_icechunk else output,
+        use_icechunk=use_icechunk,
+        icechunk_url=output if use_icechunk else None,
+        concat_dim=concat_dim,
         **kwargs,
     )
 
@@ -251,9 +265,9 @@ __all__ = [
     "airnow",
     "aeronet",
     "aqs",
-    "cems",  # TODO: module with add_data
+    "cems",
     "crn",
-    "improve",  # TODO: module with add_data
+    "improve",
     "ish",
     "ish_lite",
     "nadp",
@@ -284,6 +298,9 @@ __all__ = [
     "gfs",
     "gefs",
     "gdas",
+    "hrrr",
+    "nam",
+    "rap",
 ]
 
 
@@ -357,9 +374,12 @@ def dataset_to_monet(ds, *, lat_name="lat", lon_name="lon", latlon2d=None):
         ndim_lat = ds[lat_name].ndim
         assert ndim_lat <= 2
         latlon2d = ndim_lat == 2
-    # TODO: apply rename_to_monet_latlon ?
+
     if latlon2d is False:
         ds = coards_to_netcdf(ds, lat_name=lat_name, lon_name=lon_name)
+
+    ds = rename_to_monet_latlon(ds)
+
     return ds
 
 
@@ -398,3 +418,9 @@ def coards_to_netcdf(ds, *, lat_name="lat", lon_name="lon"):
     ds["y"] = y
     ds = ds.set_coords(["latitude", "longitude"])
     return ds
+
+# Try to register grib2io codecs for zarr v3 / xarray if installed
+try:
+    import grib2io.codecs
+except ImportError:
+    pass
