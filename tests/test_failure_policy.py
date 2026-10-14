@@ -114,24 +114,21 @@ def test_annotate_preserves_type_and_names_inputs():
 # ---------------------------------------------------------------------------
 
 
-def test_no_empty_dataset_from_corrupt_file():
+def test_no_empty_dataset_from_corrupt_file(tmp_path):
     """quickstart §1 Defect A: tolnet on a corrupt file must not return 0 vars."""
-    bad = Path("/tmp/phase2_bad_tolnet.h5")
+    bad = tmp_path / "phase2_bad_tolnet.h5"
     bad.write_text("not hdf5 at all")
-    try:
-        with pytest.raises(Exception) as excinfo:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                result = monetio.load("tolnet", files=str(bad))
-                # If a result comes back, it must not be an empty Dataset.
-                if isinstance(result, xr.Dataset):
-                    raise AssertionError(
-                        f"silent-empty defect: returned Dataset with "
-                        f"{len(result.data_vars)} data variables"
-                    )
-        assert "bad" in str(excinfo.value).lower() or bad.name in str(excinfo.value)
-    finally:
-        bad.unlink(missing_ok=True)
+    with pytest.raises(Exception) as excinfo:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = monetio.load("tolnet", files=str(bad))
+            # If a result comes back, it must not be an empty Dataset.
+            if isinstance(result, xr.Dataset):
+                raise AssertionError(
+                    f"silent-empty defect: returned Dataset with "
+                    f"{len(result.data_vars)} data variables"
+                )
+    assert "bad" in str(excinfo.value).lower() or bad.name in str(excinfo.value)
 
 
 def test_load_never_returns_empty_without_error(sample_registry):

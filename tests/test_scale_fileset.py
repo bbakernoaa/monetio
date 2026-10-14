@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import builtins
 import heapq
+import re
 
 import fsspec
 import pytest
@@ -229,7 +230,9 @@ class TestEmptyResolutionStillRaises:
 
     def test_missing_single_file_streaming(self, tmp_path):
         missing = str(tmp_path / "absent.nc")
-        with pytest.raises(FileNotFoundError, match=f"File not found: {missing}"):
+        # The path is platform-dependent (Windows paths contain backslashes,
+        # which are invalid regex escapes), so escape it before matching.
+        with pytest.raises(FileNotFoundError, match=re.escape(f"File not found: {missing}")):
             next(FileUtility.expand_paths_iter(missing))
 
     def test_empty_list_input_yields_empty(self):
