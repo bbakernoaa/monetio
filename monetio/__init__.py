@@ -420,8 +420,11 @@ def coards_to_netcdf(ds, *, lat_name="lat", lon_name="lon"):
     return ds
 
 
-# Try to register grib2io codecs for zarr v3 / xarray if installed
-try:
-    import grib2io.codecs  # noqa: F401 - imported for its codec-registration side effect
-except ImportError:
-    pass
+# No eager grib2io import here. Importing grib2io pulls in zarr (and its whole
+# codec stack), which would defeat lazy package initialization: a bare
+# ``import monetio`` must not load optional third-party backends. grib2io
+# registers its zarr v3 codecs itself on import (``grib2io/__init__`` imports
+# its ``codecs`` submodule), and every code path that needs those codecs already
+# imports grib2io — the ``engine="grib2io"`` xarray dispatch and the GRIB2
+# VirtualiZarr pipeline both do — so registration happens exactly when needed
+# without costing the bare import.

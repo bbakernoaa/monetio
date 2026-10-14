@@ -886,13 +886,20 @@ class XarrayDriver:
                 for key in mfdataset_keys:
                     xr_kwargs.pop(key, None)
 
-                return _call_with_retries(
+                # ``xr.open_dataset`` has no ``preprocess`` argument and forwards
+                # unknown kwargs straight to the backend, which the grib2io
+                # entrypoint rejects with a ``TypeError``. ``open_mfdataset`` (the
+                # multi-file path below) runs ``preprocess`` itself, so only the
+                # single-file path needs it applied to the opened dataset here.
+                xr_kwargs.pop("preprocess", None)
+                ds = _call_with_retries(
                     xr.open_dataset,
                     file_list[0],
                     attempts=retry_attempts,
                     base_sleep=retry_base_sleep,
                     **xr_kwargs,
                 )
+                return preprocess(ds) if preprocess else ds
 
             return _call_with_retries(
                 xr.open_mfdataset,
