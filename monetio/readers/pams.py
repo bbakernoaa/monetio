@@ -117,7 +117,7 @@ class PAMSReader(PointReader):
                         # Only read the first file's metadata
                         meta_df = read_pams(file_list[0])
                         unit_map = meta_df.attrs.get("unit_mapping", {})
-                except Exception:
+                except Exception:  # noqa: BLE001 - optional unit-mapping recovery by peeking at the first file; the load itself already succeeded and only the units attribute may be missing (categories: malformed, retrieval_failed)
                     pass
 
             # We must handle unit transfer BEFORE or AFTER expansion.

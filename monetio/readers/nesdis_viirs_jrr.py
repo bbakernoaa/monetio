@@ -6,6 +6,7 @@ import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .errors import annotate
 from .sat_utils import add_time_coord, standardize_satellite_coords, update_history
 
 JRR_SPECS = {
@@ -195,9 +196,18 @@ class VIIRSJRRReader(GriddedReader):
             # Use FileUtility to expand paths, which leverages obstore/fsspec
             try:
                 found = FileUtility.expand_paths(f"{prefix}*.nc")
-                urls.extend(found)
-            except Exception:
+            except FileNotFoundError:
+                # expand_paths raises when a glob matches nothing. A listing
+                # that succeeded and simply matched nothing is legitimately no
+                # data for this day; the empty list adds nothing and the loop
+                # carries on.
                 continue
+            except Exception as e:
+                # A failed listing is a retrieval (or credential) problem, not
+                # "no data for this date": surface it naming the prefix that
+                # could not be listed rather than skipping.
+                raise annotate(e, prefix) from e
+            urls.extend(found)
 
         return sorted(urls)
 

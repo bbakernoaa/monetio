@@ -16,6 +16,11 @@ import xarray as xr
 from ..util import force_object_strings, normalize_pandas_freq
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .errors import (
+    ContentInvalidError,
+    annotate,
+    classify_transport_error,
+)
 from .sat_utils import update_history
 
 
@@ -50,6 +55,7 @@ class AERONETReader(PointReader):
         n_procs: int = 1,
         as_xarray: bool = True,
         lazy: bool = False,
+        defer: bool = False,
         retries: int = 5,
         backoff_factor: float = 2.0,
         n_chunks: int | None = None,
@@ -104,6 +110,13 @@ class AERONETReader(PointReader):
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
             Whether to return a dask-backed object, by default False.
+        defer : bool, optional
+            Return an unevaluated result with no hidden full-data compute.
+            Implies ``lazy=True``.
+            AERONET frames are already wide (one column per wavelength), so
+            no long→wide reshape is deferred; the dask-backed DataFrame is
+            converted to a dask-backed Dataset without the per-column
+            ``to_dask_array(lengths=True)`` computes.
         retries : int, optional
             Number of retries for network calls, by default 5.
         backoff_factor : float, optional
@@ -170,6 +183,10 @@ class AERONETReader(PointReader):
 
         # Use base class to open
         # If n_procs > 1 and not lazy, we use dask to parallelize the load then compute
+        if defer:
+            # defer wins over lazy=False; the base class also
+            # enforces the capabilities.deferred guard.
+            lazy = True
         use_dask = lazy or (n_procs > 1)
 
         # Determine meta for Dask to ensure consistency and avoid early computes
@@ -193,7 +210,7 @@ class AERONETReader(PointReader):
                     if not meta.empty:
                         meta = meta.iloc[:0]  # Just the columns/dtypes
                         break
-                except Exception:
+                except Exception:  # noqa: BLE001 - meta probe: a file that cannot serve as a template is skipped (retrieval_failed, malformed); the real read raises later via the driver
                     continue
             if meta is not None and meta.empty and len(meta.columns) == 0:
                 meta = None
@@ -223,6 +240,7 @@ class AERONETReader(PointReader):
             read_method=read_func,
             as_xarray=False,
             lazy=use_dask,
+            defer=defer,
             meta=meta,
             **kwargs,
         )
@@ -237,6 +255,16 @@ class AERONETReader(PointReader):
                 pass
 
         if not lazy and df.empty:
+            # An empty result means the inputs contributed no records. When the
+            # caller asked for specific files, that is a content problem naming
+            # those files, not the "valid query but no data found" outcome that
+            # a date range legitimately returns when the site has no data.
+            if dates is None:
+                raise ContentInvalidError(
+                    "no AERONET records could be parsed",
+                    *(files if isinstance(files, list) else [files]),
+                    cause="the input(s) did not parse into any data rows",
+                )
             raise Exception("valid query but no data found")
 
         # Post-processing (Freq resampling)
@@ -254,7 +282,7 @@ class AERONETReader(PointReader):
         df = self.harmonize(df)
 
         if as_xarray:
-            ds = self.to_xarray(df, **kwargs)
+            ds = self.to_xarray(df, defer=defer, **kwargs)
 
             if add_diagnostics:
                 # Add 550nm AOD if possible
@@ -383,8 +411,11 @@ def get_valid_sites(retries: int = 5, backoff_factor: float = 2.0) -> pd.DataFra
                 "Elevation(meters)": "elevation",
             },
         )
-    except Exception as e:
-        # Check if it's a connection error
+    except Exception as e:  # noqa: BLE001 - best-effort site validation (retrieval_failed, credential_rejected, malformed); connection/timeout re-raise below
+        # Site validation is best-effort: a failure to fetch the site list must
+        # not fail an otherwise-valid load. The connection/timeout cases
+        # re-raise (the caller's network handling decides); anything else
+        # degrades to "no validation" with the reason surfaced.
         import requests
 
         if isinstance(e, requests.exceptions.ConnectionError | requests.exceptions.Timeout):
@@ -634,16 +665,11 @@ def read_aeronet_csv(
             response = session.get(str(fn), timeout=120)
             response.raise_for_status()
             source = BytesIO(response.content)
-        except Exception as e:
-            import requests
-
-            if isinstance(e, requests.exceptions.ConnectionError | requests.exceptions.Timeout):
-                raise
-
-            warnings.warn(f"Failed to fetch {fn}: {e}")
-            if meta_df is not None:
-                return meta_df.iloc[:0]
-            return pd.DataFrame()
+        except Exception as e:  # noqa: BLE001 - http fetch failure; transport/auth re-raise as named categories, HTTP-status degrades to empty frame (retrieval_failed, credential_rejected)
+            # A rejected credential names the service and the payload; a
+            # transport failure names the URL and stays retryable. Neither may
+            # look like "no data".
+            raise classify_transport_error(e, fn, service="AERONET") from e
     else:
         source = fn
 
@@ -669,10 +695,11 @@ def read_aeronet_csv(
         else:
             raise ValueError(f"Invalid source type: {type(fn)}")
     except Exception as e:
-        warnings.warn(f"Failed to read header of {fn}: {e}")
-        if meta_df is not None:
-            return meta_df.iloc[:0]
-        return pd.DataFrame()
+        # An input whose header cannot be read is a failure naming that input,
+        # not a silently-empty frame: a corrupt or unreadable local file must
+        # not look like a successful no-data result. categories:
+        # not_found, permission_denied, malformed.
+        raise annotate(e, fn) from e
 
     header_text = "\n".join(header_lines)
     is_inv = "Inversion" in header_text or inv_type is not None
@@ -685,7 +712,7 @@ def read_aeronet_csv(
         try:
             cols = [c.strip().lower() for c in header_lines[skiprows].split(",")]
             df = pd.DataFrame(columns=cols)
-        except Exception:
+        except (IndexError, ValueError):  # noqa: BLE001 - no header row to read columns from; empty result is the no-data signal
             return pd.DataFrame()
     else:
         try:
@@ -699,14 +726,10 @@ def read_aeronet_csv(
             )
             df = df.rename(columns=str.lower)
         except Exception as e:
-            warnings.warn(f"Error parsing CSV from {fn}: {e}")
-            if meta_df is not None:
-                return meta_df.iloc[:0]
-            try:
-                cols = [c.strip().lower() for c in header_lines[skiprows].split(",")]
-                df = pd.DataFrame(columns=cols)
-            except Exception:
-                return pd.DataFrame()
+            # A retrieved payload that cannot be parsed is a content problem
+            # naming the input — never a silently-empty frame. categories:
+            # malformed, content_invalid.
+            raise annotate(e, fn) from e
 
     # Do not return early if df.empty, to ensure consistent columns for Dask
     df = df.copy()
@@ -749,7 +772,7 @@ def read_aeronet_csv(
             else:
                 try:
                     df[c] = pd.to_numeric(df[c])
-                except Exception:
+                except (ValueError, TypeError):  # noqa: BLE001 - a non-numeric column keeps its dtype; dtype normalization is best-effort
                     pass
 
     if hasattr(df, "attrs"):
@@ -837,7 +860,7 @@ def _vectorized_tspack_interp(wvs: np.ndarray, aods: np.ndarray, new_wvs: np.nda
             else:
                 x, y, yp, sigma = pytspack.tspsi(row_wvs, row_aod)
                 out[i, :] = pytspack.hval(new_wvs, x, y, yp, sigma)
-        except Exception:
+        except Exception:  # noqa: BLE001 - per-row interpolation is best-effort (malformed); a row whose spline fails stays NaN
             continue
 
     return out

@@ -17,40 +17,24 @@ import inspect
 
 import pytest
 
+from monetio._manifest import SOURCE_MANIFEST
 from monetio.readers.base import READER_REGISTRY, GriddedReader, PointReader
 
-# Modules excluded from the audit (infrastructure, specs, utilities)
-EXCLUDED_MODULES = {
-    "__init__",
-    "base",
-    "drivers",
-    "_deprecation",
-    "camx_specs",
-    "cmaq_specs",
-    "ufs_specs",
-    "wrfchem_specs",
-    "epa_utils",
-    "nasa_utils",
-    "sat_utils",
-    "time_utils",
-    "ncep_pds",
-}
+# Reader modules come from the manifest (the single source of truth): only
+# modules that declare a source are audited, so the infrastructure modules
+# (base, drivers, *_specs, *_utils, _deprecation) are excluded by
+# construction rather than by a hand-maintained list.
+MANIFEST_MODULE_NAMES = sorted({s.module.rsplit(".", 1)[-1] for s in SOURCE_MANIFEST})
 
-# Modules that legitimately contain multiple distinct registered classes
-MULTI_CLASS_MODULES = {"gfs"}
+# Modules that legitimately contain multiple distinct registered classes are
+# exactly the modules whose manifest spec declares aliases — the aliases are
+# what signal additional registrations (e.g. gfs also registers gefs/gdas).
+MULTI_CLASS_MODULES = {s.module.rsplit(".", 1)[-1] for s in SOURCE_MANIFEST if s.aliases}
 
 
 def _get_reader_module_names():
-    """Discover all reader module names by scanning the readers directory."""
-    from pathlib import Path
-
-    readers_dir = Path(__file__).parent.parent / "monetio" / "readers"
-    modules = []
-    for f in sorted(readers_dir.glob("*.py")):
-        name = f.stem
-        if name not in EXCLUDED_MODULES:
-            modules.append(name)
-    return modules
+    """All audited reader module names, derived from the manifest."""
+    return MANIFEST_MODULE_NAMES
 
 
 READER_MODULE_NAMES = _get_reader_module_names()

@@ -11,6 +11,7 @@ import xarray as xr
 from ..util import force_object_strings
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .errors import RetrievalFailedError, annotate
 from .sat_utils import update_history
 from .time_utils import parse_yyyymmdd_hhmm
 
@@ -360,19 +361,10 @@ class CRNReader(PointReader):
             mdf = pd.read_csv(path, delimiter="\t")
             # Filter for USCRN
             mdf = mdf.loc[mdf["NETWORK"] == "USCRN"].copy()
-        except Exception:
-            # Fallback if file missing
-            mdf = pd.DataFrame(
-                columns=[
-                    "STATE",
-                    "LOCATION",
-                    "VECTOR",
-                    "WBAN",
-                    "LATITUDE",
-                    "LONGITUDE",
-                    "NETWORK",
-                ]
-            )
+        except Exception as e:
+            # The bundled station table is required metadata; an unreadable
+            # one is a failure naming that file, not an empty station list.
+            raise annotate(e, path) from e
 
         if latlonbox is not None:
             con = (
@@ -447,8 +439,7 @@ class CRNReader(PointReader):
                     if fname in all_fnames:
                         urls.append(f"{year_url}{fname}")
                         fnames.append(fname)
-            except Exception:
-                # Fallback to individual checks if ls fails or is not supported
+            except Exception:  # noqa: BLE001 - per-year directory listing is best-effort; an unsupported or failed ls falls back to probing each candidate URL individually (categories: retrieval_failed, malformed)
                 for _, row in monitors.iterrows():
                     state = row["STATE"]
                     site = row["LOCATION"].replace(" ", "_")
@@ -489,7 +480,8 @@ class CRNReader(PointReader):
                 try:
                     fs.get(url, fname)
                 except Exception as e:
-                    print(f"Failed to retrieve {url}: {e}")
-                    continue
+                    # A download that failed is a retrieval failure naming
+                    # the URL, not an input to silently skip.
+                    raise RetrievalFailedError(url, cause=str(e)) from e
             local_files.append(fname)
         return local_files

@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime
 import functools
 import re
-import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -14,6 +13,7 @@ import xarray as xr
 
 from .base import PointReader, register_reader
 from .drivers import FileUtility
+from .errors import annotate
 from .sat_utils import update_history
 
 if TYPE_CHECKING:
@@ -38,8 +38,9 @@ def get_ebas_catalog() -> str:
         response.raise_for_status()
         return response.text
     except Exception as e:
-        warnings.warn(f"Failed to fetch EBAS catalog: {e}")
-        return ""
+        # A catalog we cannot fetch is a failed retrieval, not an empty
+        # archive: the error names the catalog URL that could not be read.
+        raise annotate(e, catalog_url) from e
 
 
 def parse_ebas_header(filename: str) -> dict[str, Any]:
@@ -185,7 +186,8 @@ def read_actris(filename: str, **kwargs) -> pd.DataFrame:
         # Check if it's already a datetime or needs conversion from days
         try:
             df["time"] = pd.to_datetime(ref_date) + pd.to_timedelta(df[ivar_name], unit="D")
-        except Exception:
+        except Exception:  # noqa: BLE001 - IVAR column may not be convertible days-since-epoch; rows keep raw values and the load still succeeds (categories: malformed)
+            pass
             pass
 
     # Add site metadata to each row
@@ -280,7 +282,10 @@ class ACTRISReader(PointReader):
         # Check if files are NetCDF (.nc)
         if str(first_file).endswith(".nc"):
             # NetCDF format from THREDDS
-            # OPeNDAP URLs work better with Xarray/NetCDF4
+            # OPeNDAP URLs work better with Xarray/NetCDF4. open_mfdataset
+            # always returns dask-backed arrays, so honour the ``lazy`` flag
+            # here the way the eager-by-default contract requires: materialise
+            # unless the caller explicitly asked for a deferred result.
             ds = xr.open_mfdataset(files, **kwargs)
             # Coordinate standardization is already somewhat standard in EBAS NetCDF
             # but we may need to rename to match PointReader conventions
@@ -296,7 +301,10 @@ class ACTRISReader(PointReader):
 
             ds = update_history(ds, "Read ACTRIS/EBAS NetCDF data.")
             if not as_xarray:
-                return ds.to_dataframe().reset_index()
+                frame = ds.to_dataframe().reset_index()
+                return frame if lazy else frame.compute()
+            if not lazy:
+                ds = ds.load()
             return ds
 
         # Default to NASA-Ames 1001 format
@@ -412,7 +420,7 @@ class ACTRISReader(PointReader):
 
             try:
                 start_date = pd.to_datetime(parts[1], format="%Y%m%d%H%M%S")
-            except Exception:
+            except Exception:  # noqa: BLE001 - catalog entry whose filename lacks a parsable start date cannot be date-matched; other entries still resolve the result (categories: malformed)
                 continue
 
             # Duration heuristic from filename (e.g., 1y, 1d, 1mo)

@@ -194,9 +194,11 @@ def read_nesdis_frp_binary(fname: str, **kwargs) -> xr.Dataset:
             w = FortranFile(buffer)
             try:
                 a = w.read_reals(dtype=dtype)
-            except Exception:
+            except (ValueError, EOFError):
                 # Fallback: maybe it's not a reals record but a simple binary dump
-                # FortranFile expects header/footer. If missing, it fails.
+                # FortranFile expects header/footer. If missing, it fails
+                # (ValueError for a bad record marker, EOFError for a short
+                # file), so only those two fall through to the raw read.
                 buffer.seek(0)
                 a = np.frombuffer(buffer.read(), dtype=dtype)
         return a.reshape((r, r), order="F").copy()

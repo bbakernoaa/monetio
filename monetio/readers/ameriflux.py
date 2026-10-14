@@ -26,6 +26,7 @@ class AmeriFluxReader(PointReader):
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         use_dask: bool = False,
+        expand2d: bool = False,
         **kwargs,
     ) -> xr.Dataset:
         """
@@ -51,6 +52,11 @@ class AmeriFluxReader(PointReader):
             Path to the Icechunk repository, by default None.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
+        expand2d : bool, optional
+            Whether to expand to a 2D (time, node) layout, by default False.
+            AmeriFlux BASE files carry no site identity — station coordinates
+            live in the separate BADM metadata files — so there is no ``siteid``
+            axis to expand along and the result stays 1D in ``time``.
         **kwargs : dict
             Additional arguments passed to PointReader.open_dataset.
 
@@ -74,6 +80,7 @@ class AmeriFluxReader(PointReader):
             use_icechunk=use_icechunk,
             icechunk_url=icechunk_url,
             use_dask=use_dask,
+            expand2d=expand2d,
             **kwargs,
         )
 

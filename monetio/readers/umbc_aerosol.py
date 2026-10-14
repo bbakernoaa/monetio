@@ -1,12 +1,11 @@
 """UMBC Aerosol Reader (CL51)"""
 
-import warnings
-
 import numpy as np
 import pandas as pd
 import xarray as xr
 
 from .base import GriddedReader, register_reader
+from .errors import ContentInvalidError, SectionUnavailableError, is_absent_section
 from .sat_utils import apply_lazy_conversion, update_history
 
 
@@ -74,6 +73,8 @@ class UMBCAerosolReader(GriddedReader):
             kwargs["engine"] = "h5netcdf"
         dsets = []
         all_attrs = {}
+        included = []
+        absent = []
         for g in groups:
             g_kwargs = kwargs.copy()
             g_kwargs["group"] = g
@@ -92,13 +93,33 @@ class UMBCAerosolReader(GriddedReader):
                     **g_kwargs,
                 )
                 dsets.append(ds_g)
+                included.append(g)
                 # Manually collect attributes from groups
                 all_attrs.update(ds_g.attrs)
             except Exception as e:
-                warnings.warn(f"Could not open group {g}: {e}")
+                # The group list is the reader's own default, not a caller
+                # request: a file without one of these sections is normal, so
+                # an absent group is recorded and skipped. A group that exists
+                # but cannot be read still fails, naming the input and group.
+                if is_absent_section(e):
+                    absent.append(f"{g} (not present in this file)")
+                    continue
+                if g == "Instrument_Attributes" and isinstance(e, ContentInvalidError):
+                    # This group stores instrument metadata as attributes and
+                    # no data variables at all, so the driver's refusal of a
+                    # variable-less section is a false positive here: read the
+                    # attributes directly instead of losing them.
+                    all_attrs.update(_collect_group_attrs(files, g))
+                    absent.append(f"{g} (attributes-only)")
+                    continue
+                raise SectionUnavailableError(files, g, cause=str(e)) from e
 
         if not dsets:
-            raise RuntimeError("No groups could be opened.")
+            raise SectionUnavailableError(
+                files,
+                ", ".join(groups),
+                cause="no section of the input could be opened",
+            )
 
         # Merge groups
         # We use compat='no_conflicts' as coordinates should be identical
@@ -113,8 +134,37 @@ class UMBCAerosolReader(GriddedReader):
 
         # Update history
         ds = update_history(ds, "Read UMBC Aerosol data.")
+        # Multi-section products must report which sections were included, so a
+        # reader of the provenance can see the file's actual coverage.
+        sections_line = f"included sections: {', '.join(included)}"
+        if absent:
+            sections_line += f" | skipped absent sections: {', '.join(absent)}"
+        ds = update_history(ds, sections_line)
 
         return ds
+
+
+def _collect_group_attrs(files: str | list[str], group: str) -> dict:
+    """Read the attributes of an HDF5 group that carries no data variables.
+
+    The instrument-attribute section is pure metadata, which the shared
+    driver refuses as an empty section; fetch its attributes directly so
+    the site location they encode is not lost.
+    """
+    from ..util import _import_required
+
+    h5py = _import_required("h5py")
+    from .drivers import FileUtility
+
+    if isinstance(files, str):
+        files = [files]
+    attrs: dict = {}
+    for f in files:
+        with FileUtility.get_fs(f).open(f, "rb") as fh:
+            with h5py.File(fh, "r") as hf:
+                if group in hf:
+                    attrs.update({k: v for k, v in hf[group].attrs.items()})
+    return attrs
 
 
 def umbc_aerosol_preprocess(ds: xr.Dataset) -> xr.Dataset:

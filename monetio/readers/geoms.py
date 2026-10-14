@@ -9,6 +9,7 @@ import xarray as xr
 
 from .base import GriddedReader, _ensure_time_dimension, register_reader
 from .drivers import FileUtility
+from .errors import annotate
 from .sat_utils import update_history
 
 
@@ -124,18 +125,23 @@ def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True
 
     if ext in {".h4", ".hdf4", ".hdf"}:
         pyhdf_SD = _import_required("pyhdf.SD")
-        if fp.startswith("s3://"):
-            import tempfile
+        try:
+            if fp.startswith("s3://"):
+                import tempfile
 
-            with tempfile.NamedTemporaryFile(suffix=ext, delete=True) as tmp:
-                fs.get(fp, tmp.name)
-                sd = pyhdf_SD.SD(tmp.name)
+                with tempfile.NamedTemporaryFile(suffix=ext, delete=True) as tmp:
+                    fs.get(fp, tmp.name)
+                    sd = pyhdf_SD.SD(tmp.name)
+                    data_vars, attrs = _read_hdf4(sd)
+                    sd.end()
+            else:
+                sd = pyhdf_SD.SD(str(fp))
                 data_vars, attrs = _read_hdf4(sd)
                 sd.end()
-        else:
-            sd = pyhdf_SD.SD(str(fp))
-            data_vars, attrs = _read_hdf4(sd)
-            sd.end()
+        except Exception as e:
+            # pyhdf's HDF4 errors do not name the file; the error must identify
+            # the input it failed on while keeping its original type.
+            raise annotate(e, fp) from e
 
         # For HDF4, we have NumPy arrays now. Wrap in Dataset.
         ds = xr.Dataset(data_vars=data_vars, attrs=attrs)
@@ -148,8 +154,14 @@ def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True
         h5py = _import_required("h5py")
         da_array = _import_required("dask.array")
 
-        f_obj = fs.open(fp, "rb")
-        f = h5py.File(f_obj, "r")
+        try:
+            f_obj = fs.open(fp, "rb")
+            f = h5py.File(f_obj, "r")
+        except Exception as e:
+            # h5py's "file signature not found" does not name the file, so a
+            # corrupt input is indistinguishable from a wrong path. Keep the
+            # original exception type and add the location.
+            raise annotate(e, fp) from e
 
         data_vars = {}
         for k, v in f.items():
@@ -164,7 +176,7 @@ def open_dataset_geoms(fp: str, *, rename_all: bool = True, squeeze: bool = True
         # This is a trade-off for GEOMS HDF5 files which don't fit standard xr.open_dataset engines.
         ds = xr.Dataset(data_vars=data_vars, attrs=attrs)
     else:
-        raise ValueError(f"unrecognized file extension: {ext!r}")
+        raise annotate(ValueError(f"unrecognized file extension: {ext!r}"), fp)
 
     ds = geoms_preprocess(ds, rename_all=rename_all, squeeze=squeeze)
 

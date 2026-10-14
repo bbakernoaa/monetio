@@ -307,7 +307,6 @@ def load_aqs_file(url: str) -> pd.DataFrame:
 
 def build_url(param: str, year: str, daily: bool = False) -> tuple[str, str]:
     """Build URL and filename for AQS data."""
-    beginning = f"{AQS_BASE_URL}{'daily_' if daily else 'hourly_'}"
     fname_prefix = "daily_" if daily else "hourly_"
 
     p = param.upper()
@@ -356,7 +355,7 @@ def build_urls(
                     content_length = int(r.headers.get("Content-Length", 0))
                     if content_length > 500:
                         return url, fname
-        except Exception:
+        except Exception:  # noqa: BLE001 - per-candidate availability probe; an unreachable candidate is dropped and the remaining candidates still build the URL list (categories: retrieval_failed)
             pass
         return None
 

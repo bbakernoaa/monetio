@@ -18,6 +18,7 @@ from ..util import long_to_wide
 from .base import PointReader, register_reader
 from .drivers import FileUtility
 from .epa_utils import add_monitor_metadata
+from .errors import annotate
 from .sat_utils import update_history
 
 
@@ -42,6 +43,7 @@ class AirNowReader(PointReader):
         bad_utcoffset: str = "drop",
         as_xarray: bool = True,
         lazy: bool = False,
+        defer: bool = False,
         **kwargs,
     ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
         """
@@ -84,6 +86,11 @@ class AirNowReader(PointReader):
             Whether to return an xarray.Dataset, by default True.
         lazy : bool, optional
             Whether to return a dask-backed object, by default False.
+        defer : bool, optional
+            Return an unevaluated result with no hidden full-data compute.
+            Implies ``lazy=True``:
+            the wide-format reshape is skipped in the DataFrame stage and
+            deferred to ``to_xarray``/``ds_to_2d``.
         **kwargs : dict
             Additional arguments passed to the driver.
 
@@ -119,6 +126,10 @@ class AirNowReader(PointReader):
         # Use base class to open
         # We stay in long format if we are lazy to avoid expensive shuffles/computes
         # during the DataFrame stage.
+        if defer:
+            # defer wins over lazy=False; the base class also
+            # enforces the capabilities.deferred guard.
+            lazy = True
         df = super().open_dataset(
             files,
             use_virtualizarr=use_virtualizarr,
@@ -132,6 +143,7 @@ class AirNowReader(PointReader):
             read_method=read_func,
             as_xarray=False,
             lazy=lazy,
+            defer=defer,
             **kwargs,
         )
 
@@ -148,7 +160,7 @@ class AirNowReader(PointReader):
         if as_xarray:
             # Filter out expand2d from kwargs if present to avoid double-passing
             to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
-            ds = self.to_xarray(df, expand2d=wide_fmt, **to_xr_kwargs)
+            ds = self.to_xarray(df, expand2d=wide_fmt, defer=defer, **to_xr_kwargs)
 
             # Ensure history from _post_process and harmonize is there
             # even if lost in DataFrame stage (Dask doesn't support .attrs)
@@ -490,8 +502,10 @@ def read_airnow_csv(
             dtype=_dtype_hints,
             storage_options=storage_options,
         )
-    except Exception:
-        dft = pd.DataFrame(columns=hourly_cols)
+    except Exception as e:
+        # An input that cannot be read or parsed at all is a failed load
+        # naming that input, not a silently-empty observation set.
+        raise annotate(e, fn) from e
 
     ncols = dft.columns.size
     if ncols == len(hourly_cols):
