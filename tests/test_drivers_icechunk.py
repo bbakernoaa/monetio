@@ -190,8 +190,16 @@ class TestOpenViaIcechunk:
         ):
             result = _open_via_icechunk(vds, "/tmp/repo", None)
 
-        # Verify workflow
-        mock_icechunk.Repository.open_or_create.assert_called_once_with("/tmp/repo")
+        # Verify workflow. The repository is opened through the Icechunk v2 API,
+        # which takes a storage object (built from the local path), an explicit
+        # repository config, and the virtual-chunk-access mapping — not the bare
+        # path a v1 call would have used.
+        mock_icechunk.local_filesystem_storage.assert_called_once_with("/tmp/repo")
+        mock_icechunk.Repository.open_or_create.assert_called_once_with(
+            mock_icechunk.local_filesystem_storage.return_value,
+            config=mock_icechunk.RepositoryConfig.default.return_value,
+            authorize_virtual_chunk_access={},
+        )
         mock_repo.writable_session.assert_called_once_with("main")
         vds.virtualize.to_icechunk.assert_called_once_with(mock_store)
         mock_session.commit.assert_called_once_with("VirtualiZarr references")

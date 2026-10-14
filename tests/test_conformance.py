@@ -148,6 +148,17 @@ def _fixture_for(source: str):
         if not matches:
             pytest.skip(f"fixture glob matched nothing: {files}")
         files = matches
+    # A recorded payload can be absent from the checkout: the large HDF-EOS5/
+    # HDF4 samples (mopitt, omps) are git-ignored so they exist only where they
+    # were captured, never on a fresh CI runner. Skip with the reason rather
+    # than failing on a file the environment never had — matching
+    # ``SampleRegistry.require``, which guards the same case for the other
+    # load-dependent suites.
+    if isinstance(files, str) and not Path(files).exists():
+        pytest.skip(f"{source}: sample payload missing: {files}")
+    if isinstance(files, list) and files and not all(Path(f).exists() for f in files):
+        missing = [f for f in files if not Path(f).exists()]
+        pytest.skip(f"{source}: sample payload missing: {missing}")
     return files, dict(kwargs)
 
 
