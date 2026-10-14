@@ -348,7 +348,7 @@ def read_openaq_aws_csv(fp: str, **kwargs) -> pd.DataFrame:
 def read_openaq_aws_csv_robust(fp: str, **kwargs) -> pd.DataFrame:
     """Try to read a file, re-raising with the offending path named.
 
-    The name is kept for backwards compatibility; a missing or unparseable
+    The name is kept for backwards compatibility; a missing or unparsable
     archive file is now reported as a failure naming that file rather than
     quietly contributing zero rows to the load.
     """

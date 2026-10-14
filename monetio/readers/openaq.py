@@ -484,7 +484,7 @@ def read_openaq_json(fn: str, storage_options: dict = None, **kwargs: Any) -> pd
             # Replace +0100 with +01:00 if necessary
             utcoffset_str = utcoffset_str.str.replace(r"(\d{2})(\d{2})$", r"\1:\2", regex=True)
             utcoffset = pd.to_timedelta(utcoffset_str)
-        except Exception:  # noqa: BLE001 - an unparseable local-time offset is a per-record gap: UTC is kept and the offset recorded as zero, never guessed
+        except Exception:  # noqa: BLE001 - an unparsable local-time offset is a per-record gap: UTC is kept and the offset recorded as zero, never guessed
             utcoffset = pd.Timedelta(0)
     else:
         utcoffset = pd.Timedelta(0)
