@@ -9,7 +9,7 @@ import xarray as xr
 
 from .base import GriddedReader, _ensure_time_dimension, register_reader, update_history
 from .drivers import FileUtility
-from .errors import annotate
+from .errors import MalformedInputError, annotate
 
 
 @register_reader("hysplit")
@@ -376,13 +376,30 @@ class ModelBin:
         fs = FileUtility.get_fs(filename)
         fid = fs.open(filename, "rb")
 
+        # Header-derived record counts are untrusted: a corrupt file can claim
+        # far more records than it actually holds, and np.fromfile(count=...) makes
+        # NumPy pre-allocate count*itemsize before reading (observed: a 117-byte
+        # file asking for 68.4 GiB). That raises a platform-dependent MemoryError --
+        # Linux refuses the reservation outright, macOS over-commits and fails
+        # elsewhere -- so the failure is neither deterministic nor does it name the
+        # input. Reject any count whose records cannot fit in the file up front.
+        file_size = fs.info(filename).get("size")
+
+        def _fits(count, itemsize, label):
+            if count < 0 or (file_size is not None and count * itemsize > file_size):
+                raise MalformedInputError(
+                    filename,
+                    f"{label} count {count} exceeds the {file_size}-byte file",
+                )
+            return int(count)
+
         recs = self.define_struct()
         rec1, rec2, rec3, rec4a = recs[0], recs[1], recs[2], recs[3]
         rec4b, rec5a, rec5b, rec5c = recs[4], recs[5], recs[6], recs[7]
         rec6, rec8a, rec8b, rec8c = recs[8], recs[9], recs[10], recs[11]
 
         hdata1 = np.fromfile(fid, dtype=rec1, count=1)
-        nstartloc = self.parse_header(hdata1)
+        nstartloc = _fits(self.parse_header(hdata1), rec2.itemsize, "starting-location")
 
         hdata2 = np.fromfile(fid, dtype=rec2, count=nstartloc)
         century = self.parse_hdata2(hdata2, nstartloc, century)
@@ -393,13 +410,15 @@ class ModelBin:
             print("Grid specs", self.gridhash)
 
         hdata4a = np.fromfile(fid, dtype=rec4a, count=1)
-        hdata4b = np.fromfile(fid, dtype=rec4b, count=hdata4a["nlev"][0])
+        nlev = _fits(hdata4a["nlev"][0], rec4b.itemsize, "level")
+        hdata4b = np.fromfile(fid, dtype=rec4b, count=nlev)
         self.parse_hdata4(hdata4a, hdata4b)
 
         hdata5a = np.fromfile(fid, dtype=rec5a, count=1)
-        np.fromfile(fid, dtype=rec5b, count=hdata5a["pollnum"][0])
+        pollnum = _fits(hdata5a["pollnum"][0], rec5b.itemsize, "species")
+        np.fromfile(fid, dtype=rec5b, count=pollnum)
         np.fromfile(fid, dtype=rec5c, count=1)
-        self.atthash["Number of Species"] = hdata5a["pollnum"][0]
+        self.atthash["Number of Species"] = pollnum
         self.atthash["Species ID"] = []
 
         iimax = 0
@@ -424,7 +443,8 @@ class ModelBin:
                     hdata8a = np.fromfile(fid, dtype=rec8a, count=1)
                     if hdata8a["ne"] >= 1:
                         self.atthash["Species ID"].append(hdata8a["poll"][0].decode("UTF-8"))
-                        hdata8b = np.fromfile(fid, dtype=rec8b, count=hdata8a["ne"][0])
+                        ne = _fits(hdata8a["ne"][0], rec8b.itemsize, "concentration")
+                        hdata8b = np.fromfile(fid, dtype=rec8b, count=ne)
                         self.nonzeroconcdates.append(pdate1)
                     else:
                         self.zeroconcdates.append(pdate1)
