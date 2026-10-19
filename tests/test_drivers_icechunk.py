@@ -225,7 +225,7 @@ class TestIcechunkWiring:
 
         # Create mock modules for the local imports inside open()
         mock_virtualizarr = mock.MagicMock()
-        mock_virtualizarr.open_virtual_mfdataset.return_value = mock_vds
+        mock_virtualizarr.open_virtual_dataset.return_value = mock_vds
         mock_parsers = mock.MagicMock()
 
         with (

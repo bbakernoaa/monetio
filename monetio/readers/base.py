@@ -138,8 +138,20 @@ def register_reader(name):
                             requested_chunks = bound.arguments.get(param.name, {}).get("chunks")
                 if defer:
                     self._require_defer_support()
-                if requested_chunks is not None and isinstance(
-                    getattr(self, "driver", None), PandasDriver
+                # ACTRIS NetCDF inputs bypass the tabular driver entirely and
+                # hand chunk options to xarray. Its NASA-Ames path still uses
+                # PandasDriver, where array chunks have no meaning.
+                files = bound.arguments.get("files")
+                if files is None and args:
+                    files = args[0]
+                file_items = files if isinstance(files, list | tuple) else [files]
+                is_actris_netcdf = self._source_name == "actris" and all(
+                    str(path).lower().endswith(".nc") for path in file_items if path is not None
+                )
+                if (
+                    requested_chunks is not None
+                    and isinstance(getattr(self, "driver", None), PandasDriver)
+                    and not is_actris_netcdf
                 ):
                     raise OptionUnsupportedError(
                         "chunks",

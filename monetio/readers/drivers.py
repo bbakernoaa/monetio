@@ -662,7 +662,10 @@ def _open_via_icechunk(
 
     # Re-open for reading
     session = repo.readonly_session(branch="main")
-    return xr.open_zarr(session.store, consolidated=False, chunks=chunks)
+    open_kwargs = {"consolidated": False}
+    if chunks is not None:
+        open_kwargs["chunks"] = chunks
+    return xr.open_zarr(session.store, **open_kwargs)
 
 
 def _is_transient_network_error(exc: Exception) -> bool:
@@ -1399,9 +1402,12 @@ class XarrayDriver:
 
                         # 5. Route to icechunk or kerchunk
                         if use_icechunk:
-                            ds = _open_via_icechunk(
-                                vds, icechunk_url, virtualizarr_file, chunks=chunks
-                            )
+                            if chunks is None:
+                                ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file)
+                            else:
+                                ds = _open_via_icechunk(
+                                    vds, icechunk_url, virtualizarr_file, chunks=chunks
+                                )
                             self._validate_chunk_dimensions(ds, chunks)
                             if preprocess:
                                 ds = preprocess(ds)
@@ -1600,7 +1606,12 @@ class XarrayDriver:
 
                 # --- Branch on backend ---
                 if use_icechunk:
-                    ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file, chunks=chunks)
+                    if chunks is None:
+                        ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file)
+                    else:
+                        ds = _open_via_icechunk(
+                            vds, icechunk_url, virtualizarr_file, chunks=chunks
+                        )
                     self._validate_chunk_dimensions(ds, chunks)
                     if preprocess:
                         ds = preprocess(ds)
