@@ -445,7 +445,7 @@ def test_explicit_schema_handles_empty_first_partition(tmp_path):
     meta = pd.DataFrame(
         {
             "time": pd.Series(dtype="str"),
-            "siteid": pd.Series(dtype=object),
+            "siteid": pd.Series(dtype="str"),
             "v0": pd.Series(dtype="float64"),
             "v1": pd.Series(dtype="float64"),
         }
@@ -467,7 +467,7 @@ def test_mixed_schema_failure_names_the_offending_input(tmp_path):
     meta = pd.DataFrame(
         {
             "time": pd.Series(dtype="str"),
-            "siteid": pd.Series(dtype=object),
+            "siteid": pd.Series(dtype="str"),
             "value": pd.Series(dtype="float64"),
         }
     )

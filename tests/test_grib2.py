@@ -136,8 +136,9 @@ def test_real_grib2_virtualizarr_dask_backend_parity(tmp_path, reference_backend
     else:
         options.update(use_icechunk=True, icechunk_url=str(tmp_path / "grib2-icechunk"))
 
-    lazy = reader.open_dataset(str(path), **options)
+    lazy = None
     try:
+        lazy = reader.open_dataset(str(path), **options)
         assert hasattr(lazy.PRMSL.data, "dask")
         assert lazy.PRMSL.chunksizes["y"] == (30, 30, 30, 30, 30, 30, 1)
         # GRIB references preserve fixed-surface metadata as a singleton
@@ -155,8 +156,8 @@ def test_real_grib2_virtualizarr_dask_backend_parity(tmp_path, reference_backend
             assert '"id": "grib2io"' in refs["PRMSL/.zarray"]
     finally:
         eager.close()
-        lazy.close()
-    lazy.close()
+        if lazy is not None:
+            lazy.close()
 
 
 def test_grib2_reader_open():

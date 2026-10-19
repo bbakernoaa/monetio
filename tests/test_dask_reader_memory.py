@@ -58,7 +58,7 @@ def test_tabular_partition_subset_stays_below_total_rss_budget(
     meta = pd.DataFrame(
         {
             "time": pd.Series(dtype="str"),
-            "siteid": pd.Series(dtype=object),
+            "siteid": pd.Series(dtype="str"),
             "obs": pd.Series(dtype="float64"),
         }
     )

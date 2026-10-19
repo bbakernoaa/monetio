@@ -243,7 +243,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/calipso.py",
@@ -570,11 +570,11 @@
         },
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -667,7 +667,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -718,7 +718,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -778,7 +778,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -835,7 +835,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -893,7 +893,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -949,7 +949,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1008,7 +1008,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1075,7 +1075,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1138,7 +1138,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1205,7 +1205,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1264,7 +1264,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1310,11 +1310,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1370,7 +1370,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1428,7 +1428,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1485,7 +1485,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1541,7 +1541,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1598,7 +1598,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1659,7 +1659,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1717,7 +1717,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1803,7 +1803,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1860,7 +1860,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1904,7 +1904,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -1969,7 +1969,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2040,7 +2040,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2093,7 +2093,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2150,7 +2150,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -2206,7 +2206,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2321,7 +2321,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2374,7 +2374,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2426,7 +2426,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2489,7 +2489,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cems.py",
@@ -2725,7 +2725,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2789,7 +2789,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2854,7 +2854,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2928,11 +2928,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -2985,7 +2985,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/camx.py",
@@ -2997,7 +2997,7 @@
         },
         {
           "path": "tests/test_camx.py",
-          "sha256": "aa3756875dfe8419ba0e220a226c14794b9360a017266559faf719b96d0d694f"
+          "sha256": "f44e7152913f25cbe09f8439749c41644c6cd6b003668f4dbd880a9184ad8014"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:6e8158997d1fc648d112d74aa133ff5f47821be7ed0e26c2ed0e446560f95502",
@@ -3016,7 +3016,7 @@
         {
           "factory": "tests/test_camx.py::mock_camx_dataset",
           "factory_source_path": "tests/test_camx.py",
-          "factory_source_sha256": "aa3756875dfe8419ba0e220a226c14794b9360a017266559faf719b96d0d694f",
+          "factory_source_sha256": "f44e7152913f25cbe09f8439749c41644c6cd6b003668f4dbd880a9184ad8014",
           "fixture_id": "generated:camx-chunked-reader-parity",
           "kind": "generated",
           "parameters": {
@@ -3044,7 +3044,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3056,7 +3056,7 @@
         },
         {
           "path": "tests/test_grib2.py",
-          "sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8"
+          "sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:d1e99de33dc3ac8ca0586ef1a4482659f9fd845ad406bea75a8284d6dd5cae1e",
@@ -3075,7 +3075,7 @@
         {
           "factory": "tests/test_grib2.py::test_ncep_grib_eager_lazy fixture writer",
           "factory_source_path": "tests/test_grib2.py",
-          "factory_source_sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8",
+          "factory_source_sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe",
           "fixture_id": "generated:ncep-grib-netcdf-reader-parity",
           "kind": "generated",
           "parameters": {
@@ -3103,7 +3103,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3163,7 +3163,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3222,7 +3222,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3279,7 +3279,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/crn.py",
@@ -3343,11 +3343,11 @@
         },
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3411,7 +3411,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cems.py",
@@ -3471,7 +3471,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3534,7 +3534,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3593,7 +3593,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -3662,7 +3662,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3724,7 +3724,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3785,7 +3785,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3841,7 +3841,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3892,7 +3892,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -3943,7 +3943,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4001,7 +4001,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4058,7 +4058,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4114,7 +4114,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4171,7 +4171,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/calipso.py",
@@ -4228,7 +4228,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4285,7 +4285,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4342,7 +4342,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/chimere.py",
@@ -4406,7 +4406,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4462,7 +4462,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4519,7 +4519,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4579,7 +4579,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4630,7 +4630,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4679,7 +4679,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4734,7 +4734,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4785,7 +4785,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4845,7 +4845,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4905,7 +4905,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -4965,7 +4965,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5023,7 +5023,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5081,7 +5081,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5139,7 +5139,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5191,7 +5191,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5252,7 +5252,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5312,7 +5312,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5364,11 +5364,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5433,11 +5433,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5445,7 +5445,7 @@
         },
         {
           "path": "tests/test_scale_deferred.py",
-          "sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056"
+          "sha256": "694c9a8725550140e5489aeca728773b58ae0d1b95bceab0b38856c429206c22"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:c9c877e003ca840de78426933b70a36df2c666913e3690825f3f3f2a2d7dbe04",
@@ -5464,7 +5464,7 @@
         {
           "factory": "tests/test_scale_deferred.py::TestPointDeferred.test_long_xarray_preparation_batches_coordinate_discovery",
           "factory_source_path": "tests/test_scale_deferred.py",
-          "factory_source_sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056",
+          "factory_source_sha256": "694c9a8725550140e5489aeca728773b58ae0d1b95bceab0b38856c429206c22",
           "fixture_id": "generated:airnow-long-xarray-four-partitions",
           "kind": "generated",
           "parameters": {
@@ -5491,7 +5491,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5549,7 +5549,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5612,7 +5612,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5658,7 +5658,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/crn.py",
@@ -5715,7 +5715,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5773,7 +5773,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5830,7 +5830,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5886,7 +5886,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -5943,7 +5943,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6001,7 +6001,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6013,7 +6013,7 @@
         },
         {
           "path": "tests/test_modis_l2.py",
-          "sha256": "6a9db56296dbee1701b24f08404a80be4dc60ca68ed126d2fbc51cf25ce8a92a"
+          "sha256": "c6130b61db59216541bbd3706710b6ecffa668dd1b8a41e757ef71438f1aa3e7"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:ab32857c027a7aaad6a3e2bbd999ebea8a361b0b10d01ee4d88a21ada229f079",
@@ -6030,7 +6030,7 @@
         {
           "factory": "tests/test_modis_l2.py::test_modis_l2_reader_local_eager_and_use_dask_parity",
           "factory_source_path": "tests/test_modis_l2.py",
-          "factory_source_sha256": "6a9db56296dbee1701b24f08404a80be4dc60ca68ed126d2fbc51cf25ce8a92a",
+          "factory_source_sha256": "c6130b61db59216541bbd3706710b6ecffa668dd1b8a41e757ef71438f1aa3e7",
           "fixture_id": "generated:modis-l2-reader-eager-lazy-parity",
           "kind": "generated",
           "parameters": {
@@ -6061,7 +6061,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6119,7 +6119,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6179,7 +6179,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6235,7 +6235,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6291,7 +6291,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6351,7 +6351,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6406,7 +6406,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6471,7 +6471,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/crn.py",
@@ -6527,7 +6527,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6583,7 +6583,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6638,7 +6638,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6693,7 +6693,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6753,7 +6753,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6831,7 +6831,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6893,7 +6893,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -6953,7 +6953,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7015,7 +7015,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7027,7 +7027,7 @@
         },
         {
           "path": "tests/test_grib2.py",
-          "sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8"
+          "sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:e5730f54aef112d429d631b6522271eb87a255454202c52ce92debbfe4d87bdf",
@@ -7044,7 +7044,7 @@
         {
           "factory": "tests/test_grib2.py::test_grib2_reader_eager_use_dask_parity",
           "factory_source_path": "tests/test_grib2.py",
-          "factory_source_sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8",
+          "factory_source_sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe",
           "fixture_id": "generated:grib2-shaped-local-netcdf",
           "kind": "generated",
           "parameters": {
@@ -7074,7 +7074,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7135,7 +7135,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7196,7 +7196,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7257,7 +7257,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7317,7 +7317,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7370,7 +7370,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7422,7 +7422,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7476,7 +7476,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7534,7 +7534,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7577,7 +7577,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7636,7 +7636,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7697,7 +7697,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7762,7 +7762,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -7821,11 +7821,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7881,7 +7881,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -7893,7 +7893,7 @@
         },
         {
           "path": "tests/test_dask_reader_memory.py",
-          "sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79"
+          "sha256": "261affc1eee1cf289e77161827b7b1c878a2a658d0596f4f968a1562021564ce"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:3b8d71f0753c62a6dce60faafa416a2425eda3f83002ce78171011c62fc40d7d",
@@ -7913,7 +7913,7 @@
         {
           "factory": "tests/test_dask_reader_memory.py::memory fixture case",
           "factory_source_path": "tests/test_dask_reader_memory.py",
-          "factory_source_sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79",
+          "factory_source_sha256": "261affc1eee1cf289e77161827b7b1c878a2a658d0596f4f968a1562021564ce",
           "fixture_id": "generated:memory-gridded-sparse-2g",
           "kind": "generated",
           "parameters": {
@@ -7973,11 +7973,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -7985,7 +7985,7 @@
         },
         {
           "path": "tests/test_dask_reader_memory.py",
-          "sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79"
+          "sha256": "261affc1eee1cf289e77161827b7b1c878a2a658d0596f4f968a1562021564ce"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:f7746f7cb0f0c3da3c257cd24576de0529f34cedc7f598c792c6b32ec52de06c",
@@ -8005,7 +8005,7 @@
         {
           "factory": "tests/test_dask_reader_memory.py::memory fixture case",
           "factory_source_path": "tests/test_dask_reader_memory.py",
-          "factory_source_sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79",
+          "factory_source_sha256": "261affc1eee1cf289e77161827b7b1c878a2a658d0596f4f968a1562021564ce",
           "fixture_id": "generated:memory-tabular-129x8m",
           "kind": "generated",
           "parameters": {
@@ -8050,11 +8050,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8111,7 +8111,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -8182,7 +8182,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8228,7 +8228,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8291,7 +8291,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8374,7 +8374,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8428,7 +8428,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8492,7 +8492,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8555,7 +8555,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8622,11 +8622,11 @@
         },
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8667,7 +8667,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8743,7 +8743,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8795,7 +8795,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8856,7 +8856,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8911,7 +8911,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -8973,7 +8973,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9028,7 +9028,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -9082,7 +9082,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9141,7 +9141,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9191,7 +9191,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9239,7 +9239,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9302,7 +9302,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cems.py",
@@ -9358,7 +9358,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cems.py",
@@ -9425,7 +9425,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/chimere.py",
@@ -9493,7 +9493,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9545,7 +9545,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9614,7 +9614,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9680,7 +9680,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9746,7 +9746,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9808,7 +9808,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9880,7 +9880,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -9947,7 +9947,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/calipso.py",
@@ -10013,7 +10013,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10079,7 +10079,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10139,7 +10139,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10202,7 +10202,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10301,7 +10301,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10434,7 +10434,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10497,7 +10497,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10564,7 +10564,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10650,7 +10650,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10709,7 +10709,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10767,7 +10767,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10830,7 +10830,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10890,7 +10890,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -10954,7 +10954,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11018,7 +11018,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11078,7 +11078,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11138,7 +11138,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11196,7 +11196,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11244,7 +11244,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11308,7 +11308,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11368,11 +11368,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11442,7 +11442,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11513,7 +11513,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -11525,7 +11525,7 @@
         },
         {
           "path": "tests/test_dask_reader_memory.py",
-          "sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79"
+          "sha256": "261affc1eee1cf289e77161827b7b1c878a2a658d0596f4f968a1562021564ce"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:3b8d71f0753c62a6dce60faafa416a2425eda3f83002ce78171011c62fc40d7d",
@@ -11546,7 +11546,7 @@
         {
           "factory": "tests/dask_audit_support.py::make_sparse_gridded_fixture",
           "factory_source_path": "tests/dask_audit_support.py",
-          "factory_source_sha256": "485e3ec3ba68965e7e027699e0340ac66ad343421c2aa2330c4690dfec6092d2",
+          "factory_source_sha256": "0b8445ebc898297f5b7503c2cd8145c76bdb372490c92b2da68328b2c9fe62e4",
           "fixture_id": "generated:large-sparse-cmaq-rss",
           "kind": "generated",
           "parameters": {
@@ -11582,11 +11582,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11594,7 +11594,7 @@
         },
         {
           "path": "tests/test_dask_reader_memory.py",
-          "sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79"
+          "sha256": "261affc1eee1cf289e77161827b7b1c878a2a658d0596f4f968a1562021564ce"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:f7746f7cb0f0c3da3c257cd24576de0529f34cedc7f598c792c6b32ec52de06c",
@@ -11615,7 +11615,7 @@
         {
           "factory": "tests/dask_audit_support.py::make_large_compressed_table",
           "factory_source_path": "tests/dask_audit_support.py",
-          "factory_source_sha256": "485e3ec3ba68965e7e027699e0340ac66ad343421c2aa2330c4690dfec6092d2",
+          "factory_source_sha256": "0b8445ebc898297f5b7503c2cd8145c76bdb372490c92b2da68328b2c9fe62e4",
           "fixture_id": "generated:large-airnow-compressed-partitions-rss",
           "kind": "generated",
           "parameters": {
@@ -11642,11 +11642,11 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
+          "sha256": "df7327f2bccca8bc13dc750c25fc076e6dd36ba08c6d463342538854f0870922"
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11654,7 +11654,7 @@
         },
         {
           "path": "tests/test_scale_deferred.py",
-          "sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056"
+          "sha256": "694c9a8725550140e5489aeca728773b58ae0d1b95bceab0b38856c429206c22"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:c9c877e003ca840de78426933b70a36df2c666913e3690825f3f3f2a2d7dbe04",
@@ -11675,7 +11675,7 @@
         {
           "factory": "tests/test_scale_deferred.py::TestPointDeferred::test_table_and_xarray_conversion_share_preparation_without_persist",
           "factory_source_path": "tests/test_scale_deferred.py",
-          "factory_source_sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056",
+          "factory_source_sha256": "694c9a8725550140e5489aeca728773b58ae0d1b95bceab0b38856c429206c22",
           "fixture_id": "generated:airnow-width-preparation-10-100",
           "kind": "generated",
           "parameters": {
@@ -11758,7 +11758,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11814,7 +11814,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/cmaq.py",
@@ -11886,7 +11886,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -11959,7 +11959,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_ndbc.py",
@@ -12018,7 +12018,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -12089,7 +12089,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_ish.py",
@@ -12157,7 +12157,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -12991,7 +12991,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -13080,7 +13080,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -13153,7 +13153,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -13223,7 +13223,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -13293,7 +13293,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -13441,7 +13441,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -13518,7 +13518,7 @@
         },
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -13751,7 +13751,7 @@
         },
         {
           "path": "tests/test_grib2.py",
-          "sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8"
+          "sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe"
         },
         {
           "path": "tests/test_gfs.py",
@@ -13837,7 +13837,7 @@
         },
         {
           "path": "tests/test_grib2.py",
-          "sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8"
+          "sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe"
         },
         {
           "path": "tests/test_gfs.py",
@@ -13922,7 +13922,7 @@
         },
         {
           "path": "tests/test_grib2.py",
-          "sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8"
+          "sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:e879f7d11c9d0ec877085099f7672ea887e1a6ac7682e47a79d1c45005954fda",
@@ -13952,7 +13952,7 @@
         {
           "factory": "tests/test_grib2.py::test_real_grib2_backend_filters_messages_before_payload_reads",
           "factory_source_path": "tests/test_grib2.py",
-          "factory_source_sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8",
+          "factory_source_sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe",
           "fixture_id": "generated:two-variable-grib2-filter-fixture",
           "kind": "generated",
           "parameters": {
@@ -13984,7 +13984,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/base.py",
-          "sha256": "1d64acb9c96ae34f7fc24c8e6f3e40b4b9fa0861a8f963c3bd8f61f5472d984a"
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
         },
         {
           "path": "monetio/readers/camx.py",
@@ -14000,11 +14000,11 @@
         },
         {
           "path": "tests/dask_audit_support.py",
-          "sha256": "485e3ec3ba68965e7e027699e0340ac66ad343421c2aa2330c4690dfec6092d2"
+          "sha256": "0b8445ebc898297f5b7503c2cd8145c76bdb372490c92b2da68328b2c9fe62e4"
         },
         {
           "path": "tests/test_camx.py",
-          "sha256": "aa3756875dfe8419ba0e220a226c14794b9360a017266559faf719b96d0d694f"
+          "sha256": "f44e7152913f25cbe09f8439749c41644c6cd6b003668f4dbd880a9184ad8014"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -14038,7 +14038,7 @@
         {
           "factory": "tests.dask_audit_support.write_camx_pseudonetcdf_fixture",
           "factory_source_path": "tests/dask_audit_support.py",
-          "factory_source_sha256": "485e3ec3ba68965e7e027699e0340ac66ad343421c2aa2330c4690dfec6092d2",
+          "factory_source_sha256": "0b8445ebc898297f5b7503c2cd8145c76bdb372490c92b2da68328b2c9fe62e4",
           "fixture_id": "generated:camx-pseudonetcdf-uamiv",
           "kind": "generated",
           "parameters": {
@@ -14070,7 +14070,7 @@
         },
         {
           "path": "tests/test_camx.py",
-          "sha256": "aa3756875dfe8419ba0e220a226c14794b9360a017266559faf719b96d0d694f"
+          "sha256": "f44e7152913f25cbe09f8439749c41644c6cd6b003668f4dbd880a9184ad8014"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:65468cd2f15032a4abc56dafd3432b31b676f855a88eedaea74bdf64ea00a038",
@@ -14182,7 +14182,7 @@
         },
         {
           "path": "tests/test_grib2.py",
-          "sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8"
+          "sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:c9fed462515bc6f411cec19d2dd494e78e735a4379d058be9a38009f4362f96d",
@@ -15684,7 +15684,7 @@
         {
           "factory": "tests/dask_audit_support.py::make_sparse_gridded_fixture",
           "factory_source_path": "tests/dask_audit_support.py",
-          "factory_source_sha256": "485e3ec3ba68965e7e027699e0340ac66ad343421c2aa2330c4690dfec6092d2",
+          "factory_source_sha256": "0b8445ebc898297f5b7503c2cd8145c76bdb372490c92b2da68328b2c9fe62e4",
           "fixture_id": "generated:large-sparse-cmaq-rss",
           "kind": "generated",
           "parameters": {
@@ -15793,7 +15793,7 @@
         {
           "factory": "tests/test_camx.py::mock_camx_dataset",
           "factory_source_path": "tests/test_camx.py",
-          "factory_source_sha256": "aa3756875dfe8419ba0e220a226c14794b9360a017266559faf719b96d0d694f",
+          "factory_source_sha256": "f44e7152913f25cbe09f8439749c41644c6cd6b003668f4dbd880a9184ad8014",
           "fixture_id": "generated:camx-chunked-reader-parity",
           "kind": "generated",
           "parameters": {
@@ -16992,7 +16992,7 @@
         {
           "factory": "tests/test_grib2.py::test_ncep_grib_eager_lazy fixture writer",
           "factory_source_path": "tests/test_grib2.py",
-          "factory_source_sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8",
+          "factory_source_sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe",
           "fixture_id": "generated:ncep-grib-netcdf-reader-parity",
           "kind": "generated",
           "parameters": {
@@ -18127,7 +18127,7 @@
         {
           "factory": "tests/test_grib2.py::test_grib2_reader_eager_use_dask_parity",
           "factory_source_path": "tests/test_grib2.py",
-          "factory_source_sha256": "7e7cfcd8a0c03f8daf9576c1963191932cf59597b430417e732034ff0a6bd0a8",
+          "factory_source_sha256": "f7ff9466de20afbbfa956911ec6f17cf93be771c8a204fd96e1fc9dce0138dfe",
           "fixture_id": "generated:grib2-shaped-local-netcdf",
           "kind": "generated",
           "parameters": {
@@ -20141,7 +20141,7 @@
         {
           "factory": "tests/dask_audit_support.py::make_large_compressed_table",
           "factory_source_path": "tests/dask_audit_support.py",
-          "factory_source_sha256": "485e3ec3ba68965e7e027699e0340ac66ad343421c2aa2330c4690dfec6092d2",
+          "factory_source_sha256": "0b8445ebc898297f5b7503c2cd8145c76bdb372490c92b2da68328b2c9fe62e4",
           "fixture_id": "generated:large-airnow-compressed-partitions-rss",
           "kind": "generated",
           "parameters": {
@@ -20441,7 +20441,7 @@
         {
           "factory": "tests/test_scale_deferred.py::TestPointDeferred::test_table_and_xarray_conversion_share_preparation_without_persist",
           "factory_source_path": "tests/test_scale_deferred.py",
-          "factory_source_sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056",
+          "factory_source_sha256": "694c9a8725550140e5489aeca728773b58ae0d1b95bceab0b38856c429206c22",
           "fixture_id": "generated:airnow-width-preparation-10-100",
           "kind": "generated",
           "parameters": {
@@ -32702,7 +32702,7 @@
         {
           "factory": "tests/test_modis_l2.py::test_modis_l2_reader_local_eager_and_use_dask_parity",
           "factory_source_path": "tests/test_modis_l2.py",
-          "factory_source_sha256": "6a9db56296dbee1701b24f08404a80be4dc60ca68ed126d2fbc51cf25ce8a92a",
+          "factory_source_sha256": "c6130b61db59216541bbd3706710b6ecffa668dd1b8a41e757ef71438f1aa3e7",
           "fixture_id": "generated:modis-l2-reader-eager-lazy-parity",
           "kind": "generated",
           "parameters": {
