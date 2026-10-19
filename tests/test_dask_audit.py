@@ -1,4 +1,5 @@
 """Audit ledger integrity and event probe tests."""
+
 from __future__ import annotations
 
 import copy
@@ -46,7 +47,9 @@ def test_new_uninventoried_reader_module_is_reported():
             "affected_mode_ids": [],
         }
     )
-    assert any("reader inventory mismatch" in error for error in validate(ledger, ROOT, strict=False))
+    assert any(
+        "reader inventory mismatch" in error for error in validate(ledger, ROOT, strict=False)
+    )
 
 
 def test_missing_public_output_mode_is_reported():
@@ -66,14 +69,20 @@ def test_mode_must_name_its_backend_path():
     ledger = _ledger()
     mode = ledger["modes"][0]
     mode.pop("backend")
-    assert any(f"{mode['mode_id']}: missing fields backend" in error for error in validate(ledger, ROOT, strict=False))
+    assert any(
+        f"{mode['mode_id']}: missing fields backend" in error
+        for error in validate(ledger, ROOT, strict=False)
+    )
 
 
 def test_reader_module_must_name_loading_entrypoint():
     ledger = _ledger()
     module = next(m for m in ledger["modules"] if m["kind"] == "reader")
     module["public_paths"] = []
-    assert any("must enumerate their public loading paths" in e for e in validate(ledger, ROOT, strict=False))
+    assert any(
+        "must enumerate their public loading paths" in e
+        for e in validate(ledger, ROOT, strict=False)
+    )
 
 
 def test_distinct_gfs_family_classes_have_separate_ledger_modes():
@@ -129,18 +138,20 @@ def test_evidence_must_cover_each_mode_that_references_it():
 
 def test_findings_cannot_reference_unknown_omd_sources():
     ledger = _ledger()
-    ledger["findings"].append({
-        "finding_id": "finding-test",
-        "mode_ids": [],
-        "requirement": "FR-001",
-        "observed_behavior": "test",
-        "user_impact": "test",
-        "reproduction": "test",
-        "omd_reference_ids": ["missing-omd"],
-        "status": "candidate",
-        "proposed_resolution": "test",
-        "verification_evidence_ids": [],
-    })
+    ledger["findings"].append(
+        {
+            "finding_id": "finding-test",
+            "mode_ids": [],
+            "requirement": "FR-001",
+            "observed_behavior": "test",
+            "user_impact": "test",
+            "reproduction": "test",
+            "omd_reference_ids": ["missing-omd"],
+            "status": "candidate",
+            "proposed_resolution": "test",
+            "verification_evidence_ids": [],
+        }
+    )
     assert any("dangling OMD reference" in e for e in validate(ledger, ROOT, strict=False))
 
 
@@ -154,8 +165,7 @@ def test_stale_fixture_hash_is_reported():
 def test_stale_generated_fixture_factory_hash_is_reported():
     ledger = _ledger()
     mode = next(
-        m for m in ledger["modes"]
-        if any(f.get("kind") == "generated" for f in m["fixture_hashes"])
+        m for m in ledger["modes"] if any(f.get("kind") == "generated" for f in m["fixture_hashes"])
     )
     fixture = next(f for f in mode["fixture_hashes"] if f.get("kind") == "generated")
     fixture["factory_source_sha256"] = "0" * 64
@@ -173,14 +183,19 @@ def test_passed_evidence_requires_code_hashes():
     ledger = _ledger()
     case = next(e for e in ledger["evidence"] if e.get("run_status") == "passed")
     case.pop("code_hashes", None)
-    assert any("code_hashes must be a nonempty array" in error for error in validate(ledger, ROOT, strict=False))
+    assert any(
+        "code_hashes must be a nonempty array" in error
+        for error in validate(ledger, ROOT, strict=False)
+    )
 
 
 def test_stale_dependency_fingerprint_is_reported():
     ledger = _ledger()
     case = next(e for e in ledger["evidence"] if e.get("dependency_fingerprint"))
     case["dependency_fingerprint"] = "0" * 64
-    assert any("dependency fingerprint is stale" in error for error in validate(ledger, ROOT, strict=False))
+    assert any(
+        "dependency fingerprint is stale" in error for error in validate(ledger, ROOT, strict=False)
+    )
 
 
 def test_unavailable_dependency_cannot_support_a_capability():
@@ -213,7 +228,8 @@ def test_unsupported_capability_requires_passing_rejection_evidence():
 def test_rejected_defer_mode_cannot_leave_dependent_capabilities_pending():
     ledger = _ledger()
     mode = next(
-        m for m in ledger["modes"]
+        m
+        for m in ledger["modes"]
         if m["options"].get("defer") is True
         and m["capabilities"]["deferred"]["status"] == "unsupported"
     )
@@ -221,7 +237,8 @@ def test_rejected_defer_mode_cannot_leave_dependent_capabilities_pending():
         status="pending", claimed=False, reason="not checked", evidence_ids=[]
     )
     assert any(
-        f"{mode['mode_id']}: defer=True rejection is evidenced; distributed cannot remain pending" in error
+        f"{mode['mode_id']}: defer=True rejection is evidenced; distributed cannot remain pending"
+        in error
         for error in validate(ledger, ROOT, strict=False)
     )
 
@@ -249,7 +266,9 @@ def test_supported_capability_needs_passing_evidence():
     mode = ledger["modes"][0]
     cap = next(iter(mode["capabilities"].values()))
     cap.update(claimed=True, status="supported", evidence_ids=[])
-    assert any("lacks passing behavioral evidence" in e for e in validate(ledger, ROOT, strict=True))
+    assert any(
+        "lacks passing behavioral evidence" in e for e in validate(ledger, ROOT, strict=True)
+    )
 
 
 def test_trace_records_open_prepare_evaluate_and_cleanup_events():
@@ -293,22 +312,29 @@ def test_accepted_limitation_requires_rejected_capability():
     mode = next(m for m in ledger["modes"] if m["mode_id"] == finding["mode_ids"][0])
     for assessment in mode["capabilities"].values():
         assessment["status"] = "pending"
-    assert any("must reject at least one capability" in error for error in validate(ledger, ROOT, strict=False))
+    assert any(
+        "must reject at least one capability" in error
+        for error in validate(ledger, ROOT, strict=False)
+    )
 
 
 def test_finding_history_enforces_only_documented_lifecycle_transitions():
     ledger = _ledger()
     finding = next(f for f in ledger["findings"] if f["status"] == "verified_fixed")
     finding["status_history"] = ["candidate", "reproduced", "remediation_pending", "verified_fixed"]
-    assert not any("invalid finding transition" in error for error in validate(ledger, ROOT, strict=False))
+    assert not any(
+        "invalid finding transition" in error for error in validate(ledger, ROOT, strict=False)
+    )
     finding["status_history"] = ["candidate", "verified_fixed"]
-    assert any("invalid finding transition candidate -> verified_fixed" in error for error in validate(ledger, ROOT, strict=False))
+    assert any(
+        "invalid finding transition candidate -> verified_fixed" in error
+        for error in validate(ledger, ROOT, strict=False)
+    )
 
     finding["status"] = "dismissed_with_evidence"
     finding["status_history"] = ["candidate", "dismissed_with_evidence"]
     assert not any(
-        "invalid finding transition" in error
-        for error in validate(ledger, ROOT, strict=False)
+        "invalid finding transition" in error for error in validate(ledger, ROOT, strict=False)
     )
 
 
@@ -366,14 +392,27 @@ def test_validator_cli_exit_codes_and_json_report(tmp_path):
     script = ROOT / "scripts" / "validate_dask_audit.py"
 
     structural = subprocess.run(
-        [sys.executable, str(script), "--ledger", str(valid_ledger), "--structural-only", "--report", str(report_path)],
+        [
+            sys.executable,
+            str(script),
+            "--ledger",
+            str(valid_ledger),
+            "--structural-only",
+            "--report",
+            str(report_path),
+        ],
         capture_output=True,
         text=True,
         check=False,
     )
     assert structural.returncode == 0, structural.stderr
     report = json.loads(report_path.read_text())
-    assert {"exceptions", "findings", "capability_status_counts", "evidence_status_counts"} <= report.keys()
+    assert {
+        "exceptions",
+        "findings",
+        "capability_status_counts",
+        "evidence_status_counts",
+    } <= report.keys()
 
     pending_ledger = tmp_path / "pending-ledger.json"
     pending = json.loads(valid_ledger.read_text())

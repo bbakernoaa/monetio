@@ -25,7 +25,10 @@ def _assert_reader_dask_parity(reader, dataset, path, variable):
     input_dims = next(iter(dataset.data_vars.values())).dims
     chunks = {input_dims[0]: 1, input_dims[1]: 2}
     lazy = reader.open_dataset(
-        str(path), engine="h5netcdf", use_dask=True, chunks=chunks,
+        str(path),
+        engine="h5netcdf",
+        use_dask=True,
+        chunks=chunks,
         drop_variables=["unrelated"],
     )
     assert "unrelated" not in eager
@@ -37,20 +40,23 @@ def _assert_reader_dask_parity(reader, dataset, path, variable):
 
 def test_mrms_local_reader_use_dask_parity(tmp_path):
     _assert_reader_dask_parity(
-        MRMSReader(), _dataset("precip_rate", "lat", "lon"),
-        tmp_path / "mrms.nc", "precipitation_rate"
+        MRMSReader(),
+        _dataset("precip_rate", "lat", "lon"),
+        tmp_path / "mrms.nc",
+        "precipitation_rate",
     )
 
 
 def test_smap_local_reader_use_dask_parity(tmp_path):
     _assert_reader_dask_parity(
-        SMAPReader(), _dataset("soil_moisture", "row", "col"),
-        tmp_path / "smap.nc", "soil_moisture"
+        SMAPReader(), _dataset("soil_moisture", "row", "col"), tmp_path / "smap.nc", "soil_moisture"
     )
 
 
 def test_gpm_imerg_local_reader_use_dask_parity(tmp_path):
     _assert_reader_dask_parity(
-        GPMIMERGReader(), _dataset("precipitationCal", "lat", "lon"),
-        tmp_path / "gpm-imerg.nc", "precipitation"
+        GPMIMERGReader(),
+        _dataset("precipitationCal", "lat", "lon"),
+        tmp_path / "gpm-imerg.nc",
+        "precipitation",
     )

@@ -1,4 +1,5 @@
 """Support deterministic runtime evidence for deferred reader behavior."""
+
 from __future__ import annotations
 
 import hashlib
@@ -29,7 +30,9 @@ class ReadEvent:
 class AuditTrace:
     events: list[ReadEvent] = field(default_factory=list)
 
-    def record(self, stage: str, operation: str, input_identity: str | None = None, **kwargs: Any) -> None:
+    def record(
+        self, stage: str, operation: str, input_identity: str | None = None, **kwargs: Any
+    ) -> None:
         self.events.append(ReadEvent(stage, operation, input_identity, **kwargs))
 
     def stage_events(self, stage: str) -> list[ReadEvent]:
@@ -48,7 +51,13 @@ class TaskTrace(Callback):
         super().__init__()
 
     def _posttask(self, key, result, dsk, state, worker_id):
-        self.trace.record(self.stage, "dask-task", str(key), process_id=__import__("os").getpid(), worker=str(worker_id) if worker_id else None)
+        self.trace.record(
+            self.stage,
+            "dask-task",
+            str(key),
+            process_id=__import__("os").getpid(),
+            worker=str(worker_id) if worker_id else None,
+        )
 
 
 @contextmanager
@@ -69,18 +78,11 @@ def sha256_path(path: Path) -> str:
 
 def write_camx_pseudonetcdf_fixture(destination: Path) -> Path:
     """Build a projected UAMIV payload from PseudoNetCDF's bundled test file."""
+    import PseudoNetCDF
     from PseudoNetCDF import pncopen
     from PseudoNetCDF.camxfiles.uamiv.Write import ncf2uamiv
 
-    import PseudoNetCDF
-
-    source = (
-        Path(PseudoNetCDF.__file__).parent
-        / "testcase"
-        / "camxfiles"
-        / "uamiv"
-        / "test.uamiv"
-    )
+    source = Path(PseudoNetCDF.__file__).parent / "testcase" / "camxfiles" / "uamiv" / "test.uamiv"
     dataset = pncopen(str(source), format="uamiv")
     dataset.CPROJ = 2
     dataset.PLON = -100.0
@@ -104,11 +106,17 @@ def baseline_versions() -> dict[str, str | None]:
 
 def evidence_record(case_id: str, command: str, fixture: Path | None = None) -> dict[str, Any]:
     root = Path(__file__).resolve().parents[1]
-    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True, check=True
+    ).stdout.strip()
     return {
         "case_id": case_id,
         "command": command,
-        "fixture": fixture.relative_to(root).as_posix() if fixture and fixture.is_relative_to(root) else str(fixture) if fixture else None,
+        "fixture": fixture.relative_to(root).as_posix()
+        if fixture and fixture.is_relative_to(root)
+        else str(fixture)
+        if fixture
+        else None,
         "fixture_hash": sha256_path(fixture) if fixture and fixture.exists() else None,
         "code_revision": revision,
         "dependency_versions": baseline_versions(),
@@ -122,7 +130,14 @@ def write_json(path: Path, obj: Any) -> None:
     path.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n")
 
 
-def make_tabular_fixture(directory: Path, *, rows: int = 32, columns: int = 10, partitions: int = 4, empty_first: bool = False) -> list[Path]:
+def make_tabular_fixture(
+    directory: Path,
+    *,
+    rows: int = 32,
+    columns: int = 10,
+    partitions: int = 4,
+    empty_first: bool = False,
+) -> list[Path]:
     """Stream a deterministic CSV per partition; supports empty/schema edge cases."""
     directory.mkdir(parents=True, exist_ok=True)
     paths = []
@@ -134,7 +149,9 @@ def make_tabular_fixture(directory: Path, *, rows: int = 32, columns: int = 10, 
             for row in range(n):
                 idx = part * rows + row
                 vals = [f"2023-01-{1 + idx % 28:02}T{idx % 24:02}:00:00", f"S{idx % 5}"]
-                vals.extend(str(float(idx + col) if (idx + col) % 7 else "") for col in range(columns))
+                vals.extend(
+                    str(float(idx + col) if (idx + col) % 7 else "") for col in range(columns)
+                )
                 stream.write(",".join(vals) + "\n")
         paths.append(path)
     return paths
@@ -157,7 +174,9 @@ def make_malformed_table_fixture(path: Path) -> Path:
     return path
 
 
-def make_chunked_gridded_fixture(path: Path, *, time: int = 8, y: int = 16, x: int = 16, chunks: tuple[int, int, int] = (2, 8, 8)) -> Path:
+def make_chunked_gridded_fixture(
+    path: Path, *, time: int = 8, y: int = 16, x: int = 16, chunks: tuple[int, int, int] = (2, 8, 8)
+) -> Path:
     """Write a deterministic chunked netCDF fixture in bounded slabs."""
     import netCDF4
     import numpy as np
@@ -176,7 +195,9 @@ def make_chunked_gridded_fixture(path: Path, *, time: int = 8, y: int = 16, x: i
     return path
 
 
-def make_sparse_gridded_fixture(path: Path, *, shape=(1024, 1024, 512), chunks=(1, 128, 128)) -> Path:
+def make_sparse_gridded_fixture(
+    path: Path, *, shape=(1024, 1024, 512), chunks=(1, 128, 128)
+) -> Path:
     """Create a >1 GiB logical chunked array without materializing the fill data."""
     import netCDF4
 
@@ -188,7 +209,9 @@ def make_sparse_gridded_fixture(path: Path, *, shape=(1024, 1024, 512), chunks=(
     return path
 
 
-def make_large_compressed_table(directory: Path, *, files=16, bytes_per_file=64 * 1024 * 1024) -> tuple[list[Path], int]:
+def make_large_compressed_table(
+    directory: Path, *, files=16, bytes_per_file=64 * 1024 * 1024
+) -> tuple[list[Path], int]:
     """Stream deterministic gzip partitions and return logical input bytes."""
     import gzip
 

@@ -1,4 +1,5 @@
 """Slow RSS checks for subset access to inputs larger than the memory budget."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -13,9 +14,7 @@ from monetio.readers.drivers import PandasDriver, XarrayDriver
 
 
 @pytest.mark.slow
-def test_gridded_selected_chunk_stays_below_total_rss_budget(
-    tmp_path, process_distributed_cluster
-):
+def test_gridded_selected_chunk_stays_below_total_rss_budget(tmp_path, process_distributed_cluster):
     import os
 
     path = make_sparse_gridded_fixture(tmp_path / "large.nc")
@@ -56,15 +55,24 @@ def test_tabular_partition_subset_stays_below_total_rss_budget(
     # than the single-process baseline, so scale the budget with the input.
     budget = 768 * 1024 * 1024
     assert logical_bytes >= 2 * budget
-    meta = pd.DataFrame({"time": pd.Series(dtype="object"), "siteid": pd.Series(dtype="object"), "obs": pd.Series(dtype="float64")})
+    meta = pd.DataFrame(
+        {
+            "time": pd.Series(dtype="object"),
+            "siteid": pd.Series(dtype="object"),
+            "obs": pd.Series(dtype="float64"),
+        }
+    )
     client = process_distributed_cluster
     client.wait_for_workers(2)
     worker_pids = tuple(client.run(__import__("os").getpid).values())
     assert len(set(worker_pids)) == 2
     with monitor_process_tree(worker_pids=worker_pids) as memory:
         frame = PandasDriver(source="airnow").open(
-            [str(p) for p in paths], lazy=True, defer=True,
-            meta=meta, compression="gzip",
+            [str(p) for p in paths],
+            lazy=True,
+            defer=True,
+            meta=meta,
+            compression="gzip",
         )
         selected = frame.get_partition(0).compute()
         selected_warm = frame.get_partition(0).compute()

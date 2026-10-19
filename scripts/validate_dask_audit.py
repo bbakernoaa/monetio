@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate the reader Dask evidence ledger without importing reader modules."""
+
 from __future__ import annotations
 
 import argparse
@@ -13,13 +14,28 @@ from monetio._manifest import SOURCE_MANIFEST
 ROOT = Path(__file__).resolve().parents[1]
 STATUSES = {"supported", "unsupported", "pending"}
 RUN_STATUSES = {"not_run", "passed", "failed", "unavailable_dependency"}
-FINDING_STATUSES = {"candidate", "reproduced", "remediation_pending", "verified_fixed", "dismissed_with_evidence", "accepted_limitation"}
+FINDING_STATUSES = {
+    "candidate",
+    "reproduced",
+    "remediation_pending",
+    "verified_fixed",
+    "dismissed_with_evidence",
+    "accepted_limitation",
+}
 FINDING_TRANSITIONS = {
     "candidate": {"reproduced", "dismissed_with_evidence"},
     "reproduced": {"remediation_pending", "accepted_limitation"},
     "remediation_pending": {"verified_fixed"},
 }
-REQUIRED_CAPABILITIES = {"eager", "lazy_dask", "deferred", "chunk_partition_controls", "selective_reads", "distributed", "deferred_output_conversion"}
+REQUIRED_CAPABILITIES = {
+    "eager",
+    "lazy_dask",
+    "deferred",
+    "chunk_partition_controls",
+    "selective_reads",
+    "distributed",
+    "deferred_output_conversion",
+}
 
 
 def _fixture_errors(records, label: str, root: Path) -> list[str]:
@@ -60,7 +76,10 @@ def _fixture_errors(records, label: str, root: Path) -> list[str]:
                 source = rec.get("source_path")
                 if not isinstance(source, str) or not (root / source).is_file():
                     errors.append(f"{label}: {fid} subset source does not exist")
-                elif rec.get("source_sha256") != hashlib.sha256((root / source).read_bytes()).hexdigest():
+                elif (
+                    rec.get("source_sha256")
+                    != hashlib.sha256((root / source).read_bytes()).hexdigest()
+                ):
                     errors.append(f"{label}: {fid} subset source hash is stale or missing")
         else:
             errors.append(f"{label}: {fid} has unsupported fixture kind {kind!r}")
@@ -92,7 +111,18 @@ def _code_hash_errors(records, label: str, root: Path) -> list[str]:
         if rec.get("sha256") != hashlib.sha256(target.read_bytes()).hexdigest():
             errors.append(f"{label}: code hash is stale for {path}")
     return errors
-REQUIRED_TOP = {"schema_version", "baseline", "modules", "modes", "exceptions", "findings", "evidence", "references"}
+
+
+REQUIRED_TOP = {
+    "schema_version",
+    "baseline",
+    "modules",
+    "modes",
+    "exceptions",
+    "findings",
+    "evidence",
+    "references",
+}
 
 
 def validate(ledger: object, root: Path, strict: bool) -> list[str]:
@@ -106,7 +136,10 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
         errors.append(f"unknown schema_version {ledger.get('schema_version')!r}; expected 1")
     if not isinstance(ledger.get("baseline"), dict):
         errors.append("baseline must be an object")
-    elif not all(ledger["baseline"].get(k) for k in ("git_revision", "python", "platform", "date", "dependencies")):
+    elif not all(
+        ledger["baseline"].get(k)
+        for k in ("git_revision", "python", "platform", "date", "dependencies")
+    ):
         errors.append("baseline requires git_revision, python, platform, date, and dependencies")
     for key in ("modules", "modes", "exceptions", "findings", "evidence", "references"):
         if not isinstance(ledger.get(key), list):
@@ -117,13 +150,24 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
     actual = {p.relative_to(root).as_posix() for p in (root / "monetio/readers").rglob("*.py")}
     modules = ledger["modules"]
     paths: list[str] = []
-    module_kinds = {"reader", "shared driver", "parser", "helper", "specification", "package initialization"}
+    module_kinds = {
+        "reader",
+        "shared driver",
+        "parser",
+        "helper",
+        "specification",
+        "package initialization",
+    }
     for i, rec in enumerate(modules):
         if not isinstance(rec, dict):
             errors.append(f"modules[{i}] must be an object")
             continue
         path = rec.get("module_path")
-        if not isinstance(path, str) or not path.startswith("monetio/readers/") or ".." in Path(path).parts:
+        if (
+            not isinstance(path, str)
+            or not path.startswith("monetio/readers/")
+            or ".." in Path(path).parts
+        ):
             errors.append(f"modules[{i}] has invalid module_path {path!r}")
         else:
             paths.append(path)
@@ -131,7 +175,9 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
             errors.append(f"{path}: invalid module kind {rec.get('kind')!r}")
         if rec.get("disposition") not in {"audited", "pending"}:
             errors.append(f"{path}: disposition must be audited or pending")
-        if not isinstance(rec.get("public_paths"), list) or not isinstance(rec.get("affected_mode_ids"), list):
+        if not isinstance(rec.get("public_paths"), list) or not isinstance(
+            rec.get("affected_mode_ids"), list
+        ):
             errors.append(f"{path}: public_paths and affected_mode_ids must be arrays")
         elif rec.get("kind") == "reader" and not rec["public_paths"]:
             errors.append(f"{path}: reader modules must enumerate their public loading paths")
@@ -140,7 +186,9 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
     if len(paths) != len(set(paths)):
         errors.append("duplicate module paths")
     if set(paths) != actual:
-        errors.append(f"reader inventory mismatch: missing={sorted(actual-set(paths))}; stale={sorted(set(paths)-actual)}")
+        errors.append(
+            f"reader inventory mismatch: missing={sorted(actual - set(paths))}; stale={sorted(set(paths) - actual)}"
+        )
 
     evidence = ledger["evidence"]
     evidence_by_id: dict[str, dict] = {}
@@ -154,14 +202,25 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
         evidence_by_id[cid] = rec
         if rec.get("run_status") not in RUN_STATUSES:
             errors.append(f"{cid}: invalid run_status")
-        if rec.get("run_status") == "passed" and not all(rec.get(k) for k in ("command", "report", "code_revision", "dependency_versions", "dependency_fingerprint")):
+        if rec.get("run_status") == "passed" and not all(
+            rec.get(k)
+            for k in (
+                "command",
+                "report",
+                "code_revision",
+                "dependency_versions",
+                "dependency_fingerprint",
+            )
+        ):
             errors.append(
                 f"{cid}: passed evidence requires command, report, code_revision, "
                 "dependency_versions, and dependency_fingerprint"
             )
         if rec.get("dependency_fingerprint"):
             expected = hashlib.sha256(
-                json.dumps(rec.get("dependency_versions"), sort_keys=True, separators=(",", ":")).encode()
+                json.dumps(
+                    rec.get("dependency_versions"), sort_keys=True, separators=(",", ":")
+                ).encode()
             ).hexdigest()
             if rec["dependency_fingerprint"] != expected:
                 errors.append(f"{cid}: dependency fingerprint is stale")
@@ -172,8 +231,14 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
                 errors.append(f"{cid}: missing validation case field {field}")
         if not isinstance(rec.get("affected_modes", []), list):
             errors.append(f"{cid}: affected_modes must be an array")
-        if rec.get("run_status") == "passed" and not rec.get("no_payload_fixture", False) and not rec.get("fixture_hashes"):
-            errors.append(f"{cid}: passing evidence requires fixture hashes or no_payload_fixture=true")
+        if (
+            rec.get("run_status") == "passed"
+            and not rec.get("no_payload_fixture", False)
+            and not rec.get("fixture_hashes")
+        ):
+            errors.append(
+                f"{cid}: passing evidence requires fixture hashes or no_payload_fixture=true"
+            )
         errors.extend(_fixture_errors(rec.get("fixture_hashes", []), cid, root))
 
     references = ledger["references"]
@@ -186,7 +251,16 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
         if rid in reference_ids:
             errors.append(f"duplicate reference ID {rid}")
         reference_ids.add(rid)
-        for field in ("library", "version", "revision", "source", "start_line", "end_line", "url", "requirement_ids"):
+        for field in (
+            "library",
+            "version",
+            "revision",
+            "source",
+            "start_line",
+            "end_line",
+            "url",
+            "requirement_ids",
+        ):
             if field not in rec:
                 errors.append(f"{rid}: missing OMD reference field {field}")
 
@@ -199,9 +273,25 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
         if not isinstance(exc, dict):
             errors.append("preparation exception must be an object")
             continue
-        for field in ("exception_id", "mode_ids", "stage", "purpose", "trigger", "data_touched", "payload_reads", "input_cost_bound", "output_cost_bound", "expected_passes", "later_reread", "user_disclosure", "evidence_ids"):
+        for field in (
+            "exception_id",
+            "mode_ids",
+            "stage",
+            "purpose",
+            "trigger",
+            "data_touched",
+            "payload_reads",
+            "input_cost_bound",
+            "output_cost_bound",
+            "expected_passes",
+            "later_reread",
+            "user_disclosure",
+            "evidence_ids",
+        ):
             if field not in exc:
-                errors.append(f"{exc.get('exception_id', '<unknown>')}: missing exception field {field}")
+                errors.append(
+                    f"{exc.get('exception_id', '<unknown>')}: missing exception field {field}"
+                )
     finding_ids = [x.get("finding_id") for x in ledger["findings"] if isinstance(x, dict)]
     if len(finding_ids) != len(set(finding_ids)):
         errors.append("duplicate finding IDs")
@@ -209,25 +299,49 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
         if not isinstance(finding, dict):
             errors.append("finding must be an object")
             continue
-        for field in ("finding_id", "mode_ids", "requirement", "observed_behavior", "user_impact", "reproduction", "omd_reference_ids", "status", "proposed_resolution", "verification_evidence_ids"):
+        for field in (
+            "finding_id",
+            "mode_ids",
+            "requirement",
+            "observed_behavior",
+            "user_impact",
+            "reproduction",
+            "omd_reference_ids",
+            "status",
+            "proposed_resolution",
+            "verification_evidence_ids",
+        ):
             if field not in finding:
-                errors.append(f"{finding.get('finding_id', '<unknown>')}: missing finding field {field}")
+                errors.append(
+                    f"{finding.get('finding_id', '<unknown>')}: missing finding field {field}"
+                )
         if finding.get("status") not in FINDING_STATUSES:
             errors.append(f"{finding.get('finding_id', '<unknown>')}: invalid finding status")
         for ref in finding.get("omd_reference_ids", []):
             if ref not in reference_ids:
-                errors.append(f"{finding.get('finding_id', '<unknown>')}: dangling OMD reference {ref}")
+                errors.append(
+                    f"{finding.get('finding_id', '<unknown>')}: dangling OMD reference {ref}"
+                )
         status = finding.get("status")
         history = finding.get("status_history")
         if strict and history is None:
-            errors.append(f"{finding.get('finding_id')}: final finding disposition requires status_history")
+            errors.append(
+                f"{finding.get('finding_id')}: final finding disposition requires status_history"
+            )
         if history is not None:
-            if (not isinstance(history, list) or not history
-                    or any(item not in FINDING_STATUSES for item in history)):
-                errors.append(f"{finding.get('finding_id')}: status_history must be a nonempty list of valid statuses")
+            if (
+                not isinstance(history, list)
+                or not history
+                or any(item not in FINDING_STATUSES for item in history)
+            ):
+                errors.append(
+                    f"{finding.get('finding_id')}: status_history must be a nonempty list of valid statuses"
+                )
             else:
                 if history[-1] != status:
-                    errors.append(f"{finding.get('finding_id')}: status_history must end with current status")
+                    errors.append(
+                        f"{finding.get('finding_id')}: status_history must end with current status"
+                    )
                 for previous, current in zip(history, history[1:]):
                     if current not in FINDING_TRANSITIONS.get(previous, set()):
                         errors.append(
@@ -236,13 +350,19 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
         evidence_refs = finding.get("verification_evidence_ids", [])
         if status in {"verified_fixed", "dismissed_with_evidence", "accepted_limitation"}:
             if not evidence_refs:
-                errors.append(f"{finding.get('finding_id')}: terminal finding status requires evidence")
+                errors.append(
+                    f"{finding.get('finding_id')}: terminal finding status requires evidence"
+                )
             for ref in evidence_refs:
                 evidence_rec = evidence_by_id.get(ref)
                 if evidence_rec is None:
-                    errors.append(f"{finding.get('finding_id')}: missing verification evidence {ref}")
+                    errors.append(
+                        f"{finding.get('finding_id')}: missing verification evidence {ref}"
+                    )
                 elif evidence_rec.get("run_status") != "passed":
-                    errors.append(f"{finding.get('finding_id')}: verification evidence {ref} did not pass")
+                    errors.append(
+                        f"{finding.get('finding_id')}: verification evidence {ref} did not pass"
+                    )
         if status == "accepted_limitation":
             for mode_id in finding.get("mode_ids", []):
                 mode_rec = next((m for m in ledger["modes"] if m.get("mode_id") == mode_id), None)
@@ -261,7 +381,22 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
                         "requires linked user guidance"
                     )
     mode_ids: list[str] = []
-    mode_keys = {"mode_id", "source", "aliases", "module", "entrypoint", "output_form", "backend", "options", "capabilities", "fixture_ids", "exception_ids", "resource_policy", "tolerance_policy", "documentation"}
+    mode_keys = {
+        "mode_id",
+        "source",
+        "aliases",
+        "module",
+        "entrypoint",
+        "output_form",
+        "backend",
+        "options",
+        "capabilities",
+        "fixture_ids",
+        "exception_ids",
+        "resource_policy",
+        "tolerance_policy",
+        "documentation",
+    }
     for i, rec in enumerate(ledger["modes"]):
         if not isinstance(rec, dict):
             errors.append(f"modes[{i}] must be an object")
@@ -274,17 +409,33 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
         missing_mode = mode_keys - rec.keys()
         if missing_mode:
             errors.append(f"{mid}: missing fields {', '.join(sorted(missing_mode))}")
-        if rec.get("output_form") not in {"table", "long_dataset", "wide_dataset", "gridded_dataset"}:
+        if rec.get("output_form") not in {
+            "table",
+            "long_dataset",
+            "wide_dataset",
+            "gridded_dataset",
+        }:
             errors.append(f"{mid}: invalid output_form")
         if not isinstance(rec.get("aliases"), list) or not isinstance(rec.get("options"), dict):
             errors.append(f"{mid}: aliases must be an array and options must be an object")
-        if not isinstance(rec.get("fixture_ids"), list) or not isinstance(rec.get("fixture_hashes"), list) or not isinstance(rec.get("exception_ids"), list):
+        if (
+            not isinstance(rec.get("fixture_ids"), list)
+            or not isinstance(rec.get("fixture_hashes"), list)
+            or not isinstance(rec.get("exception_ids"), list)
+        ):
             errors.append(f"{mid}: fixture_ids/fixture_hashes and exception_ids must be arrays")
         errors.extend(_fixture_errors(rec.get("fixture_hashes", []), mid, root))
-        hash_ids = {fixture.get("fixture_id") for fixture in rec.get("fixture_hashes", []) if isinstance(fixture, dict)}
+        hash_ids = {
+            fixture.get("fixture_id")
+            for fixture in rec.get("fixture_hashes", [])
+            if isinstance(fixture, dict)
+        }
         if not set(rec.get("fixture_ids", [])) <= hash_ids:
             errors.append(f"{mid}: fixture_ids lack corresponding fixture hashes")
-        if not isinstance(rec.get("tolerance_policy"), dict) or rec.get("tolerance_policy", {}).get("default") != "exact":
+        if (
+            not isinstance(rec.get("tolerance_policy"), dict)
+            or rec.get("tolerance_policy", {}).get("default") != "exact"
+        ):
             errors.append(f"{mid}: tolerance_policy must default to exact comparison")
         if strict and not rec.get("resource_policy"):
             errors.append(f"{mid}: final disposition requires a resource ownership/cleanup policy")
@@ -295,10 +446,17 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
                 errors.append(f"{mid}: fixture IDs must be nonempty strings")
             elif ref.startswith("sample:"):
                 name = ref.removeprefix("sample:")
-                if not any((root / base / name / "manifest.json").is_file() for base in ("tests/data/samples", "tests/data/synthetic")):
+                if not any(
+                    (root / base / name / "manifest.json").is_file()
+                    for base in ("tests/data/samples", "tests/data/synthetic")
+                ):
                     errors.append(f"{mid}: fixture {ref} has no sample manifest")
             elif ref.startswith("generated:"):
-                if ref not in {fixture.get("fixture_id") for fixture in rec.get("fixture_hashes", []) if isinstance(fixture, dict)}:
+                if ref not in {
+                    fixture.get("fixture_id")
+                    for fixture in rec.get("fixture_hashes", [])
+                    if isinstance(fixture, dict)
+                }:
                     errors.append(f"{mid}: generated fixture {ref} has no factory/hash record")
             elif not (root / ref).exists():
                 errors.append(f"{mid}: fixture path does not exist: {ref}")
@@ -311,7 +469,9 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
             continue
         missing_caps = REQUIRED_CAPABILITIES - caps.keys()
         if missing_caps:
-            errors.append(f"{mid}: missing capability assessments: {', '.join(sorted(missing_caps))}")
+            errors.append(
+                f"{mid}: missing capability assessments: {', '.join(sorted(missing_caps))}"
+            )
         for name, claim in caps.items():
             if not isinstance(claim, dict) or claim.get("status") not in STATUSES:
                 errors.append(f"{mid}: {name} must have supported/unsupported/pending status")
@@ -328,7 +488,9 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
                 if ref not in evidence_by_id:
                     errors.append(f"{mid}: {name} references missing evidence {ref}")
                 elif mid not in evidence_by_id[ref].get("affected_modes", []):
-                    errors.append(f"{mid}: {name} references evidence {ref} that does not cover this mode")
+                    errors.append(
+                        f"{mid}: {name} references evidence {ref} that does not cover this mode"
+                    )
             if strict and claim["status"] == "pending":
                 errors.append(f"{mid}: {name} capability remains pending")
             if strict and claim["status"] == "supported":
@@ -365,7 +527,9 @@ def validate(ledger: object, root: Path, strict: bool) -> list[str]:
     # missing supported cases without importing any reader implementation.
     for spec in SOURCE_MANIFEST:
         public_names = (spec.name, *spec.aliases)
-        expected_forms = {"gridded_dataset"} if spec.kind == "gridded" else {"table", "wide_dataset"}
+        expected_forms = (
+            {"gridded_dataset"} if spec.kind == "gridded" else {"table", "wide_dataset"}
+        )
         for public_name in public_names:
             for output_form in expected_forms:
                 for defer_value in (False, True):
@@ -462,7 +626,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ledger", type=Path, required=True)
     parser.add_argument("--report", type=Path)
-    parser.add_argument("--structural-only", action="store_true", help="allow pending dispositions while constructing evidence")
+    parser.add_argument(
+        "--structural-only",
+        action="store_true",
+        help="allow pending dispositions while constructing evidence",
+    )
     args = parser.parse_args()
     try:
         ledger = json.loads(args.ledger.read_text())

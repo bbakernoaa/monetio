@@ -32,7 +32,9 @@ def _assert_parity(reader, dataset, path, variable):
 
 
 def test_era5_local_reader_use_dask_parity(tmp_path):
-    _assert_parity(ERA5Reader(), _reanalysis_data("t2m", 270), tmp_path / "era5.nc", "temperature_2m")
+    _assert_parity(
+        ERA5Reader(), _reanalysis_data("t2m", 270), tmp_path / "era5.nc", "temperature_2m"
+    )
 
 
 def test_era5_local_reader_honors_dask_chunks(tmp_path):
@@ -66,7 +68,9 @@ def test_reanalysis_readers_reject_unknown_chunk_dimensions(tmp_path):
     _reanalysis_data("t2m", 270).to_netcdf(path, engine="h5netcdf")
     with pytest.raises(ValueError, match="not_a_dimension"):
         ERA5Reader().open_dataset(
-            str(path), engine="h5netcdf", use_dask=True,
+            str(path),
+            engine="h5netcdf",
+            use_dask=True,
             chunks={"not_a_dimension": 1},
         )
 
@@ -90,7 +94,9 @@ def test_reanalysis_multifile_rejects_unknown_chunk_dimensions(tmp_path):
 
 
 def test_merra2_local_reader_use_dask_parity(tmp_path):
-    _assert_parity(MERRA2Reader(), _reanalysis_data("PS", 90000), tmp_path / "merra2.nc", "surface_pressure")
+    _assert_parity(
+        MERRA2Reader(), _reanalysis_data("PS", 90000), tmp_path / "merra2.nc", "surface_pressure"
+    )
 
 
 @pytest.mark.parametrize(

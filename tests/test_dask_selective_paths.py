@@ -3,14 +3,14 @@
 import pandas as pd
 import pytest
 
-from monetio.readers.skynet import SKYNETReader
-from monetio.readers.solrad import SOLRADReader
-from monetio.readers.surfrad import SURFRADReader
 from monetio.readers.gfs import GDASReader, GEFSReader, GFSReader
 from monetio.readers.hrrr import HRRRReader
 from monetio.readers.nam import NAMReader
 from monetio.readers.rap import RAPReader
 from monetio.readers.rrfs import RRFSReader
+from monetio.readers.skynet import SKYNETReader
+from monetio.readers.solrad import SOLRADReader
+from monetio.readers.surfrad import SURFRADReader
 
 
 @pytest.mark.parametrize(
@@ -67,9 +67,7 @@ def test_skynet_date_site_product_selectors_bound_daily_files():
     ids=["gfs", "gefs", "gdas", "hrrr", "nam", "rap", "rrfs"],
 )
 def test_ncep_forecast_selectors_bound_cycle_and_lead_urls(reader, expected_parts):
-    urls = reader.build_urls(
-        dates="2025-03-24", hour=6, lead_time=[0, 3]
-    )
+    urls = reader.build_urls(dates="2025-03-24", hour=6, lead_time=[0, 3])
     assert len(urls) == 2
     assert all(expected_parts[0] in url for url in urls)
     assert all(expected_parts[1] in url for url in urls)

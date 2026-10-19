@@ -24,7 +24,10 @@ def test_jpss_reader_eager_use_dask_parity(tmp_path, reader_cls):
     reader = reader_cls()
     eager = reader.open_dataset(str(path), engine="h5netcdf", drop_variables=["unrelated"])
     lazy = reader.open_dataset(
-        str(path), engine="h5netcdf", use_dask=True, chunks={"nscan": 1, "nlon": 2},
+        str(path),
+        engine="h5netcdf",
+        use_dask=True,
+        chunks={"nscan": 1, "nlon": 2},
         drop_variables=["unrelated"],
     )
 

@@ -70,9 +70,10 @@ def test_process_worker_error_keeps_input_identity_and_success_is_reusable(
 
     retry_path = tmp_path / "retry.txt"
     retry_path.write_text("retried")
-    assert client.submit(
-        _read_retry_once, str(retry_path), retries=1, pure=False
-    ).result() == "retried"
+    assert (
+        client.submit(_read_retry_once, str(retry_path), retries=1, pure=False).result()
+        == "retried"
+    )
 
     broken_frame = PandasDriver(source="airnow").open(
         [str(broken)], read_method=_read_worker_table, lazy=True, meta=meta

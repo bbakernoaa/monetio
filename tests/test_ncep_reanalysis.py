@@ -28,12 +28,13 @@ def test_ncep_reanalysis_reader_eager_use_dask_parity(tmp_path):
     source.to_netcdf(path, engine="h5netcdf")
 
     reader = NCEPReanalysisReader()
-    eager = reader.open_dataset(
-        files=str(path), engine="h5netcdf", drop_variables=["uwnd"]
-    )
+    eager = reader.open_dataset(files=str(path), engine="h5netcdf", drop_variables=["uwnd"])
     lazy = reader.open_dataset(
-        files=str(path), engine="h5netcdf", use_dask=True,
-        chunks={"time": 1, "lat": 1}, drop_variables=["uwnd"]
+        files=str(path),
+        engine="h5netcdf",
+        use_dask=True,
+        chunks={"time": 1, "lat": 1},
+        drop_variables=["uwnd"],
     )
 
     assert "uwnd" not in eager
@@ -58,7 +59,9 @@ def test_ncep_reanalysis_runs_on_process_workers(tmp_path, process_distributed_c
         {"air": (("time", "level", "lat", "lon"), np.arange(24, dtype="f4").reshape(2, 2, 2, 3))},
         coords={
             "time": np.array(["2023-01-01", "2023-01-02"], dtype="datetime64[ns]"),
-            "level": [1000, 850], "lat": [-10.0, 10.0], "lon": [0.0, 180.0, 270.0],
+            "level": [1000, 850],
+            "lat": [-10.0, 10.0],
+            "lon": [0.0, 180.0, 270.0],
         },
     )
     source.to_netcdf(path, engine="h5netcdf")

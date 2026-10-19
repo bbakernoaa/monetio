@@ -1,4 +1,5 @@
 """Shared deferred loading contract regression tests."""
+
 from __future__ import annotations
 
 import dask.array as da
@@ -89,7 +90,10 @@ def test_geoms_hdf5_obeys_use_dask_and_eager_defaults(tmp_path):
     reader = GEOMSReader()
     eager = reader.open_dataset(str(path), rename_all=False, squeeze=False)
     lazy = reader.open_dataset(
-        str(path), rename_all=False, squeeze=False, use_dask=True,
+        str(path),
+        rename_all=False,
+        squeeze=False,
+        use_dask=True,
         chunks={"time": 1, "altitude": 2},
     )
     lazy_alias = reader.open_dataset(str(path), rename_all=False, squeeze=False, lazy=True)
@@ -234,11 +238,10 @@ def test_geoms_table_readers_offer_serializable_dask_dataframe(reader_name):
     pickle.dumps(frame.__dask_graph__())
     assert not frame.head(1).empty
     pd.testing.assert_frame_equal(
-        eager_frame.reset_index(drop=True), frame.compute().reset_index(drop=True),
+        eager_frame.reset_index(drop=True),
+        frame.compute().reset_index(drop=True),
         check_dtype=False,
     )
-
-
 
 
 def test_defer_rejects_chunks_none_before_open(tmp_path):
@@ -336,7 +339,9 @@ def test_direct_driver_rejects_source_without_defer_capability(tmp_path):
 
     with pytest.raises(CapabilityUnavailableError, match="aqs.*defer"):
         PandasDriver(source="aqs").open(
-            str(path), read_method=reader, defer=True,
+            str(path),
+            read_method=reader,
+            defer=True,
             meta=pd.DataFrame({"value": pd.Series(dtype="int64")}),
         )
     assert calls == []
@@ -371,7 +376,10 @@ def test_explicit_meta_keeps_delayed_reader_unexecuted_until_compute(tmp_path):
         return pd.DataFrame({"value": [1, 2]})
 
     frame = PandasDriver(source="airnow").open(
-        str(path), read_method=reader, lazy=True, defer=True,
+        str(path),
+        read_method=reader,
+        lazy=True,
+        defer=True,
         meta=pd.DataFrame({"value": pd.Series(dtype="int64")}),
     )
     assert isinstance(frame, dd.DataFrame)
@@ -407,7 +415,9 @@ def test_generated_edge_fixtures_have_stable_shapes(tmp_path):
         make_tabular_fixture,
     )
 
-    paths = make_tabular_fixture(tmp_path / "csv", rows=3, columns=10, partitions=4, empty_first=True)
+    paths = make_tabular_fixture(
+        tmp_path / "csv", rows=3, columns=10, partitions=4, empty_first=True
+    )
     assert len(paths) == 4
     assert pd.read_csv(paths[0]).empty
     assert len(pd.read_csv(paths[1]).columns) == 12
@@ -420,14 +430,18 @@ def test_generated_edge_fixtures_have_stable_shapes(tmp_path):
     with pytest.raises(pd.errors.ParserError):
         pd.read_csv(malformed)
     for width in (10, 100):
-        width_file = make_tabular_fixture(tmp_path / f"width-{width}", rows=2, columns=width, partitions=1)[0]
+        width_file = make_tabular_fixture(
+            tmp_path / f"width-{width}", rows=2, columns=width, partitions=1
+        )[0]
         assert len(pd.read_csv(width_file).columns) == width + 2
 
 
 def test_explicit_schema_handles_empty_first_partition(tmp_path):
     from dask_audit_support import make_tabular_fixture
 
-    paths = make_tabular_fixture(tmp_path / "parts", rows=3, columns=2, partitions=3, empty_first=True)
+    paths = make_tabular_fixture(
+        tmp_path / "parts", rows=3, columns=2, partitions=3, empty_first=True
+    )
     meta = pd.DataFrame(
         {
             "time": pd.Series(dtype="object"),
@@ -437,7 +451,10 @@ def test_explicit_schema_handles_empty_first_partition(tmp_path):
         }
     )
     frame = PandasDriver(source="airnow").open(
-        [str(path) for path in paths], read_method="read_csv", defer=True, meta=meta,
+        [str(path) for path in paths],
+        read_method="read_csv",
+        defer=True,
+        meta=meta,
     )
     assert frame.npartitions == 3
     assert len(frame.compute()) == 6
@@ -455,7 +472,10 @@ def test_mixed_schema_failure_names_the_offending_input(tmp_path):
         }
     )
     frame = PandasDriver(source="airnow").open(
-        [str(path) for path in paths], read_method="read_csv", defer=True, meta=meta,
+        [str(path) for path in paths],
+        read_method="read_csv",
+        defer=True,
+        meta=meta,
     )
     with pytest.raises(ValueError, match=r"schema-b\.csv"):
         frame.compute()
@@ -469,7 +489,10 @@ def test_delayed_reader_failure_names_the_input(tmp_path):
         raise ValueError("invalid payload")
 
     frame = PandasDriver(source="example").open(
-        str(path), read_method=reader, lazy=True, defer=True,
+        str(path),
+        read_method=reader,
+        lazy=True,
+        defer=True,
         meta=pd.DataFrame({"value": pd.Series(dtype="int64")}),
     )
     with pytest.raises(ValueError, match=r"invalid payload.*broken.csv"):
