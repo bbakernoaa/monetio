@@ -1219,6 +1219,19 @@ def _get_ioapi_times(ds: xr.Dataset) -> xr.Dataset:
     )
     dates = dates.compute(scheduler="synchronous")
 
+    # Some HDF readers expose the first TFLAG date as a fill value even when
+    # the IOAPI header contains the valid start date. SDATE/STIME are the
+    # authoritative timestamp for the first record, so use them to repair
+    # only that missing value; later TFLAG values remain untouched.
+    date_values = np.asarray(dates.values, dtype="datetime64[ns]")
+    if date_values.size and np.isnat(date_values.flat[0]) and "SDATE" in ds.attrs:
+        start_date = parse_ioapi_times(ds.attrs["SDATE"], ds.attrs.get("STIME", 0))
+        start_date = np.asarray(start_date, dtype="datetime64[ns]").reshape(-1)
+        if start_date.size and not np.isnat(start_date[0]):
+            date_values = date_values.copy()
+            date_values.flat[0] = start_date[0]
+            dates = dates.copy(data=date_values)
+
     # If 'TSTEP' is the time dimension, we replace its values
     if "TSTEP" in ds.dims:
         ds = ds.assign_coords(TSTEP=dates)

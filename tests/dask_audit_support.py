@@ -249,13 +249,16 @@ def monitor_process_tree(
 
     root_pid = root_pid or os.getpid()
     stopped = threading.Event()
+    first_sample = threading.Event()
     samples: dict[int, int] = {}
     aggregate_peak = 0
+    aggregate_baseline = None
+    aggregate_growth_peak = 0
     children_observable = True
     lock = threading.Lock()
 
     def sample_loop():
-        nonlocal aggregate_peak, children_observable
+        nonlocal aggregate_peak, aggregate_baseline, aggregate_growth_peak, children_observable
         while not stopped.is_set():
             try:
                 root_proc = psutil.Process(root_pid)
@@ -278,7 +281,14 @@ def monitor_process_tree(
                 with lock:
                     for pid, rss in current.items():
                         samples[pid] = max(samples.get(pid, 0), rss)
-                    aggregate_peak = max(aggregate_peak, sum(current.values()))
+                    aggregate = sum(current.values())
+                    aggregate_peak = max(aggregate_peak, aggregate)
+                    if aggregate_baseline is None:
+                        aggregate_baseline = aggregate
+                        first_sample.set()
+                    aggregate_growth_peak = max(
+                        aggregate_growth_peak, aggregate - aggregate_baseline
+                    )
             except (psutil.NoSuchProcess, psutil.AccessDenied, PermissionError):
                 children_observable = False
                 try:
@@ -286,6 +296,9 @@ def monitor_process_tree(
                     with lock:
                         samples[root_pid] = max(samples.get(root_pid, 0), rss)
                         aggregate_peak = max(aggregate_peak, rss)
+                        if aggregate_baseline is None:
+                            aggregate_baseline = rss
+                            first_sample.set()
                 except (psutil.NoSuchProcess, psutil.AccessDenied, PermissionError):
                     pass
             stopped.wait(interval)
@@ -293,9 +306,12 @@ def monitor_process_tree(
     thread = threading.Thread(target=sample_loop, daemon=True)
     thread.start()
     try:
+        first_sample.wait(timeout=2)
         yield samples
     finally:
         stopped.set()
         thread.join(timeout=2)
         samples["aggregate_peak_bytes"] = aggregate_peak
+        samples["aggregate_baseline_bytes"] = aggregate_baseline or 0
+        samples["aggregate_growth_peak_bytes"] = aggregate_growth_peak
         samples["children_observable"] = children_observable

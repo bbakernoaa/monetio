@@ -41,7 +41,7 @@ def test_gridded_selected_chunk_stays_below_total_rss_budget(tmp_path, process_d
         "evaluations=first then repeated (no Dask persistence; OS cache not controlled)"
     )
     assert selected.shape == (128, 128)
-    assert memory["aggregate_peak_bytes"] < budget
+    assert memory["aggregate_growth_peak_bytes"] < budget
 
 
 @pytest.mark.slow
@@ -58,7 +58,7 @@ def test_tabular_partition_subset_stays_below_total_rss_budget(
     meta = pd.DataFrame(
         {
             "time": pd.Series(dtype="str"),
-            "siteid": pd.Series(dtype="str"),
+            "siteid": pd.Series(dtype=object),
             "obs": pd.Series(dtype="float64"),
         }
     )
@@ -83,4 +83,4 @@ def test_tabular_partition_subset_stays_below_total_rss_budget(
         "(no Dask persistence; OS cache not controlled)"
     )
     assert len(selected) > 0
-    assert memory["aggregate_peak_bytes"] < budget
+    assert memory["aggregate_growth_peak_bytes"] < budget

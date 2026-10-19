@@ -310,7 +310,7 @@ class TestPointDeferred:
         meta = pd.DataFrame(
             {
                 "time": pd.Series(dtype="datetime64[ns]"),
-                "siteid": pd.Series(dtype="str"),
+                "siteid": pd.Series(dtype=object),
                 "variable": pd.Series(dtype="str"),
                 "obs": pd.Series(dtype="float64"),
                 "units": pd.Series(dtype="str"),
@@ -387,7 +387,7 @@ class TestPointDeferred:
         meta = pd.DataFrame(
             {
                 "time": pd.Series(dtype="datetime64[ns]"),
-                "siteid": pd.Series(dtype="str"),
+                "siteid": pd.Series(dtype=object),
                 "obs": pd.Series(dtype="float64"),
             }
         )

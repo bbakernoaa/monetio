@@ -5,6 +5,7 @@ import pytest
 import xarray as xr
 from dask_audit_support import write_camx_pseudonetcdf_fixture
 
+from monetio.readers.base import _get_ioapi_times
 from monetio.readers.camx import CAMxReader
 
 
@@ -139,6 +140,20 @@ def test_camx_pseudonetcdf_default_backend_dask_parity(tmp_path):
     finally:
         eager.close()
         lazy.close()
+
+
+def test_ioapi_time_uses_header_start_when_first_tflag_is_missing():
+    ds = mock_camx_dataset()
+    ds.attrs["SDATE"] = 2023001
+    ds.attrs["STIME"] = 0
+    ds["TFLAG"][0, 0, 0] = 0
+
+    actual = _get_ioapi_times(ds).time.values
+
+    np.testing.assert_array_equal(
+        actual,
+        np.array(["2023-01-01T00:00:00", "2023-01-01T01:00:00"], dtype="datetime64[ns]"),
+    )
 
 
 @pytest.mark.parametrize("reference_backend", ["kerchunk", "icechunk"])

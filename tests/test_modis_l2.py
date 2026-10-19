@@ -129,7 +129,12 @@ def test_modis_l2_reader_local_eager_and_use_dask_parity(tmp_path):
         assert eager.AOD.chunks is None
         assert lazy.AOD.chunks is not None
         assert lazy.AOD.chunks == ((2, 2, 2), (2, 2))
-        xr.testing.assert_identical(eager, lazy.compute())
+        eager_result = eager.copy()
+        lazy_result = lazy.compute()
+        # Reader history records a wall-clock timestamp for each load.
+        eager_result.attrs.pop("history", None)
+        lazy_result.attrs.pop("history", None)
+        xr.testing.assert_identical(eager_result, lazy_result)
     finally:
         eager.close()
         lazy.close()

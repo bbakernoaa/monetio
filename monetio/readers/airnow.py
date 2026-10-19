@@ -50,10 +50,12 @@ def _airnow_frame_meta(files, *, daily: bool, storage_options=None) -> pd.DataFr
         if use_daily
         else ["date", "time", "siteid", "site", "utcoffset", "variable", "units", "obs", "source"]
     )
-    # pandas 3 infers its dedicated ``str`` dtype for CSV text columns. Match
-    # that schema explicitly so Dask partition validation agrees across pandas
-    # 2.x (where ``str`` aliases object) and pandas 3.x.
+    # pandas 3 infers its dedicated ``str`` dtype for CSV text columns. AirNow
+    # normalizes site identifiers to object strings in ``read_airnow_csv``;
+    # match that explicitly while retaining pandas' inferred dtype for the
+    # other text columns.
     meta = pd.DataFrame({column: pd.Series(dtype="str") for column in columns})
+    meta["siteid"] = pd.Series(dtype=object)
     meta["obs"] = pd.Series(dtype="float64")
     if not use_daily:
         meta["utcoffset"] = pd.Series(dtype="int64")
