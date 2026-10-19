@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from dask_audit_support import AuditTrace, TaskTrace, audit_stage
 
-from scripts.validate_dask_audit import validate
+from scripts.validate_dask_audit import _source_digest, validate
 
 ROOT = Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "tests/data/dask_reader_audit.json"
@@ -177,6 +177,14 @@ def test_stale_code_hash_is_reported():
     case = next(e for e in ledger["evidence"] if e.get("code_hashes"))
     case["code_hashes"][0]["sha256"] = "0" * 64
     assert any("code hash is stale" in error for error in validate(ledger, ROOT, strict=False))
+
+
+def test_source_hash_is_independent_of_checkout_line_endings(tmp_path):
+    source = tmp_path / "source.py"
+    source.write_bytes(b"first line\nsecond line\n")
+    lf_digest = _source_digest(source)
+    source.write_bytes(b"first line\r\nsecond line\r\n")
+    assert _source_digest(source) == lf_digest
 
 
 def test_passed_evidence_requires_code_hashes():

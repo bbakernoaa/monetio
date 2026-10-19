@@ -132,9 +132,7 @@ class TestSelectStore:
         register.assert_any_call(root_uri, self.MockLocalStore.return_value)
         if Path(local_root).drive:
             encoded_drive = Path(local_root).drive.replace(":", "%3A")
-            register.assert_any_call(
-                f"file:///{encoded_drive}/", self.MockLocalStore.return_value
-            )
+            register.assert_any_call(f"file:///{encoded_drive}/", self.MockLocalStore.return_value)
             assert register.call_count == 2
         else:
             register.assert_called_once_with(root_uri, self.MockLocalStore.return_value)
