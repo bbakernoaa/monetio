@@ -97,6 +97,7 @@ dev = [
     "pytest-xdist",
     "filelock",
     "hypothesis",
+    "psutil",
     "ruff",
     "mkdocs-material",
     "mkdocstrings[python]",

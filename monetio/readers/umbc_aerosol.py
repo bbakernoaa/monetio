@@ -78,6 +78,10 @@ class UMBCAerosolReader(GriddedReader):
         for g in groups:
             g_kwargs = kwargs.copy()
             g_kwargs["group"] = g
+            if g == "Instrument_Attributes":
+                # This group carries scalar attributes only; array chunk
+                # settings belong to DATA variables and are invalid here.
+                g_kwargs.pop("chunks", None)
             try:
                 # We open without the UMBC preprocess at this stage
                 ds_g = super().open_dataset(

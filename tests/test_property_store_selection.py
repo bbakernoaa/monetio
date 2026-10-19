@@ -10,7 +10,7 @@ files, prefix them with file://.
 
 import unittest.mock as mock
 
-from hypothesis import given, settings, strategies as st
+from hypothesis import example, given, settings, strategies as st
 
 from monetio.readers.drivers import _select_store
 
@@ -124,24 +124,12 @@ def test_s3_paths_select_s3store(path):
     assert result_files == [path]
 
 
+@example("http://abc.example/path/file.nc")
+@example("https://abc.example/path/file.nc")
 @settings(max_examples=100)
-@given(path=_http_path)
-def test_http_paths_select_httpstore(path):
-    """HTTP paths must instantiate HTTPStore."""
-    ctx, MockS3, MockHTTP, MockLocal, MockReg = _mock_obstore_context()
-    with ctx:
-        registry, result_files = _select_store([path], {})
-
-    MockHTTP.assert_called_once()
-    MockS3.assert_not_called()
-    MockLocal.assert_not_called()
-    assert result_files == [path]
-
-
-@settings(max_examples=100)
-@given(path=_https_path)
-def test_https_paths_select_httpstore(path):
-    """HTTPS paths must instantiate HTTPStore."""
+@given(path=st.one_of(_http_path, _https_path))
+def test_http_and_https_paths_select_httpstore(path):
+    """HTTP and HTTPS paths must instantiate HTTPStore."""
     ctx, MockS3, MockHTTP, MockLocal, MockReg = _mock_obstore_context()
     with ctx:
         registry, result_files = _select_store([path], {})

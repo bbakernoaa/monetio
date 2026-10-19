@@ -191,6 +191,9 @@ class ISHLiteReader(PointReader):
         if source is not None:
             ish.source = source
 
+        if use_dask:
+            lazy = True
+
         if files is None and dates is not None:
             dates = pd.to_datetime(dates)
             # Ensure dates is always a DatetimeIndex, not a single Timestamp

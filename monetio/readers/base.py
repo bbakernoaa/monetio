@@ -1,5 +1,7 @@
 import abc
+import inspect
 import threading
+from functools import wraps
 from typing import TYPE_CHECKING, NamedTuple, Union
 
 import numpy as np
@@ -31,6 +33,17 @@ def _partition_column(part, col):
     stays picklable for distributed schedulers.
     """
     return np.asarray(part[col])
+
+
+def _partition_layout(part, columns):
+    """Return partition length and the small row keys needed for Xarray layout.
+
+    Deferred table-to-Xarray conversion needs concrete index coordinates for
+    the UGRID node layout. Gather all of those keys together with each
+    partition length so the reader parses a partition once during preparation
+    instead of once for the length and again for each index coordinate.
+    """
+    return len(part), {name: part[name].to_numpy(copy=True) for name in columns}
 
 
 def _is_dask_frame(df) -> bool:
@@ -102,6 +115,43 @@ def register_reader(name):
                     f"registered, and {cls.__module__}.{cls.__name__} claims "
                     "the same name (last-import-wins is disallowed)."
                 )
+            # Guard the public dispatch boundary as well as the shared
+            # drivers. A few registered readers call xarray.open_dataset
+            # directly, so their ``defer`` keyword would otherwise leak into
+            # the backend and fail with an unrelated TypeError (or be ignored).
+            original_open = cls.open_dataset
+            signature = inspect.signature(original_open)
+
+            @wraps(original_open)
+            def _capability_guard(self, *args, **kwargs):
+                try:
+                    bound = signature.bind_partial(self, *args, **kwargs)
+                except TypeError:
+                    # Preserve the reader's original argument error.
+                    return original_open(self, *args, **kwargs)
+                defer = bound.arguments.get("defer", False)
+                requested_chunks = bound.arguments.get("chunks")
+                for param in signature.parameters.values():
+                    if param.kind is inspect.Parameter.VAR_KEYWORD:
+                        defer = defer or bound.arguments.get(param.name, {}).get("defer", False)
+                        if requested_chunks is None:
+                            requested_chunks = bound.arguments.get(param.name, {}).get("chunks")
+                if defer:
+                    self._require_defer_support()
+                if requested_chunks is not None and isinstance(
+                    getattr(self, "driver", None), PandasDriver
+                ):
+                    raise OptionUnsupportedError(
+                        "chunks",
+                        getattr(self, "_source_name", None) or "point reader",
+                        cause=(
+                            "tabular readers parse each complete input file as one dataframe "
+                            "partition; array chunk mappings cannot control those reads"
+                        ),
+                    )
+                return original_open(self, *args, **kwargs)
+
+            cls.open_dataset = _capability_guard
             READER_REGISTRY[name] = cls
         return cls
 
@@ -420,6 +470,7 @@ class PointReader(BaseReader):
             files,
             read_method=read_method,
             lazy=lazy,
+            defer=defer,
             meta=meta,
             tolerate=tolerate,
             **kwargs,
@@ -533,11 +584,13 @@ class PointReader(BaseReader):
         expand2d : bool, optional
             Whether to expand to 2D (time, node) structure, by default True.
         defer : bool, optional
-            Build the Dask-backed dataset from a *single* bounded partition-length
-            computation instead of one ``to_dask_array(lengths=True)`` compute per
-            column. The result is equally dask-backed and
-            evaluates to the same thing; the wide reshape stays lazy through
-            ``ds_to_2d``. Default ``False`` keeps today's behavior byte-identical.
+            Preserve the explicit deferred-loading contract. Lazy and deferred
+            table-to-Xarray conversion runs one preparation task per partition
+            to collect its length and required ``time``/``siteid`` coordinate
+            keys; ``variable`` keys are also collected for the wide UGRID
+            layout. This is a full partition parse for text readers, with
+            O(rows) coordinate keys retained in memory; it does not persist
+            payload columns. Later evaluation can reread the input.
         **kwargs : dict
             Additional arguments passed to ds_to_2d (e.g. pivot).
 
@@ -590,58 +643,87 @@ class PointReader(BaseReader):
 
             if is_dask:
                 # 4a. Lazy Path
-                # Exception to "No Hidden Computes": xarray structurally requires
-                # concrete dimension sizes, so the per-partition lengths are
-                # computed here. With ``defer=True`` this is a
-                # *single* bounded metadata computation shared across all columns
-                # — the eager path performs one ``to_dask_array(lengths=True)``
-                # compute per column instead — and the 2D reshape below stays
-                # unevaluated through ``ds_to_2d``.
-                lengths = None
-                parts = None
-                if defer:
-                    import dask.array as da
-                    from dask.delayed import delayed
+                # Xarray needs concrete node lengths for the one-dimensional
+                # partition layout. Computing these lengths executes each
+                # upstream parser once; for text inputs this is a full payload
+                # preparation scan, even though only O(partitions) integers are
+                # returned. Share that scan across columns and retain the graph
+                # for subsequent evaluation. Do not claim it is metadata-only
+                # or persist the full table to avoid the later storage read.
+                import dask
+                import dask.array as da
+                from dask.delayed import delayed
 
-                    lengths = [int(n) for n in temp_df.map_partitions(len).compute()]
-                    # Materialize the partition list ONCE. Asking each column for
-                    # its own delayed parts re-optimizes the whole expression tree
-                    # per column, which is quadratic in the number of columns —
-                    # fatal for wide observation products (hundreds of wavelength
-                    # columns). Selecting the column inside the delayed callable
-                    # keeps it lazy without touching the graph again.
-                    parts = temp_df.to_delayed()
-
-                    def _col_array(col):
-                        series = temp_df[col]
-                        dtype = series.dtype
-                        if isinstance(dtype, pd.api.extensions.ExtensionDtype):
-                            # Mirror to_dask_array's conversion of extension dtypes
-                            # (e.g. nullable strings) to object arrays.
-                            dtype = np.dtype(object)
-                        # Each partition delay yields a pandas DataFrame; wrap it so
-                        # the dask-array blocks are real numpy arrays (a downstream
-                        # unstack shuffle indexes blocks positionally, which a Series
-                        # rejects). ``np.asarray`` is applied lazily, not computed.
-                        arrs = [
-                            da.from_delayed(
-                                delayed(_partition_column, pure=True)(part, col),
-                                shape=(n,),
-                                dtype=dtype,
-                            )
-                            for part, n in zip(parts, lengths, strict=True)
+                # Materialize each partition once for lengths and the index
+                # columns that Xarray must know before it can build node
+                # coordinates. These values are bounded to partition lengths
+                # and required coordinate keys; data variables remain in the
+                # deferred graph and are reread when that graph is evaluated.
+                parts = temp_df.to_delayed()
+                layout_columns = [name for name in ("time", "siteid") if name in temp_df.columns]
+                if expand2d and "variable" in temp_df.columns:
+                    layout_columns.append("variable")
+                if layout_columns:
+                    layout = dask.compute(
+                        *[
+                            delayed(_partition_layout, pure=True)(part, layout_columns)
+                            for part in parts
                         ]
-                        return arrs[0] if len(arrs) == 1 else da.concatenate(arrs)
+                    )
+                    lengths = [int(item[0]) for item in layout]
+                    prepared_indexes = {
+                        name: np.concatenate([item[1][name] for item in layout])
+                        for name in layout_columns
+                    }
+                else:
+                    # Dask's map_partitions(len) can trigger parser/meta work
+                    # in addition to its length computation. The same delayed
+                    # partition helper gives one full parse per partition and
+                    # retains only the O(partitions) lengths for 1D output.
+                    layout = dask.compute(
+                        *[delayed(_partition_layout, pure=True)(part, []) for part in parts]
+                    )
+                    lengths = [int(item[0]) for item in layout]
+                    prepared_indexes = {}
+                # its own delayed parts re-optimizes the whole expression tree
+                # per column, which is quadratic in the number of columns —
+                # fatal for wide observation products (hundreds of wavelength
+                # columns). Selecting the column inside the delayed callable
+                # keeps it lazy without touching the graph again.
+
+                def _col_array(col):
+                    series = temp_df[col]
+                    dtype = series.dtype
+                    if isinstance(dtype, pd.api.extensions.ExtensionDtype):
+                        # Mirror to_dask_array's conversion of extension dtypes
+                        # (e.g. nullable strings) to object arrays.
+                        dtype = np.dtype(object)
+                    # Each partition delay yields a pandas DataFrame; wrap it so
+                    # the dask-array blocks are real numpy arrays (a downstream
+                    # unstack shuffle indexes blocks positionally, which a Series
+                    # rejects). ``np.asarray`` is applied lazily, not computed.
+                    arrs = [
+                        da.from_delayed(
+                            delayed(_partition_column, pure=True)(part, col),
+                            shape=(n,),
+                            dtype=dtype,
+                        )
+                        for part, n in zip(parts, lengths, strict=True)
+                    ]
+                    return arrs[0] if len(arrs) == 1 else da.concatenate(arrs)
 
                 ds = xr.Dataset()
                 for col in temp_df.columns:
                     if col == "node" and "node" in ds.dims:
                         continue
-                    if defer:
-                        data = _col_array(col)
-                    else:
-                        data = temp_df[col].to_dask_array(lengths=True)
+                    data = prepared_indexes[col] if col in prepared_indexes else _col_array(col)
                     ds[col] = (("node",), data)
+
+                # Dask DataFrame has no DataFrame-level attrs. Preserve stable
+                # reader metadata attached to its declared empty schema so
+                # deferred Xarray output retains provenance such as AERONET's
+                # source header, matching the eager conversion.
+                ds.attrs.update(getattr(temp_df._meta, "attrs", {}))
             else:
                 # 4b. Eager Path
                 # Consistently use 1D for both Eager and Lazy by default.
@@ -1081,7 +1163,7 @@ def _add_ioapi_latlon(ds: xr.Dataset, proj4_srs: str) -> xr.Dataset:
 
 def _get_ioapi_times(ds: xr.Dataset) -> xr.Dataset:
     """
-    Extracts and assigns time coordinate from IOAPI TFLAG lazily.
+    Extracts a concrete time coordinate from the small IOAPI TFLAG variable.
 
     Parameters
     ----------
@@ -1111,7 +1193,10 @@ def _get_ioapi_times(ds: xr.Dataset) -> xr.Dataset:
     else:
         dt_dim = dt_dims[0]
 
-    # Use apply_ufunc to construct dates lazily using vectorized parser
+    # Parse only TFLAG through a local synchronous scheduler. Xarray needs a
+    # concrete index coordinate, and inheriting a caller's distributed Client
+    # here can send the PseudoNetCDF file manager to a worker during graph
+    # construction. The gridded data variables remain Dask-backed.
     dates = xr.apply_ufunc(
         parse_ioapi_times,
         tflag.isel(**{dt_dim: 0}),
@@ -1120,6 +1205,7 @@ def _get_ioapi_times(ds: xr.Dataset) -> xr.Dataset:
         dask="parallelized",
         output_dtypes=[np.dtype("datetime64[ns]")],
     )
+    dates = dates.compute(scheduler="synchronous")
 
     # If 'TSTEP' is the time dimension, we replace its values
     if "TSTEP" in ds.dims:

@@ -139,7 +139,15 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     _s("nam", ".readers.nam", "gridded"),
     _s("rap", ".readers.rap", "gridded"),
     _s("ncep_reanalysis", ".readers.ncep_reanalysis", "gridded"),
-    _s("era5", ".readers.era5", "gridded"),
+    _s(
+        "era5",
+        ".readers.era5",
+        "gridded",
+        caps=ScaleCapabilities(
+            chunk_controls=("chunks",),
+            reason="Deferred loading is not advertised; chunks are honored with use_dask=True.",
+        ),
+    ),
     # ---- point observations ----
     _s("airnow", ".readers.airnow", "point", caps=_DEFERRED_WIDE, legacy=("obs.airnow",)),
     _s("aeronet", ".readers.aeronet", "point", caps=_DEFERRED, legacy=("obs.aeronet",)),
@@ -193,7 +201,15 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     _s("mopitt", ".readers.mopitt", "gridded"),
     _s("tempo", ".readers.tempo", "gridded"),
     _s("tropomi", ".readers.tropomi", "gridded"),
-    _s("merra2", ".readers.merra2", "gridded"),
+    _s(
+        "merra2",
+        ".readers.merra2",
+        "gridded",
+        caps=ScaleCapabilities(
+            chunk_controls=("chunks",),
+            reason="Deferred loading is not advertised; chunks are honored with use_dask=True.",
+        ),
+    ),
     _s("nesdis_viirs_jrr", ".readers.nesdis_viirs_jrr", "gridded", aliases=("viirs_jrr",)),
     _s("calipso", ".readers.calipso", "gridded"),
     _s("earthcare", ".readers.earthcare", "gridded"),
