@@ -558,14 +558,19 @@ def _select_store(file_list: list[str], storage_options: dict) -> tuple:
         registry.register("http://", store)
         registry.register("https://", store)
     else:
-        store = LocalStore(prefix="/")
-        registry.register("file:///", store)
-        file_list = [
-            Path(f.removeprefix("file://")).resolve().as_uri()
-            if not f.startswith(("http://", "https://", "s3://"))
-            else f
-            for f in file_list
-        ]
+        local_files = [Path(f.removeprefix("file://")).resolve() for f in file_list]
+        registered_roots = set()
+        for path in local_files:
+            root = Path(path.anchor)
+            root_url = root.as_uri()
+            if root_url not in registered_roots:
+                # Register the filesystem root as the URI prefix. On Windows,
+                # registering only file:/// leaves the encoded drive letter
+                # in the object key (D%3A/...), which LocalStore then resolves
+                # relative to the current drive and cannot open.
+                registry.register(root_url, LocalStore(prefix=str(root)))
+                registered_roots.add(root_url)
+        file_list = [path.as_uri() for path in local_files]
 
     return registry, file_list
 
@@ -1609,9 +1614,7 @@ class XarrayDriver:
                     if chunks is None:
                         ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file)
                     else:
-                        ds = _open_via_icechunk(
-                            vds, icechunk_url, virtualizarr_file, chunks=chunks
-                        )
+                        ds = _open_via_icechunk(vds, icechunk_url, virtualizarr_file, chunks=chunks)
                     self._validate_chunk_dimensions(ds, chunks)
                     if preprocess:
                         ds = preprocess(ds)

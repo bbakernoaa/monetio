@@ -9,6 +9,7 @@ files, prefix them with file://.
 """
 
 import unittest.mock as mock
+from pathlib import Path
 
 from hypothesis import example, given, settings, strategies as st
 
@@ -156,8 +157,8 @@ def test_local_paths_select_localstore_and_prefix(path):
     assert result_files[0].startswith("file://"), (
         f"Local path should be prefixed with file://, got {result_files[0]!r}"
     )
-    # The original path should be embedded after the prefix
-    assert result_files[0] == f"file://{path}"
+    # A resolved URI preserves Windows drive letters and spaces correctly.
+    assert result_files[0] == Path(path).resolve().as_uri()
 
 
 @settings(max_examples=100)

@@ -161,7 +161,11 @@ def process_distributed_cluster():
                 threads_per_worker=1,
                 processes=True,
                 dashboard_address=None,
-                memory_limit="256MiB",
+                # Reader tests import pandas, xarray, and source-specific
+                # decoders in each worker. 256 MiB was below their steady
+                # state RSS on Python 3.13, so the nanny repeatedly restarted
+                # workers during normal test execution.
+                memory_limit="1GiB",
                 silence_logs=50,
             )
             try:

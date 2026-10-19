@@ -515,7 +515,7 @@
         },
         {
           "path": "monetio/readers/umbc_aerosol.py",
-          "sha256": "0ebd5e50e7e82bb08085eb21cf90827bb528a9d6da7ccdc7a160f5ebb74a5905"
+          "sha256": "7e7063a8bc62243a45fa799c8baad412ce87a2073b6a58b59752717ed2beaf81"
         },
         {
           "path": "monetio/readers/wrfchem.py",
@@ -523,7 +523,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:e9f9ea7c84d5fddcb7989d6aa11028d47ac4122f66942bb22a86fb972644490f",
@@ -570,7 +570,7 @@
         },
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -675,7 +675,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:d3232d355ca9ca3eff429b2e24e031906441afd4dc2bf9fcd6f8eac5b7ab601c",
@@ -692,7 +692,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:actris-netcdf-4",
           "kind": "generated",
           "parameters": {
@@ -734,7 +734,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:65c9cf25d5f96e3a149a86b358fd20814b24bd2d1dbbdcd244144598ca11a483",
@@ -752,7 +752,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:direct-netcdf-readers-four",
           "kind": "generated",
           "parameters": {
@@ -794,7 +794,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:1344b452c48f0cf7f7e6e273152233594a565ad49e74a59ea05f6e8e845c40ee",
@@ -901,7 +901,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:d3232d355ca9ca3eff429b2e24e031906441afd4dc2bf9fcd6f8eac5b7ab601c",
@@ -919,7 +919,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:actris-netcdf-table-4",
           "kind": "generated",
           "parameters": {
@@ -961,7 +961,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:f511444298b6ff49fed91ea42e116f449b3470551e06f06e1e5820237c6f13ae",
@@ -979,7 +979,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_point_netcdf",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:amdar-madis-point-netcdf",
           "kind": "generated",
           "parameters": {
@@ -1272,7 +1272,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:60767b154ef87b25a49bdc50f05b001035f9f7705163f3ddbcadf9a95037355e",
@@ -1310,7 +1310,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -1916,7 +1916,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:a0bd5237f4aeff1a81c4575a1b0710fa77fb8b58de556e359104cbf70f570089",
@@ -1935,7 +1935,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_geoms_hdf5_obeys_use_dask_and_eager_defaults",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:geoms-hdf5-small",
           "kind": "generated",
           "parameters": {
@@ -1985,7 +1985,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:1344b452c48f0cf7f7e6e273152233594a565ad49e74a59ea05f6e8e845c40ee",
@@ -2010,7 +2010,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_geoms_table_readers_offer_serializable_dask_dataframe",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:geoms-chunk-50-contract",
           "kind": "generated",
           "parameters": {
@@ -2105,7 +2105,7 @@
         },
         {
           "path": "tests/test_omps_nadir.py",
-          "sha256": "a1c95829a9f8f45567001518ba0d6d7791bf69bcd0fae9b9224926f2c9e704b6"
+          "sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:25545d47f56898ed8ac411fb491f995f5fa85e069a4403799e646e05deb9fe32",
@@ -2124,7 +2124,7 @@
         {
           "factory": "tests/test_omps_nadir.py::test_omps_sdr_multi_group",
           "factory_source_path": "tests/test_omps_nadir.py",
-          "factory_source_sha256": "a1c95829a9f8f45567001518ba0d6d7791bf69bcd0fae9b9224926f2c9e704b6",
+          "factory_source_sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346",
           "fixture_id": "generated:omps-nadir-use-dask-group-forwarding",
           "kind": "generated",
           "parameters": {
@@ -2162,7 +2162,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:092990438b0701ea59c1966b234327d6e0044207322f1b6f0aa776e982efdf9e",
@@ -2181,7 +2181,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_lazy_dask_rejects_chunks_none",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:gridded-use-dask-rejects-unchunked",
           "kind": "generated",
           "parameters": {
@@ -2801,7 +2801,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:5416826a12cc5b0ef0d0952fb9d8cc566904d91f93b5e46871c511e1df865ff4",
@@ -2820,7 +2820,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_lazy_point_to_xarray_shares_length_discovery_across_columns",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:point-xarray-shared-length-preparation-width-10-100",
           "kind": "generated",
           "parameters": {
@@ -2928,7 +2928,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -3343,7 +3343,7 @@
         },
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -3951,7 +3951,7 @@
         },
         {
           "path": "monetio/readers/umbc_aerosol.py",
-          "sha256": "0ebd5e50e7e82bb08085eb21cf90827bb528a9d6da7ccdc7a160f5ebb74a5905"
+          "sha256": "7e7063a8bc62243a45fa799c8baad412ce87a2073b6a58b59752717ed2beaf81"
         },
         {
           "path": "tests/test_umbc.py",
@@ -5202,36 +5202,45 @@
           "sha256": "9d3da4370ac63a6f2e31aecb85cfc292113cccb97d31364970bd3c9f3ebb4dfc"
         },
         {
-          "path": "tests/test_conformance.py",
-          "sha256": "4fb948f533f1d012670d710704301bd820b74d81dcb82da4fbc70e9a9652c8c5"
+          "path": "tests/test_omps.py",
+          "sha256": "9c1fae3c76f6e923938b0810fe93c2201cc45fe08710403a5c66f0b1fbb178cc"
         }
       ],
-      "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:040bf849b69f8e2bc38eb82237697cbc79e378aadefbf7fcde7636cd290879a5",
-      "command": ".venv/bin/python -m pytest 'tests/test_conformance.py::test_c07_no_forced_chunking[omps]' -q",
-      "dependency_fingerprint": "b00a4483aa7a2bdf04ef4a20338c4d0118c6d06029d826de003cd8c7fcf8eddf",
+      "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:5b74022fc7d66bc399cd23e27ccf7a160e8572d78fa1215f96d8e27a13499744",
+      "command": ".venv/bin/python -m pytest tests/test_omps.py::test_omps_reader_eager_use_dask_parity -q",
+      "dependency_fingerprint": "47b2bb9f07bce9bbf8e7a2d676bbbacc0faabc17c6c6c772f5ceccf3e4c0acd4",
       "dependency_versions": {
         "dask": "2026.1.2",
-        "distributed": "2026.1.2",
-        "pandas": "2.3.3",
         "platform": "macOS-26.3.1-arm64",
         "python": "3.12.14",
         "xarray": "2025.12.0"
       },
-      "expected_behavior": "Default result is not Dask-backed and reader source contains no hardcoded chunk dict in its entry module.",
+      "expected_behavior": "Generated local NetCDF verifies the default OMPS result is eager and caller-provided chunks are honored.",
       "fixture_hashes": [
         {
-          "fixture_id": "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
-          "kind": "file",
-          "path": "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
-          "sha256": "a2c3332a2a9e8c633b169bfd2f4121ab31449295c389c511adebf5313b875e07"
+          "factory": "tests/test_omps.py::test_omps_reader_eager_use_dask_parity",
+          "factory_source_path": "tests/test_omps.py",
+          "factory_source_sha256": "9c1fae3c76f6e923938b0810fe93c2201cc45fe08710403a5c66f0b1fbb178cc",
+          "fixture_id": "generated:omps-l3-local-netcdf",
+          "kind": "generated",
+          "parameters": {
+            "engine": "h5netcdf",
+            "product": "nmto3_l3",
+            "shape": [
+              3,
+              4
+            ]
+          }
         }
       ],
-      "fixture_provenance": "Offline sample registered for omps; resolved by the shared SampleRegistry. No network.",
+      "fixture_provenance": "Generated local h5netcdf OMPS L3 file with deterministic ozone values, coordinates, and Date attribute.",
       "report": "specs/003-audit-readers-dask/validation.md",
       "requirements": [
-        "FR-002",
-        "FR-006",
-        "SC-002"
+        "FR-003",
+        "FR-005",
+        "FR-007",
+        "SC-003",
+        "FR-008"
       ],
       "run_status": "passed"
     },
@@ -5254,36 +5263,44 @@
           "sha256": "2eb8f3801c0ebdbd833aab07d8114d5dfc09231c2e09688d5b55b804472c1535"
         },
         {
-          "path": "tests/test_conformance.py",
-          "sha256": "4fb948f533f1d012670d710704301bd820b74d81dcb82da4fbc70e9a9652c8c5"
+          "path": "tests/test_omps_nadir.py",
+          "sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346"
         }
       ],
-      "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:b2aeb40054933309bd044fdc70bf53f09f8d2270a42562e20af73f419a51b8b5",
-      "command": ".venv/bin/python -m pytest 'tests/test_conformance.py::test_c07_no_forced_chunking[omps_nadir]' -q",
-      "dependency_fingerprint": "b00a4483aa7a2bdf04ef4a20338c4d0118c6d06029d826de003cd8c7fcf8eddf",
+      "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:25545d47f56898ed8ac411fb491f995f5fa85e069a4403799e646e05deb9fe32",
+      "command": ".venv/bin/python -m pytest tests/test_omps_nadir.py::test_omps_nadir_reader_honors_chunks_on_local_file -q",
+      "dependency_fingerprint": "47b2bb9f07bce9bbf8e7a2d676bbbacc0faabc17c6c6c772f5ceccf3e4c0acd4",
       "dependency_versions": {
         "dask": "2026.1.2",
-        "distributed": "2026.1.2",
-        "pandas": "2.3.3",
         "platform": "macOS-26.3.1-arm64",
         "python": "3.12.14",
         "xarray": "2025.12.0"
       },
-      "expected_behavior": "Default result is not Dask-backed and reader source contains no hardcoded chunk dict in its entry module.",
+      "expected_behavior": "Generated local NetCDF verifies the default OMPS Nadir result is eager and caller-provided chunks are honored.",
       "fixture_hashes": [
         {
-          "fixture_id": "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
-          "kind": "file",
-          "path": "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
-          "sha256": "a2c3332a2a9e8c633b169bfd2f4121ab31449295c389c511adebf5313b875e07"
+          "factory": "tests/test_omps_nadir.py::test_omps_nadir_reader_honors_chunks_on_local_file",
+          "factory_source_path": "tests/test_omps_nadir.py",
+          "factory_source_sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346",
+          "fixture_id": "generated:omps-nadir-reader-chunks",
+          "kind": "generated",
+          "parameters": {
+            "engine": "h5netcdf",
+            "group": "root",
+            "product": "v8toz",
+            "shape": [
+              5,
+              10
+            ]
+          }
         }
       ],
-      "fixture_provenance": "Offline sample registered for omps_nadir; resolved by the shared SampleRegistry. No network.",
+      "fixture_provenance": "Generated local h5netcdf OMPS V8TOZ file with 5 time rows and 10 IFOV columns.",
       "report": "specs/003-audit-readers-dask/validation.md",
       "requirements": [
-        "FR-002",
         "FR-006",
-        "SC-002"
+        "FR-007",
+        "FR-008"
       ],
       "run_status": "passed"
     },
@@ -5347,7 +5364,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -5359,7 +5376,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:e39cfc1470a6d87ee82f8d8437937acb9de1f15c84c5199799adb53127a47993",
@@ -5378,7 +5395,7 @@
         {
           "factory": "test_table_and_xarray_conversion_share_preparation_without_persist::parse_partition",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:point-xarray-width-preparation",
           "kind": "generated",
           "parameters": {
@@ -5416,7 +5433,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -5428,7 +5445,7 @@
         },
         {
           "path": "tests/test_scale_deferred.py",
-          "sha256": "e557342c8ee909f1d0a893c6d0a0f66a3f2477873a0b2c15b910c28c2497aba7"
+          "sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:c9c877e003ca840de78426933b70a36df2c666913e3690825f3f3f2a2d7dbe04",
@@ -5447,7 +5464,7 @@
         {
           "factory": "tests/test_scale_deferred.py::TestPointDeferred.test_long_xarray_preparation_batches_coordinate_discovery",
           "factory_source_path": "tests/test_scale_deferred.py",
-          "factory_source_sha256": "e557342c8ee909f1d0a893c6d0a0f66a3f2477873a0b2c15b910c28c2497aba7",
+          "factory_source_sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056",
           "fixture_id": "generated:airnow-long-xarray-four-partitions",
           "kind": "generated",
           "parameters": {
@@ -6290,7 +6307,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:334e8f05bdd3c15beff1e22b02f04eaaa67043a9942f3836db5f67dcbe46cbd4",
@@ -6307,7 +6324,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_lazy_table_preserves_pandas_object_strings_without_mutating_dask_config",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:lazy-table-object-string",
           "kind": "generated",
           "parameters": {
@@ -7631,7 +7648,7 @@
         },
         {
           "path": "tests/test_omps_nadir.py",
-          "sha256": "a1c95829a9f8f45567001518ba0d6d7791bf69bcd0fae9b9224926f2c9e704b6"
+          "sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:25545d47f56898ed8ac411fb491f995f5fa85e069a4403799e646e05deb9fe32",
@@ -7648,7 +7665,7 @@
         {
           "factory": "tests/test_omps_nadir.py::test_omps_nadir_reader_honors_chunks_on_local_file",
           "factory_source_path": "tests/test_omps_nadir.py",
-          "factory_source_sha256": "a1c95829a9f8f45567001518ba0d6d7791bf69bcd0fae9b9224926f2c9e704b6",
+          "factory_source_sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346",
           "fixture_id": "generated:omps-nadir-reader-chunks",
           "kind": "generated",
           "parameters": {
@@ -7804,7 +7821,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -7876,7 +7893,7 @@
         },
         {
           "path": "tests/test_dask_reader_memory.py",
-          "sha256": "fca8218b7e121484bdd78f7c548d05a8f83e08a85bd342e97af21f64f03116f1"
+          "sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:3b8d71f0753c62a6dce60faafa416a2425eda3f83002ce78171011c62fc40d7d",
@@ -7896,7 +7913,7 @@
         {
           "factory": "tests/test_dask_reader_memory.py::memory fixture case",
           "factory_source_path": "tests/test_dask_reader_memory.py",
-          "factory_source_sha256": "fca8218b7e121484bdd78f7c548d05a8f83e08a85bd342e97af21f64f03116f1",
+          "factory_source_sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79",
           "fixture_id": "generated:memory-gridded-sparse-2g",
           "kind": "generated",
           "parameters": {
@@ -7956,7 +7973,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -7968,7 +7985,7 @@
         },
         {
           "path": "tests/test_dask_reader_memory.py",
-          "sha256": "fca8218b7e121484bdd78f7c548d05a8f83e08a85bd342e97af21f64f03116f1"
+          "sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:f7746f7cb0f0c3da3c257cd24576de0529f34cedc7f598c792c6b32ec52de06c",
@@ -7988,7 +8005,7 @@
         {
           "factory": "tests/test_dask_reader_memory.py::memory fixture case",
           "factory_source_path": "tests/test_dask_reader_memory.py",
-          "factory_source_sha256": "fca8218b7e121484bdd78f7c548d05a8f83e08a85bd342e97af21f64f03116f1",
+          "factory_source_sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79",
           "fixture_id": "generated:memory-tabular-129x8m",
           "kind": "generated",
           "parameters": {
@@ -8033,7 +8050,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -8605,7 +8622,7 @@
         },
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -8617,7 +8634,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:6163585faeb388f43cc2cda83edf34e76f1107cbf278f1e5b8f25512d340acde",
@@ -10488,7 +10505,7 @@
         },
         {
           "path": "monetio/readers/umbc_aerosol.py",
-          "sha256": "0ebd5e50e7e82bb08085eb21cf90827bb528a9d6da7ccdc7a160f5ebb74a5905"
+          "sha256": "7e7063a8bc62243a45fa799c8baad412ce87a2073b6a58b59752717ed2beaf81"
         },
         {
           "path": "tests/test_umbc.py",
@@ -11351,7 +11368,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -11508,7 +11525,7 @@
         },
         {
           "path": "tests/test_dask_reader_memory.py",
-          "sha256": "fca8218b7e121484bdd78f7c548d05a8f83e08a85bd342e97af21f64f03116f1"
+          "sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:3b8d71f0753c62a6dce60faafa416a2425eda3f83002ce78171011c62fc40d7d",
@@ -11565,7 +11582,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -11577,7 +11594,7 @@
         },
         {
           "path": "tests/test_dask_reader_memory.py",
-          "sha256": "fca8218b7e121484bdd78f7c548d05a8f83e08a85bd342e97af21f64f03116f1"
+          "sha256": "bd95be49ac6805daeb3e3cf8f9e3e33e1d341c7776b78136f5701ce6ddf61d79"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:f7746f7cb0f0c3da3c257cd24576de0529f34cedc7f598c792c6b32ec52de06c",
@@ -11625,7 +11642,7 @@
       "code_hashes": [
         {
           "path": "monetio/readers/airnow.py",
-          "sha256": "ba9fe9328a67ce85da81d8ba07b42893717f638199eaaf5b602ae4dd57e85d62"
+          "sha256": "9437451384ffd6f21f494d14273937b460ad8435cbce45e2fb7c4e0a12e0dee6"
         },
         {
           "path": "monetio/readers/base.py",
@@ -11637,7 +11654,7 @@
         },
         {
           "path": "tests/test_scale_deferred.py",
-          "sha256": "e557342c8ee909f1d0a893c6d0a0f66a3f2477873a0b2c15b910c28c2497aba7"
+          "sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056"
         }
       ],
       "code_revision": "b159c52ff1ae1cd2d15238ac74471e562315940d+relevant-files-sha256:c9c877e003ca840de78426933b70a36df2c666913e3690825f3f3f2a2d7dbe04",
@@ -11658,7 +11675,7 @@
         {
           "factory": "tests/test_scale_deferred.py::TestPointDeferred::test_table_and_xarray_conversion_share_preparation_without_persist",
           "factory_source_path": "tests/test_scale_deferred.py",
-          "factory_source_sha256": "e557342c8ee909f1d0a893c6d0a0f66a3f2477873a0b2c15b910c28c2497aba7",
+          "factory_source_sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056",
           "fixture_id": "generated:airnow-width-preparation-10-100",
           "kind": "generated",
           "parameters": {
@@ -11813,7 +11830,7 @@
         },
         {
           "path": "tests/test_dask_reader_execution.py",
-          "sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6"
+          "sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01"
         },
         {
           "path": "tests/test_reader_dask_reanalysis.py",
@@ -12771,7 +12788,7 @@
         "python": "3.12.14",
         "xarray": "2025.12.0"
       },
-      "expected_behavior": "Repeated requested dates in one month with a selected state produce one matching monthly file; table and wide Dask outputs contain only that file’s rows.",
+      "expected_behavior": "Repeated requested dates in one month with a selected state produce one matching monthly file; table and wide Dask outputs contain only that file\u2019s rows.",
       "fixture_hashes": [
         {
           "factory": "tests/test_cems_modern.py::test_cems_month_state_selection_limits_input_files",
@@ -13416,7 +13433,7 @@
         },
         {
           "path": "monetio/readers/umbc_aerosol.py",
-          "sha256": "0ebd5e50e7e82bb08085eb21cf90827bb528a9d6da7ccdc7a160f5ebb74a5905"
+          "sha256": "7e7063a8bc62243a45fa799c8baad412ce87a2073b6a58b59752717ed2beaf81"
         },
         {
           "path": "monetio/readers/drivers.py",
@@ -13726,7 +13743,7 @@
         },
         {
           "path": "tests/conftest.py",
-          "sha256": "7d58db6901c9d8eb682badc5401075876eb5a9d7bad4de8ac6c23e19e465d50c"
+          "sha256": "d997e6338bdd7dc642911648f0ef43e07810ef8ec870a3ee09a8ca2415ff000e"
         },
         {
           "path": "tests/test_scale_distributed.py",
@@ -13979,7 +13996,7 @@
         },
         {
           "path": "tests/conftest.py",
-          "sha256": "7d58db6901c9d8eb682badc5401075876eb5a9d7bad4de8ac6c23e19e465d50c"
+          "sha256": "d997e6338bdd7dc642911648f0ef43e07810ef8ec870a3ee09a8ca2415ff000e"
         },
         {
           "path": "tests/dask_audit_support.py",
@@ -14283,7 +14300,7 @@
       ],
       "output_cost_bound": "Zero retained data rows; only an empty dataframe carrying parsed column names and dtypes is retained as Dask meta.",
       "payload_reads": "One bounded five-row schema read at open; each partition is fully read later when computed.",
-      "purpose": "Infer the fixed CEMS dataframe schema while avoiding Dask’s full first-file metadata inference.",
+      "purpose": "Infer the fixed CEMS dataframe schema while avoiding Dask\u2019s full first-file metadata inference.",
       "stage": "schema preparation before lazy graph construction",
       "trigger": "lazy=True or use_dask=True with at least one expanded file",
       "user_disclosure": "Lazy table construction performs a bounded five-row read of the first file before compute."
@@ -15523,7 +15540,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_lazy_dask_rejects_chunks_none",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:gridded-use-dask-rejects-unchunked",
           "kind": "generated",
           "parameters": {
@@ -20364,7 +20381,7 @@
         {
           "factory": "test_table_and_xarray_conversion_share_preparation_without_persist::parse_partition",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:point-xarray-width-preparation",
           "kind": "generated",
           "parameters": {
@@ -20424,7 +20441,7 @@
         {
           "factory": "tests/test_scale_deferred.py::TestPointDeferred::test_table_and_xarray_conversion_share_preparation_without_persist",
           "factory_source_path": "tests/test_scale_deferred.py",
-          "factory_source_sha256": "e557342c8ee909f1d0a893c6d0a0f66a3f2477873a0b2c15b910c28c2497aba7",
+          "factory_source_sha256": "83c0854017f3a02e82daf0e48a2450c24324471d868294bde6c7a0a3865d6056",
           "fixture_id": "generated:airnow-width-preparation-10-100",
           "kind": "generated",
           "parameters": {
@@ -23853,7 +23870,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -24041,7 +24058,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -25002,7 +25019,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -25200,7 +25217,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -26566,7 +26583,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_geoms_table_readers_offer_serializable_dask_dataframe",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:geoms-chunk-50-contract",
           "kind": "generated",
           "parameters": {
@@ -26749,7 +26766,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_geoms_table_readers_offer_serializable_dask_dataframe",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:geoms-chunk-50-contract",
           "kind": "generated",
           "parameters": {
@@ -26889,7 +26906,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -27077,7 +27094,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -28414,7 +28431,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:direct-netcdf-readers-four",
           "kind": "generated",
           "parameters": {
@@ -28608,7 +28625,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:direct-netcdf-readers-four",
           "kind": "generated",
           "parameters": {
@@ -28767,7 +28784,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -28955,7 +28972,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -29451,7 +29468,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_geoms_hdf5_obeys_use_dask_and_eager_defaults",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:geoms-hdf5-small",
           "kind": "generated",
           "parameters": {
@@ -29592,7 +29609,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -29794,7 +29811,7 @@
           "evidence_ids": [
             "openaq-pams-skynet-icartt-gml-process-parity"
           ],
-          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader’s local file parser path.",
+          "reason": "Table and wide output graphs executed on separate worker PIDs and matched eager outputs for the reader\u2019s local file parser path.",
           "status": "supported"
         },
         "eager": {
@@ -30783,7 +30800,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:actris-netcdf-table-4",
           "kind": "generated",
           "parameters": {
@@ -30966,7 +30983,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:actris-netcdf-4",
           "kind": "generated",
           "parameters": {
@@ -31149,7 +31166,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:direct-netcdf-readers-four",
           "kind": "generated",
           "parameters": {
@@ -31346,7 +31363,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::_nc",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:direct-netcdf-readers-four",
           "kind": "generated",
           "parameters": {
@@ -33034,14 +33051,23 @@
       "exception_ids": [],
       "fixture_hashes": [
         {
-          "fixture_id": "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
-          "kind": "file",
-          "path": "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
-          "sha256": "a2c3332a2a9e8c633b169bfd2f4121ab31449295c389c511adebf5313b875e07"
+          "factory": "tests/test_omps.py::test_omps_reader_eager_use_dask_parity",
+          "factory_source_path": "tests/test_omps.py",
+          "factory_source_sha256": "9c1fae3c76f6e923938b0810fe93c2201cc45fe08710403a5c66f0b1fbb178cc",
+          "fixture_id": "generated:omps-l3-local-netcdf",
+          "kind": "generated",
+          "parameters": {
+            "engine": "h5netcdf",
+            "product": "nmto3_l3",
+            "shape": [
+              3,
+              4
+            ]
+          }
         }
       ],
       "fixture_ids": [
-        "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5"
+        "generated:omps-l3-local-netcdf"
       ],
       "mode_id": "omps:open_dataset:gridded_dataset:source_default:defer=false",
       "module": "readers.omps",
@@ -33201,15 +33227,9 @@
       "exception_ids": [],
       "fixture_hashes": [
         {
-          "fixture_id": "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
-          "kind": "file",
-          "path": "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
-          "sha256": "a2c3332a2a9e8c633b169bfd2f4121ab31449295c389c511adebf5313b875e07"
-        },
-        {
           "factory": "tests/test_omps_nadir.py::test_omps_sdr_multi_group",
           "factory_source_path": "tests/test_omps_nadir.py",
-          "factory_source_sha256": "a1c95829a9f8f45567001518ba0d6d7791bf69bcd0fae9b9224926f2c9e704b6",
+          "factory_source_sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346",
           "fixture_id": "generated:omps-nadir-use-dask-group-forwarding",
           "kind": "generated",
           "parameters": {
@@ -33220,7 +33240,23 @@
         {
           "factory": "tests/test_omps_nadir.py::test_omps_nadir_reader_honors_chunks_on_local_file",
           "factory_source_path": "tests/test_omps_nadir.py",
-          "factory_source_sha256": "a1c95829a9f8f45567001518ba0d6d7791bf69bcd0fae9b9224926f2c9e704b6",
+          "factory_source_sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346",
+          "fixture_id": "generated:omps-nadir-reader-chunks",
+          "kind": "generated",
+          "parameters": {
+            "engine": "h5netcdf",
+            "group": "root",
+            "product": "v8toz",
+            "shape": [
+              5,
+              10
+            ]
+          }
+        },
+        {
+          "factory": "tests/test_omps_nadir.py::test_omps_nadir_reader_honors_chunks_on_local_file",
+          "factory_source_path": "tests/test_omps_nadir.py",
+          "factory_source_sha256": "31b181bf2d51e820c0405eac74eec3e7005aba422c764a9303b4f089d4d84346",
           "fixture_id": "generated:omps-nadir-reader-chunks",
           "kind": "generated",
           "parameters": {
@@ -33235,7 +33271,6 @@
         }
       ],
       "fixture_ids": [
-        "tests/data/OMPS-TO3-L3-DAILY_v2.1_20190905.h5",
         "generated:omps-nadir-use-dask-group-forwarding",
         "generated:omps-nadir-reader-chunks"
       ],
@@ -36197,7 +36232,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_geoms_table_readers_offer_serializable_dask_dataframe",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:geoms-chunk-50-contract",
           "kind": "generated",
           "parameters": {
@@ -36380,7 +36415,7 @@
         {
           "factory": "tests/test_dask_reader_execution.py::test_geoms_table_readers_offer_serializable_dask_dataframe",
           "factory_source_path": "tests/test_dask_reader_execution.py",
-          "factory_source_sha256": "3b9670c9524bdaa706cbef5a218d7dee642ac0d894de21459ba21457d9d264e6",
+          "factory_source_sha256": "cad8033d5558de0a70f6073a454cfefcc6e7c9bb54ad836a53e08677b32faf01",
           "fixture_id": "generated:geoms-chunk-50-contract",
           "kind": "generated",
           "parameters": {

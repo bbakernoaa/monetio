@@ -100,6 +100,7 @@ def test_omps_nadir_reader_honors_chunks_on_local_file(tmp_path):
     try:
         assert "Unrelated" not in result
         assert "Unrelated" not in eager
+        assert eager.ozone_column.chunks is None
         assert result.ozone_column.chunks == ((2, 2, 1), (5, 5))
         xr.testing.assert_equal(
             eager.drop_vars("history", errors="ignore"),

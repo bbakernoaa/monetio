@@ -1,6 +1,7 @@
 """Tests for XarrayDriver Icechunk backend support (Tasks 2.1–2.4)."""
 
 import unittest.mock as mock
+from pathlib import Path
 
 import pytest
 import xarray as xr
@@ -124,16 +125,18 @@ class TestSelectStore:
         files = ["/data/file1.nc", "/data/file2.nc"]
         registry, result_files = _select_store(files, {})
 
-        self.MockLocalStore.assert_called_once_with(prefix="/")
+        local_root = Path(files[0]).resolve().anchor
+        root_uri = Path(local_root).as_uri()
+        self.MockLocalStore.assert_called_once_with(prefix=local_root)
         self.MockRegistry.return_value.register.assert_called_once_with(
-            "file:///", self.MockLocalStore.return_value
+            root_uri, self.MockLocalStore.return_value
         )
-        assert result_files == ["file:///data/file1.nc", "file:///data/file2.nc"]
+        assert result_files == [Path(path).resolve().as_uri() for path in files]
 
     def test_local_files_already_prefixed_not_doubled(self):
         files = ["file:///data/file1.nc"]
         _, result_files = _select_store(files, {})
-        assert result_files == ["file:///data/file1.nc"]
+        assert result_files == [Path("/data/file1.nc").resolve().as_uri()]
 
 
 # ---------------------------------------------------------------------------
