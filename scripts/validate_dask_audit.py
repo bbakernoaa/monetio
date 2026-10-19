@@ -67,7 +67,7 @@ def _fixture_errors(records, label: str, root: Path) -> list[str]:
                     errors.append(f"{label}: {fid} generated fixture missing {field}")
             source = rec.get("factory_source_path")
             if isinstance(source, str) and (root / source).is_file():
-                digest = hashlib.sha256((root / source).read_bytes()).hexdigest()
+                digest = _source_digest(root / source)
                 if rec.get("factory_source_sha256") != digest:
                     errors.append(f"{label}: {fid} factory source hash is stale")
             elif source is not None:
@@ -108,9 +108,15 @@ def _code_hash_errors(records, label: str, root: Path) -> list[str]:
         if not target.is_file():
             errors.append(f"{label}: hashed code file does not exist: {path}")
             continue
-        if rec.get("sha256") != hashlib.sha256(target.read_bytes()).hexdigest():
+        if rec.get("sha256") != _source_digest(target):
             errors.append(f"{label}: code hash is stale for {path}")
     return errors
+
+
+def _source_digest(path: Path) -> str:
+    """Hash source text consistently across checkouts with different line endings."""
+    normalized = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(normalized).hexdigest()
 
 
 REQUIRED_TOP = {

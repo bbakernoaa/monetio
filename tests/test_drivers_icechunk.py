@@ -128,9 +128,16 @@ class TestSelectStore:
         local_root = Path(files[0]).resolve().anchor
         root_uri = Path(local_root).as_uri()
         self.MockLocalStore.assert_called_once_with(prefix=local_root)
-        self.MockRegistry.return_value.register.assert_called_once_with(
-            root_uri, self.MockLocalStore.return_value
-        )
+        register = self.MockRegistry.return_value.register
+        register.assert_any_call(root_uri, self.MockLocalStore.return_value)
+        if Path(local_root).drive:
+            encoded_drive = Path(local_root).drive.replace(":", "%3A")
+            register.assert_any_call(
+                f"file:///{encoded_drive}/", self.MockLocalStore.return_value
+            )
+            assert register.call_count == 2
+        else:
+            register.assert_called_once_with(root_uri, self.MockLocalStore.return_value)
         assert result_files == [Path(path).resolve().as_uri() for path in files]
 
     def test_local_files_already_prefixed_not_doubled(self):

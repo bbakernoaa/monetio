@@ -5,6 +5,7 @@ import warnings
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Union
+from urllib.parse import quote
 
 import fsspec
 import pandas as pd
@@ -568,7 +569,16 @@ def _select_store(file_list: list[str], storage_options: dict) -> tuple:
                 # registering only file:/// leaves the encoded drive letter
                 # in the object key (D%3A/...), which LocalStore then resolves
                 # relative to the current drive and cannot open.
-                registry.register(root_url, LocalStore(prefix=str(root)))
+                store = LocalStore(prefix=str(root))
+                registry.register(root_url, store)
+                # VirtualiZarr/obspec versions may percent-encode the Windows
+                # drive colon when resolving a local file URL. Register that
+                # equivalent prefix too, so LocalStore receives a path relative
+                # to the drive root instead of ``D%3A/...``.
+                if root.drive:
+                    encoded_drive_url = f"file:///{quote(root.drive, safe='')}/"
+                    if encoded_drive_url != root_url:
+                        registry.register(encoded_drive_url, store)
                 registered_roots.add(root_url)
         file_list = [path.as_uri() for path in local_files]
 

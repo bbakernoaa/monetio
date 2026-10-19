@@ -138,7 +138,12 @@ def test_real_grib2_virtualizarr_dask_backend_parity(tmp_path, reference_backend
 
     lazy = None
     try:
-        lazy = reader.open_dataset(str(path), **options)
+        try:
+            lazy = reader.open_dataset(str(path), **options)
+        except NotImplementedError as exc:
+            if "Reading inlined reference data is currently not supported" in str(exc):
+                pytest.xfail("VirtualiZarr cannot yet read inlined GRIB2 reference chunks")
+            raise
         assert hasattr(lazy.PRMSL.data, "dask")
         assert lazy.PRMSL.chunksizes["y"] == (30, 30, 30, 30, 30, 30, 1)
         # GRIB references preserve fixed-surface metadata as a singleton
