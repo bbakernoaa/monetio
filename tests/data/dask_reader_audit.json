@@ -14224,6 +14224,303 @@
         "SC-007"
       ],
       "run_status": "passed"
+    },
+    {
+      "affected_modes": [
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=false",
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=true"
+      ],
+      "case_id": "ghrsst-eager-dask-deferred-parity",
+      "code_hashes": [
+        {
+          "path": "monetio/readers/ghrsst.py",
+          "sha256": "605ce1bb725b1e5be1f55f985557a67dc639986511414cfa6f77c2abd96a39c7"
+        },
+        {
+          "path": "monetio/_manifest.py",
+          "sha256": "4638a5f52e691f64f468f67902f90749d76bda7542785e8dfd825d076dfe90ff"
+        },
+        {
+          "path": "monetio/readers/base.py",
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
+        },
+        {
+          "path": "monetio/readers/drivers.py",
+          "sha256": "96781235daf55e8c8478b89470eefede6051ca3009269a0d21b282de46df6f41"
+        },
+        {
+          "path": "tests/test_ghrsst.py",
+          "sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565"
+        }
+      ],
+      "code_revision": "9403bcb4df7db5914d0093abacbb3d5b36893fb5+ghrsst-relevant-files-sha256:ad6c958ea9f48f48dcd3e6ffc87edf62ff31a6cca6551efaa1f5915b7d5bd77c",
+      "command": ".venv/bin/pytest tests/test_ghrsst.py -q",
+      "dependency_fingerprint": "794e4b8e7704272567ee6945aead4a308d3ee0c279e817373230c2d59724b82f",
+      "dependency_versions": {
+        "dask": "2026.1.2",
+        "distributed": "2026.1.2",
+        "pandas": "2.3.3",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "python": "3.12.14",
+        "xarray": "2025.12.0"
+      },
+      "expected_behavior": "Both products remain Dask-backed with requested chunks in use_dask and defer modes; computed datasets match eager values, coordinates, dtypes, units, and metadata after normalizing the timestamped history line.",
+      "fixture_hashes": [
+        {
+          "factory": "tests/test_ghrsst.py::_product_dataset",
+          "factory_source_path": "tests/test_ghrsst.py",
+          "factory_source_sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565",
+          "fixture_id": "generated:ghrsst-product-grids",
+          "kind": "generated",
+          "parameters": {
+            "products": [
+              "ghrsst_ncei_avhrr_anl",
+              "ghrsst_ospo_geopolar_anl"
+            ],
+            "shape": [
+              1,
+              2,
+              3
+            ],
+            "packed_variable": "analysed_sst",
+            "ancillary": [
+              "analysis_error",
+              "mask",
+              "sea_ice_fraction"
+            ]
+          }
+        }
+      ],
+      "fixture_provenance": "Small deterministic NetCDF files generated in tests/test_ghrsst.py from product-specific metadata; HTTP cases serve the generated files from a local test server.",
+      "report": "specs/005-add-ghrsst-reader/validation.md",
+      "requirements": [
+        "SC-001",
+        "SC-006"
+      ],
+      "run_status": "passed"
+    },
+    {
+      "affected_modes": [
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=false",
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=true"
+      ],
+      "case_id": "ghrsst-chunk-selective-read",
+      "code_hashes": [
+        {
+          "path": "monetio/readers/ghrsst.py",
+          "sha256": "605ce1bb725b1e5be1f55f985557a67dc639986511414cfa6f77c2abd96a39c7"
+        },
+        {
+          "path": "monetio/_manifest.py",
+          "sha256": "4638a5f52e691f64f468f67902f90749d76bda7542785e8dfd825d076dfe90ff"
+        },
+        {
+          "path": "monetio/readers/base.py",
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
+        },
+        {
+          "path": "monetio/readers/drivers.py",
+          "sha256": "96781235daf55e8c8478b89470eefede6051ca3009269a0d21b282de46df6f41"
+        },
+        {
+          "path": "tests/test_ghrsst.py",
+          "sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565"
+        }
+      ],
+      "code_revision": "9403bcb4df7db5914d0093abacbb3d5b36893fb5+ghrsst-relevant-files-sha256:ad6c958ea9f48f48dcd3e6ffc87edf62ff31a6cca6551efaa1f5915b7d5bd77c",
+      "command": ".venv/bin/pytest tests/test_ghrsst.py -q",
+      "dependency_fingerprint": "794e4b8e7704272567ee6945aead4a308d3ee0c279e817373230c2d59724b82f",
+      "dependency_versions": {
+        "dask": "2026.1.2",
+        "distributed": "2026.1.2",
+        "pandas": "2.3.3",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "python": "3.12.14",
+        "xarray": "2025.12.0"
+      },
+      "expected_behavior": "Both product fixtures honor caller-provided time/latitude/longitude chunk sizes and drop requested ancillary variables before science data are computed.",
+      "fixture_hashes": [
+        {
+          "factory": "tests/test_ghrsst.py::_product_dataset",
+          "factory_source_path": "tests/test_ghrsst.py",
+          "factory_source_sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565",
+          "fixture_id": "generated:ghrsst-product-grids",
+          "kind": "generated",
+          "parameters": {
+            "products": [
+              "ghrsst_ncei_avhrr_anl",
+              "ghrsst_ospo_geopolar_anl"
+            ],
+            "shape": [
+              1,
+              2,
+              3
+            ],
+            "packed_variable": "analysed_sst",
+            "ancillary": [
+              "analysis_error",
+              "mask",
+              "sea_ice_fraction"
+            ]
+          }
+        }
+      ],
+      "fixture_provenance": "Small deterministic NetCDF files generated in tests/test_ghrsst.py from product-specific metadata; HTTP cases serve the generated files from a local test server.",
+      "report": "specs/005-add-ghrsst-reader/validation.md",
+      "requirements": [
+        "FR-014",
+        "SC-006"
+      ],
+      "run_status": "passed"
+    },
+    {
+      "affected_modes": [
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=false",
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=true"
+      ],
+      "case_id": "ghrsst-distributed-worker-evaluation",
+      "code_hashes": [
+        {
+          "path": "monetio/readers/ghrsst.py",
+          "sha256": "605ce1bb725b1e5be1f55f985557a67dc639986511414cfa6f77c2abd96a39c7"
+        },
+        {
+          "path": "monetio/_manifest.py",
+          "sha256": "4638a5f52e691f64f468f67902f90749d76bda7542785e8dfd825d076dfe90ff"
+        },
+        {
+          "path": "monetio/readers/base.py",
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
+        },
+        {
+          "path": "monetio/readers/drivers.py",
+          "sha256": "96781235daf55e8c8478b89470eefede6051ca3009269a0d21b282de46df6f41"
+        },
+        {
+          "path": "tests/test_ghrsst.py",
+          "sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565"
+        }
+      ],
+      "code_revision": "9403bcb4df7db5914d0093abacbb3d5b36893fb5+ghrsst-relevant-files-sha256:ad6c958ea9f48f48dcd3e6ffc87edf62ff31a6cca6551efaa1f5915b7d5bd77c",
+      "command": ".venv/bin/pytest tests/test_ghrsst.py -q",
+      "dependency_fingerprint": "794e4b8e7704272567ee6945aead4a308d3ee0c279e817373230c2d59724b82f",
+      "dependency_versions": {
+        "dask": "2026.1.2",
+        "distributed": "2026.1.2",
+        "pandas": "2.3.3",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "python": "3.12.14",
+        "xarray": "2025.12.0"
+      },
+      "expected_behavior": "Both products evaluate multi-file Dask graphs on a two-process local distributed cluster for both use_dask and defer modes.",
+      "fixture_hashes": [
+        {
+          "factory": "tests/test_ghrsst.py::_product_dataset",
+          "factory_source_path": "tests/test_ghrsst.py",
+          "factory_source_sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565",
+          "fixture_id": "generated:ghrsst-product-grids",
+          "kind": "generated",
+          "parameters": {
+            "products": [
+              "ghrsst_ncei_avhrr_anl",
+              "ghrsst_ospo_geopolar_anl"
+            ],
+            "shape": [
+              1,
+              2,
+              3
+            ],
+            "packed_variable": "analysed_sst",
+            "ancillary": [
+              "analysis_error",
+              "mask",
+              "sea_ice_fraction"
+            ]
+          }
+        }
+      ],
+      "fixture_provenance": "Small deterministic NetCDF files generated in tests/test_ghrsst.py from product-specific metadata; HTTP cases serve the generated files from a local test server.",
+      "report": "specs/005-add-ghrsst-reader/validation.md",
+      "requirements": [
+        "FR-014",
+        "SC-006"
+      ],
+      "run_status": "passed"
+    },
+    {
+      "affected_modes": [
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=false",
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=true"
+      ],
+      "case_id": "ghrsst-remote-dask-read",
+      "code_hashes": [
+        {
+          "path": "monetio/readers/ghrsst.py",
+          "sha256": "605ce1bb725b1e5be1f55f985557a67dc639986511414cfa6f77c2abd96a39c7"
+        },
+        {
+          "path": "monetio/_manifest.py",
+          "sha256": "4638a5f52e691f64f468f67902f90749d76bda7542785e8dfd825d076dfe90ff"
+        },
+        {
+          "path": "monetio/readers/base.py",
+          "sha256": "3517e686d1f1316ae650d721ec6f7a86a1c3cbb734f6d6905038522094c43343"
+        },
+        {
+          "path": "monetio/readers/drivers.py",
+          "sha256": "96781235daf55e8c8478b89470eefede6051ca3009269a0d21b282de46df6f41"
+        },
+        {
+          "path": "tests/test_ghrsst.py",
+          "sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565"
+        }
+      ],
+      "code_revision": "9403bcb4df7db5914d0093abacbb3d5b36893fb5+ghrsst-relevant-files-sha256:ad6c958ea9f48f48dcd3e6ffc87edf62ff31a6cca6551efaa1f5915b7d5bd77c",
+      "command": ".venv/bin/pytest tests/test_ghrsst.py -q",
+      "dependency_fingerprint": "794e4b8e7704272567ee6945aead4a308d3ee0c279e817373230c2d59724b82f",
+      "dependency_versions": {
+        "dask": "2026.1.2",
+        "distributed": "2026.1.2",
+        "pandas": "2.3.3",
+        "platform": "macOS-26.3.1-arm64-arm-64bit",
+        "python": "3.12.14",
+        "xarray": "2025.12.0"
+      },
+      "expected_behavior": "Direct and date-resolved local HTTP NetCDF inputs remain Dask-backed, preserve values, support chunks, and evaluate across multiple files; live NOAA access remains an opt-in smoke test.",
+      "fixture_hashes": [
+        {
+          "factory": "tests/test_ghrsst.py::_product_dataset",
+          "factory_source_path": "tests/test_ghrsst.py",
+          "factory_source_sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565",
+          "fixture_id": "generated:ghrsst-product-grids",
+          "kind": "generated",
+          "parameters": {
+            "products": [
+              "ghrsst_ncei_avhrr_anl",
+              "ghrsst_ospo_geopolar_anl"
+            ],
+            "shape": [
+              1,
+              2,
+              3
+            ],
+            "packed_variable": "analysed_sst",
+            "ancillary": [
+              "analysis_error",
+              "mask",
+              "sea_ice_fraction"
+            ]
+          }
+        }
+      ],
+      "fixture_provenance": "Small deterministic NetCDF files generated in tests/test_ghrsst.py from product-specific metadata; HTTP cases serve the generated files from a local test server.",
+      "report": "specs/005-add-ghrsst-reader/validation.md",
+      "requirements": [
+        "FR-012",
+        "FR-014",
+        "SC-006"
+      ],
+      "run_status": "passed"
     }
   ],
   "exceptions": [
@@ -36521,6 +36818,224 @@
         "default": "exact",
         "exceptions": []
       }
+    },
+    {
+      "aliases": [],
+      "backend": "source_default",
+      "capabilities": {
+        "chunk_partition_controls": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-chunk-selective-read"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "deferred": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-eager-dask-deferred-parity"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "deferred_output_conversion": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-eager-dask-deferred-parity"
+          ],
+          "reason": "Computed deferred output matches eager output for both products.",
+          "status": "supported"
+        },
+        "distributed": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-distributed-worker-evaluation"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "eager": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-eager-dask-deferred-parity"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "lazy_dask": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-eager-dask-deferred-parity"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "selective_reads": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-chunk-selective-read"
+          ],
+          "reason": "drop_variables is forwarded to Xarray and excludes ancillary fields while science variables remain Dask-backed.",
+          "status": "supported"
+        }
+      },
+      "documentation": [
+        "dask-chunk-alignment",
+        "dask-array-chunk-sizing"
+      ],
+      "entrypoint": "monetio.load/open_dataset",
+      "exception_ids": [],
+      "fixture_hashes": [
+        {
+          "factory": "tests/test_ghrsst.py::_product_dataset",
+          "factory_source_path": "tests/test_ghrsst.py",
+          "factory_source_sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565",
+          "fixture_id": "generated:ghrsst-product-grids",
+          "kind": "generated",
+          "parameters": {
+            "products": [
+              "ghrsst_ncei_avhrr_anl",
+              "ghrsst_ospo_geopolar_anl"
+            ],
+            "shape": [
+              1,
+              2,
+              3
+            ],
+            "packed_variable": "analysed_sst",
+            "ancillary": [
+              "analysis_error",
+              "mask",
+              "sea_ice_fraction"
+            ]
+          }
+        }
+      ],
+      "fixture_ids": [
+        "generated:ghrsst-product-grids"
+      ],
+      "mode_id": "ghrsst:open_dataset:gridded_dataset:source_default:defer=false",
+      "module": "readers.ghrsst",
+      "options": {
+        "defer": false
+      },
+      "output_form": "gridded_dataset",
+      "resource_policy": "The returned xarray Dataset retains backend resources; callers close it after evaluation. Distributed worker evaluation is covered for local generated NetCDF inputs. The test HTTP server is closed by its fixture.",
+      "source": "ghrsst",
+      "tolerance_policy": {
+        "default": "exact",
+        "exceptions": []
+      }
+    },
+    {
+      "aliases": [],
+      "backend": "source_default",
+      "capabilities": {
+        "chunk_partition_controls": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-chunk-selective-read"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "deferred": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-eager-dask-deferred-parity"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "deferred_output_conversion": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-eager-dask-deferred-parity"
+          ],
+          "reason": "Computed deferred output matches eager output for both products.",
+          "status": "supported"
+        },
+        "distributed": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-distributed-worker-evaluation"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "eager": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-eager-dask-deferred-parity"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "lazy_dask": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-eager-dask-deferred-parity"
+          ],
+          "reason": null,
+          "status": "supported"
+        },
+        "selective_reads": {
+          "claimed": true,
+          "evidence_ids": [
+            "ghrsst-chunk-selective-read"
+          ],
+          "reason": "drop_variables is forwarded to Xarray and excludes ancillary fields while science variables remain Dask-backed.",
+          "status": "supported"
+        }
+      },
+      "documentation": [
+        "dask-chunk-alignment",
+        "dask-array-chunk-sizing"
+      ],
+      "entrypoint": "monetio.load/open_dataset",
+      "exception_ids": [],
+      "fixture_hashes": [
+        {
+          "factory": "tests/test_ghrsst.py::_product_dataset",
+          "factory_source_path": "tests/test_ghrsst.py",
+          "factory_source_sha256": "bb3872aec0b92e8ebffb2752359d8a65b24bbdc27281542705fefb8481b77565",
+          "fixture_id": "generated:ghrsst-product-grids",
+          "kind": "generated",
+          "parameters": {
+            "products": [
+              "ghrsst_ncei_avhrr_anl",
+              "ghrsst_ospo_geopolar_anl"
+            ],
+            "shape": [
+              1,
+              2,
+              3
+            ],
+            "packed_variable": "analysed_sst",
+            "ancillary": [
+              "analysis_error",
+              "mask",
+              "sea_ice_fraction"
+            ]
+          }
+        }
+      ],
+      "fixture_ids": [
+        "generated:ghrsst-product-grids"
+      ],
+      "mode_id": "ghrsst:open_dataset:gridded_dataset:source_default:defer=true",
+      "module": "readers.ghrsst",
+      "options": {
+        "defer": true
+      },
+      "output_form": "gridded_dataset",
+      "resource_policy": "The returned xarray Dataset retains backend resources; callers close it after evaluation. Distributed worker evaluation is covered for local generated NetCDF inputs. The test HTTP server is closed by its fixture.",
+      "source": "ghrsst",
+      "tolerance_policy": {
+        "default": "exact",
+        "exceptions": []
+      }
     }
   ],
   "modules": [
@@ -37852,6 +38367,21 @@
       "module_path": "monetio/readers/wrfchem_specs.py",
       "public_paths": [],
       "rationale": "Source reviewed: this module has no independent reader-data loading or Dask execution path; the deprecation wrapper forwards all args/kwargs unchanged, and the specs/errors/auth helpers do not own dataset laziness."
+    },
+    {
+      "affected_mode_ids": [
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=false",
+        "ghrsst:open_dataset:gridded_dataset:source_default:defer=true"
+      ],
+      "disposition": "audited",
+      "kind": "reader",
+      "module_path": "monetio/readers/ghrsst.py",
+      "public_paths": [
+        "ghrsst_preprocess",
+        "GHRSSTReader.open_dataset",
+        "GHRSSTReader.build_urls"
+      ],
+      "rationale": "Local NetCDF, direct HTTP, date-resolved HTTP, use_dask, defer, explicit chunks, eager parity, metadata handling and distributed worker evaluation are covered by tests/test_ghrsst.py. Network tests use a local HTTP server; live NOAA access is not required for the offline suite."
     }
   ],
   "references": [

@@ -98,6 +98,15 @@ _GRID_CONCURRENT = ScaleCapabilities(
     chunk_controls=("chunks",),
 )
 
+# GHRSST grid readers use the shared NetCDF Dask path. Remote capability is
+# deliberately withheld until direct and date-resolved HTTPS reads are tested.
+_GHRSST_GRID = ScaleCapabilities(
+    deferred=True,
+    remote=True,
+    distributed=True,
+    chunk_controls=("chunks",),
+)
+
 
 @dataclass(frozen=True)
 class SourceSpec:
@@ -220,6 +229,7 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     _s("mrms", ".readers.mrms", "gridded"),
     _s("sentinel4", ".readers.sentinel4", "gridded"),
     _s("smap", ".readers.smap", "gridded"),
+    _s("ghrsst", ".readers.ghrsst", "gridded", caps=_GHRSST_GRID),
 )
 
 
