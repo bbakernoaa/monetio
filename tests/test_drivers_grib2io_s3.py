@@ -1,3 +1,6 @@
+from io import BytesIO
+from pathlib import Path
+
 import pytest
 import xarray as xr
 
@@ -143,6 +146,44 @@ def test_grib2io_s3_sets_default_storage_options(monkeypatch):
     driver.open(path, engine="grib2io")
 
     assert captured["kwargs"]["storage_options"] == get_default_storage_options(path)
+
+
+def test_grib2io_gcs_stages_remote_file_and_closes_temporary_copy(monkeypatch):
+    driver = XarrayDriver()
+    source = "gs://public-bucket/data/sample.grib2"
+    requested = {}
+    dataset = xr.Dataset({"value": ("x", [1])})
+
+    class FakeFilesystem:
+        def open(self, path, mode):
+            requested["path"] = path
+            return BytesIO(b"GRIB payload")
+
+    def fake_open(paths, *args):
+        local = paths[0]
+        requested["local_path"] = local
+        requested["payload"] = Path(local).read_bytes()
+        return dataset
+
+    monkeypatch.setattr(
+        FileUtility,
+        "get_fs",
+        lambda uri, options: requested.update(options=options) or FakeFilesystem(),
+    )
+    monkeypatch.setattr(driver, "_open_grib2io_paths", fake_open)
+
+    result = driver._open_grib2io_native(
+        [source], {}, preprocess=None, retry_attempts=0, retry_base_sleep=0
+    )
+
+    assert requested["path"] == source
+    assert requested["options"] == {"token": "anon"}
+    assert requested["payload"] == b"GRIB payload"
+    assert result.attrs["monetio_source_files"] == '["gs://public-bucket/data/sample.grib2"]'
+    local_path = requested["local_path"]
+    assert Path(local_path).exists()
+    result.close()
+    assert not Path(local_path).exists()
 
 
 def test_get_fs_passes_s3_kwargs_through(monkeypatch):

@@ -1,5 +1,8 @@
+import hashlib
 import json
 import os
+import shutil
+import tempfile
 import time
 import warnings
 from collections.abc import Callable, Mapping
@@ -49,6 +52,8 @@ def get_default_storage_options(path: str) -> dict:
     """
     if path.startswith("s3://"):
         return {"anon": True}
+    if path.startswith(("gs://", "gcs://")):
+        return {"token": "anon"}
     return {}
 
 
@@ -961,6 +966,67 @@ class XarrayDriver:
         icechunk_url: str | None = None,
     ) -> xr.Dataset:
         """Open GRIB2 data via native xarray+grib2io backend."""
+        remote = [
+            str(path)
+            for path in file_list
+            if str(path).startswith(("gs://", "gcs://", "https://", "http://"))
+        ]
+        if not remote:
+            return self._open_grib2io_paths(
+                file_list, xr_kwargs, preprocess, retry_attempts, retry_base_sleep, icechunk_url
+            )
+
+        options = dict(xr_kwargs.get("storage_options", {}))
+        if not options:
+            options = get_default_storage_options(remote[0])
+        cache_dir = options.pop("cache_dir", None)
+        temporary = None if cache_dir else tempfile.TemporaryDirectory(prefix="monetio-grib-")
+        target_dir = Path(cache_dir) if cache_dir else Path(temporary.name)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        staged = []
+        try:
+            for uri in file_list:
+                uri = str(uri)
+                if uri not in remote:
+                    staged.append(uri)
+                    continue
+                fs = FileUtility.get_fs(uri, options)
+                identity = hashlib.sha256(uri.encode()).hexdigest()[:16]
+                name = Path(uri.split("?", 1)[0]).name or "remote.grib2"
+                target = target_dir / f"{identity}-{name}"
+                if not target.exists():
+                    partial = target.with_suffix(target.suffix + ".partial")
+                    with fs.open(uri, "rb") as source, partial.open("wb") as output:
+                        shutil.copyfileobj(source, output)
+                    os.replace(partial, target)
+                staged.append(str(target))
+            backend_kwargs = dict(xr_kwargs)
+            backend_kwargs.pop("storage_options", None)
+            ds = self._open_grib2io_paths(
+                staged, backend_kwargs, preprocess, retry_attempts, retry_base_sleep, icechunk_url
+            )
+        except Exception:
+            if temporary:
+                temporary.cleanup()
+            raise
+        if temporary:
+            close = ds._close
+
+            def close_staged_files():
+                try:
+                    if close is not None:
+                        close()
+                finally:
+                    temporary.cleanup()
+
+            ds.set_close(close_staged_files)
+        ds.attrs["monetio_source_files"] = json.dumps(remote)
+        return ds
+
+    def _open_grib2io_paths(
+        self, file_list, xr_kwargs, preprocess, retry_attempts, retry_base_sleep, icechunk_url
+    ) -> xr.Dataset:
+        """Open local GRIB paths with xarray and grib2io."""
         xr_kwargs["engine"] = "grib2io"
 
         # Keep public S3 reads safe by default unless the caller set explicit options.
