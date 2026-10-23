@@ -149,6 +149,7 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
         ),
     ),
     # ---- point observations ----
+    _s("prepbufr", ".readers.prepbufr", "point"),
     _s("airnow", ".readers.airnow", "point", caps=_DEFERRED_WIDE, legacy=("obs.airnow",)),
     _s("aeronet", ".readers.aeronet", "point", caps=_DEFERRED, legacy=("obs.aeronet",)),
     _s("aqs", ".readers.aqs", "point", legacy=("obs.aqs",)),

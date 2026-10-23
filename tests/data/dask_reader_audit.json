@@ -36521,6 +36521,262 @@
         "default": "exact",
         "exceptions": []
       }
+    },
+    {
+      "mode_id": "prepbufr:open_dataset:table:source_default:defer=false",
+      "source": "prepbufr",
+      "aliases": [],
+      "module": "monetio.readers.prepbufr",
+      "entrypoint": "monetio.load/open_dataset",
+      "output_form": "table",
+      "backend": "source_default",
+      "options": {
+        "defer": false
+      },
+      "capabilities": {
+        "eager": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "lazy_dask": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "deferred": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "chunk_partition_controls": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "selective_reads": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "distributed": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "deferred_output_conversion": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        }
+      },
+      "fixture_ids": [],
+      "fixture_hashes": [],
+      "exception_ids": [],
+      "resource_policy": {},
+      "tolerance_policy": {
+        "default": "exact"
+      },
+      "documentation": []
+    },
+    {
+      "mode_id": "prepbufr:open_dataset:table:source_default:defer=true",
+      "source": "prepbufr",
+      "aliases": [],
+      "module": "monetio.readers.prepbufr",
+      "entrypoint": "monetio.load/open_dataset",
+      "output_form": "table",
+      "backend": "source_default",
+      "options": {
+        "defer": true
+      },
+      "capabilities": {
+        "eager": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "lazy_dask": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "deferred": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "chunk_partition_controls": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "selective_reads": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "distributed": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "deferred_output_conversion": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        }
+      },
+      "fixture_ids": [],
+      "fixture_hashes": [],
+      "exception_ids": [],
+      "resource_policy": {},
+      "tolerance_policy": {
+        "default": "exact"
+      },
+      "documentation": []
+    },
+    {
+      "mode_id": "prepbufr:open_dataset:wide_dataset:source_default:defer=false",
+      "source": "prepbufr",
+      "aliases": [],
+      "module": "monetio.readers.prepbufr",
+      "entrypoint": "monetio.load/open_dataset",
+      "output_form": "wide_dataset",
+      "backend": "source_default",
+      "options": {
+        "defer": false
+      },
+      "capabilities": {
+        "eager": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "lazy_dask": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "deferred": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "chunk_partition_controls": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "selective_reads": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "distributed": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "deferred_output_conversion": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        }
+      },
+      "fixture_ids": [],
+      "fixture_hashes": [],
+      "exception_ids": [],
+      "resource_policy": {},
+      "tolerance_policy": {
+        "default": "exact"
+      },
+      "documentation": []
+    },
+    {
+      "mode_id": "prepbufr:open_dataset:wide_dataset:source_default:defer=true",
+      "source": "prepbufr",
+      "aliases": [],
+      "module": "monetio.readers.prepbufr",
+      "entrypoint": "monetio.load/open_dataset",
+      "output_form": "wide_dataset",
+      "backend": "source_default",
+      "options": {
+        "defer": true
+      },
+      "capabilities": {
+        "eager": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "lazy_dask": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "deferred": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "chunk_partition_controls": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "selective_reads": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "distributed": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        },
+        "deferred_output_conversion": {
+          "claimed": false,
+          "status": "pending",
+          "reason": "PREPBUFR was added after the Dask audit baseline; this mode has not yet been audited.",
+          "evidence_ids": []
+        }
+      },
+      "fixture_ids": [],
+      "fixture_hashes": [],
+      "exception_ids": [],
+      "resource_policy": {},
+      "tolerance_policy": {
+        "default": "exact"
+      },
+      "documentation": []
     }
   ],
   "modules": [
@@ -37852,6 +38108,22 @@
       "module_path": "monetio/readers/wrfchem_specs.py",
       "public_paths": [],
       "rationale": "Source reviewed: this module has no independent reader-data loading or Dask execution path; the deprecation wrapper forwards all args/kwargs unchanged, and the specs/errors/auth helpers do not own dataset laziness."
+    },
+    {
+      "module_path": "monetio/readers/prepbufr.py",
+      "kind": "reader",
+      "disposition": "pending",
+      "public_paths": [
+        "read_prepbufr",
+        "PREPBUFRReader.open_dataset"
+      ],
+      "affected_mode_ids": [
+        "prepbufr:open_dataset:table:source_default:defer=false",
+        "prepbufr:open_dataset:table:source_default:defer=true",
+        "prepbufr:open_dataset:wide_dataset:source_default:defer=false",
+        "prepbufr:open_dataset:wide_dataset:source_default:defer=true"
+      ],
+      "rationale": "Added after the Dask reader audit baseline; audit its eager, Dask, deferred, and output conversion behavior before claiming support."
     }
   ],
   "references": [
