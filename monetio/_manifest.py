@@ -145,6 +145,7 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     _s("rrfs", ".readers.rrfs", "gridded"),
     _s("gfs", ".readers.gfs", "gridded", aliases=("gefs", "gdas")),
     _s("hrrr", ".readers.hrrr", "gridded"),
+    _s("dynamical", ".readers.dynamical", "gridded"),
     _s("nam", ".readers.nam", "gridded"),
     _s("rap", ".readers.rap", "gridded"),
     _s("ncep_reanalysis", ".readers.ncep_reanalysis", "gridded"),
