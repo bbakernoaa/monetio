@@ -94,3 +94,20 @@ HYSPLIT Particle Dump files.
 - **CAMx**: Comprehensive Air Quality Model with extensions (`camx`)
 - **CHIMERE**: Multi-scale chemistry-transport model (`chimere`)
 - **RAQMS**: Realtime Air Quality Modeling System (`raqms`)
+
+### dynamical.org catalog
+
+Gridded products in the [dynamical.org catalog](https://dynamical.org/catalog/) can be opened by catalog ID. Install the optional provider with `pip install 'monetio[dynamical]'`.
+
+```python
+import monetio as mio
+
+ds = mio.load(
+    "dynamical",
+    dataset="noaa-gfs-analysis",
+    variables=["temperature_2m"],
+    sel={"time": slice("2025-01-01", "2025-01-02")},
+)
+```
+
+The reader passes keyword arguments to `dynamical_catalog.open` and then applies optional `variables` and label-based `sel`. Native coordinates, forecast and ensemble dimensions, projection metadata, units, and dataset attributes are retained. Narrow selections before use because catalog stores can be large. Access follows dynamical.org's current catalog service and may require network access. Experimental station observations are tabular and are not supported by this gridded reader.
