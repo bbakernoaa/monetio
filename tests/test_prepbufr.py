@@ -116,6 +116,30 @@ def test_lazy_table_does_not_decode(bufr_files):
     assert all(handle.closed for handle in handles)
 
 
+def test_remote_bufr_input_is_downloaded_and_source_uri_preserved(bufr_files, monkeypatch):
+    paths, _ = bufr_files
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def raise_for_status(self):
+            return None
+
+        def iter_content(self, chunk_size):
+            assert chunk_size > 0
+            yield b"mock prepbufr payload"
+
+    monkeypatch.setattr(prepbufr.requests, "get", lambda *args, **kwargs: Response())
+    url = "https://example.test/gdas.prepbufr"
+    frame = prepbufr.read_prepbufr(url, subsets="SFCSHP")
+    assert not frame.empty
+    assert frame.source_file.eq(url).all()
+
+
 def test_errors_close_handle(bufr_files, monkeypatch):
     paths, handles = bufr_files
     original = sys.modules["ncepbufr"].open
@@ -175,3 +199,4 @@ def test_missing_values_and_no_matching_reports(bufr_files, monkeypatch):
     assert df.empty
     assert df.dtypes.equals(prepbufr._schema().dtypes)
     assert all(handle.closed for handle in handles)
+

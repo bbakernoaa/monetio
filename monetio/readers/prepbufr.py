@@ -7,12 +7,14 @@ No quality filtering, vertical interpolation, or event-stack merging is applied.
 from __future__ import annotations
 
 import os
+import tempfile
 import threading
 from functools import partial
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+import requests
 
 from .base import PointReader, register_reader
 from .sat_utils import update_history
@@ -88,9 +90,29 @@ def read_prepbufr(fname, *, subsets=None, table=None):
             "See https://noaa-emc.github.io/NCEPLIBS-bufr/python/ncepbufr.html"
         ) from exc
 
-    fname = os.fspath(fname)
-    if not os.path.isfile(fname):
-        raise FileNotFoundError(fname)
+    source_name = os.fspath(fname)
+    local_name = source_name
+    temporary_path = None
+    try:
+        if source_name.startswith(("http://", "https://")):
+            with requests.get(source_name, stream=True, timeout=60) as response:
+                response.raise_for_status()
+                with tempfile.NamedTemporaryFile(suffix=".prepbufr", delete=False) as target:
+                    temporary_path = target.name
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        if chunk:
+                            target.write(chunk)
+            local_name = temporary_path
+        if not os.path.isfile(local_name):
+            raise FileNotFoundError(source_name)
+        return _decode_prepbufr_file(local_name, source_name, selected, table, ncepbufr)
+    finally:
+        if temporary_path and os.path.exists(temporary_path):
+            os.unlink(temporary_path)
+
+
+def _decode_prepbufr_file(fname, source_name, selected, table, ncepbufr):
+    """Decode an already-local PREPBUFR file while recording its input URI."""
     rows = []
     with _BUFR_LOCK:
         bufr = ncepbufr.open(fname, table=table)
@@ -140,7 +162,7 @@ def read_prepbufr(fname, *, subsets=None, table=None):
                             elevation=hdr[5],
                             report_type=hdr[4],
                             subset=subset,
-                            source_file=fname,
+                            source_file=source_name,
                             message=message,
                             report=report,
                             level=level,
@@ -250,3 +272,4 @@ class PREPBUFRReader(PointReader):
         return update_history(
             ds, "Decoded PREPBUFR report levels; retained quality marks without filtering."
         )
+

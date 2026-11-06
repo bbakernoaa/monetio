@@ -62,8 +62,11 @@ result = ds.compute()
 ```
 
 Omitting `subsets` selects all five types. A single string selects one type.
-Files must be local and accessible to every Dask worker. Embedded BUFR tables
-are used by default; `table="/data/prepbufr.table"` selects an external table.
+Input may be a local path or a direct HTTP/HTTPS URL. Supplied URLs are
+downloaded to a temporary file for BUFRLIB decoding and then removed; the
+reader does not discover archive URLs. Each Dask worker must be able to access
+its input path or URL. Embedded BUFR tables are used by default;
+`table="/data/prepbufr.table"` selects an external table.
 
 The default output is an xarray Dataset with one `node` per report level,
 including repeated station IDs and times. `source_file`, `message`, `report`,
