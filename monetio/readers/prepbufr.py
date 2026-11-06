@@ -44,7 +44,8 @@ def _schema():
     """Return the stable, empty post-decoding table schema."""
     types = dict.fromkeys(
         ["latitude", "longitude", "elevation", "report_type"]
-        + [field[0] for field in _FIELDS.values()],
+        + [field[0] for field in _FIELDS.values()]
+        + ["wave_height"],
         "float64",
     )
     types.update(dict.fromkeys(["siteid", "subset", "source_file"], "object"))
@@ -148,6 +149,14 @@ def _decode_prepbufr_file(fname, source_name, selected, table, ncepbufr):
                     ).filled(np.nan)
                     obs[obs == bufr.missing_value] = np.nan
                     hdr[hdr == bufr.missing_value] = np.nan
+                    wave_height = np.nan
+                    if subset in {"SFCSHP", "ADPSFC"}:
+                        wave = np.ma.asarray(bufr.read_subset("HOWV"), dtype="float64").filled(
+                            np.nan
+                        )
+                        wave[wave == bufr.missing_value] = np.nan
+                        if wave.size:
+                            wave_height = wave[0, 0]
                     time = (
                         reference + pd.to_timedelta(hdr[3], unit="h")
                         if np.isfinite(hdr[3])
@@ -166,6 +175,7 @@ def _decode_prepbufr_file(fname, source_name, selected, table, ncepbufr):
                             message=message,
                             report=report,
                             level=level,
+                            wave_height=wave_height,
                         )
                         for i, (name, _, scale) in enumerate(_FIELDS.values()):
                             row[name] = obs[i, level] * scale
@@ -236,6 +246,12 @@ class PREPBUFRReader(PointReader):
             ds = ds.drop_vars("node").rename_dims({"time": "node"})
             ds = ds.assign_coords(node=np.arange(ds.sizes["node"]))
         decoded_fields = {name for name, _, _ in _FIELDS.values()}
+        if "wave_height" in ds:
+            ds.wave_height.attrs.update(
+                units="m",
+                long_name="Reported height of waves",
+                bufr_mnemonic="HOWV",
+            )
         for mnemonic, (name, units, _) in _FIELDS.items():
             if name in ds.variables:
                 ds[name].attrs.update(units=units, bufr_mnemonic=mnemonic)

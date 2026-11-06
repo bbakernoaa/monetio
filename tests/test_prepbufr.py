@@ -42,6 +42,8 @@ def bufr_files(tmp_path, monkeypatch):
             if mnemonics == prepbufr._HEADER:
                 sid = np.frombuffer(b"TEST    ", dtype="float64")[0]
                 return np.ma.array([sid, 270, 40, -0.5, 120, 100])[:, None]
+            if mnemonics == "HOWV":
+                return np.ma.array([[6.5]])
             assert mnemonics == " ".join(prepbufr._FIELDS)
             data = np.array(
                 [
@@ -94,6 +96,11 @@ def test_read_types(bufr_files, subset, use_dask):
     assert ds.time[0].data == np.datetime64("2023-12-31T23:30:00")
     assert ds.temperature.attrs["units"] == "degC"
     assert ds.temperature_quality[1].item() == 3
+    if subset in {"SFCSHP", "ADPSFC"}:
+        np.testing.assert_allclose(ds.wave_height, [6.5] * 4)
+        assert ds.wave_height.attrs["units"] == "m"
+    else:
+        assert np.isnan(ds.wave_height).all()
     assert all(handle.closed for handle in handles)
 
 

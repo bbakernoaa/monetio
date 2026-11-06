@@ -98,8 +98,9 @@ this preparation scan. `defer=True` is not advertised for this new reader.
 
 SFCSHP reports are selected directly with `subsets="SFCSHP"`. They share the
 PREPBUFR decoder and preserve each report's location, type, time, and quality
-marks. Fields not included in the decoder, including wave height, are not
-inferred from other report types.
+marks. The decoder reads the PREPBUFR `HOWV` field as `wave_height` in meters
+for SFCSHP and ADPSFC reports. Missing wave reports remain missing; wave height
+is not derived from other fields.
 
 ### NDBC marine observations
 

@@ -32,6 +32,9 @@ def test_native_report_values(native_reports, subset, levels, siteid, pressure, 
     np.testing.assert_allclose(ds.pressure[0], pressure)
     np.testing.assert_allclose(ds.temperature[0], temperature)
     assert ds.pressure.attrs["units"] == "Pa"
+    assert "wave_height" in ds
+    if subset in {"SFCSHP", "ADPSFC"}:
+        assert ds.wave_height.attrs["units"] == "m"
 
 
 @pytest.mark.parametrize("scheduler", ["threads", "processes"])
@@ -53,3 +56,4 @@ def test_native_dask_equivalence(native_reports, tmp_path, scheduler):
     eager.attrs.pop("history")
     computed.attrs.pop("history")
     xr.testing.assert_identical(eager, computed)
+
