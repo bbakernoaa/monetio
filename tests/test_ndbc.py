@@ -123,17 +123,17 @@ def test_ndbc_local_read_does_not_fetch_station_metadata(mock_ndbc_file, monkeyp
         raise AssertionError("local reads must not retrieve station metadata")
 
     monkeypatch.setattr(ndbc, "get_station_table", fail_if_called)
-    result = NDBCReader().open_dataset(files=mock_ndbc_file, as_xarray=False)
-    assert result.siteid.tolist() == ["41002", "41002"]
+    result = NDBCReader().open_dataset(files=mock_ndbc_file)
+    assert isinstance(result, xr.Dataset)
+    assert result.sizes["time"] == 2
     assert "latitude" not in result
+    with pytest.raises(OptionUnsupportedError, match="ndbc.*as_xarray=False"):
+        NDBCReader().open_dataset(files=mock_ndbc_file, as_xarray=False)
 
 
-@pytest.mark.parametrize("as_xarray", [False, True])
 def test_ndbc_station_year_selection_bounds_file_list_and_lazy_outputs(
-    mock_ndbc_hist_file, monkeypatch, as_xarray
+    mock_ndbc_hist_file, monkeypatch
 ):
-    import dask.dataframe as dd
-
     import monetio.readers.ndbc as ndbc
 
     observed = {}
@@ -163,21 +163,16 @@ def test_ndbc_station_year_selection_bounds_file_list_and_lazy_outputs(
         years=[2020],
         realtime=False,
         use_dask=True,
-        as_xarray=as_xarray,
-        wide_fmt=as_xarray,
+        wide_fmt=True,
     )
     try:
         assert observed["urls"] == [
             "https://www.ndbc.noaa.gov/data/historical/stdmet/41002h2020.txt.gz"
         ]
-        if as_xarray:
-            assert isinstance(result, xr.Dataset)
-            assert result["wind_speed"].chunks is not None
-            computed = result.compute()
-            assert float(computed["wind_speed"].values.squeeze()) == 10.0
-        else:
-            assert isinstance(result, dd.DataFrame)
-            assert result.compute()["wind_speed"].tolist() == [10.0]
+        assert isinstance(result, xr.Dataset)
+        assert result["wind_speed"].chunks is not None
+        computed = result.compute()
+        assert float(computed["wind_speed"].values.squeeze()) == 10.0
     finally:
         if isinstance(result, xr.Dataset):
             result.close()
@@ -204,13 +199,11 @@ def test_ndbc_historical(mock_ndbc_hist_file, monkeypatch):
     assert "wind_speed" in ds.data_vars
 
 
-@pytest.mark.parametrize("as_xarray", [False, True])
 @pytest.mark.parametrize("use_dask", [False, True])
-def test_ndbc_rejects_array_chunks_before_file_access(tmp_path, as_xarray, use_dask):
+def test_ndbc_rejects_array_chunks_before_file_access(tmp_path, use_dask):
     with pytest.raises(OptionUnsupportedError, match="ndbc.*chunks"):
         NDBCReader().open_dataset(
             files=str(tmp_path / "missing-ndbc.txt"),
-            as_xarray=as_xarray,
             use_dask=use_dask,
             chunks={"time": 1},
         )
