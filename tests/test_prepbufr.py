@@ -9,6 +9,7 @@ import xarray as xr
 
 import monetio
 from monetio.readers import prepbufr
+from monetio.readers.errors import OptionUnsupportedError
 
 
 @pytest.fixture
@@ -115,12 +116,11 @@ def test_eager_lazy_parity(bufr_files):
     assert eager.sizes["node"] == 20
 
 
-def test_lazy_table_does_not_decode(bufr_files):
+def test_dataframe_output_is_not_supported(bufr_files):
     paths, handles = bufr_files
-    df = monetio.load("prepbufr", files=paths, use_dask=True, as_xarray=False)
+    with pytest.raises(OptionUnsupportedError, match="prepbufr.*as_xarray=False"):
+        monetio.load("prepbufr", files=paths, use_dask=True, as_xarray=False)
     assert not handles
-    assert len(df.compute()) == 20
-    assert all(handle.closed for handle in handles)
 
 
 def test_remote_bufr_input_is_downloaded_and_source_uri_preserved(bufr_files, monkeypatch):
