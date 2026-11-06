@@ -1,7 +1,7 @@
 """NDBC Buoy Reader"""
 
-from functools import lru_cache, partial
 import os
+from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Union
 
 import numpy as np
@@ -106,7 +106,9 @@ class NDBCReader(PointReader):
             )
 
         self._station_metadata = station_metadata
-        self._retrieve_metadata = (files is None) if retrieve_metadata is None else retrieve_metadata
+        self._retrieve_metadata = (
+            (files is None) if retrieve_metadata is None else retrieve_metadata
+        )
 
         if files is None:
             if stations is None:
@@ -433,4 +435,3 @@ def add_station_metadata(
         df = df.merge(meta, on="siteid", how="left")
 
     return df
-

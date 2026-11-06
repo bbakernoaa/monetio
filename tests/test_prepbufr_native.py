@@ -56,4 +56,3 @@ def test_native_dask_equivalence(native_reports, tmp_path, scheduler):
     eager.attrs.pop("history")
     computed.attrs.pop("history")
     xr.testing.assert_identical(eager, computed)
-

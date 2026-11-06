@@ -13,8 +13,8 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 import requests
+import xarray as xr
 
 from .base import PointReader, register_reader
 from .sat_utils import update_history
@@ -288,4 +288,3 @@ class PREPBUFRReader(PointReader):
         return update_history(
             ds, "Decoded PREPBUFR report levels; retained quality marks without filtering."
         )
-

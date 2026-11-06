@@ -70,7 +70,12 @@ def test_ndbc_eager_vs_lazy(mock_ndbc_file, monkeypatch):
 
     # Eager
     metadata = pd.DataFrame(
-        {"siteid": ["41002"], "name": ["South Hatteras"], "latitude": [31.73], "longitude": [-74.95]}
+        {
+            "siteid": ["41002"],
+            "name": ["South Hatteras"],
+            "latitude": [31.73],
+            "longitude": [-74.95],
+        }
     )
     ds_eager = reader.open_dataset(
         files=mock_ndbc_file, station_metadata=metadata, lazy=False, as_xarray=True
@@ -222,4 +227,3 @@ def test_ndbc_network():
         assert ds.sizes["node"] > 0
     except Exception as e:
         pytest.skip(f"NDBC network call failed: {e}")
-

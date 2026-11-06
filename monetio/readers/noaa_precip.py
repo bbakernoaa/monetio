@@ -188,7 +188,12 @@ def _read_prism_bil(path: str) -> xr.Dataset:
     raw = np.fromfile(raster, dtype=np.uint8)
     if raw.size != rows * row_bytes:
         raise ValueError(f"Unexpected byte count in PRISM BIL file {raster}")
-    values = raw.reshape(rows, row_bytes)[:, : cols * dtype.itemsize].copy().view(dtype).reshape(rows, cols)
+    values = (
+        raw.reshape(rows, row_bytes)[:, : cols * dtype.itemsize]
+        .copy()
+        .view(dtype)
+        .reshape(rows, cols)
+    )
     values = values.astype("float32")
     nodata = float(header.get("NODATA", header.get("NODATA_VALUE", "-9999")))
     values[values == nodata] = np.nan
@@ -201,7 +206,9 @@ def _read_prism_bil(path: str) -> xr.Dataset:
     y = float(header["ULYMAP"]) - np.arange(rows) * float(header["YDIM"])
     coords = {"x": x, "y": y}
     data = xr.DataArray(values, dims=("y", "x"), coords=coords, name=variable)
-    data.attrs["units"] = "mm" if variable == "ppt" else ("degC" if variable.startswith("t") else "")
+    data.attrs["units"] = (
+        "mm" if variable == "ppt" else ("degC" if variable.startswith("t") else "")
+    )
     data.attrs["_FillValue"] = nodata
     ds = data.to_dataset()
     if match:
@@ -212,8 +219,12 @@ def _read_prism_bil(path: str) -> xr.Dataset:
         from pyproj import CRS, Transformer
 
         crs = CRS.from_wkt(prj.read_text())
-        ds["spatial_ref"] = xr.DataArray(0, attrs={"crs_wkt": crs.to_wkt(), "spatial_ref": crs.to_wkt()})
-        longitude, latitude = Transformer.from_crs(crs, "EPSG:4326", always_xy=True).transform(*np.meshgrid(x, y))
+        ds["spatial_ref"] = xr.DataArray(
+            0, attrs={"crs_wkt": crs.to_wkt(), "spatial_ref": crs.to_wkt()}
+        )
+        longitude, latitude = Transformer.from_crs(crs, "EPSG:4326", always_xy=True).transform(
+            *np.meshgrid(x, y)
+        )
         ds = ds.assign_coords(latitude=(("y", "x"), latitude), longitude=(("y", "x"), longitude))
     return ds
 

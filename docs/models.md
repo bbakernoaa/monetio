@@ -94,4 +94,3 @@ HYSPLIT Particle Dump files.
 - **CAMx**: Comprehensive Air Quality Model with extensions (`camx`)
 - **CHIMERE**: Multi-scale chemistry-transport model (`chimere`)
 - **RAQMS**: Realtime Air Quality Modeling System (`raqms`)
-

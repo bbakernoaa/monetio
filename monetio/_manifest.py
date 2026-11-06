@@ -279,4 +279,3 @@ def build_reader_modules() -> dict[str, str]:
         for a in s.aliases:
             out[a] = s.module
     return out
-

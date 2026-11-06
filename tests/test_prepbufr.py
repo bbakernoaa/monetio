@@ -206,4 +206,3 @@ def test_missing_values_and_no_matching_reports(bufr_files, monkeypatch):
     assert df.empty
     assert df.dtypes.equals(prepbufr._schema().dtypes)
     assert all(handle.closed for handle in handles)
-
