@@ -159,6 +159,9 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     ),
     # ---- point observations ----
     _s("prepbufr", ".readers.prepbufr", "point"),
+    _s("prism", ".readers.noaa_precip", "gridded"),
+    _s("ccpa", ".readers.noaa_precip", "gridded"),
+    _s("nohrsc", ".readers.noaa_precip", "gridded"),
     _s("airnow", ".readers.airnow", "point", caps=_DEFERRED_WIDE, legacy=("obs.airnow",)),
     _s("aeronet", ".readers.aeronet", "point", caps=_DEFERRED, legacy=("obs.aeronet",)),
     _s("aqs", ".readers.aqs", "point", legacy=("obs.aqs",)),
@@ -276,3 +279,4 @@ def build_reader_modules() -> dict[str, str]:
         for a in s.aliases:
             out[a] = s.module
     return out
+

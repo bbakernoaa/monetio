@@ -93,6 +93,29 @@ keys in memory; payload variables remain Dask-backed and files are decoded again
 when evaluated. `as_xarray=False, use_dask=True` returns a Dask DataFrame without
 this preparation scan. `defer=True` is not advertised for this new reader.
 
+SFCSHP reports are selected directly with `subsets="SFCSHP"`. They share the
+PREPBUFR decoder and preserve each report's location, type, time, and quality
+marks. Fields not included in the decoder, including wave height, are not
+inferred from other report types.
+
+### NDBC marine observations
+
+NDBC station files include moored and drifting buoy reports and C-MAN station
+reports. Load local observations without fetching the station table:
+
+```python
+ds = mio.load("ndbc", files="/data/41002.txt", as_xarray=True)
+```
+
+Provide `station_metadata` as a CSV path or DataFrame with a unique `siteid`
+column to add station coordinates and names. When using `stations=...` to
+retrieve observations, station metadata is retrieved by default; set
+`retrieve_metadata=False` to avoid that request. Existing report coordinates
+are retained. NDBC variables include available meteorological observations,
+sea-level pressure, significant wave height, wave periods, and mean wave
+direction with source units. Retrieved station metadata includes the source
+platform type code.
+
 ### AirNow
 
 Near real-time air quality data for the United States.
@@ -178,3 +201,4 @@ Global hourly and synoptic surface observations.
 - **CEMS**: Continuous Emission Monitoring Systems (`cems`)
 - **IMPROVE**: Interagency Monitoring of Protected Visual Environments (`improve`)
 - **E-PROFILE**: European Automatic Lidar and Ceilometer network (`eprofile`)
+

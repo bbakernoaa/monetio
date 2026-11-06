@@ -56,6 +56,27 @@ National Centers for Environmental Prediction (NCEP) GRIB2 model outputs.
 - **Recommended API**: Use `open_dataset(...)` with the grib2io xarray backend
     options (`filters`, `use_icechunk`, `storage_options`, etc.).
 
+### NOAA verification precipitation and snowfall grids
+
+The `prism`, `ccpa`, and `nohrsc` readers open local product files or URLs
+directly through the shared Xarray driver. `files` accepts a path, list, glob,
+HTTP URL, or supported object-store path; callers can therefore use either
+archived local inputs or directly address a published file. These readers do
+not search or enumerate remote archives.
+
+```python
+prism = mio.load("prism", files="/data/prism_daily.nc")
+ccpa = mio.load("ccpa", files="/data/ccpa_06h.nc")
+snow = mio.load("nohrsc", files="/data/nohrsc_snowfall.grib2", engine="grib2io")
+```
+
+Common product variables are given MONETIO names (`precipitation_amount`,
+daily PRISM temperature fields, and `snowfall_amount` or
+`snow_water_equivalent`). Native values and units, grid mapping, and available
+validity or accumulation bounds are preserved. Use the product's variable
+attributes to distinguish accumulation periods and snowfall depth from snow
+water equivalent. GRIB inputs require an installed Xarray GRIB backend.
+
 ### ICAP-MME
 
 International Cooperative for Aerosol Prediction Multi-Model Ensemble.
@@ -73,3 +94,4 @@ HYSPLIT Particle Dump files.
 - **CAMx**: Comprehensive Air Quality Model with extensions (`camx`)
 - **CHIMERE**: Multi-scale chemistry-transport model (`chimere`)
 - **RAQMS**: Realtime Air Quality Modeling System (`raqms`)
+

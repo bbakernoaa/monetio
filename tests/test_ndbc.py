@@ -69,9 +69,17 @@ def test_ndbc_eager_vs_lazy(mock_ndbc_file, monkeypatch):
     reader = NDBCReader()
 
     # Eager
-    ds_eager = reader.open_dataset(files=mock_ndbc_file, lazy=False, as_xarray=True)
+    metadata = pd.DataFrame(
+        {"siteid": ["41002"], "name": ["South Hatteras"], "latitude": [31.73], "longitude": [-74.95]}
+    )
+    ds_eager = reader.open_dataset(
+        files=mock_ndbc_file, station_metadata=metadata, lazy=False, as_xarray=True
+    )
     assert isinstance(ds_eager, xr.Dataset)
     assert "wind_speed" in ds_eager.data_vars
+    assert "sea_level_pressure" in ds_eager.data_vars
+    assert ds_eager.sea_level_pressure.attrs["units"] == "hPa"
+    assert ds_eager.wave_height.attrs["units"] == "m"
     assert ds_eager.siteid.values[0] == "41002"
     assert ds_eager.latitude.values[0] == 31.73
 
@@ -81,10 +89,14 @@ def test_ndbc_eager_vs_lazy(mock_ndbc_file, monkeypatch):
             "error",
             message="Merging dataframes with merge column data type mismatches.*",
         )
-        ds_lazy = reader.open_dataset(files=mock_ndbc_file, lazy=True, as_xarray=True)
+        ds_lazy = reader.open_dataset(
+            files=mock_ndbc_file, station_metadata=metadata, lazy=True, as_xarray=True
+        )
     assert ds_lazy.wind_speed.chunks is not None
 
-    ds_use_dask = reader.open_dataset(files=mock_ndbc_file, use_dask=True, as_xarray=True)
+    ds_use_dask = reader.open_dataset(
+        files=mock_ndbc_file, station_metadata=metadata, use_dask=True, as_xarray=True
+    )
     assert ds_use_dask.wind_speed.chunks is not None
 
     ds_lazy_comp = ds_lazy.compute()
@@ -97,6 +109,18 @@ def test_ndbc_eager_vs_lazy(mock_ndbc_file, monkeypatch):
 
     xr.testing.assert_allclose(ds_eager, ds_lazy_comp)
     xr.testing.assert_allclose(ds_eager, ds_use_dask_comp)
+
+
+def test_ndbc_local_read_does_not_fetch_station_metadata(mock_ndbc_file, monkeypatch):
+    import monetio.readers.ndbc as ndbc
+
+    def fail_if_called():
+        raise AssertionError("local reads must not retrieve station metadata")
+
+    monkeypatch.setattr(ndbc, "get_station_table", fail_if_called)
+    result = NDBCReader().open_dataset(files=mock_ndbc_file, as_xarray=False)
+    assert result.siteid.tolist() == ["41002", "41002"]
+    assert "latitude" not in result
 
 
 @pytest.mark.parametrize("as_xarray", [False, True])
@@ -198,3 +222,4 @@ def test_ndbc_network():
         assert ds.sizes["node"] > 0
     except Exception as e:
         pytest.skip(f"NDBC network call failed: {e}")
+

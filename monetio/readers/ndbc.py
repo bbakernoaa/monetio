@@ -1,6 +1,7 @@
 """NDBC Buoy Reader"""
 
 from functools import lru_cache, partial
+import os
 from typing import TYPE_CHECKING, Union
 
 import numpy as np
@@ -28,6 +29,8 @@ class NDBCReader(PointReader):
         use_icechunk: bool = False,
         icechunk_url: str | None = None,
         use_dask: bool = False,
+        station_metadata: pd.DataFrame | str | None = None,
+        retrieve_metadata: bool | None = None,
         stations: str | list[str] = None,
         years: int | list[int] = None,
         realtime: bool = True,
@@ -60,6 +63,11 @@ class NDBCReader(PointReader):
             Path to the Icechunk repository, by default None.
         use_dask : bool, optional
             Whether to use Dask for lazy loading, by default False.
+        station_metadata : pandas.DataFrame or str, optional
+            Local station table or CSV with siteid, latitude, and longitude.
+        retrieve_metadata : bool, optional
+            Fetch station metadata. Defaults to False for explicit files and
+            True when retrieving observations by station.
         stations : Union[str, List[str]], optional
             Station IDs to retrieve if files are not provided.
         years : Union[int, List[int]], optional
@@ -96,6 +104,9 @@ class NDBCReader(PointReader):
                     "array chunk mappings are not supported"
                 ),
             )
+
+        self._station_metadata = station_metadata
+        self._retrieve_metadata = (files is None) if retrieve_metadata is None else retrieve_metadata
 
         if files is None:
             if stations is None:
@@ -138,6 +149,15 @@ class NDBCReader(PointReader):
             # Filter out expand2d from kwargs if present to avoid double-passing
             to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
             ds = self.to_xarray(df, expand2d=wide_fmt, **to_xr_kwargs)
+            for name, units in {
+                "sea_level_pressure": "hPa",
+                "wave_height": "m",
+                "dominant_wave_period": "s",
+                "average_wave_period": "s",
+                "mean_wave_direction": "degree",
+            }.items():
+                if name in ds:
+                    ds[name].attrs["units"] = units
             ds = update_history(ds, "Read NDBC buoy data.")
             return ds
 
@@ -159,7 +179,7 @@ class NDBCReader(PointReader):
             "DPD": "dominant_wave_period",
             "APD": "average_wave_period",
             "MWD": "mean_wave_direction",
-            "PRES": "air_pressure",
+            "PRES": "sea_level_pressure",
             "ATMP": "air_temperature",
             "WTMP": "sea_surface_temperature",
             "DEWP": "dew_point_temperature",
@@ -169,8 +189,21 @@ class NDBCReader(PointReader):
         }
         df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
 
+        units = {
+            "sea_level_pressure": "hPa",
+            "wave_height": "m",
+            "dominant_wave_period": "s",
+            "average_wave_period": "s",
+            "mean_wave_direction": "degree",
+        }
+        for name, unit in units.items():
+            if name in df.columns:
+                df[name].attrs["units"] = unit
+
         # Add metadata (lat/lon)
-        df = add_station_metadata(df)
+        df = add_station_metadata(
+            df, metadata=self._station_metadata, retrieve=self._retrieve_metadata
+        )
 
         return super().harmonize(df)
 
@@ -300,8 +333,6 @@ def read_ndbc(fn: str, **kwargs) -> pd.DataFrame:
         raise annotate(e, fn) from e
 
     # Extract siteid from filename
-    import os
-
     basename = os.path.basename(fn)
     # 41002.txt -> 41002
     # 41002h2020.txt.gz -> 41002
@@ -351,7 +382,8 @@ def get_station_table() -> pd.DataFrame:
         df["latitude"] = locs.apply(lambda x: x[0])
         df["longitude"] = locs.apply(lambda x: x[1])
 
-        return df[["siteid", "name", "latitude", "longitude"]]
+        df["platform_type"] = df["ttype"].astype(str).str.strip()
+        return df[["siteid", "name", "latitude", "longitude", "platform_type"]]
     except Exception as e:
         # The station table is required metadata; a failed fetch is a
         # retrieval failure naming the source, not an empty station list.
@@ -360,6 +392,9 @@ def get_station_table() -> pd.DataFrame:
 
 def add_station_metadata(
     df: Union[pd.DataFrame, "dd.DataFrame"],
+    *,
+    metadata: pd.DataFrame | str | None = None,
+    retrieve: bool = True,
 ) -> Union[pd.DataFrame, "dd.DataFrame"]:
     """
     Merge station metadata (lat/lon) into the dataframe.
@@ -367,14 +402,28 @@ def add_station_metadata(
     if hasattr(df, "columns") and len(df.columns) == 0:
         return df
 
-    meta = get_station_table()
+    if metadata is None:
+        if not retrieve:
+            return df
+        meta = get_station_table()
+    else:
+        meta = (
+            pd.read_csv(metadata, dtype={"siteid": str})
+            if isinstance(metadata, str | os.PathLike)
+            else metadata.copy()
+        )
+        if "siteid" not in meta:
+            raise ValueError("station_metadata requires a siteid column")
+        meta["siteid"] = meta.siteid.astype(str).str.strip().str.upper()
+        if meta.siteid.duplicated().any():
+            raise ValueError("station_metadata must have unique siteid values")
     if meta.empty:
         return df
 
-    # Remove lat/lon from df if already present to avoid merge suffix
+    # Preserve report coordinates, including positions of moving platforms.
     cols_to_drop = [c for c in meta.columns if c in df.columns and c != "siteid"]
     if cols_to_drop:
-        df = df.drop(columns=cols_to_drop)
+        meta = meta.drop(columns=cols_to_drop)
 
     try:
         import dask.dataframe as dd
@@ -395,3 +444,4 @@ def add_station_metadata(
         df = df.merge(meta, on="siteid", how="left")
 
     return df
+
