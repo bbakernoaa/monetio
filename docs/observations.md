@@ -68,10 +68,11 @@ reader does not discover archive URLs. Each Dask worker must be able to access
 its input path or URL. Embedded BUFR tables are used by default;
 `table="/data/prepbufr.table"` selects an external table.
 
-The default output is an xarray Dataset with one `node` per report level,
-including repeated station IDs and times. `source_file`, `message`, `report`,
-and zero-based `level` identify each observation. `expand2d=True` is rejected
-because a station/time reshape could combine distinct profile levels.
+The output is always an xarray Dataset with one `node` per report level,
+including repeated station IDs and times. `as_xarray=False` is unsupported.
+`source_file`, `message`, `report`, and zero-based `level` identify each
+observation. `expand2d=True` is rejected because a station/time reshape could
+combine distinct profile levels.
 
 Variables include pressure (Pa), temperature and dewpoint (degC), specific
 humidity (kg/kg), height and station elevation (m), wind components and speed
@@ -93,8 +94,8 @@ use process workers for parallel file decoding. Array `chunks` mappings are
 unsupported for this whole-file decoder. Xarray construction performs a full
 decode of each file to collect row counts and time/station keys, retaining those
 keys in memory; payload variables remain Dask-backed and files are decoded again
-when evaluated. `as_xarray=False, use_dask=True` returns a Dask DataFrame without
-this preparation scan. `defer=True` is not advertised for this new reader.
+when evaluated. PREPBUFR does not provide a DataFrame output mode, so
+`as_xarray=False` is rejected. `defer=True` is not advertised for this reader.
 
 SFCSHP reports are selected directly with `subsets="SFCSHP"`. They share the
 PREPBUFR decoder and preserve each report's location, type, time, and quality
@@ -105,10 +106,11 @@ is not derived from other fields.
 ### NDBC marine observations
 
 NDBC station files include moored and drifting buoy reports and C-MAN station
-reports. Load local observations without fetching the station table:
+reports. The reader always returns an xarray Dataset. Load local observations
+without fetching the station table:
 
 ```python
-ds = mio.load("ndbc", files="/data/41002.txt", as_xarray=True)
+ds = mio.load("ndbc", files="/data/41002.txt")
 ```
 
 Provide `station_metadata` as a CSV path or DataFrame with a unique `siteid`
