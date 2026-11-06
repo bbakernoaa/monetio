@@ -17,6 +17,7 @@ import requests
 import xarray as xr
 
 from .base import PointReader, register_reader
+from .errors import OptionUnsupportedError
 from .sat_utils import update_history
 
 # BUFRLIB and its Python wrapper maintain process-global Fortran state.
@@ -192,7 +193,9 @@ class PREPBUFRReader(PointReader):
 
     fixed_location = False
 
-    def open_dataset(self, files, *, subsets=None, table=None, expand2d=False, **kwargs):
+    def open_dataset(
+        self, files, *, subsets=None, table=None, expand2d=False, as_xarray=True, **kwargs
+    ) -> xr.Dataset:
         """Open PREPBUFR files with optional Dask decoding.
 
         Parameters
@@ -205,15 +208,17 @@ class PREPBUFRReader(PointReader):
             External BUFR table; default uses embedded tables.
         expand2d : bool, optional
             Must be False to preserve repeated times, stations, and levels.
+        as_xarray : bool, optional
+            Must be True; PREPBUFRReader always returns an xarray.Dataset.
         **kwargs : dict
-            Shared PointReader options, including use_dask/lazy and as_xarray.
-            One complete file is one Dask partition. Xarray construction scans
-            each partition for lengths and time/site keys, then rereads payload
-            at compute time. Use as_xarray=False to defer all decoding.
+            Shared PointReader options, including use_dask/lazy/defer. One
+            complete file is one Dask partition. Deferred Xarray construction
+            scans each partition for lengths and time/site keys, then rereads
+            payload at compute time.
 
         Returns
         -------
-        xarray.Dataset or pandas.DataFrame or dask.dataframe.DataFrame
+        xarray.Dataset
             Observations indexed by node, preserving every selected level.
 
         Examples
@@ -223,6 +228,12 @@ class PREPBUFRReader(PointReader):
         if expand2d:
             raise ValueError(
                 "PREPBUFR requires expand2d=False to preserve individual report levels"
+            )
+        if not as_xarray:
+            raise OptionUnsupportedError(
+                "as_xarray=False",
+                "prepbufr",
+                cause="the public PREPBUFR reader always returns an xarray.Dataset",
             )
         return super().open_dataset(
             files,
