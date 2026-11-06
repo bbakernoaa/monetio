@@ -17,7 +17,7 @@ import xarray as xr
 
 from .base import GriddedReader, register_reader
 from .errors import OptionUnsupportedError
-from .sat_utils import standardize_satellite_coords, update_history
+from .sat_utils import update_history
 
 
 def _harmonize_grid(ds: xr.Dataset, aliases: dict[str, str]) -> xr.Dataset:
@@ -28,12 +28,50 @@ def _harmonize_grid(ds: xr.Dataset, aliases: dict[str, str]) -> xr.Dataset:
             rename[source] = target
     if rename:
         ds = ds.rename(rename)
-    ds = standardize_satellite_coords(
-        ds,
-        y_dim=["lat", "LAT", "latitude"],
-        x_dim=["lon", "LON", "longitude"],
-        time_name="valid_time",
+    latitude = next(
+        (name for name in ("latitude", "lat", "LAT", "Latitude") if name in ds.variables), None
     )
+    longitude = next(
+        (name for name in ("longitude", "lon", "LON", "Longitude") if name in ds.variables), None
+    )
+    dim_rename = {}
+    reserved_dims = set(ds.dims)
+    y_names = {"lat", "latitude", "rows", "scanline", "nlat", "nscan"}
+    x_names = {"lon", "longitude", "columns", "ground_pixel", "nlon", "nstep"}
+    for dim in ds.dims:
+        lowered = dim.lower()
+        if lowered in y_names and dim != "y" and "y" not in reserved_dims:
+            dim_rename[dim] = "y"
+            reserved_dims.add("y")
+        elif lowered in x_names and dim != "x" and "x" not in reserved_dims:
+            dim_rename[dim] = "x"
+            reserved_dims.add("x")
+    if dim_rename:
+        ds = ds.rename_dims(dim_rename)
+    variable_rename = {}
+    if latitude and latitude != "latitude" and "latitude" not in ds.variables:
+        variable_rename[latitude] = "latitude"
+    if longitude and longitude != "longitude" and "longitude" not in ds.variables:
+        variable_rename[longitude] = "longitude"
+    if variable_rename:
+        ds = ds.rename_vars(variable_rename)
+    if "time" not in ds.variables:
+        if "valid_time" in ds.variables:
+            ds = ds.rename_vars({"valid_time": "time"})
+        else:
+            time_name = next((name for name in ds.variables if name.lower() == "time"), None)
+            if time_name:
+                ds = ds.rename_vars({time_name: "time"})
+    for name, units, standard_name in (
+        ("latitude", "degrees_north", "latitude"),
+        ("longitude", "degrees_east", "longitude"),
+    ):
+        if name in ds.variables:
+            ds = ds.set_coords(name)
+            ds[name].attrs.setdefault("units", units)
+            ds[name].attrs.setdefault("standard_name", standard_name)
+    if "time" in ds.variables:
+        ds = ds.set_coords("time")
     # Keep projection/grid mapping variables and accumulation bounds intact.
     return ds
 
