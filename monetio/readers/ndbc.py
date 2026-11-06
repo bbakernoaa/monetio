@@ -189,17 +189,6 @@ class NDBCReader(PointReader):
         }
         df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
 
-        units = {
-            "sea_level_pressure": "hPa",
-            "wave_height": "m",
-            "dominant_wave_period": "s",
-            "average_wave_period": "s",
-            "mean_wave_direction": "degree",
-        }
-        for name, unit in units.items():
-            if name in df.columns:
-                df[name].attrs["units"] = unit
-
         # Add metadata (lat/lon)
         df = add_station_metadata(
             df, metadata=self._station_metadata, retrieve=self._retrieve_metadata
