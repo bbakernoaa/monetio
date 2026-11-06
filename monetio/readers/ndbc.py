@@ -39,7 +39,7 @@ class NDBCReader(PointReader):
         as_xarray: bool = True,
         lazy: bool = False,
         **kwargs,
-    ) -> Union[pd.DataFrame, xr.Dataset, "dd.DataFrame"]:
+    ) -> xr.Dataset:
         """
         Retrieve and load NOAA National Data Buoy Center (NDBC) data.
 
@@ -79,7 +79,7 @@ class NDBCReader(PointReader):
         n_procs : int, optional
             Number of processors for dask compute (if not lazy), by default 1.
         as_xarray : bool, optional
-            Whether to return an xarray.Dataset, by default True.
+            Must be True; NDBCReader always returns an xarray.Dataset.
         lazy : bool, optional
             Whether to return a dask-backed object, by default False.
         **kwargs : dict
@@ -87,9 +87,16 @@ class NDBCReader(PointReader):
 
         Returns
         -------
-        Union[pd.DataFrame, xr.Dataset, dd.DataFrame]
+        xarray.Dataset
             The loaded NDBC data.
         """
+        if not as_xarray:
+            raise OptionUnsupportedError(
+                "as_xarray=False",
+                "ndbc",
+                cause="the public NDBC reader always returns an xarray.Dataset",
+            )
+
         # Keep NDBC's post-processing decisions aligned with the shared driver:
         # it checks ``lazy`` after ``super().open_dataset`` has returned.
         if use_dask:
@@ -145,25 +152,21 @@ class NDBCReader(PointReader):
         if not lazy and hasattr(df, "compute") and not isinstance(df, pd.DataFrame):
             df = df.compute(num_workers=n_procs)
 
-        if as_xarray:
-            # NDBC is already "wide" (one row per time/station)
-            # expand2d=True will use ds_to_2d which works fine.
-            # Filter out expand2d from kwargs if present to avoid double-passing
-            to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
-            ds = self.to_xarray(df, expand2d=wide_fmt, **to_xr_kwargs)
-            for name, units in {
-                "sea_level_pressure": "hPa",
-                "wave_height": "m",
-                "dominant_wave_period": "s",
-                "average_wave_period": "s",
-                "mean_wave_direction": "degree",
-            }.items():
-                if name in ds:
-                    ds[name].attrs["units"] = units
-            ds = update_history(ds, "Read NDBC buoy data.")
-            return ds
-
-        return df
+        # NDBC is already "wide" (one row per time/station); expand2d=True
+        # uses ds_to_2d, which works for this station layout. Filter out
+        # expand2d from kwargs to avoid passing it twice.
+        to_xr_kwargs = {k: v for k, v in kwargs.items() if k != "expand2d"}
+        ds = self.to_xarray(df, expand2d=wide_fmt, **to_xr_kwargs)
+        for name, units in {
+            "sea_level_pressure": "hPa",
+            "wave_height": "m",
+            "dominant_wave_period": "s",
+            "average_wave_period": "s",
+            "mean_wave_direction": "degree",
+        }.items():
+            if name in ds:
+                ds[name].attrs["units"] = units
+        return update_history(ds, "Read NDBC buoy data.")
 
     def harmonize(self, df):
         """
