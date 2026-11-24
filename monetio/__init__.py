@@ -61,13 +61,21 @@ def source_capabilities(name: str):
     return source_info(name).capabilities
 
 
-def load(source: str, files=None, **kwargs):
+def load(source=None, /, files=None, **kwargs):
     """
     Universal load function.
 
     Usage:
         ds = monetio.load("cmaq", files="/path/to/data*.nc")
         df = monetio.load("airnow", files=["2023-01-01", "2023-01-02"])
+        ds = monetio.load("era5", source="aws", dates=dates, variables=[...])
+
+    ``source`` (the reader name) is positional-only so that readers whose
+    own ``open_dataset`` accepts a ``source`` keyword (e.g. ``era5``,
+    ``gdas``, ``gfs``, ``hrrr``, ``ish``) can receive it through
+    ``**kwargs`` without colliding with this function's parameter. The
+    legacy keyword form ``load(source="era5", ...)`` still works when no
+    positional reader name is given.
 
     The available sources are enumerated by :func:`available_sources`; this
     docstring no longer hand-lists them (that list drifted).
@@ -91,6 +99,13 @@ def load(source: str, files=None, **kwargs):
             in the result's provenance. Tolerance is never implied and never
             the default: without it, the first bad input fails the whole load.
     """
+    if source is None:
+        # Legacy keyword form: load(source="era5", ...). With a positional
+        # reader name, a `source` kwarg belongs to the reader and is
+        # forwarded untouched.
+        if "source" not in kwargs:
+            raise TypeError("load() missing required positional argument: 'source'")
+        source = kwargs.pop("source")
     try:
         reader_cls = _lazy.get_reader_class(source)
     except KeyError:
