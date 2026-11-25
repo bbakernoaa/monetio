@@ -171,6 +171,7 @@ SOURCE_MANIFEST: tuple[SourceSpec, ...] = (
     _s("eprofile", ".readers.eprofile", "gridded", legacy=("obs.eprofile",)),
     _s("ish", ".readers.ish", "point", legacy=("obs.ish",)),
     _s("ish_lite", ".readers.ish_lite", "point", legacy=("obs.ish_lite",)),
+    _s("ghcnh", ".readers.ghcnh", "point"),
     _s("nadp", ".readers.nadp", "point", legacy=("obs.nadp",)),
     _s("openaq", ".readers.openaq", "point", legacy=("obs.openaq",)),
     _s("openaq_v2", ".readers.openaq_v2", "point", legacy=("obs.openaq_v2",)),
